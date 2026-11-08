@@ -213,7 +213,13 @@ fun DotMailRoot(requests: StateFlow<ExternalRequest?>, onRequestConsumed: () -> 
             ) { entry ->
                 ComposeScreen(route = entry.toRoute(), onClose = { nav.popBackStack() })
             }
-            composable<SearchRoute> { entry ->
+            composable<SearchRoute>(
+                // Search opens like a field growing out of the header: a short fade with a hint of downward travel.
+                enterTransition = { if (reducedMotion) EnterTransition.None else fadeIn(tween(DotMotion.medium, easing = DotMotion.decelerate)) + slideInVertically(tween(DotMotion.medium, easing = DotMotion.decelerate)) { -it / 24 } },
+                exitTransition = { if (reducedMotion) ExitTransition.None else fadeOut(tween(DotMotion.fast)) },
+                popEnterTransition = { if (reducedMotion) EnterTransition.None else fadeIn(tween(DotMotion.medium, easing = DotMotion.decelerate)) },
+                popExitTransition = { if (reducedMotion) ExitTransition.None else fadeOut(tween(DotMotion.fast)) + slideOutVertically(tween(DotMotion.fast, easing = DotMotion.accelerate)) { -it / 32 } },
+            ) { entry ->
                 val route = entry.toRoute<SearchRoute>()
                 SearchScreen(onBack = { nav.popBackStack() }, onOpenThread = { nav.navigate(ThreadRoute(it)) }, folderId = route.folderId, role = route.role)
             }
