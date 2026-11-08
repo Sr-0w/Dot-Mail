@@ -59,6 +59,7 @@ fun OutboxScreen(onBack: () -> Unit) {
     var confirmDuplicate by remember { mutableStateOf<OutboxItem?>(null) }
     val snackbar = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
+    val reducedMotion = app.dot.design.rememberReducedMotion()
     val busyText = stringResource(R.string.outbox_busy_toast)
     fun busy(ok: Boolean) { if (!ok) scope.launch { snackbar.showSnackbar(busyText) } }
     val c = Dot.colors
@@ -71,7 +72,9 @@ fun OutboxScreen(onBack: () -> Unit) {
         }
         LazyColumn(state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp), modifier = Modifier.navigationBarsPadding()) {
             items(items, key = { it.id }) { item ->
-                Column(Modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.l)) {
+                Column(
+                    Modifier.then(if (reducedMotion) Modifier else Modifier.animateItem()).fillMaxWidth().padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.l),
+                ) {
                     Row {
                         Text(
                             item.subject.ifBlank { stringResource(R.string.outbox_no_subject) }, style = Dot.type.headline, color = c.textPrimary,

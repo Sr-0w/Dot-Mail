@@ -76,9 +76,13 @@ fun Hairline(modifier: Modifier = Modifier, inset: Dp = 0.dp) {
 
 enum class ButtonStyle { Primary, Secondary, Ghost, Danger }
 
+/** Solid fill of primary actions: Accent Blue with >= 4.7:1 contrast against a white label in both themes. */
+@Composable
+internal fun primaryFill(): Color = if (Dot.colors.isDark) Color(0xFF476CE8) else Dot.colors.accent
+
 /**
- * The one button. Primary is an inverted solid (no brand colour); Secondary a hairline outline;
- * Ghost is text only. Rounded rectangles, never pills.
+ * The one button. Primary is a solid Accent Blue fill (priority, never glass); Secondary a hairline outline;
+ * Ghost is text only; Danger a red outline. Rounded rectangles, never pills. Floating actions use [DotFrostedPill].
  */
 @Composable
 fun DotButton(
@@ -97,7 +101,7 @@ fun DotButton(
     val pressed by interaction.collectIsPressedAsState()
     val reduceMotion = rememberReducedMotion()
     val (bg, fg, outline) = when (style) {
-        ButtonStyle.Primary -> Triple(c.inverse, c.onInverse, Color.Transparent)
+        ButtonStyle.Primary -> Triple(primaryFill(), Color.White, Color.Transparent)
         ButtonStyle.Secondary -> Triple(Color.Transparent, c.textPrimary, c.borderStrong)
         ButtonStyle.Ghost -> Triple(Color.Transparent, c.textPrimary, Color.Transparent)
         ButtonStyle.Danger -> Triple(Color.Transparent, c.danger, c.border)
@@ -282,21 +286,8 @@ fun DotFrostedPill(
     val pressed by interaction.collectIsPressedAsState()
     val reduceMotion = rememberReducedMotion()
 
-    val surfaceBrush = if (c.isDark) {
-        val top = if (pressed) Color(0xEB313138) else Color(0xE02A2A30)
-        val bottom = if (pressed) Color(0xEB232328) else Color(0xE01C1C21)
-        Brush.verticalGradient(listOf(top, bottom))
-    } else {
-        val top = if (pressed) Color(0xEDEAEAEF) else Color(0xEBF5F5F8)
-        val bottom = if (pressed) Color(0xEDDFDFE6) else Color(0xEBE8E8EE)
-        Brush.verticalGradient(listOf(top, bottom))
-    }
-
-    val borderBrush = if (c.isDark) {
-        Brush.verticalGradient(listOf(Color(0xFF42424A), Color(0xFF2B2B31)))
-    } else {
-        Brush.verticalGradient(listOf(Color(0xFFFFFFFF), Color(0xFFD2D2DA)))
-    }
+    val surfaceBrush = frostedSurfaceBrush(pressed)
+    val borderBrush = frostedBorderBrush()
 
     val fg = if (!enabled) c.textTertiary else c.textPrimary
     val showLabel = expanded && !label.isNullOrEmpty()
@@ -509,4 +500,23 @@ fun ListRow(
             trailing()
         }
     }
+}
+
+/** Translucent graphite (dark) / pearl (light) gradient shared by every floating surface: compose pill, snackbars. */
+@Composable
+internal fun frostedSurfaceBrush(pressed: Boolean): Brush = if (Dot.colors.isDark) {
+    val top = if (pressed) Color(0xEB313138) else Color(0xE02A2A30)
+    val bottom = if (pressed) Color(0xEB232328) else Color(0xE01C1C21)
+    Brush.verticalGradient(listOf(top, bottom))
+} else {
+    val top = if (pressed) Color(0xEDEAEAEF) else Color(0xEBF5F5F8)
+    val bottom = if (pressed) Color(0xEDDFDFE6) else Color(0xEBE8E8EE)
+    Brush.verticalGradient(listOf(top, bottom))
+}
+
+@Composable
+internal fun frostedBorderBrush(): Brush = if (Dot.colors.isDark) {
+    Brush.verticalGradient(listOf(Color(0xFF42424A), Color(0xFF2B2B31)))
+} else {
+    Brush.verticalGradient(listOf(Color(0xFFFFFFFF), Color(0xFFD2D2DA)))
 }

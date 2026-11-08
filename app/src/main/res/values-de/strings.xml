@@ -395,14 +395,14 @@
     <string name="thread_header_reply_to">Antwort an</string>
     <string name="thread_header_date">Datum</string>
     <plurals name="thread_remote_blocked">
-        <item quantity="one">1 externes Bild blockiert, um Ihre Privatsphäre zu schützen</item>
-        <item quantity="other">%1$d externe Bilder blockiert, um Ihre Privatsphäre zu schützen</item>
+        <item quantity="one">1 externes Bild blockiert: Es könnte dem Absender melden, dass Sie diese Nachricht geöffnet haben</item>
+        <item quantity="other">%1$d externe Bilder blockiert: Sie könnten dem Absender melden, dass Sie diese Nachricht geöffnet haben</item>
     </plurals>
     <string name="thread_load_images">Bilder laden</string>
     <string name="thread_remote_more">Weitere Optionen für externe Bilder</string>
     <string name="thread_always_for">Immer für %1$s</string>
     <string name="thread_remote_confirm_title">Bilder von %1$s immer laden?</string>
-    <string name="thread_remote_confirm_body">Absender können sehen, wann und wo Sie ihre Nachrichten öffnen. Tun Sie das nur für vertrauenswürdige Absender. Die Regel lässt sich unter Einstellungen → Datenschutz &amp; Sicherheit → Externe Bilder entfernen.</string>
+    <string name="thread_remote_confirm_body">Das Laden von Bildern teilt diesem Absender bei jedem Öffnen seiner E-Mail mit, wo Sie ungefähr sind und welches Gerät Sie nutzen. Tun Sie das nur für vertrauenswürdige Absender. Die Regel lässt sich unter Einstellungen → Datenschutz &amp; Sicherheit → Externe Bilder entfernen.</string>
     <string name="thread_remote_confirm_action">Immer laden</string>
     <string name="thread_images_loaded">Bilder geladen · %1$s</string>
     <string name="thread_images_loaded_always_for">immer für %1$s</string>
@@ -507,8 +507,8 @@
     <string name="settings_website_icons">Website-Symbole</string>
     <string name="settings_website_icons_sub">Lädt das Symbol der Website des Absenders (nicht für Gmail, Outlook und Ähnliche).</string>
     <string name="settings_section_reading">Lesen</string>
-    <string name="settings_tracking_blocked">Tracking-Pixel werden immer blockiert</string>
-    <string name="settings_tracking_blocked_sub">Unsichtbare 1-Pixel-Bilder, die das Öffnen einer Nachricht melden, werden nie geladen.</string>
+    <string name="settings_tracking_blocked">Tracking wird blockiert</string>
+    <string name="settings_tracking_blocked_sub">Unsichtbare Tracking-Pixel und externe Bilder werden nie geladen, solange Sie es nicht erlauben. Absender können nicht erkennen, ob, wann oder wo Sie ihre Nachrichten lesen.</string>
     <string name="settings_confirm_links">Links bestätigen</string>
     <string name="settings_confirm_links_sub">Zeigt die echte Adresse an, bevor ein Link geöffnet wird.</string>
     <string name="settings_show_quoted">Zitierten Text anzeigen</string>
@@ -640,9 +640,9 @@
 
     <!-- Remote images settings -->
     <string name="remote_images_title">Externe Bilder</string>
-    <string name="remote_images_intro">Externe Bilder sind standardmäßig blockiert. Absender können damit sehen, wann, wo und auf welchem Gerät Sie eine Nachricht öffnen.</string>
+    <string name="remote_images_intro">Externe Bilder sind standardmäßig blockiert. Absender nutzen sie als Tracking-Pixel, um zu erfahren, ob Sie eine Nachricht geöffnet haben, wann, ungefähr wo (über Ihre IP-Adresse) und auf welchem Gerät.</string>
     <string name="remote_images_always">Externe Bilder immer laden</string>
-    <string name="remote_images_always_sub">Dann kann jeder sehen, dass Sie seine E-Mails lesen. Besser: einzelne Absender unten erlauben.</string>
+    <string name="remote_images_always_sub">Jeder Absender kann dann nachverfolgen, wann und wo Sie seine E-Mails lesen. Besser: einzelne Absender unten erlauben.</string>
     <string name="remote_images_section_rules">Immer laden für</string>
     <string name="remote_images_no_rules">Noch keine Absender oder Domains. Öffnen Sie eine Nachricht und wählen Sie im Bilderhinweis „Immer für …“.</string>
     <string name="remote_images_all_accounts">Alle Konten</string>

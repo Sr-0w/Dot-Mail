@@ -2,6 +2,9 @@ package app.dot.design.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Box
@@ -88,7 +91,7 @@ fun BackButton(onClick: () -> Unit) {
     DotIconButton(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.ds_back), onClick = onClick)
 }
 
-/** Inverted snackbar: one line of text and an optional single action ("Undo"). */
+/** Floating bar (messages, "Undo"): the same soft frosted surface as the compose pill, text primary, action in the accent. */
 @Composable
 fun DotSnackbar(data: SnackbarData) {
     val c = Dot.colors
@@ -97,15 +100,17 @@ fun DotSnackbar(data: SnackbarData) {
             .padding(horizontal = DotSpacing.l, vertical = DotSpacing.s)
             .fillMaxWidth()
             .wrapContentHeight()
-            .clip(DotShapes.medium)
-            .background(c.inverse)
+            .shadow(3.dp, RoundedCornerShape(24.dp), ambientColor = Color(0x26000000), spotColor = Color(0x33000000))
+            .clip(RoundedCornerShape(24.dp))
+            .background(frostedSurfaceBrush(pressed = false), RoundedCornerShape(24.dp))
+            .border(DotSpacing.hairline * 2, frostedBorderBrush(), RoundedCornerShape(24.dp))
             .padding(start = DotSpacing.l, end = DotSpacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             data.visuals.message,
             style = Dot.type.callout,
-            color = c.onInverse,
+            color = c.textPrimary,
             modifier = Modifier.weight(1f).padding(vertical = 14.dp),
         )
         data.visuals.actionLabel?.let { label ->
@@ -117,7 +122,7 @@ fun DotSnackbar(data: SnackbarData) {
                     .padding(horizontal = DotSpacing.m),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(label, style = Dot.type.label, color = c.onInverse)
+                Text(label, style = Dot.type.label, color = c.accent)
             }
         }
     }
