@@ -1,0 +1,8 @@
+Erste öffentliche Version von Dot Mail.
+
+- IMAP/SMTP mit (App-)Passwörtern; automatische Erkennung der großen Provider
+- Einheitlicher Posteingang, Gesprächsfäden, Ordner, lokale und Server-Suche
+- Offline-first: Mail-Cache, Aktionswarteschlange, Undo und geplanter Versand
+- HTML-Mails bereinigt und sicher gerendert; ferne Bilder blockiert
+- Benachrichtigungen mit „Als gelesen" / „Archivieren"; optionale App-Sperre
+- Keine Telemetrie, keine Konten bei uns, keine Play-Dienste

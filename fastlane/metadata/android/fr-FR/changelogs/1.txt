@@ -1,8 +1,8 @@
 Première version publique de Dot Mail.
 
-- IMAP/SMTP avec mot de passe ou mot de passe applicatif ; détection automatique des fournisseurs majeurs
-- Boîte de réception unifiée, conversations, dossiers, recherche locale et sur le serveur
-- Hors ligne par conception : cache local, actions mises en file puis rejouées, annulation de l'envoi, envoi programmé
+- IMAP/SMTP par mot de passe ; détection automatique des fournisseurs majeurs
+- Poste unifié, conversations, dossiers, recherche
+- Offline-first : cache, actions en file rejouées, undo, envoi programmé
 - HTML assaini ; images distantes bloquées par défaut
-- Notifications avec actions « Marquer lu » / « Archiver » ; verrouillage d'application facultatif
+- Notifications « lu » / « archiver » ; verrouillage d'app facultatif
 - Aucune télémétrie, aucun compte chez nous, aucun Play Services
