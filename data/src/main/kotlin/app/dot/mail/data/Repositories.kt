@@ -109,6 +109,13 @@ interface MailRepository {
     fun attachments(kind: app.dot.mail.data.model.AttachmentKind? = null, query: String = ""): Flow<PagingData<app.dot.mail.data.model.AttachmentItem>> =
         kotlinx.coroutines.flow.flowOf(PagingData.empty())
 
+    // ---- Muting: new mail in a muted conversation stays unread but never notifies. Virtual (message-mode) ids mute their conversation. ----
+
+    suspend fun setMuted(threadIds: Collection<Long>, muted: Boolean) { throw UnsupportedOperationException() }
+
+    /** Real thread ids currently muted (UI draws a small glyph on those rows). */
+    fun mutedThreads(): Flow<Set<Long>> = kotlinx.coroutines.flow.flowOf(emptySet())
+
     // ---- Snooze: local only, nothing changes on the server. Ids may be real or virtual (ConversationIds) thread ids. ----
 
     /** Hides the conversations (or single messages) until [untilMillis], then they return to the top of the list, with a notification if the account allows it. */

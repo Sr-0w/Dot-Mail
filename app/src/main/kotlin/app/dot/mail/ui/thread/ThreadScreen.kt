@@ -73,6 +73,8 @@ import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Report
 import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.NotificationsActive
+import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material.icons.outlined.Snooze
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarOutline
@@ -235,6 +237,14 @@ class ThreadViewModel(
     fun alwaysAllowDomain(m: Message) { remotePolicy.addRule(isDomain = true, raw = app.dot.mail.ui.settings.RemoteImageMatching.domainOf(m.from.email), accountId = m.accountId) }
     fun stopRemote(m: Message, reason: app.dot.mail.ui.settings.LoadReason) = remotePolicy.stop(m, reason)
 
+    fun setMuted(muted: Boolean) {
+        viewModelScope.launch {
+            runCatching { graph.mail.setMuted(listOf(threadId), muted) }
+                .onSuccess { _events.send(ThreadEvent.Message(if (muted) "Muted: new mail won't notify" else "Unmuted")) }
+                .onFailure { _events.send(ThreadEvent.Message(it.message ?: "Couldn't change mute")) }
+        }
+    }
+
     fun snooze(untilMillis: Long) {
         viewModelScope.launch {
             runCatching { graph.mail.snooze(listOf(threadId), untilMillis) }
@@ -301,6 +311,7 @@ fun ThreadScreen(
     var pdfPreview by remember { mutableStateOf<ThreadEvent.OpenUri?>(null) }
     var menu by remember { mutableStateOf(false) }
     var snoozing by remember { mutableStateOf(false) }
+    val muted by remember(graph, threadId) { graph.mail.mutedThreads() }.collectAsStateWithLifecycle(emptySet()).let { s -> androidx.compose.runtime.derivedStateOf { threadId in s.value || (messages?.firstOrNull()?.threadId?.let { it in s.value } == true) } }
     var showMove by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var confirmTrash by remember { mutableStateOf(false) }
@@ -388,6 +399,7 @@ fun ThreadScreen(
                         DotMenu(menu, { menu = false }) {
                             val starred = list?.any { it.isStarred } == true
                             DotMenuItem("Snooze…", Icons.Outlined.Snooze) { menu = false; snoozing = true }
+                            DotMenuItem(if (muted) "Unmute conversation" else "Mute conversation", if (muted) Icons.Outlined.NotificationsActive else Icons.Outlined.NotificationsOff) { menu = false; vm.setMuted(!muted) }
                             DotMenuItem(if (starred) "Remove star" else "Star", if (starred) Icons.Outlined.StarOutline else Icons.Outlined.Star) {
                                 menu = false; vm.act(if (starred) MessageAction.UNSTAR else MessageAction.STAR)
                             }

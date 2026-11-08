@@ -19,6 +19,7 @@ import kotlinx.coroutines.withContext
 internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null, scheduled: Boolean = false): Boolean = syncLock.withLock {
     var success = true
     val settingsStore = AccountSettingsStore.get(context)
+    val notificationRules = NotificationRules.get(context)
     dao.accounts().filter { accountIds == null || it.id in accountIds }.forEach { account ->
         val accountSettings = settingsStore.current(account.id)
         if (scheduled && !isScheduledSyncDue(accountSettings, settingsStore.lastSynced(account.id))) return@forEach
@@ -111,7 +112,7 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null, schedu
                     result.headers.filter { !it.flags.deleted && it.uid !in pending }.forEach { header ->
                         val (thread, fresh) = upsertHeader(folder.copy(validity = result.cursor.uidValidity), header)
                         if (fresh && !result.reset) dao.deleteThreadSnooze(thread) // new mail in a snoozed conversation wakes it
-                        if (fresh && !result.reset && !header.flags.seen && remote.role == Role.INBOX) notifications += thread to header.subject
+                        if (fresh && !result.reset && !header.flags.seen && notificationRules.notifyForFolder(folder.id, remote.role.name) && !notificationRules.isMuted(thread)) notifications += thread to header.subject
                     }
                     result.flags.filter { it.uid !in pending }.forEach { flag -> dao.byUid(folder.id, flag.uid)?.let { row ->
                         if (row.id !in pendingLocalIds) { if (flag.deleted) dao.deleteMessage(row.id) else dao.updateMessage(row.copy(unread = !flag.seen, starred = flag.starred)) }

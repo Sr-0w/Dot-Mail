@@ -61,6 +61,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Archive
+import androidx.compose.material.icons.outlined.NotificationsActive
+import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material.icons.outlined.Snooze
 import androidx.compose.material.icons.outlined.Attachment
 import androidx.compose.material.icons.outlined.Check
@@ -181,6 +183,7 @@ fun InboxScreen(
     val snackbar = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
     var showMove by remember { mutableStateOf(false) }
+    val mutedThreads by graph.mail.mutedThreads().collectAsStateWithLifecycle(emptySet())
     // Conversations waiting for a snooze time (from the selection bar, or a swipe).
     var snoozeTargets by remember { mutableStateOf<List<Long>?>(null) }
     // Account whose password the user is re-entering (from the sync-error banner).
@@ -253,6 +256,8 @@ fun InboxScreen(
                             onAction = { if (it == MessageAction.TRASH && prefs.confirmDelete) pendingTrash = selection.toList() else vm.act(it) },
                             onMove = { showMove = true },
                             onSnooze = { snoozeTargets = selection.toList() },
+                            allMuted = selection.isNotEmpty() && selection.all { it in mutedThreads },
+                            onMute = { vm.mute(selection.toList(), muted = !(selection.isNotEmpty() && selection.all { it in mutedThreads })) },
                             onUnsnooze = { vm.unsnooze() },
                         )
                     } else {
@@ -309,6 +314,7 @@ fun InboxScreen(
                     ThreadList(
                         myAddresses = remember(accountsNow) { accountsNow.map { it.email.lowercase() }.toSet() },
                         threads = threads,
+                        mutedThreads = mutedThreads,
                         listState = listState,
                         selection = selection,
                         density = prefs.density,
@@ -382,6 +388,7 @@ fun InboxScreen(
 private fun ThreadList(
     myAddresses: Set<String>,
     threads: LazyPagingItems<ThreadSummary>,
+    mutedThreads: Set<Long>,
     listState: LazyListState,
     selection: Set<Long>,
     density: Density,
@@ -431,6 +438,7 @@ private fun ThreadList(
                         showRecipients = role == FolderRole.SENT || role == FolderRole.DRAFTS,
                         myAddresses = myAddresses,
                         selected = t.threadId in selection,
+                        muted = t.threadId in mutedThreads,
                         selectionMode = selection.isNotEmpty(),
                         compact = density == Density.COMPACT,
                         onClick = { onOpen(t) },
@@ -534,6 +542,8 @@ private fun swipeVisual(action: SwipeAction, t: ThreadSummary): Pair<ImageVector
 fun ThreadRow(
     thread: ThreadSummary,
     selected: Boolean,
+    /** Conversation is muted: a small glyph, new mail doesn't notify. */
+    muted: Boolean = false,
     showRecipients: Boolean = false,
     myAddresses: Set<String> = emptySet(),
     selectionMode: Boolean,
@@ -634,6 +644,10 @@ fun ThreadRow(
                     }
                 }
                 Spacer(Modifier.width(DotSpacing.s))
+                if (muted) {
+                    Icon(Icons.Outlined.NotificationsOff, "Muted", Modifier.size(15.dp), tint = c.textTertiary)
+                    Spacer(Modifier.width(6.dp))
+                }
                 if (thread.hasAttachments) {
                     Icon(Icons.Outlined.Attachment, null, Modifier.size(15.dp), tint = c.textTertiary)
                     Spacer(Modifier.width(6.dp))
@@ -738,6 +752,8 @@ private fun SelectionBar(
     onMove: () -> Unit,
     onSnooze: () -> Unit,
     onUnsnooze: () -> Unit,
+    allMuted: Boolean,
+    onMute: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
     DotTopBar(
@@ -756,6 +772,7 @@ private fun SelectionBar(
                     DotMenuItem("Mark as unread", Icons.Outlined.MarkEmailUnread) { menu = false; onAction(MessageAction.MARK_UNREAD) }
                     DotMenuItem("Star", Icons.Outlined.StarOutline) { menu = false; onAction(MessageAction.STAR) }
                     DotMenuItem("Snooze…", Icons.Outlined.Snooze) { menu = false; onSnooze() }
+                    DotMenuItem(if (allMuted) "Unmute" else "Mute", if (allMuted) Icons.Outlined.NotificationsActive else Icons.Outlined.NotificationsOff) { menu = false; onMute() }
                     DotMenuItem("Move to…", Icons.Outlined.DriveFileMove) { menu = false; onMove() }
                     if (role == FolderRole.SPAM) DotMenuItem("Not spam", Icons.Outlined.Inbox) { menu = false; onAction(MessageAction.NOT_SPAM) }
                     else DotMenuItem("Report spam", Icons.Outlined.Report) { menu = false; onAction(MessageAction.SPAM) }
