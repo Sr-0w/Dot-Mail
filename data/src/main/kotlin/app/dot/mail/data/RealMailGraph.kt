@@ -279,13 +279,32 @@ internal class RealMailGraph(
         val candidates = dao.operations(message.accountId).filter { it.action == "MOVE" && (it.messageLocalId == message.id || it.messageLocalId == null) }
         return candidates.firstOrNull { it.messageLocalId == message.id } ?: candidates.filter { it.target == dao.folder(message.folderId)?.path }.singleOrNull()
     }
-    override suspend fun apply(action: MessageAction, threadIds: Collection<Long>) = withContext(Dispatchers.IO) {
+    @Deprecated("Pass the displayed sourceMailbox to scope conversation actions")
+    override suspend fun apply(action: MessageAction, threadIds: Collection<Long>) =
+        applyScoped(action, threadIds, if (action == MessageAction.ARCHIVE) Mailbox.Unified(FolderRole.INBOX) else null)
+
+    override suspend fun apply(action: MessageAction, threadIds: Collection<Long>, sourceMailbox: Mailbox) =
+        applyScoped(action, threadIds, sourceMailbox)
+
+    private suspend fun actionRows(id: Long, mailbox: Mailbox?, moving: Boolean): List<MessageRow> {
+        val rows = threadOrMessageRows(id)
+        if (mailbox == null) {
+            if (moving && rows.map { it.folderId }.distinct().size > 1)
+                throw MailActionException(MailActionFailure.SOURCE_REQUIRED, "Choose the source mailbox before moving this conversation")
+            return rows
+        }
+        return when (mailbox) {
+            is Mailbox.InFolder -> rows.filter { it.folderId == mailbox.folderId }
+            is Mailbox.Unified -> rows.filter { dao.folder(it.folderId)?.role == mailbox.role.name }
+        }
+    }
+
+    private suspend fun applyScoped(action: MessageAction, threadIds: Collection<Long>, sourceMailbox: Mailbox?) = withContext(Dispatchers.IO) {
         database.withTransaction {
             for (thread in threadIds.distinct()) {
                 if (thread < 0) { if (action in setOf(MessageAction.TRASH, MessageAction.DELETE_FOREVER)) removeDraftAndSource(-thread); continue }
-                val rows = threadOrMessageRows(thread)
+                val rows = actionRows(thread, sourceMailbox, action in setOf(MessageAction.ARCHIVE, MessageAction.TRASH, MessageAction.SPAM, MessageAction.NOT_SPAM, MessageAction.DELETE_FOREVER))
                 for (message in rows) {
-                    if (action == MessageAction.ARCHIVE && dao.folder(message.folderId)?.role != "INBOX") continue
                     val seen = when(action) { MessageAction.MARK_READ -> true; MessageAction.MARK_UNREAD -> false; else -> null }
                     val starred = when(action) { MessageAction.STAR -> true; MessageAction.UNSTAR -> false; else -> null }
                     if (seen != null || starred != null) {
@@ -323,11 +342,16 @@ internal class RealMailGraph(
     override suspend fun renameFolder(folderId: Long, newName: String) = relocateFolderLocal(folderId, keepParent = true, newParentId = null, newName = newName)
     override suspend fun moveFolder(folderId: Long, newParentFolderId: Long?) = relocateFolderLocal(folderId, keepParent = false, newParentId = newParentFolderId, newName = null)
     override suspend fun deleteFolder(folderId: Long, moveContentsTo: Long?) = deleteFolderLocal(folderId, moveContentsTo)
-    override suspend fun move(threadIds: Collection<Long>, targetFolderId: Long) = withContext(Dispatchers.IO) {
+    @Deprecated("Pass the displayed sourceMailbox to avoid moving other folder copies")
+    override suspend fun move(threadIds: Collection<Long>, targetFolderId: Long) = moveScoped(threadIds, targetFolderId, null)
+
+    override suspend fun move(threadIds: Collection<Long>, targetFolderId: Long, sourceMailbox: Mailbox) = moveScoped(threadIds, targetFolderId, sourceMailbox)
+
+    private suspend fun moveScoped(threadIds: Collection<Long>, targetFolderId: Long, sourceMailbox: Mailbox?) = withContext(Dispatchers.IO) {
         val target = dao.folder(targetFolderId) ?: throw MailActionException(MailActionFailure.FOLDER_UNAVAILABLE, "Destination folder is no longer available")
         database.withTransaction {
             if (threadIds.any { it < 0 }) throw MailActionException(MailActionFailure.OPERATION_PENDING, "Open or discard a local draft instead of moving it")
-            val messages = threadIds.distinct().flatMap { threadOrMessageRows(it) }
+            val messages = threadIds.distinct().flatMap { actionRows(it, sourceMailbox, true) }
             if (messages.any { it.accountId != target.accountId }) throw MailActionException(MailActionFailure.ACCOUNT_MISMATCH, "Choose conversations and a destination in the same account")
             messages.forEach { moveMessage(it, target) }
             messages.map { it.threadId }.distinct().forEach { rebuildThread(it) }

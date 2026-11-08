@@ -85,9 +85,17 @@ interface MailRepository {
     /** Downloads an attachment if needed and returns a content:// URI shareable via FileProvider. */
     suspend fun openAttachment(attachment: Attachment): String
 
+    @Deprecated("Pass the displayed sourceMailbox to scope conversation actions")
     suspend fun apply(action: MessageAction, threadIds: Collection<Long>)
 
+    @Deprecated("Pass the displayed sourceMailbox to avoid moving other folder copies")
     suspend fun move(threadIds: Collection<Long>, targetFolderId: Long)
+
+    /** Apply only to messages visible in [sourceMailbox], including per-account folders in a unified role. */
+    suspend fun apply(action: MessageAction, threadIds: Collection<Long>, sourceMailbox: Mailbox) = apply(action, threadIds)
+
+    /** Move only messages visible in [sourceMailbox]; other copies/replies in the conversation stay put. */
+    suspend fun move(threadIds: Collection<Long>, targetFolderId: Long, sourceMailbox: Mailbox) = move(threadIds, targetFolderId)
 
     // ---- Folder management. Local change is immediate; the server command is queued and replayed on sync. ----
     // All throw FolderException(reason) for refusals. If the server later refuses (name taken meanwhile, folder

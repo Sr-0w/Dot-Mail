@@ -204,7 +204,7 @@ enum class OAuthProvider { GOOGLE, MICROSOFT }
 data class OAuthAvailability(val provider: OAuthProvider, val available: Boolean, val reason: String?)
 class OAuthException(message: String) : Exception(message)
 
-enum class MailActionFailure { FOLDER_UNAVAILABLE, ACCOUNT_MISMATCH, OPERATION_PENDING }
+enum class MailActionFailure { FOLDER_UNAVAILABLE, ACCOUNT_MISMATCH, OPERATION_PENDING, SOURCE_REQUIRED }
 class MailActionException(val reason: MailActionFailure, message: String) : Exception(message)
 class MailSyncException(message: String) : Exception(message)
 

@@ -124,8 +124,9 @@ class InboxViewModel(
     fun act(action: MessageAction, ids: Collection<Long> = _selection.value) {
         if (ids.isEmpty()) return
         val count = ids.size
+        val source = _mailbox.value
         viewModelScope.launch {
-            runCatching { graph.mail.apply(action, ids.toList()) }
+            runCatching { graph.mail.apply(action, ids.toList(), source) }
                 .onSuccess {
                     _selection.value = emptySet()
                     confirmation(action, count)?.let { _events.send(it) }
@@ -137,8 +138,9 @@ class InboxViewModel(
     fun moveSelection(folderId: Long) {
         val ids = _selection.value.toList()
         if (ids.isEmpty()) return
+        val source = _mailbox.value
         viewModelScope.launch {
-            runCatching { graph.mail.move(ids, folderId) }
+            runCatching { graph.mail.move(ids, folderId, source) }
                 .onSuccess {
                     _selection.value = emptySet()
                     _events.send(if (ids.size == 1) "Moved" else "Moved ${ids.size} conversations")
