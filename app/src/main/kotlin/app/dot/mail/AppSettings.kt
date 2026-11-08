@@ -48,6 +48,7 @@ data class UiPrefs(
     /** Sender pictures, each an independent opt-in (see ui/avatar). */
     val contactPhotos: Boolean = false,
     val gravatar: Boolean = false,
+    val libravatar: Boolean = false,
     val brandLogos: Boolean = false,
     val websiteIcons: Boolean = false,
     /** Reading text size in percent, 90..130. */
@@ -98,6 +99,7 @@ class AppSettings(context: Context) {
             putBoolean("avatarColors", next.avatarColors)
             putBoolean("contactPhotos", next.contactPhotos)
             putBoolean("gravatar", next.gravatar)
+            putBoolean("libravatar", next.libravatar)
             putBoolean("brandLogos", next.brandLogos)
             putBoolean("websiteIcons", next.websiteIcons)
             putInt("readingTextPercent", next.readingTextPercent)
@@ -130,6 +132,7 @@ class AppSettings(context: Context) {
             avatarColors = prefs.getBoolean("avatarColors", d.avatarColors),
             contactPhotos = prefs.getBoolean("contactPhotos", d.contactPhotos),
             gravatar = prefs.getBoolean("gravatar", d.gravatar),
+            libravatar = prefs.getBoolean("libravatar", d.libravatar),
             brandLogos = prefs.getBoolean("brandLogos", d.brandLogos),
             websiteIcons = prefs.getBoolean("websiteIcons", d.websiteIcons),
             readingTextPercent = prefs.getInt("readingTextPercent", d.readingTextPercent).coerceIn(90, 130),

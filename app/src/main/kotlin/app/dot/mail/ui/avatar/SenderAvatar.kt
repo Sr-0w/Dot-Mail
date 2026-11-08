@@ -35,8 +35,8 @@ import app.dot.mail.data.model.EmailAddress
 @Composable
 fun SenderAvatar(address: EmailAddress, modifier: Modifier = Modifier, size: Dp = 40.dp) {
     val prefs by LocalSettings.current.ui.collectAsStateWithLifecycle()
-    val sources = remember(prefs.contactPhotos, prefs.gravatar, prefs.brandLogos, prefs.websiteIcons) {
-        AvatarSources(prefs.contactPhotos, prefs.gravatar, prefs.brandLogos, prefs.websiteIcons)
+    val sources = remember(prefs.contactPhotos, prefs.gravatar, prefs.libravatar, prefs.brandLogos, prefs.websiteIcons) {
+        AvatarSources(prefs.contactPhotos, prefs.gravatar, prefs.brandLogos, prefs.websiteIcons, libravatar = prefs.libravatar)
     }
     val repo = AvatarRepository.get(LocalContext.current)
     val image by produceState(if (sources.any) repo.peek(address, sources) else null, address.email, sources) {

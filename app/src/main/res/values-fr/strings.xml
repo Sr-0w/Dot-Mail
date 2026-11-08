@@ -743,4 +743,6 @@
     <string name="pdf_show_text">Afficher le texte</string>
     <string name="pdf_show_pages">Afficher les pages</string>
     <string name="pdf_no_text">Aucun texte sélectionnable dans ce PDF (c\'est peut-être un scan).</string>
+    <string name="settings_libravatar">Libravatar</string>
+    <string name="settings_libravatar_sub">L\'alternative libre et fédérée à Gravatar. Envoie un hachage de l\'adresse de l\'expéditeur à libravatar.org.</string>
 </resources>

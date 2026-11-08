@@ -47,7 +47,7 @@ object SettingsBackup {
         put("defaultAccount", accountEmailOf(p.defaultAccountId))
         put("confirmDelete", p.confirmDelete); put("afterAction", p.afterAction.name); put("markRead", p.markRead.name)
         put("conversationView", p.conversationView); put("avatarColors", p.avatarColors)
-        put("gravatar", p.gravatar); put("brandLogos", p.brandLogos); put("websiteIcons", p.websiteIcons)
+        put("gravatar", p.gravatar); put("libravatar", p.libravatar); put("brandLogos", p.brandLogos); put("websiteIcons", p.websiteIcons)
         put("readingTextPercent", p.readingTextPercent); put("quotedExpanded", p.quotedExpanded)
         put("replyAllByDefault", p.replyAllByDefault); put("swipeBetweenMessages", p.swipeBetweenMessages)
         put("includeOriginal", p.includeOriginal); put("defaultFormat", p.defaultFormat.name); put("lockAfterMinutes", p.lockAfterMinutes)
@@ -71,7 +71,7 @@ object SettingsBackup {
             afterAction = enum("afterAction", AfterAction.entries.toTypedArray(), base.afterAction),
             markRead = enum("markRead", MarkRead.entries.toTypedArray(), base.markRead),
             conversationView = bool("conversationView", base.conversationView), avatarColors = bool("avatarColors", base.avatarColors),
-            gravatar = bool("gravatar", base.gravatar), brandLogos = bool("brandLogos", base.brandLogos), websiteIcons = bool("websiteIcons", base.websiteIcons),
+            gravatar = bool("gravatar", base.gravatar), libravatar = bool("libravatar", base.libravatar), brandLogos = bool("brandLogos", base.brandLogos), websiteIcons = bool("websiteIcons", base.websiteIcons),
             readingTextPercent = int("readingTextPercent", base.readingTextPercent, 90..130), quotedExpanded = bool("quotedExpanded", base.quotedExpanded),
             replyAllByDefault = bool("replyAllByDefault", base.replyAllByDefault), swipeBetweenMessages = bool("swipeBetweenMessages", base.swipeBetweenMessages),
             includeOriginal = bool("includeOriginal", base.includeOriginal), defaultFormat = enum("defaultFormat", ComposeFormat.entries.toTypedArray(), base.defaultFormat),

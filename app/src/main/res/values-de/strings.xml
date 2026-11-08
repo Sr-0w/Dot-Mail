@@ -743,4 +743,6 @@
     <string name="pdf_show_text">Text anzeigen</string>
     <string name="pdf_show_pages">Seiten anzeigen</string>
     <string name="pdf_no_text">Kein auswählbarer Text in diesem PDF (vielleicht ein Scan).</string>
+    <string name="settings_libravatar">Libravatar</string>
+    <string name="settings_libravatar_sub">Die freie, föderierte Alternative zu Gravatar. Sendet einen Hash der Absenderadresse an libravatar.org.</string>
 </resources>

@@ -6,8 +6,9 @@ data class AvatarSources(
     val gravatar: Boolean = false,
     val brandLogos: Boolean = false,
     val websiteIcons: Boolean = false,
+    val libravatar: Boolean = false,
 ) {
-    val any: Boolean get() = contacts || gravatar || brandLogos || websiteIcons
+    val any: Boolean get() = contacts || gravatar || libravatar || brandLogos || websiteIcons
 }
 
 /** A loaded picture. [plated] images (logos) are shown contained on a light plate; photos fill the circle. */

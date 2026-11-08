@@ -25,7 +25,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
 /**
- * Finds a picture for a sender, trying the enabled sources in order: contact photo (local), Gravatar, BIMI brand
+ * Finds a picture for a sender, trying the enabled sources in order: contact photo (local), Gravatar, Libravatar, BIMI brand
  * logo, website icon. Everything runs off the main thread, concurrently-asked addresses are de-duplicated, network
  * work is limited to a few parallel requests, and every outcome (also "nothing found") is cached, see [AvatarCache].
  * WebView is never involved: pictures are fetched with [SafeHttp] and decoded to a small bitmap.
@@ -48,7 +48,7 @@ class AvatarRepository private constructor(
         if (!sources.any) return null
         val email = address.email.trim().lowercase()
         if ('@' !in email) return null
-        val id = "$email|${sources.contacts}${sources.gravatar}${sources.brandLogos}${sources.websiteIcons}"
+        val id = "$email|${sources.contacts}${sources.gravatar}${sources.libravatar}${sources.brandLogos}${sources.websiteIcons}"
         return inFlight.getOrPut(id) {
             scope.async {
                 try { resolve(address, sources) } finally { inFlight.remove(id) }
@@ -70,6 +70,7 @@ class AvatarRepository private constructor(
         return buildList {
             if (sources.contacts && hasContactsPermission()) add(Step("c:$email", false, { contactPhoto(email) }, network = false))
             if (sources.gravatar) add(Step("g:${sha256(email)}", false, { gravatar(email) }, network = true))
+            if (sources.libravatar) add(Step("l:${sha256(email)}", false, { libravatar(email) }, network = true))
             if (sources.brandLogos && !free) add(Step("b:$org", true, { brandLogo(domain, org) }, network = true))
             if (sources.websiteIcons && !free) add(Step("w:$org", true, { websiteIcon(org) }, network = true))
         }
@@ -110,6 +111,12 @@ class AvatarRepository private constructor(
         return decode(f.bytes, minSide = 1)
     }
 
+    /** Libravatar: the free, federated alternative to Gravatar (same hash, served by the Libravatar CDN). */
+    private fun libravatar(email: String): Bitmap? {
+        val f = SafeHttp.get("https://seccdn.libravatar.org/avatar/${sha256(email)}?s=128&d=404") ?: return null
+        return decode(f.bytes, minSide = 1)
+    }
+
     private fun brandLogo(domain: String, org: String): Bitmap? {
         val names = listOf(domain, org).distinct().map { "default._bimi.$it" }
         for (name in names) {
@@ -123,7 +130,7 @@ class AvatarRepository private constructor(
     }
 
     private fun websiteIcon(org: String): Bitmap? {
-        for (path in listOf("apple-touch-icon.png", "favicon.ico")) {
+        for (path in listOf("apple-touch-icon.png", "apple-touch-icon-precomposed.png", "favicon.png", "favicon.ico")) {
             val f = SafeHttp.get("https://$org/$path") ?: continue
             decode(f.bytes, minSide = 32)?.let { return it }
         }

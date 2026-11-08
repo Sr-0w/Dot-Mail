@@ -238,6 +238,9 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             ToggleRow(stringResource(R.string.settings_gravatar), stringResource(R.string.settings_gravatar_sub), Icons.Outlined.Public, prefs.gravatar) { v ->
                 settings.update { it.copy(gravatar = v) }
             }
+            ToggleRow(stringResource(R.string.settings_libravatar), stringResource(R.string.settings_libravatar_sub), Icons.Outlined.Public, prefs.libravatar) { v ->
+                settings.update { it.copy(libravatar = v) }
+            }
             ToggleRow(stringResource(R.string.settings_brand_logos), stringResource(R.string.settings_brand_logos_sub), Icons.Outlined.VerifiedUser, prefs.brandLogos) { v ->
                 settings.update { it.copy(brandLogos = v) }
             }
