@@ -1,12 +1,17 @@
 # Feature requests
 
-The owner's list of things to add. **Add new items at the bottom of "Open"**, in any language, one line
-is enough. The team reads this file whenever it picks the next piece of work, moves items to
-"In progress" when started and to "Done" with a short note when shipped.
+The owner's feature backlog. Add requests under **Open**; move them to **In progress** when work starts.
+Use **Done only for the fully delivered and verified scope**, not for partial implementations,
+untested changes, or a merged PR alone. If something in Done is incomplete or regresses,
+move it back to In progress/Open and document what's missing. Keep each entry concise,
+include acceptance criteria where useful, and link PRs/commits instead of accumulating
+lengthy inline progress diaries. Never lose a user requirement during cleanup.
 
-Priority hints (optional): `P1` = next, `P2` = soon (default), `P3` = nice to have.
+Priority: `P1` = next / blocking · `P2` = soon · `P3` = nice to have.
 
 ## Open
+
+- P1 · **Housekeeping and full Done audit of FEATURE_REQUESTS.md (owner request):** Refactor this growing backlog into a concise, readable, consistently formatted Markdown tracker, grouped logically by feature area and actual status, with short titles, explicit acceptance criteria, checkboxes/subtasks only when useful, and links to issues/PRs/commits for implementation details instead of multi-paragraph single-line bullets. Deduplicate overlapping requests, merge related entries, eliminate contradictory inline `[done]`/`[in progress]` annotations, keep important requirements and history traceable, and make it easy for agents to add/update tasks without turning the file back into a wall of text. **Audit every existing Done entry against current code, tests and relevant real-device behavior; never assume a merged PR or a checked-off note means the full user request was delivered.** If any requirement is missing, broken, untested or only partly implemented, move the item to **In progress** (work active) or **Open** (work not active), noting the exact gaps. Mark Done only when all scoped acceptance criteria are implemented and verified, with evidence (PR/commit and test/device-check when applicable); do not claim verification that has not happened. Preserve genuinely completed features and do not silently discard user requests. Perform the audit and cleanup, not merely rewrite the status labels.
 
 
 - P2 · **Polish animations across most meaningful user actions** [in progress: screen transitions, selection mode, menus/dialogs, Cc/Bcc reveal, reduced-motion lists, Outbox removal done — Gemini, Sonnet #32; reader capsules next] in Dot Mail, using subtle, fast, consistent Quiet UI motion: navigation and screen transitions; mail row insertion/removal on archive, delete, restore and refresh; swipe feedback; selection and contextual-action transitions; conversation expand/collapse; buttons, sheets, menus, dialogs and loading states. **Specifically animate the Cc and Bcc recipient fields in Compose when the user taps “Cc/Bcc”**: smoothly reveal and collapse the rows with coordinated height/opacity/position changes, reflow surrounding content without jumps, and keep keyboard focus and accessibility correct. Prefer native Jetpack Compose animations, smooth 60/120 Hz behavior and reduced-motion accessibility settings; avoid excessive motion, delays, flashy effects or animations on every trivial interaction.
