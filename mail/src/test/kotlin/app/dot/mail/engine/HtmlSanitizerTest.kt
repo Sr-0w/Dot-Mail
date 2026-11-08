@@ -179,4 +179,73 @@ class HtmlSanitizerTest {
         assertTrue("Stylesheet output was not capped: ${res.html.length}", res.html.length <= 70_000)
         assertTrue(res.html.contains("<p>Hello</p>"))
     }
+
+    // ---- cell backgrounds and tracking pixels (AliExpress-style product grids) ------------------------------
+
+    private val productCell = """<table width="184"><tr><td width="168" background="https://img.example.com/kf/product.png"
+        style="background-size:cover;background-position:100% 100%;background-repeat:no-repeat;padding:148px 8px 0">
+        <div>-12%</div></td></tr></table>"""
+
+    @Test fun cellBackgroundIsBlockedLikeAnImageByDefault() {
+        val res = HtmlSanitizer.sanitize(productCell)
+        assertTrue(res.hasRemoteImages)
+        assertEquals(1, res.blockedRemoteResources)
+        assertFalse(res.html.contains("img.example.com"))
+        assertFalse(res.html.contains("dotbg-"))
+    }
+
+    @Test fun cellBackgroundLoadsWhenImagesAreAllowed() {
+        val res = HtmlSanitizer.sanitize(productCell, allowRemoteImages = true)
+        val td = Jsoup.parse(res.html).selectFirst("td")!!
+        assertTrue(td.attr("style"), td.attr("style").contains("background-image:url(\"https://img.example.com/kf/product.png\")"))
+        assertTrue(td.attr("style").contains("background-size:cover"))
+        assertFalse(td.hasAttr("background"))
+        assertFalse(res.html.contains("dotbg-"))
+        assertEquals(0, res.blockedRemoteResources)
+    }
+
+    @Test fun inlineBackgroundImageUrlTakesTheSameGate() {
+        val html = "<td style=\"background-image:url('https://img.example.com/a.jpg');color:#fff\">x</td>"
+        assertFalse(HtmlSanitizer.sanitize("<table><tr>$html</tr></table>").html.contains("img.example.com"))
+        val allowed = Jsoup.parse(HtmlSanitizer.sanitize("<table><tr>$html</tr></table>", allowRemoteImages = true).html).selectFirst("td")!!.attr("style")
+        assertTrue(allowed, allowed.contains("background-image:url(\"https://img.example.com/a.jpg\")"))
+        assertTrue(allowed, allowed.contains("color:#fff"))
+    }
+
+    @Test fun backgroundUrlsMustBePlainHttp() {
+        for (bad in listOf("javascript:alert(1)", "data:image/png;base64,AAAA", "https://x.example/a\")b", "https://x.example/a'b",
+            "https://x.example/a b", "//x.example/a.png", "https://x.example/a\\b")) {
+            assertNull("$bad -> ${HtmlSanitizer.backgroundUrl(bad, "")}", HtmlSanitizer.backgroundUrl(bad, ""))
+            if ('"' in bad) continue // the HTML parser ends the attribute at the quote: a different (valid) value
+            val out = HtmlSanitizer.sanitize("<table><tr><td background=\"$bad\">x</td></tr></table>", allowRemoteImages = true).html
+            assertFalse(out, out.contains("background-image"))
+        }
+        // Escape attempts inside style url() never survive either.
+        val out = HtmlSanitizer.sanitize("<div style=\"background:url(https://x.example/a.png) ;}</style><script>\">x</div>", allowRemoteImages = true).html
+        assertFalse(out.contains("<script"))
+    }
+
+    @Test fun trackingPixelsNeverLoadEvenWhenImagesAreAllowed() {
+        val html = """
+            <img style="display:none" src="http://ae.mmstat.com/ae.edm.edm_open?tracelog=x">
+            <img width="1" height="1" src="https://news.example.com/o.php?u=1">
+            <img src="https://t.example.com/pixel.gif">
+            <img src="https://example.us1.list-manage.com/track/open.php?u=1">
+            <img width="1" height="20" src="https://cdn.example.com/spacer.gif">
+            <img width="600" src="https://cdn.example.com/hero.jpg">"""
+        val res = HtmlSanitizer.sanitize(html, allowRemoteImages = true)
+        assertEquals(4, res.trackersBlocked)
+        assertFalse(res.html.contains("mmstat"))
+        assertFalse(res.html.contains("list-manage"))
+        assertFalse(res.html.contains("pixel.gif"))
+        assertFalse(res.html.contains("o.php"))
+        assertTrue("spacer is layout, not a tracker", res.html.contains("spacer.gif"))
+        assertTrue(res.html.contains("hero.jpg"))
+    }
+
+    @Test fun trackerBackgroundsAreDroppedToo() {
+        val res = HtmlSanitizer.sanitize("<table><tr><td background=\"https://t.sendgrid.net/wf/open?upn=1\">x</td></tr></table>", allowRemoteImages = true)
+        assertEquals(1, res.trackersBlocked)
+        assertFalse(res.html.contains("sendgrid"))
+    }
 }

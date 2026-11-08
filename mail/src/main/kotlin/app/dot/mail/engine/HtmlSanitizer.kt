@@ -21,6 +21,8 @@ object HtmlSanitizer {
         val blockedRemoteResources: Int,
         val layoutWidth: Int = 0,
         val responsive: Boolean = false,
+        /** Tracking pixels removed even though remote images were allowed. */
+        val trackersBlocked: Int = 0,
     )
 
     private val tags = arrayOf("a", "abbr", "b", "blockquote", "br", "caption", "center", "code", "col", "colgroup", "dd", "del", "div", "dl", "dt", "em", "font", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "i", "img", "li", "ol", "p", "pre", "s", "small", "span", "strong", "sub", "sup", "table", "tbody", "td", "tfoot", "th", "thead", "tr", "u", "ul")
@@ -37,6 +39,7 @@ object HtmlSanitizer {
         "margin", "margin-top", "margin-bottom", "margin-left", "margin-right",
         "width", "height", "max-width", "min-width", "max-height", "min-height",
         "display", "float", "clear", "table-layout", "box-sizing", "direction", "list-style-type",
+        "background-size", "background-position", "background-repeat",
     )
     private val colourFunction = Regex("(?i)rgba?\\(\\s*[0-9.]+%?\\s*[, ]\\s*[0-9.]+%?\\s*[, ]\\s*[0-9.]+%?\\s*([,/]\\s*[0-9.]+%?\\s*)?\\)")
     private val safeValue = Regex("[a-zA-Z0-9#.,%\\s'\"+/-]+")
@@ -196,11 +199,25 @@ object HtmlSanitizer {
         doc.outputSettings().prettyPrint(false)
         var remote = false
         var blocked = 0
+        var trackers = 0
+        val backgrounds = ArrayList<String>()
         val sheets = StringBuilder()
         for (el in doc.allElements) {
-            if (el.hasAttr("srcset") || el.hasAttr("background")) { remote = true; blocked++ }
             val style = el.attr("style")
-            if (style.isNotEmpty() && containsRemoteCss(style)) { remote = true; blocked++ }
+            // Cell/table backgrounds (the legacy `background=` attribute or an inline background url) are pictures
+            // like any <img>: same remote-image gate, same tracker filter. A marker class lets us re-attach a clean
+            // `background-image` after the cleaner has run; only plain http(s) URLs without quotes/escapes qualify.
+            val bgUrl = if (el.tagName() in backgroundTags) backgroundUrl(el.attr("background"), style) else null
+            if (bgUrl != null) {
+                remote = true
+                when {
+                    isTrackerUrl(bgUrl) -> trackers++
+                    allowRemoteImages -> { el.addClass("$BG_MARKER${backgrounds.size}"); backgrounds += bgUrl }
+                    else -> blocked++
+                }
+            } else if (el.hasAttr("background")) { remote = true; blocked++ }
+            if (el.hasAttr("srcset")) { remote = true; blocked++ }
+            if (bgUrl == null && style.isNotEmpty() && containsRemoteCss(style)) { remote = true; blocked++ }
             if (el.tagName() == "style") {
                 val cssData = el.data()
                 if (containsRemoteCss(cssData)) { remote = true; blocked++ }
@@ -219,6 +236,7 @@ object HtmlSanitizer {
                     if (uri != null && uri.startsWith("content://")) el.attr("src", uri) else el.removeAttr("src")
                 } else if (src.isNotEmpty()) {
                     remote = true
+                    if (isTrackingPixel(el, src)) { el.remove(); trackers++; continue }
                     if (!allowRemoteImages || !Regex("(?i)^https?://[^\\s]+$").matches(src)) { el.removeAttr("src"); blocked++ }
                 }
             }
@@ -239,6 +257,14 @@ object HtmlSanitizer {
         val cleaned = Cleaner(safe).clean(doc)
         cleaned.outputSettings().prettyPrint(false)
         cleaned.select("a").attr("rel", "noreferrer noopener")
+        backgrounds.forEachIndexed { i, url ->
+            cleaned.select(".$BG_MARKER$i").forEach { el ->
+                el.removeClass("$BG_MARKER$i")
+                val own = el.attr("style").trim().trimEnd(';')
+                el.attr("style", (if (own.isEmpty()) "" else "$own;") + "background-image:url(\"$url\")")
+            }
+        }
+        cleaned.select("[class]").forEach { el -> el.classNames().filter { it.startsWith(BG_MARKER) }.forEach(el::removeClass) }
         // Only colour values survive in bgcolor; ids and classes can't collide with anything we inject.
         cleaned.select("[bgcolor]").forEach { if (!it.attr("bgcolor").matches(Regex("#?[a-zA-Z0-9]{1,20}"))) it.removeAttr("bgcolor") }
         val bodyColour = doc.body().attr("bgcolor").takeIf { it.matches(Regex("#?[a-zA-Z0-9]{1,20}")) }
@@ -254,6 +280,7 @@ object HtmlSanitizer {
             blockedRemoteResources = blocked,
             layoutWidth = layoutWidth(cleaned),
             responsive = Regex("(?i)@media[^{]*max-width").containsMatchIn(stylesheet),
+            trackersBlocked = trackers,
         )
     }
 
@@ -279,6 +306,42 @@ object HtmlSanitizer {
     }
 
     private const val MAX_LAYOUT_WIDTH = 1280
+    private const val BG_MARKER = "dotbg-"
+    private val backgroundTags = setOf("table", "thead", "tbody", "tfoot", "tr", "td", "th", "div")
+    private val plainHttpUrl = Regex("(?i)^https?://[a-z0-9._~:/?#@!$&*+,;=%-]+$")
+    private val styleUrl = Regex("(?i)background(?:-image)?\\s*:[^;]*?url\\(\\s*(['\"]?)([^'\")\\s]+)\\1\\s*\\)")
+
+    /** The single background picture of a cell/table, if it is a plain http(s) URL; null otherwise. */
+    internal fun backgroundUrl(attr: String, style: String): String? {
+        val raw = attr.trim().ifEmpty { styleUrl.find(style)?.groupValues?.get(2)?.trim().orEmpty() }
+        return raw.takeIf { it.length <= 2048 && plainHttpUrl.matches(it) }
+    }
+
+    // Open-tracking endpoints and services (path patterns are deliberately specific to avoid hiding real images).
+    private val trackerHosts = listOf(
+        "mmstat.com", "list-manage.com/track/open", "mailchimp.com/track", "sendgrid.net/wf/open", "/wf/open?",
+        "track.hubspot.com", "hubspotemail.net/e2t/to", "mandrillapp.com/track/open", "ct.sendgrid.net",
+        "mailtrack.io", "mixmax.com/api/track", "yesware.com/t/", "bananatag.com", "pixel.wp.com", "facebook.com/tr",
+        "google-analytics.com/collect", "/open.php", "/track/open", "/tracking/open", "/e/o/", "/o.gif", "/open.gif",
+        "emltrk.com", "sparkpostmail.com/q/", "exct.net/open", "rs6.net/on.jsp", "klclick", "/pixel.gif", "/pixel.png",
+    )
+
+    internal fun isTrackerUrl(url: String): Boolean {
+        val u = url.lowercase(Locale.ROOT)
+        return trackerHosts.any { it in u }
+    }
+
+    private val tinySize = Regex("^0*[0-2](?:px)?$")
+    private val hiddenStyle = Regex("(?i)display\\s*:\\s*none|visibility\\s*:\\s*hidden|(?:^|;)\\s*(?:max-)?(?:width|height)\\s*:\\s*0*[0-2](?:px)?\\s*(?:!important)?\\s*(?:;|$)|opacity\\s*:\\s*0(?:\\.0+)?\\s*(?:;|$)")
+
+    /** An invisible or 1–2 px image, or one served by a known open-tracking endpoint: never loaded, even when allowed. */
+    internal fun isTrackingPixel(img: org.jsoup.nodes.Element, src: String): Boolean {
+        val w = img.attr("width").trim().lowercase(Locale.ROOT)
+        val h = img.attr("height").trim().lowercase(Locale.ROOT)
+        if (w.matches(tinySize) && h.matches(tinySize)) return true
+        if (hiddenStyle.containsMatchIn(img.attr("style"))) return true
+        return isTrackerUrl(src)
+    }
     private const val MAX_STYLE_TAG_CHARS = 65_536
     private const val MAX_TOTAL_CSS_CHARS = 32_768
     private const val MAX_CSS_RULES = 500

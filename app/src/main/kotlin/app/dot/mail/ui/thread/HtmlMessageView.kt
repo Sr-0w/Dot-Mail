@@ -152,7 +152,9 @@ ${if (dark) "" else "<meta name=\"color-scheme\" content=\"light\">"}
 <style>
 html,body{margin:0;padding:0;background:transparent;}
 ${if (viewportWidth > 0) "body{padding:0 ${BODY_MARGIN}px;}" else ""}
-body{font-family:sans-serif;font-size:15px;line-height:1.55;${if (dark) "" else "color:${css(textColor)};"}word-wrap:break-word;overflow-wrap:anywhere;-webkit-text-size-adjust:100%;}
+body{font-family:sans-serif;font-size:15px;line-height:1.55;${if (dark) "" else "color:${css(textColor)};"}word-wrap:break-word;overflow-wrap:break-word;-webkit-text-size-adjust:100%;}
+/* Break only tokens longer than the line (URLs, hashes); never split ordinary words or squeeze table columns. */
+td,th{word-break:normal;}
 ${if (dark) "" else "a{color:${css(linkColor)};}"}
 img{max-width:100%!important;height:auto!important;}
 ${if (viewportWidth > 0) "" else "table{max-width:100%;}"}
