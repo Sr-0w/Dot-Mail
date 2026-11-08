@@ -36,6 +36,8 @@ Priority hints (optional): `P1` = next, `P2` = soon (default), `P3` = nice to ha
 - P3 · OpenPGP and S/MIME signing/encryption and verification using established, audited libraries or integrations.
 - P3 · Optional JMAP support alongside IMAP/SMTP for compatible providers, without making JMAP mandatory.
 
+- P2 · Refine primary action buttons to use compact, softly rounded ChatGPT-style Quiet UI controls. In particular, redesign the oversized Compose/New email button so it occupies much less space (prefer a compact rounded floating or inline action where appropriate), without compromising discoverability, touch-target accessibility, or one-handed reachability. Avoid generic oversized Material-style buttons.
+
 ## In progress
 
 - P1 · Harden IMAP synchronization and message operations before daily-driver release: fix subject-only threading collisions, cross-folder archive/move behavior, large-body storage/performance, IDLE reconnect loops and global sync lock contention; add regression and network-failure tests. — Codex (file-backed bodies, IDLE churn, lock contention, threading — from Gemini's review)
