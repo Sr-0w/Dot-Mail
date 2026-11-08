@@ -35,3 +35,6 @@ data class OutgoingMail(
 
 data class CachedPart(val partId: String, val name: String, val mimeType: String, val contentId: String?, val inline: Boolean, val file: java.io.File)
 data class CachedBody(val text: java.io.File?, val html: java.io.File?, val attachments: List<CachedPart>)
+
+data class DraftInventory(val validity: Long, val activeUids: Set<Long>)
+data class DraftCopy(val validity: Long, val uid: Long)

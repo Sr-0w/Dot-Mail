@@ -25,6 +25,12 @@ internal object WorkScheduling {
             OneTimeWorkRequestBuilder<SnoozeWorker>().setInitialDelay((dueAt - System.currentTimeMillis()).coerceAtLeast(0), TimeUnit.MILLISECONDS).build())
     }
     fun cancelSnooze(context: Context, id: Long) { WorkManager.getInstance(context).cancelUniqueWork("dotmail.snooze.$id") }
+    fun drafts(context: Context, accountId: Long) {
+        WorkManager.getInstance(context).enqueueUniqueWork("dotmail.drafts.$accountId",ExistingWorkPolicy.REPLACE,
+            OneTimeWorkRequestBuilder<DraftMirrorWorker>().setInputData(workDataOf("accountId" to accountId))
+                .setInitialDelay(DRAFT_DEBOUNCE_MS,TimeUnit.MILLISECONDS).setConstraints(network)
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL,10,TimeUnit.SECONDS).build())
+    }
     fun outbox(context: Context, id: Long, dueAt: Long, replace: Boolean = false) {
         WorkManager.getInstance(context).enqueueUniqueWork("dotmail.outbox.$id", if (replace) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
             OneTimeWorkRequestBuilder<OutboxWorker>().setInputData(workDataOf("id" to id)).setInitialDelay((dueAt - System.currentTimeMillis()).coerceAtLeast(0), TimeUnit.MILLISECONDS).setConstraints(network).setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS).build())
@@ -40,6 +46,14 @@ class SnoozeWorker(context: Context, params: WorkerParameters) : CoroutineWorker
     override suspend fun doWork(): Result = try {
         GraphRegistry.get(applicationContext).resurfaceDue(); Result.success()
     } catch (e: CancellationException) { throw e } catch (e: Exception) { SyncDiagnostics.warn("Snooze worker", e); Result.retry() }
+}
+class DraftMirrorWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context,params) {
+    override suspend fun doWork(): Result = try {
+        val graph=GraphRegistry.get(applicationContext)
+        val accountId=inputData.getLong("accountId",-1)
+        val ok=graph.syncAll(setOf(accountId))
+        if(ok && graph.dao.draftMirrors(accountId).none { it.deleted || it.revision!=it.syncedRevision || it.attemptRevision!=null }) Result.success() else Result.retry()
+    } catch(e: CancellationException) { throw e } catch(e: Exception) { SyncDiagnostics.warn("Draft mirror worker",e); Result.retry() }
 }
 class OutboxWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result = try {
