@@ -28,11 +28,11 @@ internal suspend fun RealMailGraph.syncOneFolder(account:AccountRow,config:Accou
             mirrorDrafts(account,config,creds,folder)
             stage="Folder header sync"
         }
-        val initialCursor = SyncCursor(folder.validity, folder.nextUid, folder.modSeq,folder.total)
+        val initialCursor = SyncCursor(if(folder.nextUid==1L && folder.modSeq<0) 0 else folder.validity, folder.nextUid, folder.modSeq,folder.total)
         var result = client.sync(config.imap.endpoint(), creds, folder.path, initialCursor, limit = windowLimit, windowDays = windowDays)
         val cached=dao.folderMessages(folder.id)
         val pending=dao.operations(account.id).any { it.folderId==folder.id }
-        val needsMetadata=cached.any { it.uid>0 && Codec.field(it.header,"category")==null }
+        val needsMetadata=cached.any { it.uid>0 && (Codec.field(it.header,"category")==null || Codec.field(it.header,"attachmentNames")==null) }
         val needsPreview=cached.any { !it.snippetFetched && (it.bodyLoaded || (it.uid>0 && it.snippet.isNotBlank())) } || cached.sortedByDescending { it.sentAt }.take(200).any { it.uid>0 && !it.snippetFetched && !it.bodyLoaded }
         if(result.unchanged && !pending && !needsMetadata && !needsPreview) {
             if(folder.name!=remote.name || folder.role!=remote.role.name || folder.unread!=remote.unread || folder.total!=remote.total)
@@ -45,7 +45,7 @@ internal suspend fun RealMailGraph.syncOneFolder(account:AccountRow,config:Accou
             result.failures.forEach { SyncDiagnostics.warn("Header UID=${it.uid} account=${account.id} folderRole=${remote.role}", it.error, redactions) }
             headerWarning = "Folder ${remote.role}: some message headers could not be read; retrying"
         }
-        val missing=dao.folderMessages(folder.id).filter { it.uid>0 && Codec.field(it.header,"category")==null && result.headers.none { h -> h.uid==it.uid } }.take(200)
+        val missing=dao.folderMessages(folder.id).filter { it.uid>0 && (Codec.field(it.header,"category")==null || Codec.field(it.header,"attachmentNames")==null) && result.headers.none { h -> h.uid==it.uid } }.take(200)
         if(missing.isNotEmpty() && !result.reset) {
             try { result=result.copy(headers=result.headers+client.headers(config.imap.endpoint(),creds,folder.path,missing.map { it.uid }.toLongArray(),result.cursor.uidValidity)) }
             catch(e: CancellationException) { throw e } catch(e: Exception) { SyncDiagnostics.warn("Classification metadata account=${account.id} folderRole=${remote.role}",e,redactions) }
@@ -129,7 +129,7 @@ private suspend fun RealMailGraph.applyFolderHeaders(account:AccountRow,folder:F
     val dbStart=System.nanoTime()
     database.withTransaction {
         val old = dao.folderMessages(folder.id)
-        if (result.reset) old.filter { it.uid > 0 }.forEach { dao.deleteMessage(it.id) }
+        if (result.reset && dao.folder(folder.id)?.validity!=result.cursor.uidValidity) old.filter { it.uid > 0 }.forEach { dao.deleteMessage(it.id) }
         else if(!result.unchanged) old.filter { it.uid > 0 && it.uid !in result.existingUids }.forEach { dao.deleteMessage(it.id) }
         val operations = dao.operations(account.id)
         val pending = operations.filter { it.folderId == folder.id && it.validity == result.cursor.uidValidity }.map { it.uid }.toSet()

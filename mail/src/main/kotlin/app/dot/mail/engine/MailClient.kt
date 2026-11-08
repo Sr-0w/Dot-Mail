@@ -197,7 +197,7 @@ class MailClient(val timeoutMs: Int = 30_000, private val timing: (String,Long) 
             flags(f,message), runCatching { hasAttachments(message) }.getOrDefault(false),
             if ((f.store as IMAPStore).hasCapability("X-GM-EXT-1")) (message as IMAPMessage).getItem(GmailThreadFetch.item) as? Long else null)
     }
-        return basic.copy(classificationHeaders=ClassificationHeaders.read(message),hasPdfAttachment=runCatching { hasPdf(message) }.getOrDefault(false))
+        return basic.copy(classificationHeaders=ClassificationHeaders.read(message),hasPdfAttachment=runCatching { hasPdf(message) }.getOrDefault(false),attachmentNames=runCatching { attachmentNames(message) }.getOrDefault(emptyList()))
     }
     /** Bounded metadata backfill for cached messages written by builds predating classification. */
     suspend fun headers(endpoint: Endpoint, credentials: Credentials, path: String, uids: LongArray, expectedValidity: Long): List<Header> = store(endpoint,credentials) { s -> folder(s,path) { f ->
@@ -220,6 +220,18 @@ class MailClient(val timeoutMs: Int = 30_000, private val timing: (String,Long) 
         val post = m.getHeader("List-Unsubscribe-Post")?.toList() ?: return null
         app.dot.mail.engine.text.ListUnsubscribe.parse(mapOf("List-Unsubscribe" to list, "List-Unsubscribe-Post" to post))?.oneClickHttps
     }.getOrNull()
+    private fun attachmentNames(root: Part): List<String> {
+        val names=ArrayList<String>(); var remaining=256
+        fun visit(part:Part,depth:Int) {
+            if(depth>=40 || remaining--<=0 || names.size>=64) return
+            if(!part.disposition.equals(Part.INLINE,true)) part.fileName?.let { names+=it.take(512) }
+            if(part.isMimeType("multipart/*")) {
+                val source=part.dataHandler.dataSource as? MultipartDataSource ?: return
+                for(i in 0 until minOf(source.count,remaining.coerceAtLeast(0))) visit(source.getBodyPart(i),depth+1)
+            }
+        }
+        visit(root,0); return names
+    }
     private fun hasPdf(part: Part, depth: Int = 0): Boolean {
         if(depth>=40) return false
         if(part.isMimeType("application/pdf")) return true
@@ -332,10 +344,11 @@ class MailClient(val timeoutMs: Int = 30_000, private val timing: (String,Long) 
             transport.sendMessage(message, message.allRecipients)
         }
     }
-    suspend fun search(endpoint: Endpoint, credentials: Credentials, path: String, query: String, limit: Int = 500): List<Header> = store(endpoint, credentials) { s -> folder(s, path) { f ->
+    suspend fun search(endpoint: Endpoint, credentials: Credentials, path: String, query: String, limit: Int = 500): List<Header> = searchBatch(endpoint,credentials,path,query,limit).headers
+    suspend fun searchBatch(endpoint: Endpoint, credentials: Credentials, path: String, query: String, limit: Int = 500): SearchBatch = store(endpoint, credentials) { s -> folder(s, path) { f ->
         val parsed = MailSearch.parse(query)
-        val messages = f.search(parsed.serverTerm()).takeLast(limit).toTypedArray()
-        fetchHeaders(f, messages, s.hasCapability("X-GM-EXT-1")); messages.map { header(f, it) }.filter { !parsed.needsAttachments || it.hasAttachments }
+        val messages = f.search(jakarta.mail.search.AndTerm(parsed.serverTerm(),jakarta.mail.search.FlagTerm(Flags(Flags.Flag.DELETED),false))).takeLast(limit.coerceIn(1,500)).toTypedArray()
+        fetchHeaders(f, messages, s.hasCapability("X-GM-EXT-1")); SearchBatch(f.uidValidity,messages.map { header(f, it) }.filter { !parsed.needsAttachments || it.hasAttachments },messages.size>=limit.coerceIn(1,500))
     } }
     /** Dedicated IDLE socket; cancellation closes it immediately, including while idle blocks. */
     suspend fun idle(endpoint: Endpoint, credentials: Credentials, path: String = "INBOX", changed: () -> Unit) = withImapSession(endpoint,credentials) { coroutineScope {

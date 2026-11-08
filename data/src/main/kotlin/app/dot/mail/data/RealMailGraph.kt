@@ -27,7 +27,7 @@ internal object GraphRegistry {
     @Volatile private var graph: RealMailGraph? = null
     fun get(context: Context): RealMailGraph = graph ?: synchronized(this) {
         graph ?: RealMailGraph(context.applicationContext,
-            Room.databaseBuilder(context.applicationContext, MailDatabase::class.java, "dotmail.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7).build(),
+            Room.databaseBuilder(context.applicationContext, MailDatabase::class.java, "dotmail.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8).build(),
             KeystoreCredentialVault()).also { graph = it; it.start() }
     }
 }
@@ -52,7 +52,12 @@ internal class RealMailGraph(
     internal val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     internal val syncLock = Mutex()
     internal val outboxLock = Mutex()
-    private val searchLock = Mutex()
+    internal val searchIndex = SearchIndex(this)
+    internal val fullSearch = FullContentSearch(this)
+    override val searchIndexProgress: Flow<SearchIndexProgress> get() = searchIndex.progress
+    override fun search(query:String,scope:SearchScope):Flow<PagingData<SearchResult>> = fullSearch.search(query,scope)
+    override fun searchProgress(query:String,scope:SearchScope):Flow<SearchProgress> = fullSearch.progress(query,scope)
+
     private val bodyLocks = java.util.concurrent.ConcurrentHashMap<Long, Mutex>()
     private val oauth = OAuthManager(context, database, vault, oauthClients, tokenEndpoint)
     internal val syncing = MutableStateFlow<Set<Long>>(emptySet())
@@ -75,7 +80,7 @@ internal class RealMailGraph(
     internal val foregroundIdle by lazy { ForegroundIdle(this) }
     override val instantNotifications: Flow<Boolean> = AccountSettingsStore.get(context).sync.map { it.instantNotifications }.distinctUntilChanged()
     override suspend fun setInstantNotificationsEnabled(enabled: Boolean): Boolean = changeInstantNotifications(enabled)
-    internal fun start() { if (scheduling) { WorkScheduling.periodic(context); foregroundIdle.start(); scope.launch { recoverOutbox(); dao.accounts().forEach { account -> if(dao.draftMirrors(account.id).isNotEmpty()) WorkScheduling.drafts(context,account.id) } }; scope.launch { resurfaceDue() }; scope.launch { recoverSnippetRepairs() } } }
+    internal fun start() { if (scheduling) { scope.launch { searchIndex.ensure(); dao.observeSearchPendingCount().collect { if(it>0) WorkScheduling.searchIndex(context) } }; WorkScheduling.periodic(context); foregroundIdle.start(); scope.launch { recoverOutbox(); dao.accounts().forEach { account -> if(dao.draftMirrors(account.id).isNotEmpty()) WorkScheduling.drafts(context,account.id) } }; scope.launch { resurfaceDue() }; scope.launch { recoverSnippetRepairs() } } }
     internal suspend fun credentials(row: AccountRow): Credentials = withContext(Dispatchers.IO) {
         if (Codec.config(row.config).authType == AuthType.OAUTH2) oauth.credentials(row.id) else try { Credentials(vault.decrypt(row.email, row.secret)) }
         catch(e:java.security.GeneralSecurityException) { dao.syncError(row.id,"Saved credentials are unavailable. Sign in again.",true); throw ReauthenticationRequired(e) }
@@ -206,49 +211,7 @@ internal class RealMailGraph(
             is Mailbox.Unified -> if (mailbox.role.category() != null) emitAll(p("EXISTS(SELECT 1 FROM messages m JOIN folders f ON f.id=m.folderId WHERE m.threadId=t.id AND ${categoryPredicate("m","f",mailbox.role.category()!!)})",emptyList())) else if (mailbox.role == FolderRole.SNOOZED) emitAll(snoozedThreadsPaging()) else emitAll(p("EXISTS(SELECT 1 FROM messages m JOIN folders f ON f.id=m.folderId WHERE m.threadId=t.id AND f.role=?)", listOf(mailbox.role.name), mailbox.role == FolderRole.DRAFTS))
         }
     }
-    override fun search(query: String, accountId: Long?): Flow<PagingData<ThreadSummary>> = flow {
-        val job = scope.launch { runCatching { serverSearch(query, accountId) } }
-        try { emitAll(Pager(PagingConfig(pageSize = 40)) { searchSource(query, accountId) }.flow.map { it.map { row -> summary(row) } }) }
-        finally { job.cancel() }
-    }
-    internal fun searchSource(query: String, accountId: Long?): PagingSource<Int, ThreadRow> {
-        val predicates = mutableListOf<String>()
-        val args = mutableListOf<Any>()
-        if (accountId != null) { predicates += "t.accountId=?"; args += accountId }
-        fun like(value: String): String = "%" + value.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%"
-        for (term in MailSearch.parse(query).terms) {
-            val field = when (term.field) {
-                "from" -> "m.senderSearch"; "to" -> "m.recipientSearch"; "subject" -> "m.subject"; else -> null
-            }
-            val condition = when {
-                field != null -> { args += like(term.value); "$field LIKE ? ESCAPE '!'" }
-                term.field == "has" -> "m.hasAttachments=1"
-                term.field == "is" -> if (term.value.equals("unread", true)) "m.unread=1" else "m.starred=1"
-                else -> { repeat(6) { args += like(term.value) }; "(m.senderSearch LIKE ? ESCAPE '!' OR m.subject LIKE ? ESCAPE '!' OR m.snippet LIKE ? ESCAPE '!' OR m.text LIKE ? ESCAPE '!' OR m.html LIKE ? ESCAPE '!' OR EXISTS(SELECT 1 FROM body_text b WHERE b.messageId=m.id AND b.text LIKE ? ESCAPE '!'))" }
-            }
-            predicates += "EXISTS(SELECT 1 FROM messages m WHERE m.threadId=t.id AND ($condition))"
-        }
-        val local = predicates.joinToString(" AND ").ifBlank { "1=1" }
-        val where = "($local) OR EXISTS(SELECT 1 FROM messages m JOIN search_matches s ON s.messageId=m.id WHERE m.threadId=t.id AND s.queryHash=?)"
-        args += searchHash(query,accountId)
-        return dao.page(SimpleSQLiteQuery("SELECT t.* FROM threads t WHERE t.count>0 AND ($where) ORDER BY t.lastAt DESC,t.id DESC", args.toTypedArray()))
-    }
-    private fun searchHash(query: String, accountId: Long?) = java.security.MessageDigest.getInstance("SHA-256").digest("${accountId ?: "*"}:$query".toByteArray()).joinToString("") { "%02x".format(it) }
-    private suspend fun serverSearch(query: String, accountId: Long?) = searchLock.withLock {
-        if (query.isBlank()) return@withLock
-        val hash = searchHash(query,accountId)
-        dao.clearSearchMatches(hash)
-        dao.accounts().filter { accountId == null || it.id == accountId }.forEach { account ->
-            val config = Codec.config(account.config); val creds = credentials(account)
-            dao.folders(account.id).forEach { folder ->
-                val headers = client.search(config.imap.endpoint(), creds, folder.path, query)
-                database.withTransaction { headers.forEach { header ->
-                    upsertHeader(folder, header)
-                    dao.byUid(folder.id,header.uid)?.let { dao.putSearchMatch(SearchMatchRow(hash,it.id)) }
-                } }
-            }
-        }
-    }
+    override fun search(query: String, accountId: Long?): Flow<PagingData<ThreadSummary>> = fullSearch.search(query,SearchScope(accountIds=accountId?.let { setOf(it) } ?: emptySet())).map { page -> page.map { it.thread } }
     override fun thread(threadId: Long): Flow<List<app.dot.mail.data.model.Message>> = (if (ConversationIds.isMessage(threadId)) dao.observeMessage(ConversationIds.messageIdOf(threadId)) else dao.observeThread(threadId)).map { allRows ->
         val rows = allRows.groupBy { Codec.field(it.header, "messageId") ?: "local:${it.id}" }.values.map { copies -> copies.firstOrNull { it.bodyLoaded } ?: copies.first() }.sortedBy { it.sentAt }
         val attachments = dao.attachmentsFor(rows.map { it.id }).groupBy { it.messageId }
@@ -283,20 +246,19 @@ internal class RealMailGraph(
             if(current==null) { directory.deleteRecursively(); return@withTransaction }
             dao.clearAttachments(messageId); parts.forEach { dao.insertAttachment(it) }
             dao.updateMessage(current.copy(text=null,html=null,bodyPath=directory.absolutePath,bodyLoaded=true,snippetFetched=true,remoteImages=remote,snippet=snippet,hasAttachments=parts.any { !it.inline }))
-            bodyStore.index(messageId,body.text ?: body.html,body.text==null)
             rebuildThread(message.threadId)
         }
     } }
     override suspend fun openAttachment(attachment: Attachment): String = withContext(Dispatchers.IO) {
         dao.attachment(attachment.id)?.localUri ?: run { loadBody(attachment.messageId); dao.attachment(attachment.id)?.localUri ?: error("Attachment no longer available") }
     }
-    internal suspend fun upsertHeader(folder: FolderRow, header: Header): Pair<Long, Boolean> {
+    internal suspend fun upsertHeader(folder: FolderRow, header: Header, rebuild: Boolean = true): Pair<Long, Boolean> {
         val old = dao.byUid(folder.id, header.uid) ?: header.messageId?.let { mid -> dao.pendingMessage(folder.id,mid) ?: dao.unkeyedPending(folder.id).firstNotNullOfOrNull { id -> dao.message(id)?.takeIf { Codec.field(it.header,"messageId")==mid } } }
         if (old != null) {
             // Pending optimistic changes win until replay completes.
             val pending = dao.operations(folder.accountId).any { it.messageLocalId == old.id || (it.folderId == folder.id && it.uid == header.uid && it.validity == folder.validity) }
             dao.updateMessage(old.copy(uid = header.uid, header=Codec.header(header), messageIdKey=header.messageId, unread = if (pending) old.unread else !header.flags.seen, starred = if (pending) old.starred else header.flags.starred))
-            rebuildThread(old.threadId); return old.threadId to false
+            if(rebuild) rebuildThread(old.threadId); return old.threadId to false
         }
         val keys = Threading.keys(header)
         val exact = keys.mapNotNull { dao.threadKey(folder.accountId, it) }.distinct()
@@ -310,7 +272,7 @@ internal class RealMailGraph(
         }
         dao.insertMessage(MessageRow(accountId = folder.accountId, folderId = folder.id, threadId = threadId, uid = header.uid, header = Codec.header(header), messageIdKey=header.messageId, senderSearch = header.from.joinToString(" ") { "${it.name.orEmpty()} ${it.email}" }, recipientSearch = header.to.joinToString(" ") { "${it.name.orEmpty()} ${it.email}" }, subject = header.subject, sentAt = header.sentAt, unread = !header.flags.seen, starred = header.flags.starred, hasAttachments = header.hasAttachments))
         (header.from + header.to + header.cc).forEach { dao.putContact(ContactRow(folder.accountId, it.email, it.name, header.sentAt)) }
-        rebuildThread(threadId); return threadId to true
+        if(rebuild) rebuildThread(threadId); return threadId to true
     }
     internal suspend fun rebuildThread(id: Long) {
         val row = dao.threadRow(id) ?: return

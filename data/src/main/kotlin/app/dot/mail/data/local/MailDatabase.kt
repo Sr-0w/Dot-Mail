@@ -47,6 +47,18 @@ internal const val MESSAGE_META = "id,accountId,folderId,threadId,uid,header,sub
 
 @Dao
 interface MailDao {
+    @Query("SELECT * FROM search_pending ORDER BY messageId LIMIT :limit") suspend fun searchPending(limit: Int): List<SearchPendingRow>
+    @Query("DELETE FROM search_matches WHERE queryHash NOT IN(SELECT queryHash FROM search_matches GROUP BY queryHash ORDER BY MAX(rowid) DESC LIMIT 32)") suspend fun pruneSearchMatches()
+    @Query("SELECT COUNT(*) FROM search_pending") suspend fun searchPendingCount(): Int
+    @Query("SELECT COUNT(*) FROM search_pending") fun observeSearchPendingCount(): Flow<Int>
+    @Query("SELECT COUNT(*) FROM messages") suspend fun searchMessageCount(): Int
+    @Query("DELETE FROM search_pending WHERE messageId=:id AND revision=:revision") suspend fun finishSearchIndex(id: Long, revision: Long)
+    @Query("SELECT * FROM search_documents WHERE messageId=:id") suspend fun searchDocument(id:Long): SearchDocumentRow?
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putSearchDocument(row: SearchDocumentRow)
+    @Query("DELETE FROM message_fts WHERE rowid=:id") suspend fun clearMessageFts(id: Long)
+    @Insert suspend fun putMessageFts(row: MessageFtsRow)
+    @RawQuery(observedEntities = [SearchDocumentRow::class, MessageRow::class, ThreadRow::class, FolderRow::class, SearchMatchRow::class]) fun searchPage(query: SupportSQLiteQuery): PagingSource<Int, IndexedSearchRow>
+
     @Query("SELECT * FROM accounts ORDER BY id") fun observeAccounts(): Flow<List<AccountRow>>
     @Query("SELECT * FROM accounts ORDER BY id") suspend fun accounts(): List<AccountRow>
     @Query("SELECT * FROM accounts WHERE id=:id") suspend fun account(id: Long): AccountRow?
@@ -157,7 +169,7 @@ interface MailDao {
     @Query("SELECT email, name, MAX(lastSeen) AS lastSeen, accountId FROM contacts WHERE email LIKE :prefix ESCAPE '!' OR name LIKE :prefix ESCAPE '!' GROUP BY email ORDER BY lastSeen DESC LIMIT :limit") suspend fun contacts(prefix: String, limit: Int): List<ContactRow>
 }
 
-@Database(entities = [AccountRow::class, FolderRow::class, ThreadRow::class, ThreadKeyRow::class, MessageRow::class, AttachmentRow::class, DraftRow::class, OutboxRow::class, OperationRow::class, ContactRow::class, BodyTextRow::class, SearchMatchRow::class, SnoozeRow::class, DraftMirrorRow::class], version = 7, exportSchema = true)
+@Database(entities = [AccountRow::class, FolderRow::class, ThreadRow::class, ThreadKeyRow::class, MessageRow::class, AttachmentRow::class, DraftRow::class, OutboxRow::class, OperationRow::class, ContactRow::class, BodyTextRow::class, SearchMatchRow::class, SnoozeRow::class, DraftMirrorRow::class, SearchDocumentRow::class, MessageFtsRow::class, SearchPendingRow::class], version = 8, exportSchema = true)
 abstract class MailDatabase : RoomDatabase() { abstract fun mail(): MailDao }
 
 internal val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
@@ -211,5 +223,17 @@ internal val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
         db.execSQL("CREATE TABLE IF NOT EXISTS draft_mirrors (localId INTEGER NOT NULL PRIMARY KEY, accountId INTEGER NOT NULL, token TEXT NOT NULL, revision INTEGER NOT NULL, syncedRevision INTEGER NOT NULL, dueAt INTEGER NOT NULL, folderId INTEGER, validity INTEGER NOT NULL, uid INTEGER NOT NULL, deleted INTEGER NOT NULL, attemptRevision INTEGER, FOREIGN KEY(accountId) REFERENCES accounts(id) ON UPDATE NO ACTION ON DELETE CASCADE)")
         db.execSQL("CREATE INDEX IF NOT EXISTS index_draft_mirrors_accountId ON draft_mirrors(accountId)")
         db.execSQL("INSERT INTO draft_mirrors(localId,accountId,token,revision,syncedRevision,dueAt,folderId,validity,uid,deleted,attemptRevision) SELECT d.id,d.accountId,lower(hex(randomblob(16))),1,0,0,m.folderId,COALESCE(f.validity,0),MAX(COALESCE(m.uid,0),0),0,NULL FROM drafts d LEFT JOIN messages m ON m.id=d.sourceMessageId LEFT JOIN folders f ON f.id=m.folderId")
+    }
+}
+
+
+internal val MIGRATION_7_8 = object : androidx.room.migration.Migration(7, 8) {
+    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS search_documents (messageId INTEGER NOT NULL PRIMARY KEY, body TEXT NOT NULL, files TEXT NOT NULL, attachmentText TEXT NOT NULL, FOREIGN KEY(messageId) REFERENCES messages(id) ON DELETE CASCADE)")
+        db.execSQL("CREATE VIRTUAL TABLE IF NOT EXISTS message_fts USING FTS4(subject TEXT NOT NULL, sender TEXT NOT NULL, recipients TEXT NOT NULL, body TEXT NOT NULL, files TEXT NOT NULL, attachmentText TEXT NOT NULL, tokenize=unicode61)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS search_pending (messageId INTEGER NOT NULL PRIMARY KEY, revision INTEGER NOT NULL, FOREIGN KEY(messageId) REFERENCES messages(id) ON DELETE CASCADE)")
+        db.execSQL("DELETE FROM body_text") // Superseded unbounded LIKE chunks; the bounded FTS worker backfills cached files.
+        installSearchTriggers(db)
+        db.execSQL("INSERT OR IGNORE INTO search_pending(messageId,revision) SELECT id,1 FROM messages")
     }
 }

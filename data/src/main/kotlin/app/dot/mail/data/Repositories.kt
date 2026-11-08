@@ -100,6 +100,11 @@ interface MailRepository {
     /** Searches local cache immediately; server search results are merged in as they arrive. */
     fun search(query: String, accountId: Long? = null): Flow<PagingData<ThreadSummary>>
 
+    /** Scoped full-content search; keep collecting searchProgress to show partial indexing/server failures. */
+    fun search(query: String, scope: app.dot.mail.data.model.SearchScope): Flow<PagingData<app.dot.mail.data.model.SearchResult>> = kotlinx.coroutines.flow.flowOf(PagingData.empty())
+    val searchIndexProgress: Flow<app.dot.mail.data.model.SearchIndexProgress> get() = kotlinx.coroutines.flow.flowOf(app.dot.mail.data.model.SearchIndexProgress())
+    fun searchProgress(query: String, scope: app.dot.mail.data.model.SearchScope): Flow<app.dot.mail.data.model.SearchProgress> = kotlinx.coroutines.flow.flowOf(app.dot.mail.data.model.SearchProgress())
+
     /** Messages of a conversation, oldest first. Bodies download on demand via [loadBody]. */
     fun thread(threadId: Long): Flow<List<Message>>
 

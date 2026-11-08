@@ -23,6 +23,9 @@ class RepositoryTest {
     private lateinit var graph: RealMailGraph
     private val config = AccountConfig("alice@example.org", "Alice", ServerConfig("localhost", 143, Security.NONE, "alice"), ServerConfig("localhost", 25, Security.NONE, "alice"))
     @Before fun setup() {
+        // Robolectric gives each method a new filesDir; FileProvider caches the old root in a static map.
+        val paths=androidx.core.content.FileProvider::class.java.getDeclaredField("sCache").apply { isAccessible=true }.get(null) as MutableMap<*,*>
+        synchronized(paths) { paths.clear() }
         val context = ApplicationProvider.getApplicationContext<Context>()
         db = Room.inMemoryDatabaseBuilder(context, MailDatabase::class.java).allowMainThreadQueries().build()
         graph = RealMailGraph(context, db, object : CredentialVault {
@@ -118,7 +121,8 @@ class RepositoryTest {
         val folder = FolderRow(id = db.mail().insertFolder(FolderRow(accountId = account, path = "INBOX", name = "INBOX", role = "INBOX")), accountId = account, path = "INBOX", name = "INBOX", role = "INBOX")
         graph.upsertHeader(folder, Header(1, "<search@example.org>", emptyList(), null, listOf(Address("bob@example.org", "Bob Smith")), listOf(Address("alice@example.org")), emptyList(), emptyList(), emptyList(), "Weekly Report", 100, RemoteFlags(1, false, true, false), true))
         suspend fun count(query: String, accountId: Long? = null): Int {
-            val page = graph.searchSource(query, accountId).load(androidx.paging.PagingSource.LoadParams.Refresh(key = null, loadSize = 40, placeholdersEnabled = false))
+            graph.searchIndex.drain()
+            val page = graph.fullSearch.source(query, SearchScope(accountIds=accountId?.let { setOf(it) } ?: emptySet(),includeServer=false)).load(androidx.paging.PagingSource.LoadParams.Refresh(key = null, loadSize = 40, placeholdersEnabled = false))
             return (page as androidx.paging.PagingSource.LoadResult.Page).data.size
         }
         assertEquals(1, count("from:bob to:alice subject:Report has:attachment is:unread is:starred"))

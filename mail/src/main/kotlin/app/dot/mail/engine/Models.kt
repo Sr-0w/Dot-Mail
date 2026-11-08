@@ -20,7 +20,9 @@ data class Header(
     val unsubscribeOneClick: String? = null,
     val classificationHeaders: Map<String, List<String>> = emptyMap(),
     val hasPdfAttachment: Boolean = false,
+    val attachmentNames: List<String> = emptyList(),
 )
+data class SearchBatch(val uidValidity: Long, val headers: List<Header>, val limited: Boolean = false)
 data class HeaderFailure(val uid: Long, val error: Exception)
 data class HeaderSync(val cursor: SyncCursor, val reset: Boolean, val headers: List<Header>, val flags: List<RemoteFlags>, val existingUids: Set<Long>, val failures: List<HeaderFailure> = emptyList(), val unchanged: Boolean = false)
 data class MimeAttachment(val partId: String, val name: String, val mimeType: String, val contentId: String?, val inline: Boolean, val bytes: ByteArray)
