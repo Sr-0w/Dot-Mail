@@ -2,6 +2,9 @@ package app.dot.mail.ui.inbox
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.RepeatMode
@@ -13,7 +16,11 @@ import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -115,6 +122,8 @@ import app.dot.design.components.EmptyState
 import app.dot.design.components.ListRow
 import app.dot.design.components.UnreadDot
 import app.dot.design.components.dotShimmer
+import app.dot.design.components.dotSurfaceEnter
+import app.dot.design.rememberReducedMotion
 import app.dot.mail.Density
 import app.dot.mail.LocalMailGraph
 import app.dot.mail.LocalSettings
@@ -179,10 +188,25 @@ fun InboxScreen(
         },
     ) {
         Box(Modifier.fillMaxSize().background(Dot.colors.background)) {
+            val reducedMotion = rememberReducedMotion()
             Column(Modifier.fillMaxSize()) {
                 AnimatedContent(
                     targetState = selection.isNotEmpty(),
-                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    transitionSpec = {
+                        if (reducedMotion) {
+                            EnterTransition.None togetherWith ExitTransition.None
+                        } else if (targetState) {
+                            (slideInVertically(tween(200, easing = DotMotion.decelerate)) { -it / 4 } +
+                                fadeIn(tween(180, easing = DotMotion.decelerate))) togetherWith
+                                (slideOutVertically(tween(150, easing = DotMotion.accelerate)) { it / 4 } +
+                                    fadeOut(tween(120, easing = DotMotion.accelerate)))
+                        } else {
+                            (slideInVertically(tween(200, easing = DotMotion.decelerate)) { it / 4 } +
+                                fadeIn(tween(180, easing = DotMotion.decelerate))) togetherWith
+                                (slideOutVertically(tween(150, easing = DotMotion.accelerate)) { -it / 4 } +
+                                    fadeOut(tween(120, easing = DotMotion.accelerate)))
+                        }.using(SizeTransform(clip = false))
+                    },
                     label = "topbar",
                 ) { selecting ->
                     if (selecting) {
@@ -275,7 +299,7 @@ fun InboxScreen(
 
     pendingTrash?.let { ids ->
         androidx.compose.material3.AlertDialog(
-            onDismissRequest = { pendingTrash = null }, containerColor = Dot.colors.surface, shape = DotShapes.large,
+            onDismissRequest = { pendingTrash = null }, modifier = Modifier.dotSurfaceEnter(), containerColor = Dot.colors.surface, shape = DotShapes.large,
             title = { Text(if (ids.size == 1) "Move to trash?" else "Move ${ids.size} conversations to trash?", style = Dot.type.title, color = Dot.colors.textPrimary) },
             confirmButton = { app.dot.design.components.DotButton("Delete", { pendingTrash = null; vm.act(MessageAction.TRASH, ids) }, style = app.dot.design.components.ButtonStyle.Danger, compact = true) },
             dismissButton = { app.dot.design.components.DotButton("Cancel", { pendingTrash = null }, style = app.dot.design.components.ButtonStyle.Ghost, compact = true) },
@@ -284,6 +308,7 @@ fun InboxScreen(
     if (showMove) {
         ModalBottomSheet(
             onDismissRequest = { showMove = false },
+            modifier = Modifier.dotSurfaceEnter(),
             containerColor = Dot.colors.surface,
             shape = DotShapes.sheet,
             dragHandle = null,
@@ -461,7 +486,12 @@ fun ThreadRow(
 ) {
     val c = Dot.colors
     val haptics = LocalHapticFeedback.current
-    val bg by animateColorAsState(if (selected) c.surfaceRaised else c.background, label = "row-bg")
+    val reducedMotion = rememberReducedMotion()
+    val bg by animateColorAsState(
+        if (selected) c.surfaceRaised else c.background,
+        animationSpec = DotMotion.fastSpec(reducedMotion),
+        label = "row-bg",
+    )
     val unread = thread.isUnread
     val sender = if (showRecipients && thread.recipients.isNotEmpty()) {
         "To " + thread.recipients.joinToString(", ") { it.displayName.substringBefore(' ').ifBlank { it.displayName } }
@@ -492,7 +522,20 @@ fun ThreadRow(
         }
         if (!compact) {
             Box(Modifier.clip(CircleShape).combinedClickable(onClickLabel = if (selected) "Deselect" else "Select", onClick = onLongClick).clearAndSetSemantics { }) {
-                AnimatedContent(selected || selectionMode, label = "avatar") { sel ->
+                AnimatedContent(
+                    targetState = selected || selectionMode,
+                    transitionSpec = {
+                        if (reducedMotion) {
+                            EnterTransition.None togetherWith ExitTransition.None
+                        } else {
+                            (scaleIn(tween(180, easing = DotMotion.decelerate), initialScale = 0.85f) +
+                                fadeIn(tween(150, easing = DotMotion.decelerate))) togetherWith
+                                (scaleOut(tween(120, easing = DotMotion.accelerate), targetScale = 0.85f) +
+                                    fadeOut(tween(120, easing = DotMotion.accelerate)))
+                        }
+                    },
+                    label = "avatar",
+                ) { sel ->
                     if (sel) SelectCircle(selected)
                     else {
                         val first = if (showRecipients) thread.recipients.firstOrNull() ?: thread.participants.lastOrNull() else thread.participants.lastOrNull()
@@ -501,9 +544,17 @@ fun ThreadRow(
                 }
             }
             Spacer(Modifier.width(DotSpacing.m))
-        } else if (selectionMode) {
-            SelectCircle(selected, size = 24)
-            Spacer(Modifier.width(DotSpacing.m))
+        } else {
+            AnimatedVisibility(
+                visible = selectionMode,
+                enter = if (reducedMotion) EnterTransition.None else expandHorizontally(tween(180, easing = DotMotion.standard)) + fadeIn(tween(150)),
+                exit = if (reducedMotion) ExitTransition.None else shrinkHorizontally(tween(150, easing = DotMotion.standard)) + fadeOut(tween(120)),
+            ) {
+                Row {
+                    SelectCircle(selected, size = 24)
+                    Spacer(Modifier.width(DotSpacing.m))
+                }
+            }
         }
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -574,11 +625,40 @@ private fun senderLine(t: ThreadSummary, me: Set<String> = emptySet()): String {
 @Composable
 private fun SelectCircle(selected: Boolean, size: Int = 40) {
     val c = Dot.colors
+    val reducedMotion = rememberReducedMotion()
+    val bg by animateColorAsState(
+        if (selected) c.inverse else c.surfaceRaised,
+        animationSpec = DotMotion.fastSpec(reducedMotion),
+        label = "sel-circle-bg",
+    )
+    val checkScale by animateFloatAsState(
+        if (selected) 1f else 0.6f,
+        animationSpec = DotMotion.spec(180, DotMotion.decelerate, reducedMotion),
+        label = "sel-check-scale",
+    )
+    val checkAlpha by animateFloatAsState(
+        if (selected) 1f else 0f,
+        animationSpec = DotMotion.fastSpec(reducedMotion),
+        label = "sel-check-alpha",
+    )
     Box(
-        Modifier.size(size.dp).clip(CircleShape).background(if (selected) c.inverse else c.surfaceRaised),
+        Modifier.size(size.dp).clip(CircleShape).background(bg),
         contentAlignment = Alignment.Center,
     ) {
-        if (selected) Icon(Icons.Outlined.Check, "Selected", Modifier.size((size / 2).dp), tint = c.onInverse)
+        if (selected || checkAlpha > 0.01f) {
+            Icon(
+                Icons.Outlined.Check,
+                if (selected) "Selected" else null,
+                Modifier
+                    .size((size / 2).dp)
+                    .graphicsLayer {
+                        scaleX = checkScale
+                        scaleY = checkScale
+                        alpha = checkAlpha
+                    },
+                tint = c.onInverse,
+            )
+        }
     }
 }
 

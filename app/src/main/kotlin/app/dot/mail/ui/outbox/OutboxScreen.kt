@@ -41,6 +41,7 @@ import app.dot.design.components.DotButton
 import app.dot.design.components.DotTopBar
 import app.dot.design.components.EmptyState
 import app.dot.design.components.Hairline
+import app.dot.design.components.dotSurfaceEnter
 import app.dot.mail.LocalMailGraph
 import app.dot.mail.data.model.OutboxItem
 import app.dot.mail.data.model.OutboxState
@@ -107,6 +108,7 @@ fun OutboxScreen(onBack: () -> Unit) {
     confirmDuplicate?.let { item ->
         AlertDialog(
             onDismissRequest = { confirmDuplicate = null },
+            modifier = Modifier.dotSurfaceEnter(),
             containerColor = c.surface,
             shape = DotShapes.large,
             title = { Text("Send again?", style = Dot.type.title, color = c.textPrimary) },

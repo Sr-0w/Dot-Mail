@@ -85,6 +85,7 @@ import app.dot.design.components.DotTopBar
 import app.dot.design.components.Hairline
 import app.dot.design.components.ListRow
 import app.dot.design.components.SectionLabel
+import app.dot.design.components.dotSurfaceEnter
 import app.dot.mail.AfterAction
 import app.dot.mail.BuildConfig
 import app.dot.mail.ComposeFormat
@@ -348,6 +349,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
     removing?.let { a ->
         AlertDialog(
             onDismissRequest = { removing = null },
+            modifier = Modifier.dotSurfaceEnter(),
             containerColor = c.surface,
             shape = DotShapes.large,
             icon = { Avatar(a.displayName, a.email) },
@@ -369,6 +371,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
     if (about) {
         AlertDialog(
             onDismissRequest = { about = false },
+            modifier = Modifier.dotSurfaceEnter(),
             containerColor = c.surface,
             shape = DotShapes.large,
             title = { Text("Dot Mail ${BuildConfig.VERSION_NAME}", style = Dot.type.title, color = c.textPrimary) },
@@ -385,6 +388,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
     if (licences) {
         AlertDialog(
             onDismissRequest = { licences = false },
+            modifier = Modifier.dotSurfaceEnter(),
             containerColor = c.surface,
             shape = DotShapes.large,
             title = { Text("Open-source licences", style = Dot.type.title, color = c.textPrimary) },

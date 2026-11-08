@@ -1,11 +1,15 @@
 package app.dot.mail.ui
 
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,6 +39,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import app.dot.design.Dot
 import app.dot.design.DotMotion
+import app.dot.design.rememberReducedMotion
 import app.dot.mail.ExternalRequest
 import app.dot.mail.LocalMailGraph
 import app.dot.mail.ui.account.AddAccountScreen
@@ -81,13 +86,14 @@ fun DotMailRoot(requests: StateFlow<ExternalRequest?>, onRequestConsumed: () -> 
     Box(Modifier.fillMaxSize().background(Dot.colors.background)) {
         val ready = hasAccounts ?: return@Box
         val nav = rememberNavController()
+        val reducedMotion = rememberReducedMotion()
         NavHost(
             navController = nav,
             startDestination = if (ready) InboxRoute else WelcomeRoute,
-            enterTransition = { slideIn() },
-            exitTransition = { fadeOut(tween(DotMotion.fast)) },
-            popEnterTransition = { fadeIn(tween(DotMotion.medium, easing = DotMotion.decelerate)) },
-            popExitTransition = { slideOut() },
+            enterTransition = { quietEnter(reducedMotion) },
+            exitTransition = { quietExit(reducedMotion) },
+            popEnterTransition = { quietPopEnter(reducedMotion) },
+            popExitTransition = { quietPopExit(reducedMotion) },
         ) {
             composable<WelcomeRoute> {
                 WelcomeScreen(onAddAccount = { nav.navigate(AddAccountRoute(firstAccount = true)) })
@@ -123,7 +129,12 @@ fun DotMailRoot(requests: StateFlow<ExternalRequest?>, onRequestConsumed: () -> 
                     },
                 )
             }
-            composable<ComposeRoute> { entry ->
+            composable<ComposeRoute>(
+                enterTransition = { composeEnter(reducedMotion) },
+                exitTransition = { if (reducedMotion) ExitTransition.None else fadeOut(tween(DotMotion.fast)) },
+                popEnterTransition = { if (reducedMotion) EnterTransition.None else fadeIn(tween(NAV_DURATION_MS, easing = DotMotion.decelerate)) },
+                popExitTransition = { composePopExit(reducedMotion) },
+            ) { entry ->
                 ComposeScreen(route = entry.toRoute(), onClose = { nav.popBackStack() })
             }
             composable<SearchRoute> {
@@ -163,13 +174,43 @@ fun DotMailRoot(requests: StateFlow<ExternalRequest?>, onRequestConsumed: () -> 
     }
 }
 
-private fun AnimatedContentTransitionScope<NavBackStackEntry>.slideIn() =
-    slideInHorizontally(tween(DotMotion.medium, easing = DotMotion.standard)) { it / 8 } +
-        fadeIn(tween(DotMotion.medium, easing = DotMotion.decelerate))
+private const val NAV_DURATION_MS = 220
 
-private fun AnimatedContentTransitionScope<NavBackStackEntry>.slideOut() =
-    slideOutHorizontally(tween(DotMotion.medium, easing = DotMotion.standard)) { it / 8 } +
-        fadeOut(tween(DotMotion.fast))
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.quietEnter(reducedMotion: Boolean): EnterTransition =
+    if (reducedMotion) EnterTransition.None else {
+        fadeIn(tween(NAV_DURATION_MS, easing = DotMotion.decelerate)) +
+            slideInHorizontally(tween(NAV_DURATION_MS, easing = DotMotion.standard)) { it / 12 }
+    }
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.quietExit(reducedMotion: Boolean): ExitTransition =
+    if (reducedMotion) ExitTransition.None else {
+        fadeOut(tween(DotMotion.fast, easing = DotMotion.accelerate)) +
+            slideOutHorizontally(tween(NAV_DURATION_MS, easing = DotMotion.standard)) { -it / 12 }
+    }
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.quietPopEnter(reducedMotion: Boolean): EnterTransition =
+    if (reducedMotion) EnterTransition.None else {
+        fadeIn(tween(NAV_DURATION_MS, easing = DotMotion.decelerate)) +
+            slideInHorizontally(tween(NAV_DURATION_MS, easing = DotMotion.standard)) { -it / 12 }
+    }
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.quietPopExit(reducedMotion: Boolean): ExitTransition =
+    if (reducedMotion) ExitTransition.None else {
+        fadeOut(tween(DotMotion.fast, easing = DotMotion.accelerate)) +
+            slideOutHorizontally(tween(NAV_DURATION_MS, easing = DotMotion.standard)) { it / 12 }
+    }
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.composeEnter(reducedMotion: Boolean): EnterTransition =
+    if (reducedMotion) EnterTransition.None else {
+        slideInVertically(tween(NAV_DURATION_MS, easing = DotMotion.decelerate)) { it / 6 } +
+            fadeIn(tween(NAV_DURATION_MS, easing = DotMotion.decelerate))
+    }
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.composePopExit(reducedMotion: Boolean): ExitTransition =
+    if (reducedMotion) ExitTransition.None else {
+        slideOutVertically(tween(NAV_DURATION_MS, easing = DotMotion.accelerate)) { it / 6 } +
+            fadeOut(tween(DotMotion.fast, easing = DotMotion.accelerate))
+    }
 
 
 /** "Sending… Undo" lives at the root so it survives the compose screen closing. */

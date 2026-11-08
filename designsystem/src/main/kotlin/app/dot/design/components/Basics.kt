@@ -60,6 +60,7 @@ import app.dot.design.Dot
 import app.dot.design.DotMotion
 import app.dot.design.DotShapes
 import app.dot.design.DotSpacing
+import app.dot.design.rememberReducedMotion
 
 /** 0.5dp separator, inset by default to align with row text. */
 @Composable
@@ -94,6 +95,7 @@ fun DotButton(
     val haptics = LocalHapticFeedback.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val reduceMotion = rememberReducedMotion()
     val (bg, fg, outline) = when (style) {
         ButtonStyle.Primary -> Triple(c.inverse, c.onInverse, Color.Transparent)
         ButtonStyle.Secondary -> Triple(Color.Transparent, c.textPrimary, c.borderStrong)
@@ -107,7 +109,7 @@ fun DotButton(
             pressed -> c.surfaceRaised
             else -> bg
         },
-        tween(DotMotion.fast), label = "btn",
+        DotMotion.fastSpec(reduceMotion), label = "btn",
     )
     val fgFinal = if (enabled) fg else c.textTertiary
     Row(
@@ -161,6 +163,7 @@ fun DotPrimaryButton(
     val haptics = LocalHapticFeedback.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val reduceMotion = rememberReducedMotion()
     // Solid Accent Blue fill with >= 4.7:1 WCAG AA contrast against white foreground in both themes.
     val accentFill = if (c.isDark) Color(0xFF476CE8) else c.accent
     val bgAnimated by animateColorAsState(
@@ -169,7 +172,7 @@ fun DotPrimaryButton(
             pressed -> accentFill.copy(alpha = 0.86f)
             else -> accentFill
         },
-        tween(DotMotion.fast), label = "primary-btn",
+        DotMotion.fastSpec(reduceMotion), label = "primary-btn",
     )
     val fgFinal = if (enabled) Color.White else c.textTertiary
     Row(
@@ -221,6 +224,7 @@ fun DotPrimaryButton(
     val haptics = LocalHapticFeedback.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val reduceMotion = rememberReducedMotion()
     val accentFill = if (c.isDark) Color(0xFF476CE8) else c.accent
     val bgAnimated by animateColorAsState(
         when {
@@ -228,7 +232,7 @@ fun DotPrimaryButton(
             pressed -> accentFill.copy(alpha = 0.86f)
             else -> accentFill
         },
-        tween(DotMotion.fast), label = "primary-icon-btn",
+        DotMotion.fastSpec(reduceMotion), label = "primary-icon-btn",
     )
     val fgFinal = if (enabled) Color.White else c.textTertiary
     val visualSize = if (compact) 40.dp else 48.dp
@@ -273,15 +277,10 @@ fun DotFrostedPill(
     contentDescription: String? = label,
 ) {
     val c = Dot.colors
-    val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val reduceMotion = remember(context) {
-        runCatching {
-            Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
-        }.getOrDefault(false)
-    }
+    val reduceMotion = rememberReducedMotion()
 
     val surfaceBrush = if (c.isDark) {
         val top = if (pressed) Color(0xEB313138) else Color(0xE02A2A30)

@@ -1,9 +1,17 @@
 package app.dot.design
 
+import android.provider.Settings
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -177,4 +185,43 @@ object DotMotion {
     const val fast = 150
     const val medium = 250
     const val slow = 380
+
+    /** Returns [snap] when [reducedMotion] is true, otherwise a [tween] with [durationMillis] and [easing]. */
+    fun <T> spec(
+        durationMillis: Int = medium,
+        easing: Easing = standard,
+        reducedMotion: Boolean = false,
+    ): FiniteAnimationSpec<T> = if (reducedMotion) snap() else tween(durationMillis = durationMillis, easing = easing)
+
+    fun <T> fastSpec(reducedMotion: Boolean = false, easing: Easing = standard): FiniteAnimationSpec<T> =
+        spec(durationMillis = fast, easing = easing, reducedMotion = reducedMotion)
+
+    fun <T> mediumSpec(reducedMotion: Boolean = false, easing: Easing = standard): FiniteAnimationSpec<T> =
+        spec(durationMillis = medium, easing = easing, reducedMotion = reducedMotion)
+
+    fun <T> slowSpec(reducedMotion: Boolean = false, easing: Easing = standard): FiniteAnimationSpec<T> =
+        spec(durationMillis = slow, easing = easing, reducedMotion = reducedMotion)
+
+    /** Composable convenience that reads [rememberReducedMotion] and returns [snap] when reduced motion is enabled. */
+    @Composable
+    fun <T> rememberSpec(
+        durationMillis: Int = medium,
+        easing: Easing = standard,
+    ): FiniteAnimationSpec<T> {
+        val reduced = rememberReducedMotion()
+        return remember(reduced, durationMillis, easing) { spec(durationMillis, easing, reduced) }
+    }
+}
+
+/**
+ * True when the user has disabled system animations (`Settings.Global.ANIMATOR_DURATION_SCALE == 0f`).
+ */
+@Composable
+fun rememberReducedMotion(): Boolean {
+    val context = LocalContext.current
+    return remember(context) {
+        runCatching {
+            Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+        }.getOrDefault(false)
+    }
 }

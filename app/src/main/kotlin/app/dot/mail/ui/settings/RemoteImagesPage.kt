@@ -40,6 +40,7 @@ import app.dot.design.components.DotTopBar
 import app.dot.design.components.Hairline
 import app.dot.design.components.ListRow
 import app.dot.design.components.SectionLabel
+import app.dot.design.components.dotSurfaceEnter
 import app.dot.mail.LocalSettings
 import app.dot.mail.data.model.Account
 
@@ -102,6 +103,7 @@ internal fun RemoteImagesPage(accounts: List<Account>, onBack: () -> Unit) {
     if (confirmReset) {
         AlertDialog(
             onDismissRequest = { confirmReset = false },
+            modifier = Modifier.dotSurfaceEnter(),
             containerColor = c.surface, shape = DotShapes.large,
             title = { Text("Reset all rules?", style = Dot.type.title, color = c.textPrimary) },
             text = { Text("Images will be blocked again for every sender and domain on the list.", style = Dot.type.callout, color = c.textSecondary) },
@@ -120,6 +122,7 @@ private fun AddRuleDialog(accounts: List<Account>, onDismiss: () -> Unit, onAdd:
     var error by remember { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.dotSurfaceEnter(),
         containerColor = c.surface, shape = DotShapes.large,
         title = { Text("Add sender or domain", style = Dot.type.title, color = c.textPrimary) },
         text = {

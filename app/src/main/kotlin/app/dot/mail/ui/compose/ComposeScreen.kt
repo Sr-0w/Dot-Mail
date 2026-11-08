@@ -125,6 +125,8 @@ import app.dot.design.components.DotPrimaryButton
 import app.dot.design.components.DotTextField
 import app.dot.design.components.DotTopBar
 import app.dot.design.components.Hairline
+import app.dot.design.components.dotSurfaceEnter
+import app.dot.design.rememberReducedMotion
 import app.dot.mail.ComposeFormat
 import app.dot.mail.LocalMailGraph
 import app.dot.mail.LocalSettings
@@ -174,11 +176,7 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
     val toFocus = remember { FocusRequester() }
     val ccFocus = remember { FocusRequester() }
     var focusCcOnReveal by remember { mutableStateOf(false) }
-    val reduceMotion = remember(context) {
-        runCatching {
-            Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
-        }.getOrDefault(false)
-    }
+    val reduceMotion = rememberReducedMotion()
 
     val richTextState = rememberRichTextState()
     LaunchedEffect(c.accent, c.textPrimary, c.surfaceRaised, c.border) {
@@ -642,6 +640,7 @@ private fun QuotedReplySection(
     onToggle: () -> Unit,
 ) {
     val c = Dot.colors
+    val reduceMotion = rememberReducedMotion()
     Column(Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s)) {
         Box(
             Modifier
@@ -660,7 +659,11 @@ private fun QuotedReplySection(
         ) {
             Text("•••", style = Dot.type.label, color = c.textSecondary)
         }
-        AnimatedVisibility(expanded) {
+        AnimatedVisibility(
+            visible = expanded,
+            enter = if (reduceMotion) EnterTransition.None else expandVertically(tween(200, easing = FastOutSlowInEasing)) + fadeIn(tween(200, easing = FastOutSlowInEasing)),
+            exit = if (reduceMotion) ExitTransition.None else shrinkVertically(tween(200, easing = FastOutSlowInEasing)) + fadeOut(tween(150, easing = FastOutSlowInEasing)),
+        ) {
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -693,6 +696,7 @@ private fun ConfirmPlainTextDialog(
     val c = Dot.colors
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.dotSurfaceEnter(),
         containerColor = c.surface,
         shape = DotShapes.large,
         title = { Text("Plain text", style = Dot.type.title, color = c.textPrimary) },
@@ -718,6 +722,7 @@ private fun InsertLinkDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.dotSurfaceEnter(),
         containerColor = c.surface,
         shape = DotShapes.large,
         title = { Text(if (isEditing) "Edit link" else "Insert link", style = Dot.type.title, color = c.textPrimary) },
