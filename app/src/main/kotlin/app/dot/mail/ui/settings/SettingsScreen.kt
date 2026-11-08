@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.ContactPage
+import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.Fingerprint
@@ -126,8 +127,9 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
     var accountPage by rememberSaveable { mutableLongStateOf(0L) }
     var identityPage by rememberSaveable { mutableLongStateOf(-1L) }
     var remoteImagesPage by rememberSaveable { mutableStateOf(false) }
+    var categoriesPage by rememberSaveable { mutableStateOf(false) }
     val pageAccount = accounts.firstOrNull { it.id == accountPage }
-    BackHandler(enabled = accountPage != 0L || remoteImagesPage) { if (remoteImagesPage) remoteImagesPage = false else if (identityPage >= 0) identityPage = -1 else accountPage = 0 }
+    BackHandler(enabled = accountPage != 0L || remoteImagesPage || categoriesPage) { if (categoriesPage) categoriesPage = false else if (remoteImagesPage) remoteImagesPage = false else if (identityPage >= 0) identityPage = -1 else accountPage = 0 }
     val c = Dot.colors
     val canLock = remember {
         BiometricManager.from(context).canAuthenticate(
@@ -148,7 +150,9 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
     // Permission revoked in system settings while the toggle was on: show it off.
     LaunchedEffect(Unit) { contactsGranted = hasContacts() }
 
-    if (remoteImagesPage) {
+    if (categoriesPage) {
+        CategoriesPage(onBack = { categoriesPage = false })
+    } else if (remoteImagesPage) {
         RemoteImagesPage(accounts, onBack = { remoteImagesPage = false })
     } else if (pageAccount != null && identityPage >= 0) {
         IdentityEditorPage(pageAccount, identityPage, onBack = { identityPage = -1 })
@@ -311,6 +315,13 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             )
             ChoiceRow(stringResource(R.string.settings_notif_button_first), Icons.Outlined.Notifications, buttons[0], actionOptions) { rules.setActions(it, buttons[1]) }
             ChoiceRow(stringResource(R.string.settings_notif_button_second), Icons.Outlined.Notifications, buttons[1], actionOptions) { rules.setActions(buttons[0], it) }
+            Divider()
+
+            ListRow(
+                stringResource(R.string.settings_categories), subtitle = stringResource(R.string.settings_categories_sub),
+                icon = Icons.Outlined.Email, onClick = { categoriesPage = true },
+                trailing = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = Dot.colors.textTertiary) },
+            )
             Divider()
 
             // ---- Privacy & security

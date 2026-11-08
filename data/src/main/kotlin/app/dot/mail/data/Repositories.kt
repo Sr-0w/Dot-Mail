@@ -84,6 +84,9 @@ interface MailRepository {
 
     fun folders(accountId: Long): Flow<List<Folder>>
 
+    /** Re-applies the user's classification rules to already cached mail (category views update; nothing moves). */
+    suspend fun reclassifyAll() {}
+
     fun threads(mailbox: Mailbox): Flow<PagingData<ThreadSummary>>
 
     /**

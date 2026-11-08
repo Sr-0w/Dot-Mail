@@ -49,7 +49,22 @@ enum class FolderRole {
     SNOOZED,
     /** Virtual built-in newsletter category, across accounts; never a server folder. */
     NEWSLETTERS,
+    /** Virtual optional category views (opt-in in Settings); mail stays in its folder and in the Inbox. */
+    PURCHASES, BILLS, NOTIFICATIONS, SOCIAL,
 }
+
+/** The classifier category a virtual category view shows, or null for ordinary roles. */
+fun FolderRole.category(): app.dot.mail.engine.text.Category? = when (this) {
+    FolderRole.NEWSLETTERS -> app.dot.mail.engine.text.Category.NEWSLETTER
+    FolderRole.PURCHASES -> app.dot.mail.engine.text.Category.PURCHASE
+    FolderRole.BILLS -> app.dot.mail.engine.text.Category.BILL
+    FolderRole.NOTIFICATIONS -> app.dot.mail.engine.text.Category.NOTIFICATION
+    FolderRole.SOCIAL -> app.dot.mail.engine.text.Category.SOCIAL
+    else -> null
+}
+
+/** The virtual view that shows [this] category (PERSONAL has none). */
+fun app.dot.mail.engine.text.Category.viewRole(): FolderRole? = FolderRole.entries.firstOrNull { it.category() == this }
 
 data class Folder(
     val id: Long,
