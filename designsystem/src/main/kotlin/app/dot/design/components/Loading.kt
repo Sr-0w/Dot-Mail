@@ -235,6 +235,8 @@ fun DotLinearProgress(
     progress: Float? = null,
     modifier: Modifier = Modifier,
     color: Color = Color.Unspecified,
+    /** Draw the grey track behind the bar. Off for hairline sync lines that must vanish entirely when idle. */
+    showTrack: Boolean = true,
 ) {
     val dot = Dot.colors
     val bar = dot.loaderColor(color)
@@ -247,7 +249,7 @@ fun DotLinearProgress(
         contentAlignment = Alignment.Center,
     ) {
         if (progress == null) {
-            DotProgressIndeterminate(Modifier.fillMaxSize(), bar, dot.border, reduced)
+            DotProgressIndeterminate(Modifier.fillMaxSize(), bar, if (showTrack) dot.border else Color.Transparent, reduced)
         } else {
             DotProgressDeterminate(Modifier.fillMaxSize(), bar, dot.border, progress, reduced)
         }
@@ -270,15 +272,19 @@ private fun DotProgressIndeterminate(modifier: Modifier, bar: Color, track: Colo
         label = "linear pulse",
     )
     Canvas(modifier) {
-        drawRect(color = track)
+        if (track != Color.Transparent) drawRect(color = track)
         val h = size.height
         val seg = (size.width * 0.35f).coerceAtLeast(24.dp.toPx())
         val x = if (reduced) (size.width - seg) / 2f else -seg + slide * (size.width + 2f * seg)
-        drawRoundRect(
-            color = bar.copy(alpha = if (reduced) pulse else 1f),
+        val a = if (reduced) pulse else 1f
+        // The segment fades out at both ends, so it never shows a hard-edged block (also while it enters / leaves).
+        drawRect(
+            brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                colors = listOf(bar.copy(alpha = 0f), bar.copy(alpha = a), bar.copy(alpha = 0f)),
+                startX = x, endX = x + seg,
+            ),
             topLeft = Offset(x, 0f),
             size = Size(seg, h),
-            cornerRadius = CornerRadius(h / 2f, h / 2f),
         )
     }
 }

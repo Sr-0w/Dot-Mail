@@ -909,19 +909,21 @@ private fun RecipientRow(
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(start = DotSpacing.gutter, end = DotSpacing.s, top = 8.dp, bottom = 8.dp),
+                .padding(start = DotSpacing.gutter, end = DotSpacing.s),
             verticalAlignment = Alignment.Top,
         ) {
+            // The row is 48dp tall (the contact and Cc/Bcc buttons are 48dp touch targets): the label is centred in that
+            // height and the first line of the field (32dp) sits 8dp below the top, so label, caret and icons share one centre line.
             Box(
                 Modifier
                     .width(44.dp)
-                    .heightIn(min = 32.dp),
+                    .heightIn(min = 48.dp),
                 contentAlignment = Alignment.CenterStart,
             ) {
                 Text(label, style = Dot.type.callout, color = c.textTertiary)
             }
             FlowRow(
-                Modifier.weight(1f),
+                Modifier.weight(1f).padding(vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {

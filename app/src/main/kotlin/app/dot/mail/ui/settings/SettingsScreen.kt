@@ -47,9 +47,10 @@ import androidx.compose.material.icons.outlined.ReplyAll
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.ShieldMoon
 import androidx.compose.material.icons.outlined.Storefront
+import androidx.compose.material.icons.outlined.KeyboardDoubleArrowLeft
+import androidx.compose.material.icons.outlined.KeyboardDoubleArrowRight
 import androidx.compose.material.icons.outlined.SwipeLeft
 import androidx.compose.material.icons.outlined.TextFields
-import androidx.compose.material.icons.outlined.SwipeRight
 import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -182,11 +183,11 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             }
             val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
             ChoiceRow(
-                stringResource(if (rtl) R.string.settings_swipe_left else R.string.settings_swipe_right), if (rtl) Icons.Outlined.SwipeLeft else Icons.Outlined.SwipeRight,
+                stringResource(if (rtl) R.string.settings_swipe_left else R.string.settings_swipe_right), if (rtl) Icons.Outlined.KeyboardDoubleArrowLeft else Icons.Outlined.KeyboardDoubleArrowRight,
                 prefs.swipeStart, SwipeAction.entries.map { it to swipeName(it) },
             ) { a -> settings.update { it.copy(swipeStart = a) } }
             ChoiceRow(
-                stringResource(if (rtl) R.string.settings_swipe_right else R.string.settings_swipe_left), if (rtl) Icons.Outlined.SwipeRight else Icons.Outlined.SwipeLeft,
+                stringResource(if (rtl) R.string.settings_swipe_right else R.string.settings_swipe_left), if (rtl) Icons.Outlined.KeyboardDoubleArrowRight else Icons.Outlined.KeyboardDoubleArrowLeft,
                 prefs.swipeEnd, SwipeAction.entries.map { it to swipeName(it) },
             ) { a -> settings.update { it.copy(swipeEnd = a) } }
             ToggleRow(stringResource(R.string.settings_confirm_delete), stringResource(R.string.settings_confirm_delete_sub), Icons.Outlined.Delete, prefs.confirmDelete) { v ->
