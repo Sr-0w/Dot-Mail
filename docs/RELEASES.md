@@ -108,3 +108,4 @@ every APK entry (signature files excluded), then does the same against the publi
 | Tag | Two clean builds | Published APK | Notes |
 |---|---|---|---|
 | v0.1.0-alpha.1 | **identical** | differs in `classes.dex` and the baseline profile | alpha.1 was built incrementally in a long-lived build directory instead of a clean checkout. `scripts/release.sh` now tags first and builds from a fresh clone of the tag with the same flags as `reprotest.sh`, so from alpha.2 on the published file is expected to match a rebuild. |
+| v0.1.0-alpha.2 | **identical** | **identical** (signature aside) | First release built by the new `release.sh` from a fresh clone of the tag. Two independent rebuilds (different time zones and umasks) and the published APK all match (`scripts/reprotest.sh v0.1.0-alpha.2`: PASS). |

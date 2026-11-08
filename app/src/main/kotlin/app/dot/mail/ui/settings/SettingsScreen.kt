@@ -284,6 +284,19 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
                     )
                 },
             )
+            val instant by graph.mail.instantNotifications.collectAsStateWithLifecycle(false)
+            ToggleRow(
+                "Instant notifications",
+                "Keeps a direct connection to your inbox open so new mail arrives within seconds, with no Google push service. " +
+                    "Uses more battery and shows a permanent notification. Off: checks follow the sync interval.",
+                Icons.Outlined.Notifications, instant,
+            ) { v ->
+                scope.launch {
+                    if (!graph.mail.setInstantNotificationsEnabled(v) && v) {
+                        android.widget.Toast.makeText(context, "Instant notifications couldn't be started on this device.", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
             val rules = remember { app.dot.mail.data.NotificationRules.get(context.applicationContext) }
             val buttons by rules.actions.collectAsStateWithLifecycle()
             val actionOptions = listOf(
