@@ -77,6 +77,11 @@ interface AccountRepository {
 }
 
 interface MailRepository {
+    /** Opt-in persistent Inbox connections. Keeps a foreground notification and can use more battery. */
+    val instantNotifications: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(false)
+    /** Enable from a visible app with an account. False if unavailable or the platform refuses service startup. */
+    suspend fun setInstantNotificationsEnabled(enabled: Boolean): Boolean = false
+
     fun folders(accountId: Long): Flow<List<Folder>>
 
     fun threads(mailbox: Mailbox): Flow<PagingData<ThreadSummary>>
