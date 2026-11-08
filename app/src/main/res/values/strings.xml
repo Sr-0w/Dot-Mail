@@ -740,4 +740,7 @@
     <string name="sync_error_network">no connection to the server</string>
     <string name="sync_error_other">couldn\'t synchronize</string>
     <string name="inbox_retry">Retry</string>
+    <string name="pdf_show_text">Show text</string>
+    <string name="pdf_show_pages">Show pages</string>
+    <string name="pdf_no_text">No selectable text in this PDF (it may be a scan).</string>
 </resources>

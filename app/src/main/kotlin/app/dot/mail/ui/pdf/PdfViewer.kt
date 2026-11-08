@@ -21,8 +21,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.automirrored.outlined.Subject
 import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Text
@@ -73,16 +76,25 @@ fun PdfViewerDialog(
 ) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         val c = Dot.colors
+        var showText by remember { mutableStateOf(false) }
         Column(Modifier.fillMaxSize().background(c.background)) {
             DotTopBar(
                 title = name,
                 navigation = { DotIconButton(Icons.Outlined.Close, stringResource(R.string.compose_close), onClick = onDismiss) },
                 actions = {
+                    if (PdfText.supported) {
+                        DotIconButton(
+                            if (showText) Icons.Outlined.Description else Icons.AutoMirrored.Outlined.Subject,
+                            stringResource(if (showText) R.string.pdf_show_pages else R.string.pdf_show_text),
+                            onClick = { showText = !showText },
+                        )
+                    }
                     DotIconButton(Icons.Outlined.Share, stringResource(R.string.thread_share), onClick = onShare)
                     DotIconButton(Icons.Outlined.OpenInNew, stringResource(R.string.pdf_open_with), onClick = onOpenExternally)
                 },
             )
-            PdfPages(uri, onFailed = onOpenExternally, modifier = Modifier.weight(1f))
+            if (showText) PdfTextView(uri, Modifier.weight(1f))
+            else PdfPages(uri, onFailed = onOpenExternally, modifier = Modifier.weight(1f))
         }
     }
 }
@@ -172,5 +184,57 @@ private fun PdfPage(pdf: PdfDocument, index: Int, widthPx: Int) {
             img.asImageBitmap(), contentDescription = stringResource(R.string.pdf_page, index + 1),
             modifier = Modifier.fillMaxWidth().aspectRatio(img.width.toFloat() / img.height),
         )
+    }
+}
+
+
+/**
+ * Local text extraction with the platform PDF stack (Android 15+ / SDK extension 13): nothing leaves the phone.
+ * Older devices simply don't get the text view.
+ */
+object PdfText {
+    val supported: Boolean
+        get() = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S &&
+            android.os.ext.SdkExtensions.getExtensionVersion(android.os.Build.VERSION_CODES.S) >= 13
+
+    /** Text of every page, pages separated by a blank line; null if unsupported, protected or image-only. */
+    @android.annotation.SuppressLint("NewApi")
+    fun extract(context: android.content.Context, uri: String, maxChars: Int = 500_000): String? {
+        if (!supported) return null
+        return runCatching {
+            context.contentResolver.openFileDescriptor(Uri.parse(uri), "r")!!.use { fd ->
+                PdfRenderer(fd).use { renderer ->
+                    val out = StringBuilder()
+                    for (i in 0 until renderer.pageCount) {
+                        if (out.length >= maxChars) break
+                        renderer.openPage(i).use { page ->
+                            page.textContents.forEach { out.append(it.text) }
+                        }
+                        out.append("\n\n")
+                    }
+                    out.toString().trim().take(maxChars).ifBlank { null }
+                }
+            }
+        }.getOrNull()
+    }
+}
+
+@Composable
+private fun PdfTextView(uri: String, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val c = Dot.colors
+    val text by produceState<String?>(null, uri) { value = withContext(Dispatchers.IO) { PdfText.extract(context, uri) ?: "" } }
+    val t = text
+    when {
+        t == null -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) { DotSpinner(size = 22.dp, color = c.textTertiary) }
+        t.isEmpty() -> Box(modifier.fillMaxSize().padding(DotSpacing.xl), contentAlignment = Alignment.Center) {
+            Text(stringResource(R.string.pdf_no_text), style = Dot.type.callout, color = c.textSecondary)
+        }
+        else -> androidx.compose.foundation.text.selection.SelectionContainer(modifier.fillMaxSize()) {
+            Text(
+                t, style = Dot.type.body, color = c.textPrimary,
+                modifier = Modifier.fillMaxSize().verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(DotSpacing.gutter),
+            )
+        }
     }
 }
