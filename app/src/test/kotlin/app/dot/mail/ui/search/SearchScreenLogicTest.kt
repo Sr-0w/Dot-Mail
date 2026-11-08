@@ -2,13 +2,32 @@ package app.dot.mail.ui.search
 
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.paging.LoadState
 import app.dot.mail.data.model.HighlightRange
+import app.dot.mail.data.model.SearchProgress
 import app.dot.mail.data.model.SearchSort
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 class SearchScreenLogicTest {
     private val bold = SpanStyle(fontWeight = FontWeight.Bold)
+
+    @Test fun `empty page stays searching until local and server work finish`() {
+        val loading = SearchProgress(serverRunning = true, serverAvailable = true)
+        assertThat(searchDisplayState("invoice", 0, LoadState.NotLoading(false), loading)).isEqualTo(SearchDisplayState.SEARCHING)
+        assertThat(searchDisplayState("invoice", 1, LoadState.NotLoading(false), loading)).isEqualTo(SearchDisplayState.PARTIAL_RESULTS)
+        assertThat(searchDisplayState("invoic", 0, LoadState.NotLoading(false), SearchProgress(serverAvailable = true), queryPending = true)).isEqualTo(SearchDisplayState.SEARCHING)
+        assertThat(searchDisplayState("invoice", 0, LoadState.Loading, SearchProgress())).isEqualTo(SearchDisplayState.SEARCHING)
+        assertThat(searchDisplayState("invoice", 0, LoadState.NotLoading(false), SearchProgress(serverAvailable = true))).isEqualTo(SearchDisplayState.NO_RESULTS)
+    }
+
+    @Test fun `display state distinguishes idle results partial and failure`() {
+        assertThat(searchDisplayState("i", 0, LoadState.NotLoading(false), SearchProgress())).isEqualTo(SearchDisplayState.IDLE)
+        assertThat(searchDisplayState("invoice", 1, LoadState.NotLoading(false), SearchProgress(serverAvailable = true))).isEqualTo(SearchDisplayState.RESULTS)
+        assertThat(searchDisplayState("invoice", 0, LoadState.NotLoading(false), SearchProgress(serverError = "offline"))).isEqualTo(SearchDisplayState.PARTIAL_RESULTS)
+        assertThat(searchDisplayState("invoice", 0, LoadState.Error(IllegalStateException()), SearchProgress())).isEqualTo(SearchDisplayState.ERROR)
+        assertThat(searchDisplayState("invoice", 0, LoadState.NotLoading(false), SearchProgress(serverAvailable = true, index = app.dot.mail.data.model.SearchIndexProgress(running = true)))).isEqualTo(SearchDisplayState.NO_RESULTS)
+    }
 
     @Test fun `highlights apply to the exact UTF-16 ranges`(): Unit {
         val text = "Facture d'avril"

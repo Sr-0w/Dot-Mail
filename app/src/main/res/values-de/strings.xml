@@ -290,6 +290,9 @@
     <string name="search_error_body">Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.</string>
     <string name="search_no_results_title">Keine Ergebnisse</string>
     <string name="search_no_results_body">Keine Treffer für „%1$s“ in heruntergeladenen E-Mails oder auf Ihren Servern.</string>
+    <string name="search_no_results_indexing">Noch keine Treffer für „%1$s“. Die Indexierung läuft weiter; weitere Treffer können erscheinen.</string>
+    <string name="search_partial_title">Nur auf diesem Gerät</string>
+    <string name="search_partial_body">Der Server konnte nicht durchsucht werden. Angezeigt werden nur E-Mails auf diesem Gerät.</string>
     <string name="search_hints_intro">Suchen Sie nach Absender, Betreff oder Wörtern in der Nachricht.</string>
     <string name="search_hint_from">E-Mails eines Absenders</string>
     <string name="search_hint_to">An eine Adresse gesendete E-Mails</string>

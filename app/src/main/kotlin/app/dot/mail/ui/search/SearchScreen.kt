@@ -84,6 +84,7 @@ import app.dot.mail.data.model.SearchSort
 import app.dot.mail.ui.common.Format
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
@@ -92,7 +93,6 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -135,7 +135,11 @@ class SearchViewModel(private val graph: MailGraph, private val folderId: Long, 
 
     private val scope: Flow<SearchScope> = combine(mode, sort, includeServer, context) { m, s, server, ctx -> scopeFor(m, s, server, ctx) }
 
-    private val request: Flow<Pair<String, SearchScope>> = combine(query.map { it.trim() }.debounce(250).distinctUntilChanged(), scope) { q, sc -> q to sc }
+    // Switch on each edit so results for a previous query are not kept visible during a debounce.
+    val debouncedQuery: StateFlow<String> = query.map { it.trim() }.debounce(250).distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    fun queryPending(rawQuery: String, settledQuery: String = debouncedQuery.value): Boolean = rawQuery.trim() != settledQuery
+    private val request: Flow<Pair<String, SearchScope>> = combine(debouncedQuery, scope) { q, sc -> q to sc }
 
     val results: Flow<PagingData<SearchResult>> = request
         .flatMapLatest { (q, sc) -> if (q.length < 2) flowOf(PagingData.empty()) else graph.mail.search(q, sc) }
@@ -154,6 +158,8 @@ fun SearchScreen(onBack: () -> Unit, onOpenThread: (Long) -> Unit, folderId: Lon
     val query by vm.current.collectAsStateWithLifecycle()
     val results = vm.results.collectAsLazyPagingItems()
     val progress by vm.progress.collectAsStateWithLifecycle()
+    val debouncedQuery by vm.debouncedQuery.collectAsStateWithLifecycle()
+    val queryPending = vm.queryPending(query, debouncedQuery)
     val mode by vm.mode.collectAsStateWithLifecycle()
     val sort by vm.sort.collectAsStateWithLifecycle()
     val server by vm.includeServer.collectAsStateWithLifecycle()
@@ -184,22 +190,52 @@ fun SearchScreen(onBack: () -> Unit, onOpenThread: (Long) -> Unit, folderId: Lon
         )
         val q = query.trim()
         if (q.length >= 2) ProgressLines(progress)
-        when {
-            q.length < 2 -> SearchHints()
-            results.itemCount == 0 && results.loadState.refresh is LoadState.Loading ->
+        when (searchDisplayState(q, results.itemCount, results.loadState.refresh, progress, queryPending)) {
+            SearchDisplayState.IDLE -> SearchHints()
+            SearchDisplayState.SEARCHING ->
                 Box(Modifier.fillMaxSize().padding(top = 64.dp), contentAlignment = Alignment.TopCenter) {
                     CircularProgressIndicator(Modifier.size(22.dp), color = c.textTertiary, strokeWidth = 1.5.dp)
                 }
-            results.itemCount == 0 && results.loadState.refresh is LoadState.Error ->
+            SearchDisplayState.ERROR ->
                 EmptyState(Icons.Outlined.WifiOff, stringResource(R.string.search_error_title), (results.loadState.refresh as LoadState.Error).error.message ?: stringResource(R.string.search_error_body))
-            results.itemCount == 0 && results.loadState.refresh is LoadState.NotLoading && !progress.serverRunning ->
-                EmptyState(Icons.Outlined.SearchOff, stringResource(R.string.search_no_results_title), stringResource(R.string.search_no_results_body, q))
-            else -> LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
-                items(results.itemCount, key = results.itemKey { it.messageId }) { i ->
-                    val r = results[i] ?: return@items
-                    SearchResultRow(r, onClick = { onOpenThread(r.thread.threadId) })
-                }
-            }
+            SearchDisplayState.NO_RESULTS ->
+                EmptyState(Icons.Outlined.SearchOff, stringResource(R.string.search_no_results_title), stringResource(if (progress.index.running) R.string.search_no_results_indexing else R.string.search_no_results_body, q))
+            SearchDisplayState.PARTIAL_RESULTS -> if (results.itemCount == 0) {
+                val unavailable = progress.serverError == null && progress.index.error == null && !progress.serverAvailable
+                EmptyState(
+                    Icons.Outlined.WifiOff,
+                    stringResource(if (unavailable) R.string.search_partial_title else R.string.search_error_title),
+                    stringResource(if (unavailable) R.string.search_partial_body else R.string.search_server_error),
+                )
+            } else ResultsList(results, onOpenThread)
+            SearchDisplayState.RESULTS -> ResultsList(results, onOpenThread)
+        }
+    }
+}
+
+/** Distinguishes a settled empty result from a local page while indexing or remote search is active. */
+internal enum class SearchDisplayState { IDLE, SEARCHING, RESULTS, NO_RESULTS, PARTIAL_RESULTS, ERROR }
+
+internal fun searchDisplayState(query: String, count: Int, refresh: LoadState, progress: SearchProgress, queryPending: Boolean = false): SearchDisplayState {
+    if (query.length < 2) return SearchDisplayState.IDLE
+    if (queryPending) return SearchDisplayState.SEARCHING
+    val refreshError = refresh as? LoadState.Error
+    if (count == 0 && refreshError != null) return SearchDisplayState.ERROR
+    val serverBusy = progress.serverRunning
+    val sourceFailed = progress.serverError != null || progress.index.error != null || (progress.serverAvailable.not() && progress.serverRunning.not())
+    if (refresh is LoadState.Loading) return SearchDisplayState.SEARCHING
+    if (count > 0) return if (sourceFailed || serverBusy || progress.index.running) SearchDisplayState.PARTIAL_RESULTS else SearchDisplayState.RESULTS
+    if (serverBusy) return SearchDisplayState.SEARCHING
+    if (refresh !is LoadState.NotLoading) return SearchDisplayState.SEARCHING
+    return if (sourceFailed) SearchDisplayState.PARTIAL_RESULTS else SearchDisplayState.NO_RESULTS
+}
+
+@Composable
+private fun ResultsList(results: androidx.paging.compose.LazyPagingItems<SearchResult>, onOpenThread: (Long) -> Unit) {
+    LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
+        items(results.itemCount, key = results.itemKey { it.messageId }) { i ->
+            val result = results[i] ?: return@items
+            SearchResultRow(result, onClick = { onOpenThread(result.thread.threadId) })
         }
     }
 }
