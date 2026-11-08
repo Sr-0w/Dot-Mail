@@ -10,7 +10,7 @@ Priority hints (optional): `P1` = next, `P2` = soon (default), `P3` = nice to ha
 
 
 - P2 · **Polish animations across most meaningful user actions** [in progress: screen transitions, selection mode, menus/dialogs, Cc/Bcc reveal, reduced-motion lists, Outbox removal done — Gemini, Sonnet #32; reader capsules next] in Dot Mail, using subtle, fast, consistent Quiet UI motion: navigation and screen transitions; mail row insertion/removal on archive, delete, restore and refresh; swipe feedback; selection and contextual-action transitions; conversation expand/collapse; buttons, sheets, menus, dialogs and loading states. **Specifically animate the Cc and Bcc recipient fields in Compose when the user taps “Cc/Bcc”**: smoothly reveal and collapse the rows with coordinated height/opacity/position changes, reflow surrounding content without jumps, and keep keyboard focus and accessibility correct. Prefer native Jetpack Compose animations, smooth 60/120 Hz behavior and reduced-motion accessibility settings; avoid excessive motion, delays, flashy effects or animations on every trivial interaction.
-- P2 · Sender profile pictures from other sources if possible (see avatar work in progress for what's covered).
+- P2 · [done: contact photos, Gravatar, Libravatar (new), BIMI brand logos, website icons (more locations) — all opt-in, cached, no WebView — Claude] Sender profile pictures from other sources if possible (see avatar work in progress for what's covered).
 
 
 - P2 · Advanced inbox sorting, filters and configurable smart folders across accounts.
