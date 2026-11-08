@@ -484,6 +484,7 @@ fun ListRow(
     onClick: (() -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = DotSpacing.gutter, vertical = 14.dp),
     trailing: (@Composable () -> Unit)? = null,
+    subtitleMaxLines: Int = 2,
 ) {
     Row(
         modifier
@@ -500,7 +501,7 @@ fun ListRow(
         Column(Modifier.weight(1f)) {
             Text(title, style = Dot.type.bodyStrong, color = titleColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (subtitle != null) {
-                Text(subtitle, style = Dot.type.caption, color = subtitleColor, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(subtitle, style = Dot.type.caption, color = subtitleColor, maxLines = subtitleMaxLines, overflow = TextOverflow.Ellipsis)
             }
         }
         if (trailing != null) {

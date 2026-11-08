@@ -38,7 +38,7 @@ internal fun ToggleRow(
     onChange: (Boolean) -> Unit,
 ) {
     ListRow(
-        title = title, subtitle = subtitle, icon = icon,
+        title = title, subtitle = subtitle, icon = icon, subtitleMaxLines = 4,
         titleColor = if (enabled) Dot.colors.textPrimary else Dot.colors.textTertiary,
         modifier = Modifier.toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange),
         trailing = { DotSwitch(checked, onCheckedChange = null, enabled = enabled) },
