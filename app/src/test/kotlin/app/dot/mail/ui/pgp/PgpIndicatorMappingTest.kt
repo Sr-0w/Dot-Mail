@@ -15,6 +15,15 @@ class PgpIndicatorMappingTest {
             .containsExactly(PgpIndicatorKind.ENCRYPTION)
     }
 
+    @Test fun `encryption progress and errors never replace a signature verdict`() {
+        assertThat(pgpSignatureIndicatorState(true, false, PgpOperationState.WORKING)).isNull()
+        assertThat(pgpSignatureIndicatorState(true, false, PgpOperationState.FAILED)).isNull()
+        assertThat(pgpSignatureIndicatorState(true, true, PgpOperationState.FAILED))
+            .isEqualTo(SignatureIndicatorState.VERDICT)
+        assertThat(pgpSignatureIndicatorState(true, true, PgpOperationState.WORKING))
+            .isEqualTo(SignatureIndicatorState.VERDICT)
+    }
+
     @Test fun `signed message keeps a signature indicator before verification`() {
         assertThat(pgpIndicatorKinds(PgpContent.Signed("entity", "signature"), null))
             .containsExactly(PgpIndicatorKind.SIGNATURE)

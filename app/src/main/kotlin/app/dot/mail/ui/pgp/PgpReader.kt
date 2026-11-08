@@ -134,8 +134,15 @@ fun PgpBar(body: MessageBody, state: PgpReaderState, modifier: Modifier = Modifi
     val status = state.status
     var showUnsupportedInfo by remember(pgp) { mutableStateOf(false) }
     val kinds = pgpIndicatorKinds(pgp, sig)
+    val encryptionPresent = PgpIndicatorKind.ENCRYPTION in kinds
+    val operation = when (status) {
+        is PgpReaderState.Status.Working -> PgpOperationState.WORKING
+        is PgpReaderState.Status.Failed -> PgpOperationState.FAILED
+        else -> PgpOperationState.IDLE
+    }
+    val signatureState = pgpSignatureIndicatorState(encryptionPresent, sig != null, operation)
     Column(modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.xs)) {
-        kinds.forEach { kind ->
+        kinds.filter { it != PgpIndicatorKind.SIGNATURE || signatureState != null }.forEach { kind ->
             val row = when (kind) {
                 PgpIndicatorKind.ENCRYPTION -> {
                     val (icon, text, tint) = when {
@@ -148,10 +155,10 @@ fun PgpBar(body: MessageBody, state: PgpReaderState, modifier: Modifier = Modifi
                     Triple(icon, text, tint)
                 }
                 PgpIndicatorKind.SIGNATURE -> when {
+                    signatureState == SignatureIndicatorState.VERDICT -> signatureLine(requireNotNull(sig))
                     !installed -> Triple(Icons.Outlined.GppMaybe, stringResource(R.string.pgp_install_signed), c.textSecondary)
-                    status is PgpReaderState.Status.Working -> Triple(Icons.Outlined.GppMaybe, stringResource(R.string.pgp_verifying), c.textSecondary)
-                    status is PgpReaderState.Status.Failed -> Triple(Icons.Outlined.GppBad, stringResource(R.string.pgp_failed, status.message ?: "—"), c.danger)
-                    sig != null -> signatureLine(sig)
+                    signatureState == SignatureIndicatorState.VERIFYING -> Triple(Icons.Outlined.GppMaybe, stringResource(R.string.pgp_verifying), c.textSecondary)
+                    signatureState == SignatureIndicatorState.FAILED -> Triple(Icons.Outlined.GppBad, stringResource(R.string.pgp_failed, status.let { (it as PgpReaderState.Status.Failed).message ?: "—" }), c.danger)
                     else -> Triple(Icons.Outlined.GppMaybe, stringResource(R.string.pgp_signed_unchecked), c.textSecondary)
                 }
                 PgpIndicatorKind.UNSUPPORTED_ENCRYPTION -> Triple(Icons.Outlined.Lock, stringResource(R.string.pgp_unsupported_encryption), c.textSecondary)
@@ -161,8 +168,9 @@ fun PgpBar(body: MessageBody, state: PgpReaderState, modifier: Modifier = Modifi
             val onlyIndicator = kinds.size == 1
             Row(
                 Modifier.fillMaxWidth().padding(bottom = DotSpacing.xs)
+                    .clip(DotShapes.medium)
                     .then(if (unsupported) Modifier.clickable { showUnsupportedInfo = true }.semantics { role = Role.Button } else Modifier)
-                    .clip(DotShapes.medium).background(c.surface).padding(horizontal = DotSpacing.m, vertical = 10.dp),
+                    .background(c.surface).padding(horizontal = DotSpacing.m, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(row.first, null, Modifier.size(18.dp), tint = row.third)
