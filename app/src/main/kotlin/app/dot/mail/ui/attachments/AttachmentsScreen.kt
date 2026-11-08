@@ -1,5 +1,9 @@
 package app.dot.mail.ui.attachments
 
+import androidx.compose.runtime.setValue
+
+import androidx.compose.runtime.mutableStateOf
+
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.graphics.Bitmap
@@ -133,12 +137,23 @@ fun AttachmentsScreen(onBack: () -> Unit) {
     val snackbar = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
     val c = Dot.colors
+    var pdf by remember { mutableStateOf<AttachmentEvent.Open?>(null) }
+    fun external(e: AttachmentEvent.Open, share: Boolean) {
+        val uri = Uri.parse(e.uri)
+        val intent = if (share) Intent(Intent.ACTION_SEND).setType(e.mime).putExtra(Intent.EXTRA_STREAM, uri)
+        else Intent(Intent.ACTION_VIEW).setDataAndType(uri, e.mime)
+        try { context.startActivity(Intent.createChooser(intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), e.name)) }
+        catch (_: ActivityNotFoundException) { }
+    }
+    pdf?.let { e ->
+        app.dot.mail.ui.pdf.PdfViewerDialog(e.uri, e.name, onDismiss = { pdf = null }, onShare = { external(e, true) }, onOpenExternally = { external(e, false) })
+    }
 
     LaunchedEffect(Unit) {
         vm.events.collect { e ->
             when (e) {
                 is AttachmentEvent.Message -> snackbar.showSnackbar(e.text)
-                is AttachmentEvent.Open -> {
+                is AttachmentEvent.Open -> if (!e.share && (e.mime.equals("application/pdf", true) || e.name.endsWith(".pdf", true))) pdf = e else {
                     val uri = Uri.parse(e.uri)
                     val intent = if (e.share) Intent(Intent.ACTION_SEND).setType(e.mime).putExtra(Intent.EXTRA_STREAM, uri)
                     else Intent(Intent.ACTION_VIEW).setDataAndType(uri, e.mime)
