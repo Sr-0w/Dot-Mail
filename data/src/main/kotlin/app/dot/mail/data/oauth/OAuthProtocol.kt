@@ -39,13 +39,13 @@ internal object OAuthProtocol {
         .appendQueryParameter("prompt", if (client.provider == OAuthProvider.GOOGLE) "consent" else "select_account")
         .apply { if (client.provider == OAuthProvider.GOOGLE) appendQueryParameter("access_type", "offline") }.build()
     fun validateCallback(uri: Uri, session: OAuthSession, now: Long): String {
-        if (uri.scheme != Uri.parse(session.redirect).scheme || uri.authority != null || uri.path != "/oauth2redirect" || uri.fragment != null) throw OAuthException("Invalid authorization callback")
+        if (uri.scheme != Uri.parse(session.redirect).scheme || uri.authority != null || uri.path != "/oauth2redirect" || uri.fragment != null) throw OAuthException("Invalid authorization callback", app.dot.mail.data.model.OAuthError.INVALID_CALLBACK)
         val states = uri.getQueryParameters("state")
-        if (states.size != 1 || !MessageDigest.isEqual(states.single().toByteArray(), session.state.toByteArray())) throw OAuthException("Authorization state did not match")
-        if (now - session.createdAt !in 0..600_000) throw OAuthException("Sign-in expired. Please start again.")
-        if (uri.getQueryParameters("error").isNotEmpty()) throw OAuthException("Sign-in was cancelled or denied by the provider")
+        if (states.size != 1 || !MessageDigest.isEqual(states.single().toByteArray(), session.state.toByteArray())) throw OAuthException("Authorization state did not match", app.dot.mail.data.model.OAuthError.INVALID_CALLBACK)
+        if (now - session.createdAt !in 0..600_000) throw OAuthException("Sign-in expired. Please start again.", app.dot.mail.data.model.OAuthError.EXPIRED)
+        if (uri.getQueryParameters("error").isNotEmpty()) throw OAuthException("Sign-in was cancelled or denied by the provider", app.dot.mail.data.model.OAuthError.DENIED)
         val codes = uri.getQueryParameters("code")
-        if (codes.size != 1 || codes.single().isBlank() || codes.single().length > 8192) throw OAuthException("Authorization code is missing or invalid")
+        if (codes.size != 1 || codes.single().isBlank() || codes.single().length > 8192) throw OAuthException("Authorization code is missing or invalid", app.dot.mail.data.model.OAuthError.INVALID_CALLBACK)
         return codes.single()
     }
 }

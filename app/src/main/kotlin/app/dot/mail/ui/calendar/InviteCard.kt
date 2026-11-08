@@ -21,6 +21,7 @@ import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -125,7 +126,10 @@ fun InviteCard(
                     Icons.Outlined.Person,
                     invite.organizer.name?.let { "${it} · ${invite.organizer.email}" } ?: invite.organizer.email,
                 )
-                invite.rruleSummary?.let { MetaLine(Icons.Outlined.Repeat, it) }
+                invite.rruleParts?.let { parts ->
+                    val resources = androidx.compose.ui.platform.LocalContext.current.resources
+                    MetaLine(Icons.Outlined.Repeat, remember(parts, resources.configuration) { RRuleText.format(parts, resources) })
+                }
             }
         }
         if (!cancelled) {
@@ -270,6 +274,7 @@ private fun previewRequest(
         duration = null,
         rrule = if (allDay) null else "FREQ=WEEKLY;COUNT=4",
         rruleSummary = if (allDay) null else "weekly, 4 times",
+        rruleParts = if (allDay) null else Ics.RRuleSummary(Ics.RRuleSummary.Unit.WEEK, 1, null, null, 4, null, null, false),
         status = "CONFIRMED",
     )
 }

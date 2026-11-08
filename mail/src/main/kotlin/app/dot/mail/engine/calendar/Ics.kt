@@ -90,6 +90,8 @@ object Ics {
         val rrule: String?,
         /** Human summary for simple FREQ/INTERVAL/COUNT/UNTIL/BYDAY rules; null otherwise. */
         val rruleSummary: String?,
+        /** The same summary in structured form, for localised display. */
+        val rruleParts: RRuleSummary? = null,
         /** CONFIRMED / TENTATIVE / CANCELLED, when present. */
         val status: String?,
     )
@@ -270,6 +272,7 @@ object Ics {
                 duration = duration,
                 rrule = first("RRULE")?.value,
                 rruleSummary = first("RRULE")?.value?.let { summarizeRrule(it) },
+                rruleParts = first("RRULE")?.value?.let { parseRrule(it) },
                 status = first("STATUS")?.value?.uppercase(),
             )
         }
@@ -546,8 +549,27 @@ object Ics {
     /** Test hook around [summarizeRrule]. */
     internal fun summarizeForTest(raw: String): String? = summarizeRrule(raw)
 
-    /** Human summary for the simple cases; null when the rule uses anything else. */
-    private fun summarizeRrule(raw: String): String? {
+    /** Language-neutral shape of a "simple" recurrence rule; the app turns it into text in the user's language. */
+    data class RRuleSummary(
+        val unit: Unit,
+        val interval: Int,
+        /** Weekday of BYDAY (first token only), if any. */
+        val byDay: DayOfWeek?,
+        /** null = every such weekday; -1 = last; otherwise the n-th ("2nd Tuesday"). */
+        val ordinal: Int?,
+        val count: Int?,
+        val untilDate: LocalDate?,
+        val untilTime: LocalTime?,
+        val untilUtc: Boolean,
+    ) {
+        enum class Unit { DAY, WEEK, MONTH, YEAR }
+    }
+
+    /** Test hook for the structured form. */
+    internal fun rruleSummaryForTest(raw: String): RRuleSummary? = parseRrule(raw)
+
+    /** Structured summary for the simple cases; null when the rule uses anything else. */
+    fun parseRrule(raw: String): RRuleSummary? {
         val params = LinkedHashMap<String, String>()
         for (p in raw.split(';').filter { it.contains('=') }) {
             val eq = p.indexOf('=')
@@ -556,46 +578,60 @@ object Ics {
             params[k] = p.substring(eq + 1).trim()
         }
         val unit = when (params["FREQ"]?.uppercase()) {
-            "DAILY" -> "day"; "WEEKLY" -> "week"; "MONTHLY" -> "month"; "YEARLY" -> "year"
+            "DAILY" -> RRuleSummary.Unit.DAY; "WEEKLY" -> RRuleSummary.Unit.WEEK
+            "MONTHLY" -> RRuleSummary.Unit.MONTH; "YEARLY" -> RRuleSummary.Unit.YEAR
             else -> return null
         }
-        val interval = params["INTERVAL"]?.toIntOrNull() ?: 1
-        val count = params["COUNT"]?.toIntOrNull()
-        val until = params["UNTIL"]
-        val byday = params["BYDAY"]?.split(',')?.firstOrNull()?.let { bydaySummary(it) }
-
-        val sb = StringBuilder()
-        sb.append(if (interval > 1) "every $interval ${unit}s" else "${unit}ly")
-        byday?.let { sb.append(", on ").append(it) }
-        until?.let { u ->
-            val text = when {
-                u.length == 8 -> parseDate(u)?.format(DateTimeFormatter.ofPattern("d MMM yyyy"))
+        var dow: DayOfWeek? = null
+        var ordinal: Int? = null
+        params["BYDAY"]?.split(',')?.firstOrNull()?.let { token ->
+            val m = Regex("^([+-]?\\d+)?([A-Z]{2,3})$").find(token.trim().uppercase())
+            if (m != null) {
+                dow = dayOfWeek(m.groupValues[2])
+                if (dow != null && m.groupValues[1].isNotEmpty()) ordinal = m.groupValues[1].toInt()
+            }
+        }
+        var untilDate: LocalDate? = null
+        var untilTime: LocalTime? = null
+        var untilUtc = false
+        params["UNTIL"]?.let { u ->
+            when {
+                u.length == 8 -> untilDate = parseDate(u) ?: return null
                 u.length in 13..16 -> {
-                    val d = parseDate(u) ?: return null
-                    val t = parseTimePart(u)
-                    if (t == null) d.format(DateTimeFormatter.ofPattern("d MMM yyyy"))
-                    else d.format(DateTimeFormatter.ofPattern("d MMM yyyy")) + " " +
-                        t.format(DateTimeFormatter.ofPattern("HH:mm")) +
-                        (if (u.endsWith("Z")) " UTC" else "")
+                    untilDate = parseDate(u) ?: return null
+                    untilTime = parseTimePart(u)
+                    untilUtc = untilTime != null && u.endsWith("Z")
                 }
                 else -> return null
-            } ?: return null
-            sb.append(", until ").append(text)
+            }
         }
-        if (count != null) sb.append(", ").append(count).append(" times")
-        return sb.toString()
+        return RRuleSummary(unit, params["INTERVAL"]?.toIntOrNull() ?: 1, dow, ordinal, params["COUNT"]?.toIntOrNull(), untilDate, untilTime, untilUtc)
     }
 
-    private fun bydaySummary(token: String): String? {
-        val m = Regex("^([+-]?\\d+)?([A-Z]{2,3})$").find(token.trim().uppercase()) ?: return null
-        val dow = dayOfWeek(m.groupValues[2]) ?: return null
-        val name = DOW_NAMES.getValue(dow)
-        val ord = m.groupValues[1]
-        return when {
-            ord.isEmpty() -> "${name}s" // "Mondays"
-            ord == "-1" -> "last $name"
-            else -> "${ord}${ordinalSuffix(ord.toInt())} $name"
+    /** English summary (kept for tests and non-UI callers); the app localises [RRuleSummary] itself. */
+    private fun summarizeRrule(raw: String): String? {
+        val r = parseRrule(raw) ?: return null
+        val unit = r.unit.name.lowercase()
+        val sb = StringBuilder()
+        sb.append(if (r.interval > 1) "every ${r.interval} ${unit}s" else "${unit}ly")
+        r.byDay?.let { day ->
+            val name = DOW_NAMES.getValue(day)
+            val ord = r.ordinal
+            sb.append(", on ").append(
+                when {
+                    ord == null -> "${name}s"
+                    ord == -1 -> "last $name"
+                    else -> "${ord}${ordinalSuffix(ord)} $name"
+                },
+            )
         }
+        r.untilDate?.let { d ->
+            val date = d.format(DateTimeFormatter.ofPattern("d MMM yyyy"))
+            val t = r.untilTime
+            sb.append(", until ").append(if (t == null) date else date + " " + t.format(DateTimeFormatter.ofPattern("HH:mm")) + (if (r.untilUtc) " UTC" else ""))
+        }
+        r.count?.let { sb.append(", ").append(it).append(" times") }
+        return sb.toString()
     }
 
     private fun ordinalSuffix(n: Int): String {

@@ -41,6 +41,14 @@ fun UpdatePasswordDialog(account: Account, onDismiss: () -> Unit, onSuccess: () 
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val failedText = stringResource(R.string.signin_failed)
+    val authText = stringResource(R.string.verify_auth_failed)
+    val connText = stringResource(R.string.verify_connection_failed)
+    val certText = stringResource(R.string.verify_certificate)
+    val reasons = mapOf(
+        app.dot.mail.engine.ConnectionFailure.DNS to stringResource(R.string.sync_error_dns), app.dot.mail.engine.ConnectionFailure.TIMEOUT to stringResource(R.string.sync_error_timeout),
+        app.dot.mail.engine.ConnectionFailure.SERVER_CLOSED to stringResource(R.string.sync_error_server_closed), app.dot.mail.engine.ConnectionFailure.THROTTLED to stringResource(R.string.sync_error_throttled),
+        app.dot.mail.engine.ConnectionFailure.NETWORK to stringResource(R.string.sync_error_network),
+    )
 
     fun submit() {
         if (password.isEmpty() || busy) return
@@ -49,9 +57,13 @@ fun UpdatePasswordDialog(account: Account, onDismiss: () -> Unit, onSuccess: () 
             try {
                 when (val r = graph.accounts.updatePassword(account.id, password)) {
                     VerifyResult.Ok -> { onSuccess(); onDismiss() }
-                    is VerifyResult.AuthFailed -> error = r.message
-                    is VerifyResult.ConnectionFailed -> error = r.message
-                    is VerifyResult.CertificateProblem -> error = r.message
+                    is VerifyResult.AuthFailed -> error = authText
+                    is VerifyResult.ConnectionFailed -> error = when (r.kind) {
+                        app.dot.mail.engine.ConnectionFailure.TLS -> certText
+                        app.dot.mail.engine.ConnectionFailure.AUTH -> authText
+                        else -> reasons[r.kind] ?: connText
+                    }
+                    is VerifyResult.CertificateProblem -> error = certText
                 }
             } catch (e: CancellationException) {
                 throw e

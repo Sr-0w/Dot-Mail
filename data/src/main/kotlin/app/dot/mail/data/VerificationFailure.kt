@@ -24,5 +24,5 @@ internal fun verificationFailure(error: Exception): VerifyResult {
         (next as? MessagingException)?.nextException?.let(pending::addLast)
     }
     return if (auth) VerifyResult.AuthFailed("Authentication failed. Check your password or app password.")
-    else VerifyResult.ConnectionFailed("Could not connect to the mail server")
+    else VerifyResult.ConnectionFailed("Could not connect to the mail server", app.dot.mail.engine.ConnectionFailure.classify(error))
 }

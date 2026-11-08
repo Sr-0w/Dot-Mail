@@ -35,7 +35,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.InsertDriveFile
+import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material3.Icon
 import androidx.compose.material3.SnackbarHost
@@ -229,7 +229,7 @@ private fun FilterChip(text: String, selected: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun MonthHeader(month: YearMonth) {
-    val text = remember(month) { DateTimeFormatter.ofPattern("LLLL yyyy", Locale.getDefault()).format(month).replaceFirstChar { it.titlecase(Locale.getDefault()) } }
+    val text = remember(month) { DateTimeFormatter.ofPattern(android.text.format.DateFormat.getBestDateTimePattern(Locale.getDefault(), "LLLL yyyy"), Locale.getDefault()).format(month).replaceFirstChar { it.titlecase(Locale.getDefault()) } }
     Text(
         text.uppercase(Locale.getDefault()), style = Dot.type.overline, color = Dot.colors.textTertiary,
         modifier = Modifier.fillMaxWidth().padding(start = DotSpacing.gutter, end = DotSpacing.gutter, top = DotSpacing.l, bottom = DotSpacing.xs)
@@ -244,7 +244,7 @@ private fun Modifier.androidxHeading() = this.then(Modifier.semantics { heading(
 private fun AttachmentRow(item: AttachmentItem, onOpen: () -> Unit, onShare: () -> Unit) {
     val c = Dot.colors
     val a = item.attachment
-    val date = remember(item.sentAt) { DateTimeFormatter.ofPattern("d MMM", Locale.getDefault()).format(Instant.ofEpochMilli(item.sentAt).atZone(ZoneId.systemDefault())) }
+    val date = remember(item.sentAt) { DateTimeFormatter.ofPattern(android.text.format.DateFormat.getBestDateTimePattern(Locale.getDefault(), "d MMM"), Locale.getDefault()).format(Instant.ofEpochMilli(item.sentAt).atZone(ZoneId.systemDefault())) }
     Row(
         Modifier.fillMaxWidth()
             .combinedClickable(onClickLabel = stringResource(if (item.isDownloaded) R.string.thread_open else R.string.attachments_download_and_open), onClick = onOpen, onLongClickLabel = stringResource(R.string.thread_share), onLongClick = onShare)
@@ -298,7 +298,7 @@ private fun Thumbnail(item: AttachmentItem) {
                 AttachmentKind.IMAGES -> Icons.Outlined.Image
                 AttachmentKind.PDFS -> Icons.Outlined.PictureAsPdf
                 AttachmentKind.DOCUMENTS -> Icons.Outlined.Description
-                AttachmentKind.OTHER -> Icons.Outlined.InsertDriveFile
+                AttachmentKind.OTHER -> Icons.AutoMirrored.Outlined.InsertDriveFile
             }
             Icon(icon, null, Modifier.size(22.dp), tint = c.textSecondary)
         }

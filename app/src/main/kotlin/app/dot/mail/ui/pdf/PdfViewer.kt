@@ -27,7 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.automirrored.outlined.Subject
-import androidx.compose.material.icons.outlined.OpenInNew
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -91,7 +91,7 @@ fun PdfViewerDialog(
                         )
                     }
                     DotIconButton(Icons.Outlined.Share, stringResource(R.string.thread_share), onClick = onShare)
-                    DotIconButton(Icons.Outlined.OpenInNew, stringResource(R.string.pdf_open_with), onClick = onOpenExternally)
+                    DotIconButton(Icons.AutoMirrored.Outlined.OpenInNew, stringResource(R.string.pdf_open_with), onClick = onOpenExternally)
                 },
             )
             if (showText) PdfTextView(uri, Modifier.weight(1f))

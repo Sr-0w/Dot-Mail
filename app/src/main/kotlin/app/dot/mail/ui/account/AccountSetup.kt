@@ -230,7 +230,7 @@ class AddAccountViewModel(
                 )
             }
             val result = runCatching { repo.verify(config, s.password) }.getOrElse {
-                VerifyResult.ConnectionFailed(it.message ?: str(R.string.setup_error_unknown, "Unknown error"))
+                VerifyResult.ConnectionFailed(it.message ?: "Unknown error", app.dot.mail.engine.ConnectionFailure.classify(it))
             }
             when (result) {
                 VerifyResult.Ok -> {
@@ -248,7 +248,7 @@ class AddAccountViewModel(
                         }
                 }
                 is VerifyResult.AuthFailed -> _state.update {
-                    val baseError = str(R.string.setup_error_auth_failed, "Sign-in failed: ${result.message}", result.message)
+                    val baseError = str(R.string.setup_error_auth_failed, "Sign-in failed: ${result.message}", str(verifyReasonRes(result), result.message))
                     it.copy(busy = false, status = null, error = baseError + (it.hint?.let { h -> "\n$h" } ?: ""))
                 }
                 is VerifyResult.ConnectionFailed -> _state.update {
@@ -256,7 +256,7 @@ class AddAccountViewModel(
                         busy = false,
                         status = null,
                         step = SetupState.Step.Manual,
-                        error = str(R.string.setup_error_connection_failed, "Couldn't connect: ${result.message}", result.message),
+                        error = str(R.string.setup_error_connection_failed, "Couldn't connect: ${result.message}", str(verifyReasonRes(result), result.message)),
                     )
                 }
                 is VerifyResult.CertificateProblem -> _state.update {
@@ -264,7 +264,7 @@ class AddAccountViewModel(
                         busy = false,
                         status = null,
                         step = SetupState.Step.Manual,
-                        error = str(R.string.setup_error_certificate, "The server's certificate isn't trusted: ${result.message}", result.message),
+                        error = str(R.string.setup_error_certificate, "The server's certificate isn't trusted: ${result.message}", str(verifyReasonRes(result), result.message)),
                     )
                 }
             }
