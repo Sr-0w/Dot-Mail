@@ -1,0 +1,186 @@
+package app.dot.mail.data.model
+
+/*
+ * Domain models shared by the UI (:app) and the data layer (:data).
+ * This file is the contract between the two; change it deliberately and tell the team.
+ * Timestamps are epoch milliseconds (UTC).
+ */
+
+data class Account(
+    val id: Long,
+    val displayName: String,
+    val email: String,
+    /** Stable per-account accent, index into the design system's account palette. */
+    val colorIndex: Int,
+    val identities: List<Identity> = emptyList(),
+    val syncState: SyncState = SyncState.Idle,
+)
+
+data class Identity(
+    val id: Long,
+    val accountId: Long,
+    val name: String,
+    val email: String,
+    val signature: String? = null,
+    val isDefault: Boolean = false,
+)
+
+sealed interface SyncState {
+    data object Idle : SyncState
+    data object Syncing : SyncState
+    data class Error(val message: String, val isAuthError: Boolean = false) : SyncState
+}
+
+enum class FolderRole { INBOX, SENT, DRAFTS, ARCHIVE, TRASH, SPAM, ALL_MAIL, STARRED, CUSTOM }
+
+data class Folder(
+    val id: Long,
+    val accountId: Long,
+    /** Full IMAP path, e.g. "INBOX/Receipts". */
+    val path: String,
+    /** Last path segment, for display. */
+    val name: String,
+    val role: FolderRole,
+    val unreadCount: Int,
+    val totalCount: Int,
+)
+
+/** What a message list is showing. */
+sealed interface Mailbox {
+    /** Same role across every account, e.g. the unified inbox. */
+    data class Unified(val role: FolderRole) : Mailbox
+    data class InFolder(val folderId: Long) : Mailbox
+}
+
+data class EmailAddress(val email: String, val name: String? = null) {
+    val displayName: String get() = name?.takeIf { it.isNotBlank() } ?: email
+}
+
+/** One row in a message list: a conversation within one account. */
+data class ThreadSummary(
+    val threadId: Long,
+    val accountId: Long,
+    val subject: String,
+    /** Distinct senders, most recent last. */
+    val participants: List<EmailAddress>,
+    val snippet: String,
+    val lastMessageAt: Long,
+    val messageCount: Int,
+    val unreadCount: Int,
+    val isStarred: Boolean,
+    val hasAttachments: Boolean,
+) {
+    val isUnread: Boolean get() = unreadCount > 0
+}
+
+data class Attachment(
+    val id: Long,
+    val messageId: Long,
+    val fileName: String,
+    val mimeType: String,
+    val sizeBytes: Long,
+    /** Content-ID for inline images referenced as cid: in HTML. */
+    val contentId: String?,
+    val isInline: Boolean,
+    /** content:// or file:// URI once downloaded, else null. */
+    val localUri: String?,
+)
+
+data class Message(
+    val id: Long,
+    val accountId: Long,
+    val folderId: Long,
+    val threadId: Long,
+    val from: EmailAddress,
+    val to: List<EmailAddress>,
+    val cc: List<EmailAddress>,
+    val bcc: List<EmailAddress>,
+    val replyTo: List<EmailAddress>,
+    val subject: String,
+    val sentAt: Long,
+    val snippet: String,
+    val isUnread: Boolean,
+    val isStarred: Boolean,
+    val body: MessageBody?,
+    val attachments: List<Attachment>,
+    /** RFC 5322 Message-ID, used for replies. */
+    val messageIdHeader: String?,
+    val references: List<String>,
+    /** Parsed List-Unsubscribe (mailto: or https:) if present. */
+    val unsubscribe: String?,
+)
+
+/** Body is null on [Message] until it has been downloaded. */
+data class MessageBody(
+    val plainText: String?,
+    /** Raw, UNSANITISED HTML. Only ever render via the app's sanitising viewer. */
+    val html: String?,
+    val hasRemoteImages: Boolean,
+)
+
+enum class MessageAction { MARK_READ, MARK_UNREAD, STAR, UNSTAR, ARCHIVE, TRASH, SPAM, NOT_SPAM, DELETE_FOREVER }
+
+/** A message being written. */
+data class Draft(
+    val localId: Long = 0,
+    val accountId: Long,
+    val identityId: Long?,
+    val to: List<EmailAddress> = emptyList(),
+    val cc: List<EmailAddress> = emptyList(),
+    val bcc: List<EmailAddress> = emptyList(),
+    val subject: String = "",
+    val bodyText: String = "",
+    /** content:// URIs picked by the user. */
+    val attachmentUris: List<String> = emptyList(),
+    val inReplyTo: String? = null,
+    val references: List<String> = emptyList(),
+    /** Epoch ms; null = send now (after undo window). */
+    val scheduledAt: Long? = null,
+)
+
+// ---------- Account setup ----------
+
+enum class Security { SSL_TLS, STARTTLS, NONE }
+
+enum class AuthType { PASSWORD, OAUTH2 }
+
+data class ServerConfig(
+    val host: String,
+    val port: Int,
+    val security: Security,
+    /** Login name; often the full email address. */
+    val username: String,
+)
+
+data class AccountConfig(
+    val email: String,
+    val displayName: String,
+    val imap: ServerConfig,
+    val smtp: ServerConfig,
+    val authType: AuthType = AuthType.PASSWORD,
+    /** Shown in setup, e.g. "Gmail requires an app password". */
+    val providerHint: String? = null,
+)
+
+sealed interface VerifyResult {
+    data object Ok : VerifyResult
+    data class AuthFailed(val message: String) : VerifyResult
+    data class ConnectionFailed(val message: String) : VerifyResult
+    data class CertificateProblem(val message: String) : VerifyResult
+}
+
+/** Active local sends. Completed/cancelled/deleted items disappear from the outbox flow. */
+enum class OutboxState { QUEUED, SENDING, SAVING_SENT, NEEDS_REVIEW }
+
+data class OutboxItem(
+    val id: Long,
+    val accountId: Long,
+    val subject: String,
+    val recipients: List<EmailAddress>,
+    /** Earliest send time, including the undo window; WorkManager may run later. */
+    val sendAt: Long,
+    val state: OutboxState,
+    val error: String?,
+    val canRetry: Boolean,
+    val canDelete: Boolean,
+)

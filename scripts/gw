@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Gradle entry point for every agent. Runs the build on the build host (12 cores / 88 GB)
+# after syncing sources; this laptop only hosts the agents. One build at a time (flock).
+#   scripts/gw :mail:test            -> remote
+#   DOTMAIL_LOCAL=1 scripts/gw ...   -> local (slow, low RAM)
+# Outputs synced back: build-out/apk, build-out/reports/<module>
+set -uo pipefail
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+HOST=${BUILD_HOST:-srobin@192.168.0.232}
+LIVE_OPT_IN=0
+if [ "${DOTMAIL_LIVE:-0}" = 1 ]; then LIVE_OPT_IN=1; fi
+ARGS=$(printf ' %q' "$@")
+exec 9>/tmp/dotmail-gradle.lock
+flock 9
+if [ "${DOTMAIL_LOCAL:-0}" = 1 ]; then cd "$ROOT" && ./gradlew "$@"; exit $?; fi
+rsync -az --delete --exclude .gradle --exclude build --exclude .kotlin --exclude local.properties \
+  --exclude build-out --exclude .git "$ROOT/" "$HOST:dotmail/"
+ssh "$HOST" "source ~/.bashrc; cd dotmail && echo sdk.dir=\$ANDROID_HOME > local.properties && DOTMAIL_LIVE=$LIVE_OPT_IN ./gradlew --console=plain$ARGS"
+rc=$?
+mkdir -p "$ROOT/build-out/apk" "$ROOT/build-out/reports"
+rsync -az --delete "$HOST:dotmail/app/build/outputs/apk/" "$ROOT/build-out/apk/" 2>/dev/null
+for m in app mail data designsystem; do
+  rsync -az --delete "$HOST:dotmail/$m/build/reports/" "$ROOT/build-out/reports/$m/" 2>/dev/null
+done
+exit $rc

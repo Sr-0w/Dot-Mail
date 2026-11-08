@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<clientInfo>
+  <emailProvider id="broken.example" domain="broken.example">
+    <displayName>Broken</displayName>
+    <incomingServer type="imap">
+      <hostname>imap.broken.example
+      <port>993</port>
+    <outgoingServer type="smtp">
+      <hostname>smtp.broken.example</hostname>
+</clientInfo>

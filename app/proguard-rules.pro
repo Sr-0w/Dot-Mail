@@ -1,0 +1,12 @@
+# Jakarta Mail / Angus load providers and handlers reflectively.
+-keep class org.eclipse.angus.** { *; }
+-keep class jakarta.mail.** { *; }
+-keep class jakarta.activation.** { *; }
+-keep class com.sun.mail.** { *; }
+-dontwarn java.awt.**
+-dontwarn javax.security.sasl.**
+-dontwarn javax.naming.**
+-dontwarn org.eclipse.angus.**
+-dontwarn jakarta.**
+-dontwarn org.jspecify.**
+-dontwarn com.google.re2j.**

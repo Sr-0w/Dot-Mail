@@ -1,0 +1,152 @@
+package app.dot.mail
+
+import app.dot.mail.data.model.EmailAddress
+import app.dot.mail.ui.compose.ComposeViewModel
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/**
+ * Pure-logic tests for the [ComposeViewModel] companion helpers
+ * ([ComposeViewModel.parseAddress] / [ComposeViewModel.isValidEmail]).
+ * JUnit4 assertions: Truth is not declared in :app's testImplementation.
+ */
+class ComposeAddressTest {
+
+    private fun parse(raw: String) = ComposeViewModel.parseAddress(raw)
+
+    // ------------------------------------------------------------ parseAddress
+
+    @Test
+    fun `plain address`() {
+        assertEquals(EmailAddress("a@b.co"), parse("a@b.co"))
+    }
+
+    @Test
+    fun `name with address`() {
+        val e = parse("Alice <a@b.co>")
+        assertEquals("a@b.co", e.email)
+        assertEquals("Alice", e.name)
+    }
+
+    @Test
+    fun `quoted name is unquoted`() {
+        val e = parse("\"Alice\" <a@b.co>")
+        assertEquals("a@b.co", e.email)
+        assertEquals("Alice", e.name)
+    }
+
+    @Test
+    fun `name containing angle brackets keeps them`() {
+        val e = parse("A <b> <a@b.co>")
+        assertEquals("a@b.co", e.email)
+        assertEquals("A <b>", e.name)
+    }
+
+    @Test
+    fun `brackets without a name yield null name`() {
+        val e = parse("<a@b.co>")
+        assertEquals("a@b.co", e.email)
+        assertNull(e.name)
+    }
+
+    @Test
+    fun `surrounding and inner whitespace is trimmed`() {
+        val e = parse("  Alice   <  a@b.co  >  ")
+        assertEquals("a@b.co", e.email)
+        assertEquals("Alice", e.name)
+    }
+
+    @Test
+    fun `stray closing bracket is trimmed`() {
+        assertEquals(EmailAddress("a@b.co"), parse("a@b.co>"))
+    }
+
+    @Test
+    fun `stray opening bracket is trimmed`() {
+        assertEquals(EmailAddress("a@b.co"), parse("<a@b.co"))
+    }
+
+    @Test
+    fun `displayName falls back to the address`() {
+        assertEquals("Alice", EmailAddress("a@b.co", "Alice").displayName)
+        assertEquals("a@b.co", EmailAddress("a@b.co").displayName)
+        assertEquals("a@b.co", EmailAddress("a@b.co", "   ").displayName)
+    }
+
+    // ------------------------------------------------------------- isValidEmail
+
+    private fun valid(s: String) = assertTrue("expected valid: $s", ComposeViewModel.isValidEmail(s))
+    private fun invalid(s: String) = assertFalse("expected invalid: $s", ComposeViewModel.isValidEmail(s))
+
+    @Test
+    fun `valid addresses are accepted`() {
+        listOf(
+            "alice@example.com",
+            "a+b@example.co",
+            "a.b@example.com",
+            "user@sub.domain.org",
+            "jürgen@example.de",
+            "a@xn--mnch-0ra.de",
+        ).forEach(::valid)
+    }
+
+    @Test
+    fun `whitespace is trimmed before matching`() {
+        valid("  a@b.co  ")
+    }
+
+    @Test
+    fun `rejects missing tld dot`() {
+        invalid("a@b")
+    }
+
+    @Test
+    fun `rejects single character tld`() {
+        invalid("a@b.c") // no one-character TLD exists
+    }
+
+    @Test
+    fun `rejects spaces in local part`() {
+        invalid("a b@c.de")
+    }
+
+    @Test
+    fun `rejects empty local part`() {
+        invalid("@b.co")
+    }
+
+    @Test
+    fun `rejects empty domain`() {
+        invalid("a@")
+    }
+
+    @Test
+    fun `rejects double at sign`() {
+        invalid("a@@b.co")
+    }
+
+    @Test
+    fun `rejects angle brackets`() {
+        invalid("a<b@c.de")
+        invalid("a<b@c.de>")
+    }
+
+    @Test
+    fun `rejects empty string`() {
+        invalid("")
+        invalid("   ")
+    }
+
+    @Test
+    fun `BUG consecutive dots in domain must be rejected`() {
+        invalid("a@b..co")
+    }
+
+    @Test
+    fun `BUG trailing dot in domain must be rejected`() {
+        invalid("a@b.co.")
+    }
+}

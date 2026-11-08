@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<clientInfo>
+  <emailProvider id="empty.example" domain="empty.example">
+    <displayName>Empty</displayName>
+    <displayShortName>Emp</displayShortName>
+    <offlineIMAP>False</offlineIMAP>
+  </emailProvider>
+</clientInfo>

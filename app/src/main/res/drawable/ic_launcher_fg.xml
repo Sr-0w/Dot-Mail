@@ -1,0 +1,8 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- envelope flap line -->
+    <path android:fillColor="#00000000" android:strokeColor="@color/icon_fg" android:strokeWidth="3"
+        android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M36,44 L54,57 L72,44 M38,40 L70,40 Q74,40 74,44 L74,66 Q74,70 70,70 L38,70 Q34,70 34,66 L34,44 Q34,40 38,40 Z" />
+    <path android:fillColor="#FF7C9CFF" android:pathData="M74,38 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
+</vector>

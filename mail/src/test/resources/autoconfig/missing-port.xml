@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<clientInfo>
+  <emailProvider id="noport.example" domain="noport.example">
+    <displayName>NoPort</displayName>
+    <incomingServer type="imap">
+      <hostname>imap.noport.example</hostname>
+      <socketType>SSL</socketType>
+      <username>%EMAILADDRESS%</username>
+    </incomingServer>
+    <outgoingServer type="smtp">
+      <hostname>smtp.noport.example</hostname>
+      <socketType>STARTTLS</socketType>
+      <username>%EMAILADDRESS%</username>
+    </outgoingServer>
+  </emailProvider>
+</clientInfo>

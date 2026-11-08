@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Drives the headless emulator on the build host.
+#   scripts/emu install [apk]      install (default build-out/apk/debug/app-debug.apk) and launch
+#   scripts/emu shot out.png       screenshot to a local file
+#   scripts/emu adb <args...>      any adb command on the emulator
+#   scripts/emu boot               start the emulator if it isn't running, wait for boot
+set -euo pipefail
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+HOST=${BUILD_HOST:-srobin@192.168.0.232}
+R() { ssh "$HOST" "source ~/.bashrc; $*"; }
+cmd=${1:-}; shift || true
+case "$cmd" in
+  boot)
+    R 'pgrep -f "qemu.*dotmail" >/dev/null || (nohup emulator -avd dotmail -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot-save > ~/emulator.log 2>&1 &)'
+    R 'adb wait-for-device; until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = 1 ]; do sleep 2; done; echo booted' ;;
+  install)
+    apk=${1:-$ROOT/build-out/apk/debug/app-debug.apk}
+    scp -q "$apk" "$HOST:/tmp/dotmail.apk"
+    R 'adb install -r -t /tmp/dotmail.apk >/dev/null && adb shell am start -n app.dot.mail/.MainActivity >/dev/null && echo installed' ;;
+  shot)
+    out=${1:?output png}
+    R 'adb exec-out screencap -p' > "$out"; echo "$out" ;;
+  adb)
+    R "adb $(printf ' %q' "$@")" ;;
+  *) echo "usage: scripts/emu boot|install [apk]|shot out.png|adb args"; exit 2 ;;
+esac
