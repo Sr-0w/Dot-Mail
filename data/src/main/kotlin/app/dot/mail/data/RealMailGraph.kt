@@ -27,7 +27,7 @@ internal object GraphRegistry {
     @Volatile private var graph: RealMailGraph? = null
     fun get(context: Context): RealMailGraph = graph ?: synchronized(this) {
         graph ?: RealMailGraph(context.applicationContext,
-            Room.databaseBuilder(context.applicationContext, MailDatabase::class.java, "dotmail.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build(),
+            Room.databaseBuilder(context.applicationContext, MailDatabase::class.java, "dotmail.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7).build(),
             KeystoreCredentialVault()).also { graph = it; it.start() }
     }
 }
@@ -68,7 +68,7 @@ internal class RealMailGraph(
         OutboxItem(row.id, row.accountId, draft.subject, (draft.to + draft.cc + draft.bcc).distinctBy { it.email }, row.dueAt, state, row.error,
             row.state in setOf("UNCERTAIN", "APPEND") || (row.state == "PENDING" && row.error != null), row.state in setOf("PENDING", "APPEND", "UNCERTAIN"))
     } }.flowOn(Dispatchers.IO)
-    internal fun start() { if (scheduling) { WorkScheduling.periodic(context); ForegroundIdle(this).start(); scope.launch { recoverOutbox() }; scope.launch { resurfaceDue() } } }
+    internal fun start() { if (scheduling) { WorkScheduling.periodic(context); ForegroundIdle(this).start(); scope.launch { recoverOutbox(); dao.accounts().forEach { account -> if(dao.draftMirrors(account.id).isNotEmpty()) WorkScheduling.drafts(context,account.id) } }; scope.launch { resurfaceDue() } } }
     internal suspend fun credentials(row: AccountRow): Credentials = withContext(Dispatchers.IO) {
         if (Codec.config(row.config).authType == AuthType.OAUTH2) oauth.credentials(row.id) else try { Credentials(vault.decrypt(row.email, row.secret)) }
         catch(e:java.security.GeneralSecurityException) { dao.syncError(row.id,"Saved credentials are unavailable. Sign in again.",true); throw ReauthenticationRequired(e) }
@@ -143,6 +143,10 @@ internal class RealMailGraph(
             val d = row?.let { Codec.draft(it.json) }
             return ThreadSummary(t.id, t.accountId, d?.subject.orEmpty(), d?.to.orEmpty(), d?.bodyText?.let { app.dot.mail.engine.text.Snippets.fromPlainText(it) }.orEmpty(), row?.updatedAt ?: t.lastAt, 1, 0, false, d?.attachmentUris?.isNotEmpty() == true, draftId = -t.id, recipients = d?.to.orEmpty())
         }
+        if (draftView && ConversationIds.isMessage(t.id)) {
+            val message=dao.message(ConversationIds.messageIdOf(t.id))
+            if(message!=null) return messageSummary(message).copy(draftId=-message.id)
+        }
         val messages = dao.threadMessages(t.id)
         val drafts = if (draftView) dao.folders(t.accountId).filter { it.role == "DRAFTS" }.map { it.id }.toSet() else emptySet()
         val latest = (if (draftView) messages.filter { it.folderId in drafts } else messages).lastOrNull()
@@ -155,7 +159,11 @@ internal class RealMailGraph(
     internal fun mailboxSource(where: String, args: List<Any>, draftView: Boolean, draftAccount: Long?): PagingSource<Int, ThreadRow> {
         val bump = "(SELECT z.resurfacedAt FROM snoozed z WHERE z.threadId=t.id AND z.messageId IS NULL AND z.resurfacedAt IS NOT NULL ORDER BY z.resurfacedAt DESC LIMIT 1)"
         val hidden = " AND NOT EXISTS(SELECT 1 FROM snoozed z WHERE z.threadId=t.id AND z.messageId IS NULL AND z.resurfacedAt IS NULL)"
-        val remote = "SELECT t.*, MAX(t.lastAt, COALESCE($bump,0)) AS sortAt FROM threads t WHERE t.count>0 AND ($where)$hidden" + if (draftView) " AND NOT EXISTS(SELECT 1 FROM drafts d JOIN messages m ON m.id=d.sourceMessageId WHERE m.threadId=t.id)" else ""
+        val remote = if(draftView) {
+            val source = if(draftAccount!=null) "m.folderId=?" else "f.role=?"
+            "SELECT m.id+${ConversationIds.MESSAGE_BASE} AS id,m.accountId,m.subject,'[]' AS participants,m.snippet,m.sentAt AS lastAt,1 AS count,m.unread,m.starred,m.hasAttachments AS attachments,m.sentAt AS sortAt FROM messages m JOIN folders f ON f.id=m.folderId WHERE ($source) AND NOT EXISTS(SELECT 1 FROM drafts d WHERE d.sourceMessageId=m.id) AND NOT EXISTS(SELECT 1 FROM draft_mirrors dm WHERE dm.folderId=m.folderId AND dm.uid=m.uid AND dm.validity=f.validity)"
+        } else "SELECT t.*, MAX(t.lastAt, COALESCE($bump,0)) AS sortAt FROM threads t WHERE t.count>0 AND ($where)$hidden"
+
         val local = if (draftView) " UNION ALL SELECT -id AS id,accountId,'' AS subject,'[]' AS participants,'' AS snippet,updatedAt AS lastAt,1 AS count,0 AS unread,0 AS starred,0 AS attachments,updatedAt AS sortAt FROM drafts" + if (draftAccount != null) " WHERE accountId=?" else "" else ""
         val params = args + if (draftView && draftAccount != null) listOf(draftAccount) else emptyList()
         return dao.page(SimpleSQLiteQuery("SELECT * FROM ($remote$local) ORDER BY sortAt DESC,id DESC", params.toTypedArray()))
@@ -403,7 +411,13 @@ internal class RealMailGraph(
         if (draft.localId != 0L && previous?.accountId != draft.accountId) throw MailActionException(MailActionFailure.ACCOUNT_MISMATCH, "Save a new draft when changing accounts")
         val (cached, sources) = cacheAttachments(draft)
         val json = org.json.JSONObject(Codec.draft(cached)).put("attachmentSources", sources).toString()
-        dao.putDraft(DraftRow(draft.localId, draft.accountId, json, System.currentTimeMillis(), previous?.sourceMessageId))
+        val id = database.withTransaction {
+            val id = dao.putDraft(DraftRow(draft.localId, draft.accountId, json, maxOf(System.currentTimeMillis(),(previous?.updatedAt ?: 0)+1), previous?.sourceMessageId))
+            queueDraftMirror(id,draft.accountId)
+            id
+        }
+        if (scheduling) WorkScheduling.drafts(context,draft.accountId)
+        id
     } }
     override suspend fun loadDraft(localId: Long): Draft? {
         if (localId >= 0) return dao.draft(localId)?.let { Codec.draft(it.json).copy(localId = it.id) }
@@ -416,13 +430,18 @@ internal class RealMailGraph(
             if (dao.folder(message.folderId)?.role != "DRAFTS") return@withTransaction null
             val d = Draft(accountId = message.accountId, identityId = message.accountId, to = Codec.addressField(message.header, "to"), cc = Codec.addressField(message.header, "cc"), bcc = Codec.addressField(message.header, "bcc"), subject = message.subject, bodyText = bodyStore.read(message)?.let { b -> b.plainText ?: b.html?.let { app.dot.mail.engine.text.EmailHtml.toPlainText(it) } }.orEmpty(), bodyHtml = bodyStore.read(message)?.html, attachmentUris = dao.attachments(messageId).filter { !it.inline }.mapNotNull { it.localUri }, references = Codec.strings(Codec.field(message.header, "refs") ?: "[]"))
             val id = dao.putDraft(DraftRow(accountId = message.accountId, json = Codec.draft(d), updatedAt = System.currentTimeMillis(), sourceMessageId = messageId))
+            queueDraftMirror(id,message.accountId,clean=true)
             d.copy(localId = id)
         } }
     }
     private suspend fun removeDraftAndSource(localId: Long) {
+        val draft = dao.draft(localId)
+        var mirror = dao.draftMirror(localId)
+        if (mirror==null && draft!=null) { queueDraftMirror(localId,draft.accountId,clean=true); mirror=dao.draftMirror(localId) }
+        mirror?.let { dao.putDraftMirror(it.copy(deleted=true,dueAt=0)) }
         val source = dao.draft(localId)?.sourceMessageId?.let { dao.message(it) }
         if (source != null && source.uid > 0) {
-            dao.folder(source.folderId)?.let { folder -> dao.insertOperation(OperationRow(accountId = source.accountId, folderId = folder.id, validity = folder.validity, uid = source.uid, action = MessageAction.DELETE_FOREVER.name, messageLocalId = source.id)) }
+            if(mirror==null) dao.folder(source.folderId)?.let { folder -> dao.insertOperation(OperationRow(accountId = source.accountId, folderId = folder.id, validity = folder.validity, uid = source.uid, action = MessageAction.DELETE_FOREVER.name, messageLocalId = source.id)) }
             dao.deleteMessage(source.id); rebuildThread(source.threadId)
         }
         dao.deleteDraft(localId)
@@ -450,16 +469,21 @@ internal class RealMailGraph(
         val frozen = cacheAttachments(draft).first
         val due = maxOf(System.currentTimeMillis() + undoWindowMs.coerceIn(0, 60_000), draft.scheduledAt ?: 0)
         val id = database.withTransaction { val id = dao.insertOutbox(OutboxRow(accountId = draft.accountId, draft = Codec.draft(frozen), dueAt = due)); if (draft.localId != 0L) removeDraftAndSource(draft.localId); id }
-        if (scheduling) WorkScheduling.outbox(context, id, due); id
+        if (scheduling) WorkScheduling.outbox(context, id, due)
+        if(draft.localId!=0L) requestSync()
+        id
     }
     override suspend fun cancelSend(outboxId: Long): Boolean = withContext(Dispatchers.IO) {
         val cancelled=database.withTransaction {
             val row=dao.outbox(outboxId) ?: return@withTransaction null
             if(dao.transitionOutbox(outboxId,"PENDING","CANCELLED")!=1) return@withTransaction null
             val draft=Codec.draft(row.draft)
-            dao.putDraft(DraftRow(draft.localId,row.accountId,row.draft,System.currentTimeMillis())); row
+            val id = dao.putDraft(DraftRow(draft.localId,row.accountId,row.draft,System.currentTimeMillis()))
+            queueDraftMirror(id,row.accountId); row
         } ?: return@withContext false
-        cancelled.mimePath?.let { File(it).delete() }; dao.clearOutboxMime(outboxId); true
+        cancelled.mimePath?.let { File(it).delete() }; dao.clearOutboxMime(outboxId)
+        if(scheduling) WorkScheduling.drafts(context,cancelled.accountId)
+        true
     }
     override suspend fun retrySend(outboxId: Long, confirmPossibleDuplicate: Boolean): Boolean = withContext(Dispatchers.IO) {
         if (!outboxLock.tryLock()) return@withContext false

@@ -19,6 +19,8 @@ data class MessageRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val acc
 data class AttachmentRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val messageId: Long, val partId: String, val name: String, val mime: String, val size: Long, val cid: String?, val inline: Boolean, val localUri: String?)
 @Entity(tableName = "drafts", foreignKeys = [ForeignKey(entity = AccountRow::class, parentColumns = ["id"], childColumns = ["accountId"], onDelete = ForeignKey.CASCADE)], indices = [Index("accountId"), Index(value = ["sourceMessageId"], unique = true)])
 data class DraftRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val accountId: Long, val json: String, @ColumnInfo(defaultValue = "0") val updatedAt: Long = 0, val sourceMessageId: Long? = null)
+@Entity(tableName = "draft_mirrors", foreignKeys = [ForeignKey(entity = AccountRow::class, parentColumns = ["id"], childColumns = ["accountId"], onDelete = ForeignKey.CASCADE)], indices = [Index("accountId")])
+data class DraftMirrorRow(@PrimaryKey val localId: Long, val accountId: Long, val token: String, val revision: Long, val syncedRevision: Long = 0, val dueAt: Long, val folderId: Long? = null, val validity: Long = 0, val uid: Long = 0, val deleted: Boolean = false, val attemptRevision: Long? = null)
 @Entity(tableName = "outbox", foreignKeys = [ForeignKey(entity = AccountRow::class, parentColumns = ["id"], childColumns = ["accountId"], onDelete = ForeignKey.CASCADE)], indices = [Index("accountId"), Index(value = ["state", "dueAt"])])
 data class OutboxRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val accountId: Long, val draft: String, val dueAt: Long, val state: String = "PENDING", val mimePath: String? = null, val error: String? = null)
 /**
@@ -120,6 +122,11 @@ interface MailDao {
     @RawQuery(observedEntities = [AttachmentRow::class, MessageRow::class, FolderRow::class]) fun pageAttachments(query: SupportSQLiteQuery): PagingSource<Int, AttachmentListRow>
     @Query("DELETE FROM attachments WHERE messageId=:id") suspend fun clearAttachments(id: Long)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putDraft(row: DraftRow): Long
+    @Query("SELECT * FROM draft_mirrors WHERE accountId=:accountId") suspend fun draftMirrors(accountId: Long): List<DraftMirrorRow>
+    @Query("SELECT * FROM draft_mirrors WHERE localId=:id") suspend fun draftMirror(id: Long): DraftMirrorRow?
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putDraftMirror(row: DraftMirrorRow)
+    @Query("DELETE FROM draft_mirrors WHERE localId=:id") suspend fun deleteDraftMirror(id: Long)
+    @Query("UPDATE drafts SET sourceMessageId=:messageId WHERE id=:id") suspend fun draftSource(id: Long, messageId: Long?)
     @Query("SELECT * FROM drafts WHERE id=:id") suspend fun draft(id: Long): DraftRow?
     @Query("SELECT * FROM drafts WHERE sourceMessageId=:id LIMIT 1") suspend fun draftForMessage(id: Long): DraftRow?
     @Query("DELETE FROM drafts WHERE id=:id") suspend fun deleteDraft(id: Long)
@@ -143,7 +150,7 @@ interface MailDao {
     @Query("SELECT email, name, MAX(lastSeen) AS lastSeen, accountId FROM contacts WHERE email LIKE :prefix ESCAPE '!' OR name LIKE :prefix ESCAPE '!' GROUP BY email ORDER BY lastSeen DESC LIMIT :limit") suspend fun contacts(prefix: String, limit: Int): List<ContactRow>
 }
 
-@Database(entities = [AccountRow::class, FolderRow::class, ThreadRow::class, ThreadKeyRow::class, MessageRow::class, AttachmentRow::class, DraftRow::class, OutboxRow::class, OperationRow::class, ContactRow::class, BodyTextRow::class, SearchMatchRow::class, SnoozeRow::class], version = 6, exportSchema = true)
+@Database(entities = [AccountRow::class, FolderRow::class, ThreadRow::class, ThreadKeyRow::class, MessageRow::class, AttachmentRow::class, DraftRow::class, OutboxRow::class, OperationRow::class, ContactRow::class, BodyTextRow::class, SearchMatchRow::class, SnoozeRow::class, DraftMirrorRow::class], version = 7, exportSchema = true)
 abstract class MailDatabase : RoomDatabase() { abstract fun mail(): MailDao }
 
 internal val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
@@ -189,5 +196,13 @@ internal val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
         db.execSQL("CREATE INDEX IF NOT EXISTS index_snoozed_accountId ON snoozed(accountId)")
         db.execSQL("CREATE INDEX IF NOT EXISTS index_snoozed_threadId ON snoozed(threadId)")
         db.execSQL("CREATE INDEX IF NOT EXISTS index_snoozed_until ON snoozed(until)")
+    }
+}
+
+internal val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
+    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS draft_mirrors (localId INTEGER NOT NULL PRIMARY KEY, accountId INTEGER NOT NULL, token TEXT NOT NULL, revision INTEGER NOT NULL, syncedRevision INTEGER NOT NULL, dueAt INTEGER NOT NULL, folderId INTEGER, validity INTEGER NOT NULL, uid INTEGER NOT NULL, deleted INTEGER NOT NULL, attemptRevision INTEGER, FOREIGN KEY(accountId) REFERENCES accounts(id) ON UPDATE NO ACTION ON DELETE CASCADE)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_draft_mirrors_accountId ON draft_mirrors(accountId)")
+        db.execSQL("INSERT INTO draft_mirrors(localId,accountId,token,revision,syncedRevision,dueAt,folderId,validity,uid,deleted,attemptRevision) SELECT d.id,d.accountId,lower(hex(randomblob(16))),1,0,0,m.folderId,COALESCE(f.validity,0),MAX(COALESCE(m.uid,0),0),0,NULL FROM drafts d LEFT JOIN messages m ON m.id=d.sourceMessageId LEFT JOIN folders f ON f.id=m.folderId")
     }
 }

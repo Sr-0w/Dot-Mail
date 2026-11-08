@@ -234,6 +234,37 @@ class MailClient(val timeoutMs: Int = 30_000) {
             if (s.hasCapability("UIDPLUS")) { f.expunge(messages); MoveOutcome.MOVED } else MoveOutcome.COPIED_AND_MARKED_DELETED
         }
     } }
+    suspend fun draftInventory(endpoint: Endpoint, credentials: Credentials, path: String): DraftInventory = store(endpoint, credentials) { s -> folder(s,path) { f ->
+        val messages = f.search(FlagTerm(Flags(Flags.Flag.DELETED),false))
+        f.fetch(messages, FetchProfile().apply { add(UIDFolder.FetchProfileItem.UID) })
+        DraftInventory(f.uidValidity,messages.map { f.getUID(it) }.toSet())
+    } }
+    private fun findDraft(f: IMAPFolder, token: String, revision: Long): Message? {
+        val id = "<dotdraft-$token-$revision@dotmail.local>"
+        return f.search(AndTerm(HeaderTerm("Message-ID",id),FlagTerm(Flags(Flags.Flag.DELETED),false)))
+            .firstOrNull { it.getHeader("Message-ID")?.firstOrNull()==id && it.getHeader("X-Dot-Draft-Id")?.firstOrNull()==token }
+    }
+    suspend fun findDraftCopy(endpoint: Endpoint, credentials: Credentials, path: String, token: String, revision: Long): DraftCopy? = store(endpoint,credentials) { s -> folder(s,path) { f ->
+        findDraft(f,token,revision)?.let { DraftCopy(f.uidValidity,f.getUID(it)) }
+    } }
+    /** Idempotent revision APPEND, with identity separate from Message-ID so external edits stay distinguishable by UID. */
+    suspend fun appendDraft(endpoint: Endpoint, credentials: Credentials, path: String, token: String, revision: Long, message: MimeMessage): DraftCopy = store(endpoint,credentials) { s -> folder(s,path,true) { f ->
+        require(token.matches(Regex("[a-zA-Z0-9-]{1,80}")) && revision>0)
+        message.setHeader("X-Dot-Draft-Id",token)
+        message.setHeader("Message-ID","<dotdraft-$token-$revision@dotmail.local>")
+        message.setFlag(Flags.Flag.DRAFT,true)
+        var found = findDraft(f,token,revision)
+        if (found==null) { f.appendMessages(arrayOf(message)); found=findDraft(f,token,revision) }
+        val appended = requireNotNull(found) { "Server did not expose the appended draft" }
+        DraftCopy(f.uidValidity,f.getUID(appended))
+    } }
+    /** Only the specific known copy. Without UIDPLUS, mark it deleted and leave expunge to the server. */
+    suspend fun deleteDraftCopy(endpoint: Endpoint, credentials: Credentials, path: String, copy: DraftCopy) = store(endpoint,credentials) { s -> folder(s,path,true) { f ->
+        if (f.uidValidity!=copy.validity) return@folder
+        val message=f.getMessageByUID(copy.uid) ?: return@folder
+        f.setFlags(arrayOf(message),Flags(Flags.Flag.DELETED),true)
+        if(s.hasCapability("UIDPLUS")) f.expunge(arrayOf(message))
+    } }
     suspend fun append(endpoint: Endpoint, credentials: Credentials, path: String, message: MimeMessage, draft: Boolean = false) = store(endpoint, credentials) { s ->
         val f = s.getFolder(path)
         if (!f.exists()) f.create(Folder.HOLDS_MESSAGES)

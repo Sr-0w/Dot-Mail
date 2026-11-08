@@ -43,6 +43,10 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null, schedu
             runFolderOps(account, config, creds).let { if (!it.success) success = false; folderWarning = it.warning }
             stage = "Connect"
             val remoteFolders = client.folders(config.imap.endpoint(), creds)
+            if(remoteFolders.none { it.role==Role.DRAFTS } && dao.draftMirrors(account.id).any { it.deleted || it.revision!=it.syncedRevision }) {
+                headerWarning="Drafts folder unavailable; local changes are queued"
+                success=false
+            }
             stage = "Folder list"
             reconcileFolders(account, config, creds, remoteFolders)
             for (remote in remoteFolders.sortedBy { when(it.role) { Role.INBOX -> 0; Role.SENT -> 1; Role.DRAFTS -> 2; else -> 3 } }) {
@@ -52,6 +56,11 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null, schedu
                 if (folder == null) {
                     val id = dao.insertFolder(FolderRow(accountId = account.id, path = remote.path, name = remote.name, role = remote.role.name))
                     folder = requireNotNull(dao.folder(id))
+                }
+                if(remote.role==Role.DRAFTS) {
+                    stage="Draft mirroring"
+                    mirrorDrafts(account,config,creds,folder)
+                    stage="Folder header sync"
                 }
                 val initialCursor = SyncCursor(folder.validity, folder.nextUid, folder.modSeq)
                 var result = client.sync(config.imap.endpoint(), creds, folder.path, initialCursor, limit = windowLimit, windowDays = accountSettings.syncWindowDays)
@@ -91,6 +100,7 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null, schedu
                             MessageAction.MARK_UNREAD.name -> client.setFlags(config.imap.endpoint(), creds, folder.path, longArrayOf(op.uid), seen = false)
                             MessageAction.STAR.name -> client.setFlags(config.imap.endpoint(), creds, folder.path, longArrayOf(op.uid), starred = true)
                             MessageAction.UNSTAR.name -> client.setFlags(config.imap.endpoint(), creds, folder.path, longArrayOf(op.uid), starred = false)
+                            "DELETE_DRAFT" -> client.deleteDraftCopy(config.imap.endpoint(),creds,folder.path,DraftCopy(op.validity,op.uid))
                             MessageAction.DELETE_FOREVER.name -> client.setFlags(config.imap.endpoint(), creds, folder.path, longArrayOf(op.uid), delete = true)
                         }
                         dao.deleteOperation(op.id); replayed = true
@@ -119,6 +129,7 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null, schedu
                     (old.map { it.threadId } + dao.folderMessages(folder.id).map { it.threadId }).distinct().forEach { rebuildThread(it) }
                     dao.updateFolder(folder.copy(name = remote.name, role = remote.role.name, unread = remote.unread, total = remote.total, validity = result.cursor.uidValidity, nextUid = result.cursor.uidNext, modSeq = result.cursor.highestModSeq))
                 }
+                if(remote.role==Role.DRAFTS) database.withTransaction { linkDraftCopies(dao.folder(folder.id)!!) }
                 // Only newest cached messages without a preview are fetched, at most 200 × 2 KiB per folder.
                 val previewRows = dao.folderMessages(folder.id).filter { it.uid > 0 }.sortedByDescending { it.sentAt }.take(200).filter { !it.snippetFetched && !it.bodyLoaded }
                 if (previewRows.isNotEmpty()) {
