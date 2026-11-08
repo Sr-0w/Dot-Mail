@@ -1009,11 +1009,11 @@
     <string name="pgp_install_encrypted">Diese Nachricht ist verschlüsselt. Installieren Sie OpenKeychain, um sie zu lesen.</string>
     <string name="pgp_install_signed">Diese Nachricht ist signiert. Installieren Sie OpenKeychain, um sie zu prüfen.</string>
     <string name="pgp_get_openkeychain">OpenKeychain holen</string>
-    <string name="inbox_undo">Rückgängig</string>
-    <string name="inbox_undo_partial">Einige Nachrichten konnten nicht zurückgelegt werden; das geschieht bei der nächsten Synchronisierung.</string>
+        <string name="inbox_undo">Rückgängig</string>
+        <string name="inbox_undo_partial">Einige Nachrichten konnten nicht zurückgelegt werden; das geschieht bei der nächsten Synchronisierung.</string>
 
     <!-- OLED theme -->
-    <string name="settings_theme_oled">OLED</string>
+        <string name="settings_theme_oled">OLED</string>
     <!-- OpenPGP compose -->
     <string name="account_section_pgp">OpenPGP</string>
     <string name="account_pgp_sign">Neue Nachrichten signieren</string>
@@ -1057,4 +1057,18 @@
     <string name="outbox_reschedule">Neu planen</string>
     <string name="outbox_reschedule_title">Senden um</string>
     <string name="outbox_edit_unavailable">Es wird bereits gesendet und kann nicht mehr bearbeitet werden.</string>
+    <string name="aliases_title">Aliasse</string>
+    <string name="aliases_subtitle">SimpleLogin- oder addy.io-Aliasse verwalten</string>
+    <string name="aliases_api_key">API-Schlüssel</string>
+    <string name="aliases_create">Zufälligen Alias erstellen</string>
+    <string name="aliases_limit_note">Es wird nur die erste Alias-Seite dieses Anbieters angezeigt.</string>
+    <string name="aliases_remove_title">API-Schlüssel entfernen?</string>
+    <string name="aliases_remove_body">Der gespeicherte API-Schlüssel und die geladenen Aliasse dieses Anbieters werden von diesem Gerät entfernt.</string>
+    <string name="aliases_test">Verbindung testen</string>
+    <string name="aliases_remove_key">Schlüssel entfernen</string>
+    <string name="aliases_copy">Kopieren</string>
+    <string name="aliases_error">Alias-Anbieter nicht erreichbar. Prüfen Sie den Schlüssel und versuchen Sie es erneut.</string>
+    <string name="compose_use_alias">Alias verwenden…</string>
+    <string name="compose_aliases_empty">Bei Ihren verbundenen Anbietern sind keine Aliase verfügbar.</string>
+    <string name="aliases_reply_to_guidance">Diese Alias-Domain gehört nicht zu Ihren Identitäten. Die Adresse wurde kopiert; verwenden Sie sie als Antwort-an-Hinweis.</string>
 </resources>

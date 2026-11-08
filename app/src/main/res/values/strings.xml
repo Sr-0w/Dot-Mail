@@ -1009,11 +1009,11 @@
     <string name="pgp_install_encrypted">This message is encrypted. Install OpenKeychain to read it.</string>
     <string name="pgp_install_signed">This message is signed. Install OpenKeychain to check it.</string>
     <string name="pgp_get_openkeychain">Get OpenKeychain</string>
-    <string name="inbox_undo">Undo</string>
-    <string name="inbox_undo_partial">Some messages couldn’t be put back; they will be after the next sync.</string>
+        <string name="inbox_undo">Undo</string>
+        <string name="inbox_undo_partial">Some messages couldn’t be put back; they will be after the next sync.</string>
 
     <!-- OLED theme -->
-    <string name="settings_theme_oled">OLED</string>
+        <string name="settings_theme_oled">OLED</string>
     <!-- OpenPGP compose -->
     <string name="account_section_pgp">OpenPGP</string>
     <string name="account_pgp_sign">Sign new messages</string>
@@ -1057,4 +1057,18 @@
     <string name="outbox_reschedule">Reschedule</string>
     <string name="outbox_reschedule_title">Send at</string>
     <string name="outbox_edit_unavailable">It is already being sent and can\'t be edited.</string>
+    <string name="aliases_title">Aliases</string>
+    <string name="aliases_subtitle">Manage SimpleLogin or addy.io aliases</string>
+    <string name="aliases_api_key">API key</string>
+    <string name="aliases_create">Create random alias</string>
+    <string name="aliases_limit_note">Showing only the first page of aliases from this provider.</string>
+    <string name="aliases_remove_title">Remove API key?</string>
+    <string name="aliases_remove_body">The saved API key and aliases loaded for this provider will be removed from this device.</string>
+    <string name="aliases_test">Test connection</string>
+    <string name="aliases_remove_key">Remove key</string>
+    <string name="aliases_copy">Copy</string>
+    <string name="aliases_error">Could not reach the alias provider. Check the key and try again.</string>
+    <string name="compose_use_alias">Use an alias…</string>
+    <string name="compose_aliases_empty">No aliases are available for your connected providers.</string>
+    <string name="aliases_reply_to_guidance">This alias domain is not one of your identities. The address was copied; use it as Reply-To guidance.</string>
 </resources>
