@@ -18,16 +18,13 @@ Priority hints (optional): `P1` = next, `P2` = soon (default), `P3` = nice to ha
 - P2 · Per-account and per-folder notification rules, including muting conversations and configurable notification actions.
 - P2 · Optional native Android Contacts integration (contact picker/autocomplete/photos without requiring blanket contacts access).
 - P2 · Advanced inbox sorting, filters and configurable smart folders across accounts.
-- P2 · Dedicated attachment browser across accounts, with type/date/sender filters, full attachment search, preview, export and Android sharing.
+- P2 · [in progress — Sonnet] Dedicated attachment browser across accounts, with type/date/sender filters, full attachment search, preview, export and Android sharing.
 - P2 · Backup, export, import and restore application settings/account configuration without exporting plaintext credentials by default.
-- P2 · Complete localization (especially French and German), with proper plural forms, RTL support and locale-specific formats.
-- P2 · Snooze/remind-later for individual messages: temporarily hide them and restore them at a selected time with optional local notification.
-- P2 · Optional rules-based classification of personal mail, newsletters, purchases, receipts/bills and notifications; user-editable rules and no external processing.
-- P2 · Strengthen anti-tracking and phishing protections beyond the remote-image preference controls: keep tracking pixels and unsolicited remote resources blocked by default, show real link destinations, optionally remove known tracking parameters with user control, and clearly warn that trusting an address/domain to load remote images can reveal message opens to third parties.
-- P2 · PDF/document attachment preview with local text extraction where practical; convenient Android share-to-Paperless-ngx workflow, with any direct integration strictly optional.
-- P2 · Reusable email templates and quick insertion in the native composer.
-- P2 · Dedicated newsletter/mailing-list view, with safe RFC 2369/RFC 8058 List-Unsubscribe handling, confirmation and transparent behavior.
-- P2 · Polished adaptive native layouts for tablets and foldables, including optional two-pane reading and hardware keyboard shortcuts.
+- P2 · [in progress: French + German for compose, account setup and design system; inbox and the rest next — Gemini] Complete localization (especially French and German), with proper plural forms, RTL support and locale-specific formats.
+- P2 · [engine done (Classifier, EN/FR/DE, user rules first) — UI and sync wiring next] Optional rules-based classification of personal mail, newsletters, purchases, receipts/bills and notifications; user-editable rules and no external processing.
+- P2 · [in progress: link dialog shows the real host in Unicode, warns on look-alike domains, removes tracking parameters by default (toggle) — Claude, Qwen] Strengthen anti-tracking and phishing protections beyond the remote-image preference controls: keep tracking pixels and unsolicited remote resources blocked by default, show real link destinations, optionally remove known tracking parameters with user control, and clearly warn that trusting an address/domain to load remote images can reveal message opens to third parties.
+- P2 · [in progress: in-app PDF preview with pinch zoom + Share to any app (Paperless-ngx) done; text extraction not yet — Claude] PDF/document attachment preview with local text extraction where practical; convenient Android share-to-Paperless-ngx workflow, with any direct integration strictly optional.
+- P2 · [in progress: one-click RFC 8058 unsubscribe with confirmation done; dedicated view not yet — Claude, Qwen] Dedicated newsletter/mailing-list view, with safe RFC 2369/RFC 8058 List-Unsubscribe handling, confirmation and transparent behavior.
 - P2 · Adjustable message-list density, reading typography and accessibility; retain Quiet UI with responsive gestures, subtle haptics and smooth transitions.
 
 - P3 · Optional integration with SimpleLogin and Addy.io for alias discovery/selection/management without dependence on either service.
@@ -52,6 +49,10 @@ Priority hints (optional): `P1` = next, `P2` = soon (default), `P3` = nice to ha
 
 ## Done
 
+- P2 · Snooze/remind-later for individual messages: temporarily hide them and restore them at a selected time with optional local notification. — local-only snooze with presets / date & time, Snoozed list with wake time, resurfaces on top with a notification, new mail un-snoozes (0.1, Sonnet, Qwen)
+- P2 · Reusable email templates and quick insertion in the native composer. — Compose → ⋯ → Templates: save the current message, insert with {{first_name}} {{name}} {{my_name}} {{date}}; stored on the device (0.1, Claude, Qwen)
+- P2 · Polished adaptive native layouts for tablets and foldables, including optional two-pane reading and hardware keyboard shortcuts. — partly: two-pane list + conversation from 840dp (tablets, foldables, landscape); hardware keyboard shortcuts still to do (Claude)
+- "Sign in again" after a password change: tap the sync-error banner or Settings → account → Update password; both servers are verified before saving (0.1, Codex, Sonnet)
 - P2 · Allow users to disable conversation/threaded view and display individual emails as separate entries in the message list (configurable in Settings; preserve the choice across sessions). — Settings → General → "Group into conversations"; off lists single messages with all actions (0.1, Sonnet)
 - P2 · Add an **optional horizontal swipe gesture inside the opened email reader** to navigate to the next or previous message/conversation in the current mailbox, without returning to the inbox. Provide a clear Settings toggle (off/on) and configurable swipe direction if appropriate; preserve reading position and offer a subtle transition/haptic feedback. Do not interfere with Android's system Back gesture, horizontal scrolling of HTML content, carousels, text selection, or attachment interactions. Keep the existing previous/next controls available. — Settings → Reading → "Swipe between conversations" (off by default); ignores Back-gesture edges, pinch and vertical scrolls; haptic tick; on-device check pending (0.1, Claude)
 - Formatted (rich-text) emails with a plain-text option and a default in Settings; sent as multipart/alternative; drafts keep their formatting (0.1, Gemini, Qwen, Claude)
