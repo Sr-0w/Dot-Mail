@@ -1091,4 +1091,6 @@
     <string name="action_error_local_draft_move">Ouvrez ou supprimez un brouillon local au lieu de le déplacer.</string>
     <string name="action_error_mixed_accounts">Choisissez des conversations et une destination dans le même compte.</string>
     <string name="action_error_draft_account_change">Commencez un nouveau brouillon pour utiliser un autre compte.</string>
+    <string name="thread_action_next_conversation">Conversation suivante</string>
+    <string name="thread_action_previous_conversation">Conversation précédente</string>
 </resources>

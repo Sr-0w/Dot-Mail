@@ -1091,4 +1091,6 @@
     <string name="action_error_local_draft_move">Open or discard a local draft instead of moving it.</string>
     <string name="action_error_mixed_accounts">Choose conversations and a destination in the same account.</string>
     <string name="action_error_draft_account_change">Start a new draft to use another account.</string>
+    <string name="thread_action_next_conversation">Next conversation</string>
+    <string name="thread_action_previous_conversation">Previous conversation</string>
 </resources>

@@ -1091,4 +1091,6 @@
     <string name="action_error_local_draft_move">Öffnen oder verwerfen Sie einen lokalen Entwurf, statt ihn zu verschieben.</string>
     <string name="action_error_mixed_accounts">Wählen Sie Unterhaltungen und ein Ziel im selben Konto.</string>
     <string name="action_error_draft_account_change">Beginnen Sie einen neuen Entwurf, um ein anderes Konto zu verwenden.</string>
+    <string name="thread_action_next_conversation">Nächste Unterhaltung</string>
+    <string name="thread_action_previous_conversation">Vorherige Unterhaltung</string>
 </resources>
