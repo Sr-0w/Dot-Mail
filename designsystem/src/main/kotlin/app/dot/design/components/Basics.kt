@@ -363,6 +363,13 @@ fun DotIconButton(
     tint: Color = Dot.colors.textPrimary,
     enabled: Boolean = true,
 ) {
+    val header=LocalHeaderGlass.current
+    if(header!=null && contentDescription!=null) {
+        DotFloatingCapsule(modifier=modifier,backdrop=header.backdrop) {
+            DotCapsuleButton(icon,contentDescription,onClick,enabled=enabled,tint=tint)
+        }
+        return
+    }
     Box(
         modifier
             .size(48.dp)

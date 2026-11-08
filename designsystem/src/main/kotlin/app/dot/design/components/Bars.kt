@@ -61,7 +61,7 @@ fun DotTopBar(
         animationSpec = DotMotion.fastSpec(reducedMotion),
         label = "bar-line",
     )
-    Column(modifier.background(Dot.colors.background).windowInsetsPadding(WindowInsets.statusBars)) {
+    Column(modifier.then(if(LocalHeaderGlass.current==null) Modifier.background(Dot.colors.background) else Modifier).windowInsetsPadding(WindowInsets.statusBars)) {
         Row(
             // Min height, not fixed: title + subtitle must not clip at large font scales.
             Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = DotSpacing.xs, vertical = DotSpacing.xs),
@@ -82,7 +82,7 @@ fun DotTopBar(
             }
             actions()
         }
-        Box(Modifier.fillMaxWidth().height(DotSpacing.hairline).background(lineColor))
+        if(LocalHeaderGlass.current==null) Box(Modifier.fillMaxWidth().height(DotSpacing.hairline).background(lineColor))
     }
 }
 

@@ -12,6 +12,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
@@ -75,7 +78,17 @@ fun TopEdgeFade(
         HazeStyle(backgroundColor = bg, tints = listOf(HazeTint(bg.copy(alpha = 0.35f))), blurRadius = 14.dp, noiseFactor = 0f),
     ) { progressive = HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0f) } else Modifier
     Box(
-        modifier.fillMaxWidth().height(height).graphicsLayer { alpha = p }.then(effect)
+        modifier.fillMaxWidth().height(height).graphicsLayer {
+            alpha = p
+            compositingStrategy = CompositingStrategy.Offscreen
+        }.drawWithContent {
+            drawContent()
+            // Fade the complete blur+tint, not only its background. No hard seam at the bottom.
+            drawRect(Brush.verticalGradient(0f to androidx.compose.ui.graphics.Color.White,
+                0.35f to androidx.compose.ui.graphics.Color.White,
+                0.72f to androidx.compose.ui.graphics.Color.White.copy(alpha=0.45f),
+                1f to androidx.compose.ui.graphics.Color.Transparent),blendMode=BlendMode.DstIn)
+        }.then(effect)
             .background(Brush.verticalGradient(listOf(bg.copy(alpha = if (blur) 0.72f else 0.94f), bg.copy(alpha = 0f)))),
     )
 }
