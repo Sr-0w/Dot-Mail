@@ -36,8 +36,10 @@ Microsoft no longer accepts passwords for IMAP on personal accounts, so this is 
 
 Gmail keeps working with app passwords (Google account → Security → 2-Step Verification → App passwords). Full
 mail access (`https://mail.google.com/`) is a *restricted* scope: a client ID works immediately for up to 100 test
-users, but a public release needs Google's app verification **and a yearly third-party security assessment
-(CASA)**. That is a cost/policy decision for the maintainer, not a code task.
+users (grants expire after 7 days while the app is in "Testing"), and a public release needs Google's OAuth app
+verification (free). The yearly third-party security assessment (CASA) only applies to apps whose Gmail data passes
+through a server; Dot Mail talks directly from the phone to Google, so it is
+[normally not required](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification).
 
 1. <https://console.cloud.google.com> → new project `Dot Mail` → **APIs & Services** → enable **Gmail API**.
 2. **OAuth consent screen**: External, app name, support e-mail, privacy policy URL (docs/FAQ.md "Privacy" section
