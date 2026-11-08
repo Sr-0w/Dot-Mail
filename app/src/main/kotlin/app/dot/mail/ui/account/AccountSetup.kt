@@ -50,6 +50,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -66,6 +68,7 @@ import app.dot.design.components.DotButton
 import app.dot.design.components.DotTextField
 import app.dot.design.components.DotTopBar
 import app.dot.mail.LocalMailGraph
+import app.dot.mail.R
 import app.dot.mail.data.AccountRepository
 import app.dot.mail.data.model.AccountConfig
 import app.dot.mail.data.model.AuthType
@@ -88,18 +91,22 @@ fun WelcomeScreen(onAddAccount: () -> Unit) {
         Spacer(Modifier.weight(1f))
         Box(Modifier.size(14.dp).clip(CircleShape).background(c.accent))
         Spacer(Modifier.height(DotSpacing.xxl))
-        Text("Your mail.\nNothing else.", style = Dot.type.display.copy(fontSize = Dot.type.display.fontSize * 1.35f, lineHeight = Dot.type.display.lineHeight * 1.3f), color = c.textPrimary)
+        Text(
+            stringResource(R.string.setup_welcome_title),
+            style = Dot.type.display.copy(fontSize = Dot.type.display.fontSize * 1.35f, lineHeight = Dot.type.display.lineHeight * 1.3f),
+            color = c.textPrimary,
+        )
         Spacer(Modifier.height(DotSpacing.l))
         Text(
-            "Dot Mail connects straight to your provider over IMAP and SMTP. No account with us, no servers in between, no tracking.",
+            stringResource(R.string.setup_welcome_body),
             style = Dot.type.body,
             color = c.textSecondary,
         )
         Spacer(Modifier.weight(1.2f))
-        DotButton("Add an email account", onClick = onAddAccount, modifier = Modifier.fillMaxWidth())
+        DotButton(stringResource(R.string.setup_welcome_cta), onClick = onAddAccount, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(DotSpacing.m))
         Text(
-            "Works with Infomaniak, Gmail, Fastmail, iCloud, Yahoo, mailbox.org, Posteo and any IMAP server.",
+            stringResource(R.string.setup_welcome_providers),
             style = Dot.type.caption,
             color = c.textTertiary,
             modifier = Modifier.padding(bottom = DotSpacing.l),
@@ -144,11 +151,17 @@ data class SetupState(
     }
 }
 
-class AddAccountViewModel(private val repo: AccountRepository) : ViewModel() {
+class AddAccountViewModel(
+    private val repo: AccountRepository,
+    private val strings: ((Int, Array<out Any>) -> String)? = null,
+) : ViewModel() {
     private val _state = MutableStateFlow(SetupState())
     val state: StateFlow<SetupState> = _state.asStateFlow()
     private val _done = MutableStateFlow(false)
     val done: StateFlow<Boolean> = _done.asStateFlow()
+
+    private fun str(resId: Int, fallback: String, vararg args: Any): String =
+        strings?.invoke(resId, args) ?: fallback
 
     fun edit(transform: (SetupState) -> SetupState) = _state.update { transform(it).copy(error = null) }
 
@@ -157,7 +170,13 @@ class AddAccountViewModel(private val repo: AccountRepository) : ViewModel() {
         val s = _state.value
         if (!s.emailValid || s.password.isEmpty() || s.busy) return
         viewModelScope.launch {
-            _state.update { it.copy(busy = true, status = "Looking up your provider…", error = null) }
+            _state.update {
+                it.copy(
+                    busy = true,
+                    status = str(R.string.setup_status_looking_up, "Looking up your provider…"),
+                    error = null,
+                )
+            }
             val config = if (s.step == SetupState.Step.Manual) {
                 s.toConfig()
             } else {
@@ -167,17 +186,22 @@ class AddAccountViewModel(private val repo: AccountRepository) : ViewModel() {
                         it.copy(
                             busy = false, status = null, step = SetupState.Step.Manual,
                             imapHost = "imap." + it.email.substringAfter('@'), smtpHost = "smtp." + it.email.substringAfter('@'),
-                            error = "We couldn't find settings for this address. Check them below.",
+                            error = str(R.string.setup_error_not_found, "We couldn't find settings for this address. Check them below."),
                         )
                     }
                     return@launch
                 }
                 _state.update { it.withConfig(found) }
                 if (found.authType == AuthType.OAUTH2) {
+                    val provider = found.providerHint ?: str(R.string.setup_this_provider, "This provider")
                     _state.update {
                         it.copy(
                             busy = false, status = null, oauthOnly = true,
-                            error = "${found.providerHint ?: "This provider"} requires browser sign-in (OAuth), which isn't available in this version yet.",
+                            error = str(
+                                R.string.setup_error_oauth_only,
+                                "$provider requires browser sign-in (OAuth), which isn't available in this version yet.",
+                                provider,
+                            ),
                         )
                     }
                     return@launch
@@ -186,29 +210,62 @@ class AddAccountViewModel(private val repo: AccountRepository) : ViewModel() {
                     _state.update {
                         it.copy(
                             busy = false, status = null, step = SetupState.Step.Manual,
-                            error = found.providerHint ?: "This provider only advertises unencrypted settings. Review the security options below before continuing.",
+                            error = found.providerHint ?: str(
+                                R.string.setup_error_unencrypted,
+                                "This provider only advertises unencrypted settings. Review the security options below before continuing.",
+                            ),
                         )
                     }
                     return@launch
                 }
                 found.copy(displayName = s.name.ifBlank { found.displayName })
             }
-            _state.update { it.copy(status = "Signing in to ${config.imap.host}…") }
-            when (val result = runCatching { repo.verify(config, s.password) }.getOrElse { VerifyResult.ConnectionFailed(it.message ?: "Unknown error") }) {
+            _state.update {
+                it.copy(
+                    status = str(
+                        R.string.setup_status_signing_in,
+                        "Signing in to ${config.imap.host}…",
+                        config.imap.host,
+                    ),
+                )
+            }
+            val result = runCatching { repo.verify(config, s.password) }.getOrElse {
+                VerifyResult.ConnectionFailed(it.message ?: str(R.string.setup_error_unknown, "Unknown error"))
+            }
+            when (result) {
                 VerifyResult.Ok -> {
-                    _state.update { it.copy(status = "Setting up your mailbox…") }
+                    _state.update { it.copy(status = str(R.string.setup_status_setting_up, "Setting up your mailbox…")) }
                     runCatching { repo.addAccount(config, s.password) }
                         .onSuccess { _done.value = true }
-                        .onFailure { e -> _state.update { it.copy(busy = false, status = null, error = e.message ?: "Couldn't save the account.") } }
+                        .onFailure { e ->
+                            _state.update {
+                                it.copy(
+                                    busy = false,
+                                    status = null,
+                                    error = e.message ?: str(R.string.setup_error_save_failed, "Couldn't save the account."),
+                                )
+                            }
+                        }
                 }
                 is VerifyResult.AuthFailed -> _state.update {
-                    it.copy(busy = false, status = null, error = "Sign-in failed: ${result.message}" + (it.hint?.let { h -> "\n$h" } ?: ""))
+                    val baseError = str(R.string.setup_error_auth_failed, "Sign-in failed: ${result.message}", result.message)
+                    it.copy(busy = false, status = null, error = baseError + (it.hint?.let { h -> "\n$h" } ?: ""))
                 }
                 is VerifyResult.ConnectionFailed -> _state.update {
-                    it.copy(busy = false, status = null, step = SetupState.Step.Manual, error = "Couldn't connect: ${result.message}")
+                    it.copy(
+                        busy = false,
+                        status = null,
+                        step = SetupState.Step.Manual,
+                        error = str(R.string.setup_error_connection_failed, "Couldn't connect: ${result.message}", result.message),
+                    )
                 }
                 is VerifyResult.CertificateProblem -> _state.update {
-                    it.copy(busy = false, status = null, step = SetupState.Step.Manual, error = "The server's certificate isn't trusted: ${result.message}")
+                    it.copy(
+                        busy = false,
+                        status = null,
+                        step = SetupState.Step.Manual,
+                        error = str(R.string.setup_error_certificate, "The server's certificate isn't trusted: ${result.message}", result.message),
+                    )
                 }
             }
         }
@@ -225,7 +282,13 @@ class AddAccountViewModel(private val repo: AccountRepository) : ViewModel() {
 @Composable
 fun AddAccountScreen(onBack: () -> Unit, onDone: () -> Unit) {
     val graph = LocalMailGraph.current
-    val vm: AddAccountViewModel = viewModel { AddAccountViewModel(graph.accounts) }
+    val appContext = LocalContext.current.applicationContext
+    val vm: AddAccountViewModel = viewModel {
+        AddAccountViewModel(
+            repo = graph.accounts,
+            strings = { id, args -> appContext.getString(id, *args) },
+        )
+    }
     val state by vm.state.collectAsStateLifecycle()
     val done by vm.done.collectAsStateLifecycle()
     LaunchedEffect(done) { if (done) onDone() }
@@ -237,23 +300,23 @@ fun AddAccountScreen(onBack: () -> Unit, onDone: () -> Unit) {
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = DotSpacing.gutter),
         ) {
-            Text("Add account", style = Dot.type.display, color = c.textPrimary)
+            Text(stringResource(R.string.setup_title), style = Dot.type.display, color = c.textPrimary)
             Spacer(Modifier.height(DotSpacing.s))
             Text(
-                "Sign in with your email address. For Gmail, iCloud and Yahoo use an app password.",
+                stringResource(R.string.setup_subtitle),
                 style = Dot.type.callout, color = c.textSecondary,
             )
             Spacer(Modifier.height(DotSpacing.xxl))
             DotTextField(
                 value = state.email, onValueChange = { v -> vm.edit { it.copy(email = v, oauthOnly = false) } },
-                label = "Email", placeholder = "you@example.com",
+                label = stringResource(R.string.setup_email_label), placeholder = stringResource(R.string.setup_email_placeholder),
                 keyboardType = KeyboardType.Email, contentType = ContentType.EmailAddress + ContentType.Username,
                 onImeAction = { passwordFocus.requestFocus() }, enabled = !state.busy,
             )
             Spacer(Modifier.height(DotSpacing.l))
             DotTextField(
                 value = state.password, onValueChange = { v -> vm.edit { it.copy(password = v) } },
-                label = "Password", password = true, contentType = ContentType.Password,
+                label = stringResource(R.string.setup_password_label), password = true, contentType = ContentType.Password,
                 imeAction = ImeAction.Done, onImeAction = vm::connect, focusRequester = passwordFocus,
                 enabled = !state.busy, supporting = state.hint,
             )
@@ -290,7 +353,7 @@ fun AddAccountScreen(onBack: () -> Unit, onDone: () -> Unit) {
                 ) {
                     Icon(Icons.Outlined.Tune, null, Modifier.size(18.dp), tint = c.textSecondary)
                     Spacer(Modifier.width(DotSpacing.s))
-                    Text("Configure servers manually", style = Dot.type.label, color = c.textSecondary)
+                    Text(stringResource(R.string.setup_configure_manually), style = Dot.type.label, color = c.textSecondary)
                 }
             }
             Spacer(Modifier.height(DotSpacing.xxl))
@@ -298,14 +361,14 @@ fun AddAccountScreen(onBack: () -> Unit, onDone: () -> Unit) {
                 Icon(Icons.Outlined.Lock, null, Modifier.size(16.dp).padding(top = 2.dp), tint = c.textTertiary)
                 Spacer(Modifier.width(DotSpacing.s))
                 Text(
-                    "Your password is encrypted on this device with the Android Keystore and only ever sent to your mail server.",
+                    stringResource(R.string.setup_keystore_notice),
                     style = Dot.type.caption, color = c.textTertiary,
                 )
             }
             Spacer(Modifier.height(DotSpacing.xl))
         }
         DotButton(
-            text = if (state.busy) "Connecting" else "Continue",
+            text = stringResource(if (state.busy) R.string.setup_connecting else R.string.setup_continue),
             onClick = vm::connect,
             loading = state.busy,
             enabled = state.emailValid && state.password.isNotEmpty() && !state.oauthOnly,
@@ -317,7 +380,7 @@ fun AddAccountScreen(onBack: () -> Unit, onDone: () -> Unit) {
 @Composable
 private fun ManualSettings(state: SetupState, vm: AddAccountViewModel) {
     Column(Modifier.padding(top = DotSpacing.xxl)) {
-        Text("Incoming (IMAP)", style = Dot.type.headline, color = Dot.colors.textPrimary)
+        Text(stringResource(R.string.setup_incoming_imap), style = Dot.type.headline, color = Dot.colors.textPrimary)
         Spacer(Modifier.height(DotSpacing.m))
         ServerFields(
             host = state.imapHost, port = state.imapPort, security = state.imapSecurity,
@@ -326,7 +389,7 @@ private fun ManualSettings(state: SetupState, vm: AddAccountViewModel) {
             onSecurity = { v -> vm.edit { it.copy(imapSecurity = v, imapPort = defaultPort(v, imap = true)) } },
         )
         Spacer(Modifier.height(DotSpacing.xl))
-        Text("Outgoing (SMTP)", style = Dot.type.headline, color = Dot.colors.textPrimary)
+        Text(stringResource(R.string.setup_outgoing_smtp), style = Dot.type.headline, color = Dot.colors.textPrimary)
         Spacer(Modifier.height(DotSpacing.m))
         ServerFields(
             host = state.smtpHost, port = state.smtpPort, security = state.smtpSecurity,
@@ -337,13 +400,13 @@ private fun ManualSettings(state: SetupState, vm: AddAccountViewModel) {
         Spacer(Modifier.height(DotSpacing.l))
         DotTextField(
             value = state.username, onValueChange = { v -> vm.edit { it.copy(username = v) } },
-            label = "Username", placeholder = "Usually your email address",
+            label = stringResource(R.string.setup_username_label), placeholder = stringResource(R.string.setup_username_placeholder),
             keyboardType = KeyboardType.Email,
         )
         Spacer(Modifier.height(DotSpacing.l))
         DotTextField(
             value = state.name, onValueChange = { v -> vm.edit { it.copy(name = v) } },
-            label = "Your name", placeholder = "Shown to recipients", contentType = ContentType.PersonFullName,
+            label = stringResource(R.string.setup_name_label), placeholder = stringResource(R.string.setup_name_placeholder), contentType = ContentType.PersonFullName,
         )
     }
 }
@@ -360,18 +423,22 @@ private fun ServerFields(
     onHost: (String) -> Unit, onPort: (String) -> Unit, onSecurity: (Security) -> Unit,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(DotSpacing.m)) {
-        DotTextField(host, onHost, Modifier.weight(1f), label = "Server", keyboardType = KeyboardType.Uri)
-        DotTextField(port, onPort, Modifier.widthIn(min = 100.dp).weight(0.4f), label = "Port", keyboardType = KeyboardType.Number)
+        DotTextField(host, onHost, Modifier.weight(1f), label = stringResource(R.string.setup_server_label), keyboardType = KeyboardType.Uri)
+        DotTextField(port, onPort, Modifier.widthIn(min = 100.dp).weight(0.4f), label = stringResource(R.string.setup_port_label), keyboardType = KeyboardType.Number)
     }
     Spacer(Modifier.height(DotSpacing.m))
     Segmented(
-        options = listOf(Security.SSL_TLS to "SSL/TLS", Security.STARTTLS to "STARTTLS", Security.NONE to "None"),
+        options = listOf(
+            Security.SSL_TLS to stringResource(R.string.setup_security_ssl_tls),
+            Security.STARTTLS to stringResource(R.string.setup_security_starttls),
+            Security.NONE to stringResource(R.string.setup_security_none),
+        ),
         selected = security,
         onSelect = onSecurity,
     )
     if (security == Security.NONE) {
         Text(
-            "Without encryption your password and mail travel in clear text. Only use this on a trusted local network.",
+            stringResource(R.string.setup_cleartext_warning),
             style = Dot.type.caption, color = Dot.colors.danger, modifier = Modifier.padding(top = DotSpacing.s),
         )
     }

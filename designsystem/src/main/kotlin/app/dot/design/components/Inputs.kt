@@ -41,6 +41,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.contentType
 import androidx.compose.ui.semantics.error
@@ -53,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import app.dot.design.Dot
 import app.dot.design.DotShapes
 import app.dot.design.DotSpacing
+import app.dot.design.R
 
 /**
  * Filled, borderless-until-focused text field with the label above it (never floating).
@@ -136,7 +138,7 @@ fun DotTextField(
             if (password) {
                 DotIconButton(
                     if (reveal) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                    if (reveal) "Hide password" else "Show password",
+                    stringResource(if (reveal) R.string.ds_hide_password else R.string.ds_show_password),
                     onClick = { reveal = !reveal },
                     tint = c.textSecondary,
                 )
@@ -155,7 +157,7 @@ fun SearchField(
     value: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
-    placeholder: String = "Search mail",
+    placeholder: String = stringResource(R.string.ds_search_mail),
     focusRequester: FocusRequester? = null,
     onSearch: () -> Unit = {},
 ) {
@@ -187,7 +189,7 @@ fun SearchField(
             )
         }
         if (value.isNotEmpty()) {
-            DotIconButton(Icons.Outlined.Close, "Clear search", onClick = { onValueChange("") }, tint = c.textSecondary)
+            DotIconButton(Icons.Outlined.Close, stringResource(R.string.ds_clear_search), onClick = { onValueChange("") }, tint = c.textSecondary)
         } else {
             Spacer(Modifier.width(DotSpacing.m))
         }

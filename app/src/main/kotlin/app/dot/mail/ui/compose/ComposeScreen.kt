@@ -94,6 +94,8 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -130,6 +132,7 @@ import app.dot.design.rememberReducedMotion
 import app.dot.mail.ComposeFormat
 import app.dot.mail.LocalMailGraph
 import app.dot.mail.LocalSettings
+import app.dot.mail.R
 import app.dot.mail.data.model.EmailAddress
 import app.dot.mail.ui.ComposeRoute
 import app.dot.mail.ui.avatar.SenderAvatar
@@ -152,6 +155,8 @@ private val QuoteParagraphStyle = ParagraphStyle(textIndent = TextIndent(firstLi
 fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
     val graph = LocalMailGraph.current
     val settings = LocalSettings.current
+    val context = LocalContext.current
+    val appContext = context.applicationContext
     val vm: ComposeViewModel = viewModel {
         ComposeViewModel(
             graph = graph,
@@ -160,11 +165,11 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
             defaultRichText = settings.ui.value.defaultFormat == ComposeFormat.RICH,
             defaultAccountId = { settings.ui.value.defaultAccountId },
             includeOriginal = { settings.ui.value.includeOriginal },
+            strings = { id, args -> appContext.getString(id, *args) },
         )
     }
     val state by vm.state.collectAsStateWithLifecycle()
     val closed by vm.closed.collectAsStateWithLifecycle()
-    val context = LocalContext.current
     val c = Dot.colors
     var menu by remember { mutableStateOf(false) }
     var scheduleMenu by remember { mutableStateOf(false) }
@@ -238,26 +243,26 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
             .imePadding(),
     ) {
         DotTopBar(
-            navigation = { DotIconButton(Icons.Outlined.Close, "Close", onClick = { vm.close() }) },
-            title = if (route.replyMode != null) replyTitle(route.replyMode) else "New message",
+            navigation = { DotIconButton(Icons.Outlined.Close, stringResource(R.string.compose_close), onClick = { vm.close() }) },
+            title = if (route.replyMode != null) replyTitle(route.replyMode) else stringResource(R.string.compose_new_message),
             actions = {
-                DotIconButton(Icons.Outlined.AttachFile, "Attach files", onClick = { picker.launch(arrayOf("*/*")) })
+                DotIconButton(Icons.Outlined.AttachFile, stringResource(R.string.compose_attach_files), onClick = { picker.launch(arrayOf("*/*")) })
                 Box {
-                    DotIconButton(Icons.Outlined.MoreVert, "More", onClick = { menu = true })
+                    DotIconButton(Icons.Outlined.MoreVert, stringResource(R.string.compose_more), onClick = { menu = true })
                     DotMenu(menu, { menu = false }) {
                         if (state.isRichText) {
-                            DotMenuItem("Plain text", Icons.AutoMirrored.Outlined.Subject) {
+                            DotMenuItem(stringResource(R.string.compose_plain_text), Icons.AutoMirrored.Outlined.Subject) {
                                 menu = false
                                 confirmPlainDialog = true
                             }
                         } else {
-                            DotMenuItem("Formatted text", Icons.Outlined.TextFormat) {
+                            DotMenuItem(stringResource(R.string.compose_formatted_text), Icons.Outlined.TextFormat) {
                                 menu = false
                                 vm.switchToRichText()
                             }
                         }
-                        DotMenuItem("Schedule send", Icons.Outlined.Schedule) { menu = false; scheduleMenu = true }
-                        DotMenuItem("Discard", Icons.Outlined.DeleteOutline, color = c.danger) { menu = false; vm.discard() }
+                        DotMenuItem(stringResource(R.string.compose_schedule_send), Icons.Outlined.Schedule) { menu = false; scheduleMenu = true }
+                        DotMenuItem(stringResource(R.string.compose_discard), Icons.Outlined.DeleteOutline, color = c.danger) { menu = false; vm.discard() }
                     }
                     DotMenu(scheduleMenu, { scheduleMenu = false }) {
                         scheduleOptions().forEach { (label, at) ->
@@ -273,9 +278,9 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
             // From
             if (state.senders.size > 1) {
                 Box {
-                    FieldRow("From", onClick = { senderMenu = true }) {
+                    FieldRow(stringResource(R.string.compose_from), onClick = { senderMenu = true }) {
                         Text(state.sender?.email.orEmpty(), style = Dot.type.callout, color = c.textPrimary, modifier = Modifier.weight(1f))
-                        Icon(Icons.Outlined.ExpandMore, "Choose sender", Modifier.size(18.dp), tint = c.textTertiary)
+                        Icon(Icons.Outlined.ExpandMore, stringResource(R.string.compose_choose_sender), Modifier.size(18.dp), tint = c.textTertiary)
                     }
                     DotMenu(senderMenu, { senderMenu = false }) {
                         state.senders.forEach { s ->
@@ -286,8 +291,9 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                 Hairline()
             }
             val canToggleCcBcc = !state.showCcBcc || state.canCollapseCcBcc
+            val ccBccToggleLabel = stringResource(if (state.showCcBcc) R.string.compose_hide_cc_bcc else R.string.compose_show_cc_bcc)
             RecipientRow(
-                label = "To", field = RecipientField.TO, list = draft.to, vm = vm, state = state,
+                label = stringResource(R.string.compose_to), field = RecipientField.TO, list = draft.to, vm = vm, state = state,
                 focusRequester = toFocus,
                 trailing = if (canToggleCcBcc) ({
                     Box(
@@ -297,7 +303,7 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                             .clip(DotShapes.small)
                             .clickable(
                                 role = Role.Button,
-                                onClickLabel = if (state.showCcBcc) "Hide Cc and Bcc" else "Show Cc and Bcc",
+                                onClickLabel = ccBccToggleLabel,
                             ) {
                                 if (!state.showCcBcc) {
                                     focusCcOnReveal = true
@@ -310,12 +316,12 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                             }
                             .padding(horizontal = 8.dp)
                             .semantics {
-                                contentDescription = if (state.showCcBcc) "Hide Cc and Bcc" else "Show Cc and Bcc"
+                                contentDescription = ccBccToggleLabel
                             },
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            "Cc Bcc",
+                            stringResource(R.string.compose_cc_bcc),
                             style = Dot.type.label,
                             color = if (state.showCcBcc) c.textSecondary else c.textTertiary,
                         )
@@ -349,9 +355,9 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                 exit = ccBccExit,
             ) {
                 Column(Modifier.fillMaxWidth()) {
-                    RecipientRow("Cc", RecipientField.CC, draft.cc, vm, state, focusRequester = ccFocus)
+                    RecipientRow(stringResource(R.string.compose_cc), RecipientField.CC, draft.cc, vm, state, focusRequester = ccFocus)
                     Hairline()
-                    RecipientRow("Bcc", RecipientField.BCC, draft.bcc, vm, state)
+                    RecipientRow(stringResource(R.string.compose_bcc), RecipientField.BCC, draft.bcc, vm, state)
                     Hairline()
                 }
             }
@@ -359,7 +365,7 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                 Plain(
                     value = draft.subject,
                     onValue = { v -> vm.edit { it.copy(subject = v) } },
-                    placeholder = "Subject",
+                    placeholder = stringResource(R.string.compose_subject),
                     style = Dot.type.headline,
                     singleLine = true,
                     imeAction = ImeAction.Next,
@@ -384,7 +390,7 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                 Plain(
                     value = state.editableText,
                     onValue = vm::onPlainBodyChanged,
-                    placeholder = "Write your message",
+                    placeholder = stringResource(R.string.compose_body_placeholder),
                     style = Dot.type.body,
                     singleLine = false,
                     capitalization = KeyboardCapitalization.Sentences,
@@ -406,7 +412,7 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
         }
         if (state.savedOnce) {
             Text(
-                "Draft saved", style = Dot.type.caption, color = c.textTertiary,
+                stringResource(R.string.compose_draft_saved), style = Dot.type.caption, color = c.textTertiary,
                 modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s),
             )
         }
@@ -508,7 +514,7 @@ private fun RichBodyEditor(
         decorationBox = { innerTextField ->
             Box(contentAlignment = Alignment.TopStart) {
                 if (richTextState.annotatedString.text.isEmpty() && !richTextState.isList) {
-                    Text("Write your message", style = Dot.type.body, color = c.textTertiary)
+                    Text(stringResource(R.string.compose_body_placeholder), style = Dot.type.body, color = c.textTertiary)
                 }
                 innerTextField()
             }
@@ -567,29 +573,29 @@ private fun FormattingToolbar(
             .padding(horizontal = DotSpacing.s, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        FormatButton(Icons.Outlined.FormatBold, "Bold", active = isBold) {
+        FormatButton(Icons.Outlined.FormatBold, stringResource(R.string.compose_format_bold), active = isBold) {
             richTextState.toggleSpanStyle(SpanStyle(fontWeight = FontWeight.Bold))
         }
-        FormatButton(Icons.Outlined.FormatItalic, "Italic", active = isItalic) {
+        FormatButton(Icons.Outlined.FormatItalic, stringResource(R.string.compose_format_italic), active = isItalic) {
             richTextState.toggleSpanStyle(SpanStyle(fontStyle = FontStyle.Italic))
         }
-        FormatButton(Icons.Outlined.FormatUnderlined, "Underline", active = isUnderline) {
+        FormatButton(Icons.Outlined.FormatUnderlined, stringResource(R.string.compose_format_underline), active = isUnderline) {
             richTextState.toggleSpanStyle(SpanStyle(textDecoration = TextDecoration.Underline))
         }
-        FormatButton(Icons.Outlined.FormatStrikethrough, "Strikethrough", active = isStrike) {
+        FormatButton(Icons.Outlined.FormatStrikethrough, stringResource(R.string.compose_format_strikethrough), active = isStrike) {
             richTextState.toggleSpanStyle(SpanStyle(textDecoration = TextDecoration.LineThrough))
         }
-        FormatButton(Icons.Outlined.Link, "Insert link", active = isLink, onClick = onLinkClick)
-        FormatButton(Icons.AutoMirrored.Outlined.FormatListBulleted, "Bulleted list", active = isBulleted) {
+        FormatButton(Icons.Outlined.Link, stringResource(R.string.compose_format_link), active = isLink, onClick = onLinkClick)
+        FormatButton(Icons.AutoMirrored.Outlined.FormatListBulleted, stringResource(R.string.compose_format_bulleted_list), active = isBulleted) {
             richTextState.toggleUnorderedList()
         }
-        FormatButton(Icons.Outlined.FormatListNumbered, "Numbered list", active = isNumbered) {
+        FormatButton(Icons.Outlined.FormatListNumbered, stringResource(R.string.compose_format_numbered_list), active = isNumbered) {
             richTextState.toggleOrderedList()
         }
-        FormatButton(Icons.Outlined.FormatQuote, "Quote", active = isQuote) {
+        FormatButton(Icons.Outlined.FormatQuote, stringResource(R.string.compose_format_quote), active = isQuote) {
             richTextState.toggleParagraphStyle(QuoteParagraphStyle)
         }
-        FormatButton(Icons.Outlined.FormatClear, "Clear formatting", active = false) {
+        FormatButton(Icons.Outlined.FormatClear, stringResource(R.string.compose_format_clear), active = false) {
             if (!richTextState.selection.collapsed) {
                 val range = richTextState.selection
                 richTextState.removeSpanStyle(SpanStyle(fontWeight = FontWeight.Bold), range)
@@ -641,6 +647,7 @@ private fun QuotedReplySection(
 ) {
     val c = Dot.colors
     val reduceMotion = rememberReducedMotion()
+    val quoteToggleLabel = stringResource(if (expanded) R.string.compose_hide_quoted else R.string.compose_show_quoted)
     Column(Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s)) {
         Box(
             Modifier
@@ -650,11 +657,11 @@ private fun QuotedReplySection(
                 .border(DotSpacing.hairline * 2, c.border, DotShapes.small)
                 .clickable(
                     role = Role.Button,
-                    onClickLabel = if (expanded) "Hide quoted text" else "Show quoted text",
+                    onClickLabel = quoteToggleLabel,
                     onClick = onToggle,
                 )
                 .padding(horizontal = 12.dp, vertical = 4.dp)
-                .semantics { contentDescription = if (expanded) "Hide quoted text" else "Show quoted text" },
+                .semantics { contentDescription = quoteToggleLabel },
             contentAlignment = Alignment.Center,
         ) {
             Text("•••", style = Dot.type.label, color = c.textSecondary)
@@ -699,10 +706,10 @@ private fun ConfirmPlainTextDialog(
         modifier = Modifier.dotSurfaceEnter(),
         containerColor = c.surface,
         shape = DotShapes.large,
-        title = { Text("Plain text", style = Dot.type.title, color = c.textPrimary) },
-        text = { Text("Formatting will be removed", style = Dot.type.callout, color = c.textSecondary) },
-        confirmButton = { DotPrimaryButton("Convert", onClick = onConfirm, compact = true) },
-        dismissButton = { DotButton("Cancel", onClick = onDismiss, style = ButtonStyle.Ghost, compact = true) },
+        title = { Text(stringResource(R.string.compose_plain_text), style = Dot.type.title, color = c.textPrimary) },
+        text = { Text(stringResource(R.string.compose_plain_text_confirm_body), style = Dot.type.callout, color = c.textSecondary) },
+        confirmButton = { DotPrimaryButton(stringResource(R.string.compose_convert), onClick = onConfirm, compact = true) },
+        dismissButton = { DotButton(stringResource(R.string.compose_cancel), onClick = onDismiss, style = ButtonStyle.Ghost, compact = true) },
     )
 }
 
@@ -725,14 +732,20 @@ private fun InsertLinkDialog(
         modifier = Modifier.dotSurfaceEnter(),
         containerColor = c.surface,
         shape = DotShapes.large,
-        title = { Text(if (isEditing) "Edit link" else "Insert link", style = Dot.type.title, color = c.textPrimary) },
+        title = {
+            Text(
+                stringResource(if (isEditing) R.string.compose_edit_link else R.string.compose_insert_link),
+                style = Dot.type.title,
+                color = c.textPrimary,
+            )
+        },
         text = {
             Column {
                 DotTextField(
                     value = text,
                     onValueChange = { text = it },
-                    label = "Text",
-                    placeholder = "Text to display",
+                    label = stringResource(R.string.compose_link_text_label),
+                    placeholder = stringResource(R.string.compose_link_text_placeholder),
                     singleLine = true,
                     imeAction = ImeAction.Next,
                     onImeAction = { urlFocus.requestFocus() },
@@ -741,8 +754,8 @@ private fun InsertLinkDialog(
                 DotTextField(
                     value = url,
                     onValueChange = { url = it },
-                    label = "URL",
-                    placeholder = "https://example.com",
+                    label = stringResource(R.string.compose_link_url_label),
+                    placeholder = stringResource(R.string.compose_link_url_placeholder),
                     singleLine = true,
                     keyboardType = KeyboardType.Uri,
                     imeAction = ImeAction.Done,
@@ -753,7 +766,7 @@ private fun InsertLinkDialog(
         },
         confirmButton = {
             DotPrimaryButton(
-                text = if (isEditing) "Save" else "Insert",
+                text = stringResource(if (isEditing) R.string.compose_save else R.string.compose_insert),
                 onClick = { onConfirm(text.trim(), url.trim()) },
                 enabled = url.isNotBlank(),
                 compact = true,
@@ -762,9 +775,9 @@ private fun InsertLinkDialog(
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(DotSpacing.xs)) {
                 if (isEditing) {
-                    DotButton("Remove", onClick = onRemove, style = ButtonStyle.Danger, compact = true)
+                    DotButton(stringResource(R.string.compose_remove), onClick = onRemove, style = ButtonStyle.Danger, compact = true)
                 }
-                DotButton("Cancel", onClick = onDismiss, style = ButtonStyle.Ghost, compact = true)
+                DotButton(stringResource(R.string.compose_cancel), onClick = onDismiss, style = ButtonStyle.Ghost, compact = true)
             }
         },
     )
@@ -828,20 +841,22 @@ internal fun emailHtmlToEditorHtml(emailHtml: String): String {
     }
 }
 
+@Composable
 private fun replyTitle(mode: String) = when (mode) {
-    "REPLY_ALL" -> "Reply all"
-    "FORWARD" -> "Forward"
-    else -> "Reply"
+    "REPLY_ALL" -> stringResource(R.string.compose_reply_all)
+    "FORWARD" -> stringResource(R.string.compose_forward)
+    else -> stringResource(R.string.compose_reply)
 }
 
+@Composable
 private fun scheduleOptions(): List<Pair<String, Long>> {
     val zone = ZoneId.systemDefault()
     val now = java.time.ZonedDateTime.now(zone)
     val out = mutableListOf<Pair<String, Long>>()
-    if (now.hour < 17) out += "This evening, 18:00" to now.toLocalDate().atTime(18, 0).atZone(zone).toInstant().toEpochMilli()
-    out += "Tomorrow morning, 08:00" to LocalDate.now(zone).plusDays(1).atTime(LocalTime.of(8, 0)).atZone(zone).toInstant().toEpochMilli()
+    if (now.hour < 17) out += stringResource(R.string.compose_schedule_this_evening) to now.toLocalDate().atTime(18, 0).atZone(zone).toInstant().toEpochMilli()
+    out += stringResource(R.string.compose_schedule_tomorrow_morning) to LocalDate.now(zone).plusDays(1).atTime(LocalTime.of(8, 0)).atZone(zone).toInstant().toEpochMilli()
     val monday = LocalDate.now(zone).with(TemporalAdjusters.next(DayOfWeek.MONDAY))
-    out += "Monday morning, 08:00" to monday.atTime(8, 0).atZone(zone).toInstant().toEpochMilli()
+    out += stringResource(R.string.compose_schedule_monday_morning) to monday.atTime(8, 0).atZone(zone).toInstant().toEpochMilli()
     return out
 }
 
@@ -849,7 +864,7 @@ private fun scheduleOptions(): List<Pair<String, Long>> {
 private fun SendButton(enabled: Boolean, onClick: () -> Unit) {
     DotPrimaryButton(
         icon = Icons.AutoMirrored.Outlined.Send,
-        contentDescription = "Send",
+        contentDescription = stringResource(R.string.compose_send),
         enabled = enabled,
         onClick = onClick,
         compact = true,
@@ -963,13 +978,14 @@ private fun RecipientRow(
 private fun RecipientChip(a: EmailAddress, onRemove: () -> Unit) {
     val c = Dot.colors
     val valid = ComposeViewModel.isValidEmail(a.email)
+    val removeLabel = stringResource(R.string.compose_remove_recipient, a.displayName)
     Row(
         Modifier
             .heightIn(min = 32.dp)
             .clip(DotShapes.small)
             .background(c.surfaceRaised)
             .border(1.dp, if (valid) c.surfaceRaised else c.danger, DotShapes.small)
-            .clickable(onClickLabel = "Remove ${a.displayName}", role = Role.Button, onClick = onRemove)
+            .clickable(onClickLabel = removeLabel, role = Role.Button, onClick = onRemove)
             .padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -982,7 +998,12 @@ private fun RecipientChip(a: EmailAddress, onRemove: () -> Unit) {
 private fun AttachmentChips(uris: List<String>, onRemove: (String) -> Unit) {
     val context = LocalContext.current
     val c = Dot.colors
-    Column(Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s)) {
+    val summary = pluralStringResource(R.plurals.compose_attachments_count, uris.size, uris.size)
+    Column(
+        Modifier
+            .padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s)
+            .semantics { contentDescription = summary },
+    ) {
         uris.forEach { u ->
             var meta by remember(u) { mutableStateOf(Uri.parse(u).lastPathSegment.orEmpty() to (null as Long?)) }
             LaunchedEffect(u) {
@@ -1004,7 +1025,7 @@ private fun AttachmentChips(uris: List<String>, onRemove: (String) -> Unit) {
                     Text(name, style = Dot.type.label, color = c.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (size != null) Text(Format.size(size), style = Dot.type.caption, color = c.textTertiary)
                 }
-                DotIconButton(Icons.Outlined.Close, "Remove $name", onClick = { onRemove(u) }, tint = c.textTertiary)
+                DotIconButton(Icons.Outlined.Close, stringResource(R.string.compose_remove_attachment, name), onClick = { onRemove(u) }, tint = c.textTertiary)
             }
         }
     }
@@ -1018,7 +1039,7 @@ private fun describe(context: android.content.Context, uri: Uri): Pair<String, L
             name to size
         } else null
     }
-}.getOrNull() ?: ((uri.lastPathSegment ?: "Attachment") to null)
+}.getOrNull() ?: ((uri.lastPathSegment ?: context.getString(R.string.compose_attachment_fallback)) to null)
 
 /** Borderless text input used inside compose rows. */
 @Composable
