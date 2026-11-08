@@ -81,6 +81,7 @@ fun TopEdgeFade(
     solidUntil: Float = 0.6f,
     fadeLength: Float = 1f - solidUntil,
     edgeScrim: Dp = 0.dp,
+    edgeScrimSolid: Dp = 0.dp,
 ) {
     val reduced = rememberReducedMotion()
     val p = if (reduced) (if (progress > 0.001f) 1f else 0f) else progress.coerceIn(0f, 1f)
@@ -93,23 +94,30 @@ fun TopEdgeFade(
         // Neutral page-colour veil only (no accent hue); light enough that the moving blurred content stays visible.
         val veil = androidx.compose.ui.graphics.SolidColor(bg.copy(alpha = if (Dot.colors.isDark) 0.34f else 0.42f))
         Box(box.backdropBlur(state!!, radius = 28.dp, background = bg, tint = veil, mask = maskBrush(stops, androidx.compose.ui.graphics.Color.White))
-            .edgeScrim(edgeScrim, bg))
+            .edgeScrim(edgeScrim, edgeScrimSolid, bg))
     } else {
         Box(box.background(maskBrush(stops, bg, 0.94f)))
     }
 }
 
 /**
- * Page colour over the top [height] of the band, opaque at the very edge and gone at [height]. Where the band meets the
- * screen edge there is no content beyond to blur, so whatever slides out there changes the blur abruptly; covering that
- * strip (the status bar) keeps the edge calm, as native frosted bars do.
+ * Page colour over the top [height] of the band: fully opaque down to [solid] (the screen edge and status bar), then easing
+ * out to clear at [height]. At the screen edge there is nothing beyond to blur, so content sliding out there changes the
+ * blur abruptly; native-quality frosted bars (Grok's, for one) hide that half of the bar under an opaque page-colour
+ * gradient and let the blur show only where content is genuinely passing underneath.
  */
-private fun Modifier.edgeScrim(height: Dp, color: androidx.compose.ui.graphics.Color): Modifier =
+private fun Modifier.edgeScrim(height: Dp, solid: Dp, color: androidx.compose.ui.graphics.Color): Modifier =
     if (height <= 0.dp) this else this.then(androidx.compose.ui.Modifier.drawWithContent {
         drawContent()
         val h = height.toPx().coerceAtMost(size.height)
+        val s = (solid.toPx() / h).coerceIn(0f, 0.95f)
         drawRect(
-            Brush.verticalGradient(0f to color, 0.55f to color.copy(alpha = 0.92f), 1f to color.copy(alpha = 0f), endY = h),
+            Brush.verticalGradient(
+                0f to color, s to color,
+                s + (1f - s) * 0.35f to color.copy(alpha = 0.72f),
+                s + (1f - s) * 0.7f to color.copy(alpha = 0.30f),
+                1f to color.copy(alpha = 0f), endY = h,
+            ),
             size = androidx.compose.ui.geometry.Size(size.width, h),
         )
     })
