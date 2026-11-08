@@ -59,10 +59,13 @@ fun rememberBackdrop(): Backdrop {
 fun Modifier.backdropSource(backdrop: Backdrop): Modifier =
     onPlaced { backdrop.sourceInRoot = it.positionInRoot() }.liquidGlassSource(backdrop.glass)
 
+/** The single blur radius of every backdrop surface (see [backdropBlur]). */
+val BackdropRadius = androidx.compose.ui.unit.Dp(28f)
+
 /** The surface's own rectangle, expressed in the source's coordinates. */
 private class ShiftedRect(private val shift: () -> Offset) : Shape {
     override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline =
-        Outline.Rectangle(Rect(-shift(), size))
+        Outline.Rectangle(Rect(shift(), size))
 }
 
 /**
@@ -72,6 +75,9 @@ private class ShiftedRect(private val shift: () -> Offset) : Shape {
  */
 fun Modifier.backdropBlur(backdrop: Backdrop, radius: Dp, background: Color, tint: Brush?, mask: Brush? = null): Modifier =
     composed {
+        // liquidGlass sets its blur on the one layer shared by every surface of this backdrop: surfaces with different
+        // radii would overwrite each other within a frame. One radius for all of them.
+        @Suppress("UNUSED_PARAMETER") val unused = radius
         val here = remember { mutableStateOf(Offset.Zero) }
         val shift = { here.value - backdrop.sourceInRoot }
         val shape = remember { ShiftedRect(shift) }
@@ -86,11 +92,10 @@ fun Modifier.backdropBlur(backdrop: Backdrop, radius: Dp, background: Color, tin
             .liquidGlass(
                 state = backdrop.glass,
                 shape = shape,
-                blurRadius = radius,
+                blurRadius = BackdropRadius,
                 saturation = 1f,
                 tint = solidTint,
                 borderHighlight = SolidColor(Color.Transparent),
-                grain = 0.04f,
             )
             // …and back for the surface's own content.
             .drawWithContent { val d = shift(); translate(d.x, d.y) { this@drawWithContent.drawContent() } }
