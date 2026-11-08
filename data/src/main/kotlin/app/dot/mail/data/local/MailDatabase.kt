@@ -36,6 +36,8 @@ data class ContactRow(val accountId: Long, val email: String, val name: String?,
 data class BodyTextRow(val messageId: Long, val chunk: Int, val text: String)
 @Entity(tableName = "search_matches", primaryKeys = ["queryHash", "messageId"], foreignKeys = [ForeignKey(entity = MessageRow::class, parentColumns = ["id"], childColumns = ["messageId"], onDelete = ForeignKey.CASCADE)], indices = [Index("messageId")])
 data class SearchMatchRow(val queryHash: String, val messageId: Long)
+/** Attachment joined with the few message columns the browser shows. */
+data class AttachmentListRow(val id: Long, val messageId: Long, val partId: String, val name: String, val mime: String, val size: Long, val cid: String?, val inline: Boolean, val localUri: String?, val accountId: Long, val sentAt: Long, val header: String, val subject: String)
 data class BodyChunk(val text: String?, val html: String?)
 internal const val MESSAGE_META = "id,accountId,folderId,threadId,uid,header,subject,sentAt,unread,starred,hasAttachments,snippet,NULL AS text,NULL AS html,bodyLoaded,remoteImages,senderSearch,recipientSearch,snippetFetched,bodyPath,messageIdKey"
 
@@ -115,6 +117,7 @@ interface MailDao {
     @Query("SELECT * FROM attachments WHERE id=:id") suspend fun attachment(id: Long): AttachmentRow?
     @Query("SELECT * FROM attachments WHERE localUri=:uri LIMIT 1") suspend fun attachmentUri(uri: String): AttachmentRow?
     @Insert suspend fun insertAttachment(row: AttachmentRow): Long
+    @RawQuery(observedEntities = [AttachmentRow::class, MessageRow::class, FolderRow::class]) fun pageAttachments(query: SupportSQLiteQuery): PagingSource<Int, AttachmentListRow>
     @Query("DELETE FROM attachments WHERE messageId=:id") suspend fun clearAttachments(id: Long)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putDraft(row: DraftRow): Long
     @Query("SELECT * FROM drafts WHERE id=:id") suspend fun draft(id: Long): DraftRow?

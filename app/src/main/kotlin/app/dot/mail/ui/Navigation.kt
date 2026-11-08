@@ -77,6 +77,7 @@ import kotlinx.serialization.Serializable
         }
 }
 @Serializable object SearchRoute
+@Serializable object AttachmentsRoute
 @Serializable object SettingsRoute
 @Serializable object OutboxRoute
 
@@ -146,6 +147,7 @@ fun DotMailRoot(requests: StateFlow<ExternalRequest?>, onRequestConsumed: () -> 
                                 onAddAccount = { nav.navigate(AddAccountRoute(firstAccount = false)) },
                                 onOpenDraft = { nav.openCompose(ComposeRoute(draftId = it)) },
                                 onOutbox = { nav.navigate(OutboxRoute) },
+                                onAttachments = { nav.navigate(AttachmentsRoute) },
                             )
                         }
                     }
@@ -205,6 +207,7 @@ fun DotMailRoot(requests: StateFlow<ExternalRequest?>, onRequestConsumed: () -> 
                 SearchScreen(onBack = { nav.popBackStack() }, onOpenThread = { nav.navigate(ThreadRoute(it)) })
             }
             composable<OutboxRoute> { app.dot.mail.ui.outbox.OutboxScreen(onBack = { nav.popBackStack() }) }
+            composable<AttachmentsRoute> { app.dot.mail.ui.attachments.AttachmentsScreen(onBack = { nav.popBackStack() }) }
             composable<SettingsRoute> {
                 SettingsScreen(
                     onBack = { nav.popBackStack() },

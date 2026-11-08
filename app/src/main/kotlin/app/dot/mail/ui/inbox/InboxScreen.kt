@@ -162,6 +162,7 @@ fun InboxScreen(
     onAddAccount: () -> Unit,
     onOpenDraft: (Long) -> Unit,
     onOutbox: () -> Unit,
+    onAttachments: () -> Unit = {},
 ) {
     val graph = LocalMailGraph.current
     val appSettings = LocalSettings.current
@@ -218,6 +219,7 @@ fun InboxScreen(
                 outboxCount = outbox.size,
                 outboxNeedsAttention = outbox.any { it.state == app.dot.mail.data.model.OutboxState.NEEDS_REVIEW || it.error != null },
                 onOutbox = { scope.launch { drawerState.close() }; onOutbox() },
+                onAttachments = { scope.launch { drawerState.close() }; onAttachments() },
             )
         },
     ) {
