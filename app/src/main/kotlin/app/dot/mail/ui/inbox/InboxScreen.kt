@@ -385,6 +385,7 @@ fun InboxScreen(
                         role = header.role,
                         filtered = filtersActive.any,
                         smart = mailbox is Mailbox.Smart,
+                        mailbox = mailbox,
                         onOpen = { t ->
                             when {
                                 selection.isNotEmpty() -> vm.toggleSelection(t.threadId)
@@ -462,6 +463,7 @@ private fun ThreadList(
     role: FolderRole?,
     filtered: Boolean,
     smart: Boolean,
+    mailbox: Mailbox,
     onOpen: (ThreadSummary) -> Unit,
     onToggleSelect: (Long) -> Unit,
     onSwipe: (MessageAction, ThreadSummary) -> Unit,
@@ -479,7 +481,7 @@ private fun ThreadList(
             item { EmptyFor(role, filtered, smart) }
         }
         else -> {
-            LaunchedEffect(threads.itemSnapshotList.items) { app.dot.mail.ui.thread.ThreadOrder.ids = threads.itemSnapshotList.items.map { it.threadId } }
+            LaunchedEffect(mailbox, threads.itemSnapshotList.items) { app.dot.mail.ui.thread.ThreadOrder.record(mailbox, threads.itemSnapshotList.items.map { it.threadId }) }
             LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
