@@ -8,6 +8,8 @@ Priority hints (optional): `P1` = next, `P2` = soon (default), `P3` = nice to ha
 
 ## Open
 
+- P2 · Allow users to disable conversation/threaded view and display individual emails as separate entries in the message list (configurable in Settings; preserve the choice across sessions).
+
 - P2 · Animations throughout the app (screen transitions, list item enter/leave on archive/delete, swipe feedback, expand/collapse, shared-element-like transition list → conversation), and stylish custom loading spinners in the Quiet style. Not a priority.
 - P2 · Sender profile pictures from other sources if possible (see avatar work in progress for what's covered).
 
