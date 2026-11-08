@@ -1,5 +1,6 @@
 package app.dot.mail.ui.pdf
 
+import app.dot.mail.data.PdfText
 import android.graphics.Bitmap
 import android.graphics.Color as AColor
 import android.graphics.pdf.PdfRenderer
@@ -187,37 +188,6 @@ private fun PdfPage(pdf: PdfDocument, index: Int, widthPx: Int) {
     }
 }
 
-
-/**
- * Local text extraction with the platform PDF stack (Android 15+ / SDK extension 13): nothing leaves the phone.
- * Older devices simply don't get the text view.
- */
-object PdfText {
-    val supported: Boolean
-        get() = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S &&
-            android.os.ext.SdkExtensions.getExtensionVersion(android.os.Build.VERSION_CODES.S) >= 13
-
-    /** Text of every page, pages separated by a blank line; null if unsupported, protected or image-only. */
-    @android.annotation.SuppressLint("NewApi")
-    fun extract(context: android.content.Context, uri: String, maxChars: Int = 500_000): String? {
-        if (!supported) return null
-        return runCatching {
-            context.contentResolver.openFileDescriptor(Uri.parse(uri), "r")!!.use { fd ->
-                PdfRenderer(fd).use { renderer ->
-                    val out = StringBuilder()
-                    for (i in 0 until renderer.pageCount) {
-                        if (out.length >= maxChars) break
-                        renderer.openPage(i).use { page ->
-                            page.textContents.forEach { out.append(it.text) }
-                        }
-                        out.append("\n\n")
-                    }
-                    out.toString().trim().take(maxChars).ifBlank { null }
-                }
-            }
-        }.getOrNull()
-    }
-}
 
 @Composable
 private fun PdfTextView(uri: String, modifier: Modifier = Modifier) {

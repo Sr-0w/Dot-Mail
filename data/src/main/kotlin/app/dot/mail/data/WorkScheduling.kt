@@ -7,6 +7,10 @@ import java.util.concurrent.TimeUnit
 
 internal object WorkScheduling {
     private val network = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+    fun searchIndex(context: Context) {
+        WorkManager.getInstance(context).enqueueUniqueWork("dotmail.search-index",ExistingWorkPolicy.KEEP,
+            OneTimeWorkRequestBuilder<SearchIndexWorker>().setBackoffCriteria(BackoffPolicy.EXPONENTIAL,10,TimeUnit.SECONDS).build())
+    }
     fun periodic(context: Context) {
         WorkManager.getInstance(context).enqueueUniquePeriodicWork("dotmail.periodic", ExistingPeriodicWorkPolicy.KEEP,
             PeriodicWorkRequestBuilder<SyncWorker>(15, TimeUnit.MINUTES).setConstraints(network).setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS).build())

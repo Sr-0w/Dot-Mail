@@ -35,17 +35,4 @@ internal class BodyStore(private val context: Context, private val dao: MailDao)
         }
         return MessageBody(text.toString().takeIf { it.isNotEmpty() },html.toString().takeIf { it.isNotEmpty() },row.remoteImages,isTruncated=truncated)
     }
-    suspend fun index(messageId: Long, file: File?, html: Boolean) {
-        dao.clearBodyText(messageId)
-        if(file?.isFile!=true) return
-        file.reader(Charsets.UTF_8).use { input ->
-            val buffer=CharArray(32_768); var number=0; var overlap=""
-            while(true) {
-                val n=input.read(buffer); if(n<0) break
-                val raw=overlap+String(buffer,0,n)
-                val text=if(html) org.jsoup.Jsoup.parse(raw).text() else raw
-                dao.putBodyText(BodyTextRow(messageId,number++,text)); overlap=raw.takeLast(256)
-            }
-        }
-    }
 }

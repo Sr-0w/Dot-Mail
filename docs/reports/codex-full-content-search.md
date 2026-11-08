@@ -1,0 +1,42 @@
+# Full-content search — implementation and validation
+
+## UI contract
+
+`MailRepository.search(query, SearchScope(...)): Flow<PagingData<SearchResult>>`:
+
+- `SearchScope.accountIds` / `folderIds`: empty means all cached accounts/folders. Filters intersect.
+- `includeServer=true`: optional read-only IMAP search when a validated network is available; false performs no network search.
+- `sort`: `SearchSort.RELEVANCE`, `NEWEST`, `OLDEST`.
+- `SearchResult.thread` retains the existing navigation contract; `messageId` and `folderId` identify the actual matching message. Scope actions to `Mailbox.InFolder(folderId)`; do not act on other conversation copies.
+- `subject` and `subjectHighlights` belong to that matching message. `snippet` is a match-centered excerpt with `highlights`. All ranges use UTF-16 offsets into their accompanying original string, end exclusive. Accents, decomposed combining marks and supplementary characters survive normalization.
+- `bodyAvailable` reports a cached body. `serverOnly` means the current hit relies on a server SEARCH result rather than locally indexed content; opening still calls `loadBody(messageId)`.
+- Collect `searchProgress(query, scope)`: index counts/running/error, `serverRunning`, `serverAvailable`, `serverError`, `serverLimited`. Show local results while indexing/server work continues. `serverLimited` conservatively means a folder reached the 200-header result cap; narrow the query/scope for more results.
+- `searchIndexProgress` exposes global backfill counts. Existing `search(query, accountId)` delegates to the same engine and maps results back to ThreadSummary, so the current UI benefits without changing navigation.
+
+Operators: `from:`, `to:`, `subject:`, `folder:` (folder name/path), `has:attachment`, `is:unread/read/starred`, `before:/after:/since:YYYY-MM-DD` (UTC sent date; before exclusive, after/since inclusive). Quotes preserve phrases; unquoted terms match word prefixes. All terms must match the same message, rather than separate messages in a conversation. Unknown/invalid operators become literal text. Sorting/deduplication happens in SQLite on narrow message-id/rank rows. Original body/PDF excerpts load only for the emitted page; they never enter a mailbox-wide sort buffer. The mailbox is never loaded into Kotlin.
+
+## Index and persistence
+
+Room v8 (`MIGRATION_7_8`) adds FTS4 using unicode61, a bounded original-text document table, and a durable indexing queue. Existing account/message/body-file data stays intact. The obsolete unbounded body_text LIKE chunks are cleared and no longer written. Schema 8 is exported. No dependency added.
+
+A persistent SQL-trigger queue observes message content changes and attachment insert/update/delete, including future cache eviction. A revision check keeps a concurrent edit queued if an older snapshot finishes indexing. Flags/folder moves join live metadata and require no content reindex. Message deletion cascades documents/queue and immediately removes its FTS row, including account/folder removal. The index worker performs 32-document batches (maximum 256 per run), yielding between documents and retrying remaining work with backoff. It runs off Main independently of the network sync mutex. Search emits existing index results immediately; it does not wait for a whole backfill or PDF extraction. Startup reopens the queue and resumes.
+
+Indexed fields: bounded subject/from/to, plain text, meaningful HTML text (jsoup removes script/style/head/template/noscript), filenames, and downloaded PDF text. Filenames are now retained from cached IMAP BODYSTRUCTURE during header sync without downloading attachments; older header JSON gets the existing bounded metadata backfill. Both MIME alternatives receive index space when they differ; a long plain alternative cannot crowd out HTML-only content. Truncation preserves grapheme boundaries. Text normalization uses NFKD, removes combining marks, folds case and German ß→ss. Display text stays unchanged. All MATCH operands are compiled from tokens, never raw SQL/FTS syntax. Ranking boosts subject, sender/recipient and filename matches, then recent mail, with a deterministic date/message-id tie-break. A matching conversation appears once, represented by its highest-ranked message.
+
+Bounds per message: body text 64 Ki UTF-16 chars, filenames 8 Ki, PDF text 32 Ki; source HTML parsing is capped at 512 Ki. PDF indexing examines at most four already-downloaded PDFs, at most 20 pages each and 32 Ki total. No OCR, remote resources, or attachment download is triggered. Very long content beyond these limits is not indexed. No silently unlimited disk/memory workload. FTS query prefixes follow the [FTS4 grammar](https://www.sqlite.org/fts3.html) (asterisk **inside** a quoted phrase), unlike FTS5. The SQL passes candidate rowids from FTS/server UNION into indexed message lookups; it avoids a correlated OR that would scan every cached message. Conversation selection uses one unique MAX rank key, following SQLite’s [documented bare-column MAX behavior](https://www.sqlite.org/lang_select.html#bareagg).
+
+`PdfText` moved from app's PdfViewer into `app.dot.mail.data.PdfText`; the reader imports it. It preserves platform-only extraction (Android 15 / extension 13), now bounds appends before adding page text and adds `maxPages` (default 200 for the reader). Older/protected/image-only PDFs return null. Indexing passes stricter bounds. Platform PDF extraction was verified by Claude on the owner's phone before this move; this PR does not claim a new phone PDF smoke test.
+
+## Server fallback
+
+IMAP SEARCH is read-only, capped at two concurrent folder requests, 200 newest matching headers per folder and 60 seconds per search. It reuses authenticated engine sessions, never loads a whole body or marks Seen, and is canceled when collection ends. An already-blocked Angus socket may finish at its configured timeout; the graph owns that bounded job so cancellation never makes a new local query wait for it. Partial failures retain local/previously returned results and expose a sanitized error. Account/folder scope and flags/date restrictions apply to merged results. A header search result carries UIDVALIDITY; stale namespaces are refused, and a first-ever search checkpoint still permits the normal bounded initial sync. The subsequent sync preserves older search hits in the same UID namespace, while real UIDVALIDITY resets still remove old UIDs. Server batches rebuild each changed conversation once, rather than once per matching header, and do not wait for PDF/body indexing to report network completion. Search hits merge into the existing message/thread records and deduplicate via the existing message-id threading. Provider SEARCH does not promise accent folding: offline/local FTS does.
+
+## Validation
+
+- Full `scripts/gw :mail:test :data:testDebugUnitTest :app:assembleDebug` passed, including Room/GreenMail search tests and migrations from v1/v6/v7. Final batching/grapheme and MIME-alternative regressions also passed.
+- `scripts/gw :mail:test :data:testDebugUnitTest :app:assembleRelease` passed with R8 and release lint.
+- Opt-in `DOTMAIL_LIVE=1 scripts/gw :mail:test --tests app.dot.mail.engine.LiveSearchTest` passed read-only against Infomaniak: four matching headers, 462 ms including the verification header fetch, same UIDVALIDITY and unchanged Seen. No real addresses/queries/subjects/bodies/secrets appear in the test output or this report.
+- Regression coverage: body+HTML meaningful text, excluded script/style, French/German accents/case/ß, quoted phrase/prefix, ranking/chronological sorts, all terms in one message, account/folder/flag/date filters, wildcard/FTS injection syntax, bounded body indexing/backfill and continuation, concurrent revisions/restart, body update/eviction/deletion, attachment removal, unsupported PDF, combining/supplementary-safe highlights, old server hit/body-on-demand/unread and subsequent window sync. The v7 migration test indexes a 3 MiB legacy body without projecting it into a CursorWindow, then verifies account-deletion FTS cleanup.
+- No phone installation or device search smoke test by Codex. Claude owns that follow-up. Platform PDF extraction itself was not newly exercised on device in this PR.
+
+The expanded suite exposed FileProvider's static path cache leaking a previous Robolectric test's temporary files directory into RepositoryTest. The test setup now clears that cache, as CalendarReplyTest already does; production provider behavior is unchanged.

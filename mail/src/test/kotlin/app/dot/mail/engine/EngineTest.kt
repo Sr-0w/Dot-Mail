@@ -109,7 +109,7 @@ class EngineTest {
         assertEquals("Bob Smith", parsed.terms[1].value)
         assertEquals("weekly report", parsed.terms[2].value)
         assertTrue(parsed.needsAttachments)
-        assertEquals(MailSearch.Term(null, "free phrase"), parsed.terms.last())
+        assertEquals(MailSearch.Term(null, "free phrase",quoted=true), parsed.terms.last())
     }
     @Test fun gmailThreadExtensionParsesWithoutLosingFetchResponse() {
         val protocol = org.eclipse.angus.mail.imap.protocol.IMAPProtocol(ByteArrayInputStream(byteArrayOf()), java.io.PrintStream(ByteArrayOutputStream()), Properties(), false)
