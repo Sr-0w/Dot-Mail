@@ -16,6 +16,8 @@ data class Header(
     val from: List<Address>, val to: List<Address>, val cc: List<Address>, val bcc: List<Address>, val replyTo: List<Address>,
     val subject: String, val sentAt: Long, val flags: RemoteFlags, val hasAttachments: Boolean,
     val gmailThreadId: Long? = null, val unsubscribe: String? = null,
+    /** RFC 8058 one-click endpoint (https only, List-Unsubscribe-Post present). */
+    val unsubscribeOneClick: String? = null,
 )
 data class HeaderFailure(val uid: Long, val error: Exception)
 data class HeaderSync(val cursor: SyncCursor, val reset: Boolean, val headers: List<Header>, val flags: List<RemoteFlags>, val existingUids: Set<Long>, val failures: List<HeaderFailure> = emptyList())

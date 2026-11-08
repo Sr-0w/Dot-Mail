@@ -143,7 +143,7 @@ class MailClient(val timeoutMs: Int = 30_000) {
     private fun fetchHeaders(f: IMAPFolder, messages: Array<out Message>, gmail: Boolean) {
         f.fetch(messages, FetchProfile().apply {
             add(FetchProfile.Item.ENVELOPE); add(FetchProfile.Item.FLAGS); add(FetchProfile.Item.CONTENT_INFO); add(UIDFolder.FetchProfileItem.UID)
-            listOf("Message-ID", "References", "In-Reply-To", "List-Unsubscribe").forEach { add(it) }
+            listOf("Message-ID", "References", "In-Reply-To", "List-Unsubscribe", "List-Unsubscribe-Post").forEach { add(it) }
             if (gmail) add(GmailThreadFetch.profile)
         })
     }
@@ -169,7 +169,13 @@ class MailClient(val timeoutMs: Int = 30_000) {
         m.subject.orEmpty(), (m.sentDate ?: m.receivedDate ?: Date(0)).time, flags(f, m),
         // BODYSTRUCTURE only: never access content or inputStream during header sync.
         runCatching { hasAttachments(m) }.getOrDefault(false), if ((f.store as IMAPStore).hasCapability("X-GM-EXT-1")) (m as IMAPMessage).getItem(GmailThreadFetch.item) as? Long else null, m.getHeader("List-Unsubscribe")?.firstOrNull()?.let { Regex("<(https://[^>]+|mailto:[^>]+)>", RegexOption.IGNORE_CASE).find(it)?.groupValues?.get(1) },
+        unsubscribeOneClick(m),
     )
+    private fun unsubscribeOneClick(m: Message): String? = runCatching {
+        val list = m.getHeader("List-Unsubscribe")?.toList() ?: return null
+        val post = m.getHeader("List-Unsubscribe-Post")?.toList() ?: return null
+        app.dot.mail.engine.text.ListUnsubscribe.parse(mapOf("List-Unsubscribe" to list, "List-Unsubscribe-Post" to post))?.oneClickHttps
+    }.getOrNull()
     private fun hasAttachments(part: Part, depth: Int = 0): Boolean {
         if (depth >= 40) return false
         if (part.disposition.equals(Part.ATTACHMENT, true) || (part.fileName != null && !part.disposition.equals(Part.INLINE, true))) return true

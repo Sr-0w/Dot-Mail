@@ -19,7 +19,7 @@ internal object Codec {
     fun draft(raw: String): Draft = JSONObject(raw).let { Draft(it.getLong("id"), it.getLong("account"), if (it.isNull("identity")) null else it.getLong("identity"), addresses(it.getString("to")), addresses(it.getString("cc")), addresses(it.getString("bcc")), it.getString("subject"), it.getString("text"), strings(it.getString("attachments")), it.nullString("reply"), strings(it.getString("refs")), if (it.isNull("scheduled")) null else it.getLong("scheduled"), bodyHtml = it.nullString("html")) }
     fun header(h: Header): String {
         fun convert(a: List<app.dot.mail.engine.Address>) = addresses(a.map { EmailAddress(it.email, it.name) })
-        return JSONObject().put("from", convert(h.from)).put("to", convert(h.to)).put("cc", convert(h.cc)).put("bcc", convert(h.bcc)).put("replyTo", convert(h.replyTo)).put("messageId", h.messageId).put("refs", strings(h.references)).put("unsubscribe", h.unsubscribe).toString()
+        return JSONObject().put("from", convert(h.from)).put("to", convert(h.to)).put("cc", convert(h.cc)).put("bcc", convert(h.bcc)).put("replyTo", convert(h.replyTo)).put("messageId", h.messageId).put("refs", strings(h.references)).put("unsubscribe", h.unsubscribe).put("unsubOneClick", h.unsubscribeOneClick).toString()
     }
     fun field(raw: String, name: String): String? = JSONObject(raw).nullString(name)
     fun addressField(raw: String, name: String): List<EmailAddress> = addresses(JSONObject(raw).getString(name))

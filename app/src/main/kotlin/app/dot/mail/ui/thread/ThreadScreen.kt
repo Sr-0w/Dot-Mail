@@ -174,6 +174,32 @@ class ThreadViewModel(
         }
     }
 
+    /** RFC 8058: a single POST, no cookies, redirects not followed. The sender's list software does the rest. */
+    fun unsubscribeOneClick(endpoint: String) {
+        viewModelScope.launch {
+            val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    val url = java.net.URL(endpoint)
+                    require(url.protocol.equals("https", true))
+                    (url.openConnection() as java.net.HttpURLConnection).run {
+                        requestMethod = "POST"
+                        instanceFollowRedirects = false
+                        useCaches = false
+                        connectTimeout = 15_000; readTimeout = 15_000
+                        doOutput = true
+                        setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+                        setRequestProperty("User-Agent", "DotMail")
+                        outputStream.use { it.write("List-Unsubscribe=One-Click".toByteArray()) }
+                        val code = responseCode
+                        disconnect()
+                        code in 200..299
+                    }
+                }.getOrDefault(false)
+            }
+            _events.send(ThreadEvent.Message(if (ok) "Unsubscribed. You may still get mail already on its way." else "Couldn't reach the sender's unsubscribe service. Try again later."))
+        }
+    }
+
     fun move(folderId: Long) {
         viewModelScope.launch {
             runCatching { if (source != null) graph.mail.move(listOf(threadId), folderId, source) else @Suppress("DEPRECATION") graph.mail.move(listOf(threadId), folderId) }
@@ -242,6 +268,7 @@ fun ThreadScreen(
     val snackbar = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
     var pendingLink by remember { mutableStateOf<String?>(null) }
+    var confirmUnsubscribe by remember { mutableStateOf<String?>(null) }
     var menu by remember { mutableStateOf(false) }
     var showMove by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -312,10 +339,16 @@ fun ThreadScreen(
                             DotMenuItem("Not spam", Icons.Outlined.Inbox) { menu = false; vm.act(MessageAction.NOT_SPAM) }
                             DotMenuItem("Move to…", Icons.Outlined.DriveFileMove) { menu = false; showMove = true }
                             DotMenuItem("Delete forever", Icons.Outlined.DeleteForever, color = c.danger) { menu = false; confirmDelete = true }
-                            last?.unsubscribe?.let { target ->
+                            val oneClick = list?.lastOrNull { it.unsubscribeOneClick != null }?.unsubscribeOneClick
+                            val target = list?.lastOrNull { it.unsubscribe != null }?.unsubscribe
+                            if (oneClick != null || target != null) {
                                 DotMenuItem("Unsubscribe", Icons.Outlined.Unsubscribe) {
                                     menu = false
-                                    if (target.startsWith("mailto:", ignoreCase = true)) onComposeTo(target) else pendingLink = target
+                                    when {
+                                        oneClick != null -> confirmUnsubscribe = oneClick
+                                        target!!.startsWith("mailto:", ignoreCase = true) -> onComposeTo(target)
+                                        else -> pendingLink = target
+                                    }
                                 }
                             }
                         }
@@ -409,6 +442,23 @@ fun ThreadScreen(
             text = { Text("This conversation will be permanently removed from the server.", style = Dot.type.callout, color = c.textSecondary) },
             confirmButton = { DotButton("Delete", { confirmDelete = false; vm.act(MessageAction.DELETE_FOREVER) }, style = ButtonStyle.Danger, compact = true) },
             dismissButton = { DotButton("Cancel", { confirmDelete = false }, style = ButtonStyle.Ghost, compact = true) },
+        )
+    }
+    confirmUnsubscribe?.let { endpoint ->
+        AlertDialog(
+            onDismissRequest = { confirmUnsubscribe = null },
+            containerColor = c.surface,
+            shape = DotShapes.large,
+            title = { Text("Unsubscribe?", style = Dot.type.title, color = c.textPrimary) },
+            text = {
+                Text(
+                    "Dot Mail will send a one-click unsubscribe request to ${Uri.parse(endpoint).host.orEmpty()}. " +
+                        "Nothing else is shared — no cookies, no browser.",
+                    style = Dot.type.callout, color = c.textSecondary,
+                )
+            },
+            confirmButton = { app.dot.design.components.DotPrimaryButton("Unsubscribe", { confirmUnsubscribe = null; vm.unsubscribeOneClick(endpoint) }, compact = true) },
+            dismissButton = { DotButton("Cancel", { confirmUnsubscribe = null }, style = ButtonStyle.Ghost, compact = true) },
         )
     }
     pendingLink?.let { url -> LinkDialog(url, onDismiss = { pendingLink = null }, onOpen = { target -> pendingLink = null; openUrl(context, target) }) }

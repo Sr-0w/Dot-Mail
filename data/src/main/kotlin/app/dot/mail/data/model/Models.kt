@@ -115,6 +115,8 @@ data class Message(
     val references: List<String>,
     /** Parsed List-Unsubscribe (mailto: or https:) if present. */
     val unsubscribe: String?,
+    /** RFC 8058 one-click unsubscribe endpoint (https POST "List-Unsubscribe=One-Click"), when the sender offers it. */
+    val unsubscribeOneClick: String? = null,
 )
 
 /** Body is null on [Message] until it has been downloaded. */
