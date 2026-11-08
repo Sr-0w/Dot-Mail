@@ -227,7 +227,9 @@ class AccountSettingsStoreTest {
         store.markWindowApplied(5, 0); store.markSynced(5, 1234)
         assertThat(store.appliedWindow(5)).isEqualTo(0)
         assertThat(store.lastSynced(5)).isEqualTo(1234)
+        assertThat(store.lastSyncedAll.value[5]).isEqualTo(1234) // observable for the inbox "Last synced" label
         store.forget(5)
         assertThat(store.current(5)).isEqualTo(AccountSettings())
+        assertThat(store.lastSyncedAll.value).doesNotContainKey(5)
     }
 }

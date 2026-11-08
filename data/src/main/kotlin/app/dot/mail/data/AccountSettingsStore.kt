@@ -32,6 +32,11 @@ class AccountSettingsStore private constructor(context: Context) {
     private val prefs = context.getSharedPreferences("dotmail_account_settings", Context.MODE_PRIVATE)
     private val flows = HashMap<Long, MutableStateFlow<AccountSettings>>()
     private val _sync = MutableStateFlow(readSync())
+    private val _lastSynced = MutableStateFlow(
+        prefs.all.mapNotNull { (k, v) -> if (k.endsWith(".lastSync") && v is Long) k.substringBefore('.').toLongOrNull()?.let { it to v } else null }.toMap()
+    )
+    /** Last successful sync per account id, observable for the inbox's "Last synced" label. */
+    val lastSyncedAll: StateFlow<Map<Long, Long>> = _lastSynced.asStateFlow()
     val sync: StateFlow<SyncSettings> = _sync.asStateFlow()
 
     private fun read(id: Long): AccountSettings {
@@ -81,7 +86,11 @@ class AccountSettingsStore private constructor(context: Context) {
 
     // ---- bookkeeping for the sync engine (not user settings) ----
     fun lastSynced(accountId: Long): Long = prefs.getLong("$accountId.lastSync", 0L)
-    fun markSynced(accountId: Long, at: Long = System.currentTimeMillis()) = prefs.edit { putLong("$accountId.lastSync", at) }
+    @Synchronized
+    fun markSynced(accountId: Long, at: Long = System.currentTimeMillis()) {
+        prefs.edit { putLong("$accountId.lastSync", at) }
+        _lastSynced.value = _lastSynced.value + (accountId to at)
+    }
 
     /** The window the folders were last downloaded with; null if never recorded (then the current one is assumed). */
     fun appliedWindow(accountId: Long): Int? = if (prefs.contains("$accountId.appliedWindow")) prefs.getInt("$accountId.appliedWindow", 0) else null
@@ -91,6 +100,7 @@ class AccountSettingsStore private constructor(context: Context) {
     @Synchronized
     fun forget(accountId: Long) {
         flows.remove(accountId)
+        _lastSynced.value = _lastSynced.value - accountId
         prefs.edit { prefs.all.keys.filter { it.startsWith("$accountId.") }.forEach(::remove) }
     }
 

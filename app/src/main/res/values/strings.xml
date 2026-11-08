@@ -825,4 +825,8 @@
     <string name="identity_discard_body">Your changes to this identity have not been saved.</string>
     <string name="identity_keep_editing">Keep editing</string>
     <string name="identity_discard">Discard</string>
+    <string name="inbox_last_synced">Synced %1$s</string>
+    <string name="inbox_sync_complete">Sync complete</string>
+    <string name="inbox_never_synced">Never synced yet</string>
+    <string name="inbox_synced_details">Show sync time per account</string>
 </resources>

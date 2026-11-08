@@ -55,9 +55,10 @@ internal class RealMailGraph(
     private val bodyLocks = java.util.concurrent.ConcurrentHashMap<Long, Mutex>()
     private val oauth = OAuthManager(context, database, vault, oauthClients, tokenEndpoint)
     internal val syncing = MutableStateFlow<Set<Long>>(emptySet())
-    override val accounts: Flow<List<Account>> = combine(dao.observeAccounts(), syncing, identityStore.version) { rows, active, _ -> rows.map { row ->
+    override val accounts: Flow<List<Account>> = combine(dao.observeAccounts(), syncing, identityStore.version, AccountSettingsStore.get(context).lastSyncedAll) { rows, active, _, synced -> rows.map { row ->
         Account(row.id, row.name, row.email, row.color, identityStore.resolve(row.id, row.name, row.email),
-            if (row.id in active) SyncState.Syncing else row.syncError?.let { SyncDiagnostics.state(it,row.authError) } ?: SyncState.Idle)
+            if (row.id in active) SyncState.Syncing else row.syncError?.let { SyncDiagnostics.state(it,row.authError) } ?: SyncState.Idle,
+            synced[row.id] ?: 0L)
     } }
     override val outbox: Flow<List<OutboxItem>> = dao.observeOutbox().map { rows -> rows.map { row ->
         val draft = Codec.draft(row.draft)

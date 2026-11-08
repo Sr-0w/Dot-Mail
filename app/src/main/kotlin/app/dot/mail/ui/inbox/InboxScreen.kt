@@ -236,6 +236,7 @@ fun InboxScreen(
             val reducedMotion = rememberReducedMotion()
             val screenHaptics = app.dot.design.rememberDotHaptics()
             Column(Modifier.fillMaxSize()) {
+                val accountsNow by vm.accounts.collectAsStateWithLifecycle()
                 AnimatedContent(
                     targetState = selection.isNotEmpty(),
                     transitionSpec = {
@@ -269,15 +270,17 @@ fun InboxScreen(
                         )
                     } else {
                         DotTopBar(
-                            title = header.title,
-                            subtitle = header.subtitle,
+                            titleContent = {
+                                // The unified inbox reports all accounts; a single-account view only that account.
+                                val shown = accountsNow.filter { a -> header.subtitle == a.email }.ifEmpty { accountsNow }
+                                InboxTitle(header.title, header.subtitle, shown, userSyncing)
+                            },
                             elevated = listState.canScrollBackward,
                             navigation = { DotIconButton(Icons.Outlined.Menu, stringResource(R.string.inbox_open_mailboxes), onClick = { scope.launch { drawerState.open() } }) },
                             actions = { DotIconButton(Icons.Outlined.Search, stringResource(R.string.inbox_search), onClick = onSearch) },
                         )
                     }
                 }
-                val accountsNow by vm.accounts.collectAsStateWithLifecycle()
                 val failing = accountsNow.filter { it.syncState is app.dot.mail.data.model.SyncState.Error }
                 androidx.compose.animation.AnimatedVisibility(failing.isNotEmpty() && selection.isEmpty()) {
                     val err = failing.firstOrNull()?.syncState as? app.dot.mail.data.model.SyncState.Error

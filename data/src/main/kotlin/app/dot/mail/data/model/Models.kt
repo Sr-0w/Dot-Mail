@@ -14,6 +14,8 @@ data class Account(
     val colorIndex: Int,
     val identities: List<Identity> = emptyList(),
     val syncState: SyncState = SyncState.Idle,
+    /** When the last *complete, error-free* sync of this account finished; 0 = never. Persisted across restarts. */
+    val lastSyncedAt: Long = 0L,
 )
 
 data class Identity(

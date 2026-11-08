@@ -825,4 +825,8 @@
     <string name="identity_discard_body">Ihre Änderungen an dieser Identität wurden nicht gespeichert.</string>
     <string name="identity_keep_editing">Weiter bearbeiten</string>
     <string name="identity_discard">Verwerfen</string>
+    <string name="inbox_last_synced">Synchronisiert %1$s</string>
+    <string name="inbox_sync_complete">Synchronisierung abgeschlossen</string>
+    <string name="inbox_never_synced">Noch nie synchronisiert</string>
+    <string name="inbox_synced_details">Synchronisierungszeit pro Konto anzeigen</string>
 </resources>
