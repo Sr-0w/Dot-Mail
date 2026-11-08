@@ -110,4 +110,73 @@ class HtmlSanitizerTest {
         assertEquals(1280, HtmlSanitizer.sanitize("<img width='5000'>").layoutWidth)
         assertFalse(HtmlSanitizer.sanitize("<table width='600'></table>").responsive)
     }
+
+    @Test fun blocksCrossRuleUnbalancedQuoteAndSelectorUrlInjection() {
+        // P0: Unbalanced quote in declaration + selector containing `"` and `url(https:evil.invalid)`
+        // must never emit `url(` or unbalanced quotes that swallow `}` in Chromium's CSS parser.
+        val payload = """.a { background: " } " url(https:evil.invalid) { color: red }"""
+        val sanitized = HtmlSanitizer.sanitizeStylesheet(payload)
+        assertFalse("Cross-rule url() survived: $sanitized", sanitized.contains("url(", ignoreCase = true))
+        assertEquals(0, sanitized.count { it == '"' } % 2)
+        assertEquals(0, sanitized.count { it == '\'' } % 2)
+
+        // Quotes are only valid when balanced inside font / font-family, never in color/background/width.
+        assertEquals("", HtmlSanitizer.sanitizeStylesheet(""".a { color: "red" }"""))
+        assertEquals("", HtmlSanitizer.sanitizeStylesheet(""".a { font-family: "Helvetica }"""))
+        assertEquals(""".a{font-family:"Helvetica Neue", Arial, sans-serif}""", HtmlSanitizer.sanitizeStylesheet(""".a { font-family: "Helvetica Neue", Arial, sans-serif }"""))
+    }
+
+    @Test fun blocksCommentInStringDesyncAndUnclosedComments() {
+        // P0: `/*` inside a string followed by `*/` in a later rule must not splice rules together.
+        val desync = """
+            .a { font-family: "/*"; }
+            .b { background: url(https://evil.invalid); /* */ "; color: red; }
+        """.trimIndent()
+        val out = HtmlSanitizer.sanitizeStylesheet(desync)
+        assertFalse("Comment-in-string desync spliced rules: $out", out.contains("font-family"))
+
+        // Unclosed comment must not survive or corrupt subsequent rules.
+        assertEquals(".a{color:red}", HtmlSanitizer.sanitizeStylesheet(".a { color: red } /* unclosed comment .b { color: blue }"))
+
+        // Comment splitting `url/*...*/(` or `image-set(` or `@font-face` must still flag hasRemoteImages / blockedRemoteResources.
+        val commentSplitUrl = HtmlSanitizer.sanitize("<div style='background: url/*c*/(https://evil.invalid/p)'>x</div>")
+        assertTrue(commentSplitUrl.hasRemoteImages)
+        assertTrue(commentSplitUrl.blockedRemoteResources > 0)
+
+        val imageSetString = HtmlSanitizer.sanitize("<div style='background: image-set(\"https://evil.invalid/p.png\" 1x)'>x</div>")
+        assertTrue(imageSetString.hasRemoteImages)
+        assertTrue(imageSetString.blockedRemoteResources > 0)
+    }
+
+    @Test fun blocksAttributeSelectorsAndPseudoClassProbing() {
+        // P1: Attribute selectors (`[href*=...]`) and relational pseudo-classes (`:has(...)`) can probe DOM secrets.
+        assertEquals("", HtmlSanitizer.sanitizeStylesheet("""a[href*="secret"] { display: none }"""))
+        assertEquals("", HtmlSanitizer.sanitizeStylesheet("""body:has(a[href^="https://"]) .probe { display: block }"""))
+        assertEquals("", HtmlSanitizer.sanitizeStylesheet(""".a:nth-child(2n+1) { color: red }"""))
+        assertEquals("", HtmlSanitizer.sanitizeStylesheet(""".a::after { color: red }"""))
+        // Standard element, class, id, descendant, child, adjacent, and comma selectors still work.
+        assertEquals("table.main > tbody > tr + tr, #header .title{color:red}", HtmlSanitizer.sanitizeStylesheet("table.main > tbody > tr + tr, #header .title { color: red }"))
+    }
+
+    @Test fun blocksUnbalancedMediaQueriesAndNegativeMarginSpoofing() {
+        // P1: Unbalanced parens in @media prelude swallow subsequent blocks in Chromium.
+        assertEquals("", HtmlSanitizer.sanitizeStylesheet("@media (max-width: 600px { .a { color: red } }"))
+        assertEquals("", HtmlSanitizer.sanitizeStylesheet("@media ) (max-width: 600px) { .a { color: red } }"))
+        assertEquals("", HtmlSanitizer.sanitizeStylesheet("@mediaall { .a { color: red } }"))
+
+        // P1: Negative margins / text-indent can pull attacker content over earlier message text.
+        assertEquals("", HtmlSanitizer.sanitizeStylesheet(".spoof { margin-top: -500px; margin: -20px 0; text-indent: -9999px; padding-left: -10px }"))
+        // Normal non-negative margins and hyphenated keywords remain allowed.
+        assertEquals(".ok{margin:0 auto;font-family:-apple-system, sans-serif}", HtmlSanitizer.sanitizeStylesheet(".ok { margin: 0 auto; font-family: -apple-system, sans-serif }"))
+    }
+
+    @Test fun capsHugeStylesheetsAgainstDos() {
+        // P1: Huge stylesheets (>64KB or thousands of rules) must be bounded quickly without OOM or giant output.
+        val tenThousandRules = buildString {
+            repeat(5_000) { i -> append(".r$i { color: red; padding: 4px; }\n") }
+        }
+        val res = HtmlSanitizer.sanitize("<style>$tenThousandRules</style><p>Hello</p>")
+        assertTrue("Stylesheet output was not capped: ${res.html.length}", res.html.length <= 70_000)
+        assertTrue(res.html.contains("<p>Hello</p>"))
+    }
 }
