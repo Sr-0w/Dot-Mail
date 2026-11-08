@@ -180,3 +180,40 @@ class IdentitySendingTest {
         } finally { server.stop() }
     }
 }
+
+class ScheduledSyncTest {
+    private val minute = 60_000L
+    @Test fun `manual accounts are never synced in the background`() {
+        assertThat(isScheduledSyncDue(AccountSettings(syncIntervalMinutes = 0), lastSyncedAt = 0, now = 10_000 * minute)).isFalse()
+    }
+
+    @Test fun `an account is due once its own interval has elapsed`() {
+        val s = AccountSettings(syncIntervalMinutes = 30)
+        assertThat(isScheduledSyncDue(s, lastSyncedAt = 100 * minute, now = 110 * minute)).isFalse()
+        assertThat(isScheduledSyncDue(s, lastSyncedAt = 100 * minute, now = 129 * minute + 1)).isTrue() // 1 minute of WorkManager slack
+        assertThat(isScheduledSyncDue(s, lastSyncedAt = 0, now = 100 * minute)).isTrue() // never synced
+    }
+
+    @Test fun `the 15 minute interval syncs on every WorkManager run`() {
+        assertThat(isScheduledSyncDue(AccountSettings(syncIntervalMinutes = 15), lastSyncedAt = 100 * minute, now = 115 * minute)).isTrue()
+    }
+}
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [28])
+class AccountSettingsStoreTest {
+    @Test fun `per-account values persist and bookkeeping is separate`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val store = AccountSettingsStore.get(context)
+        assertThat(store.current(5).syncWindowDays).isEqualTo(30)
+        store.update(5) { it.copy(syncIntervalMinutes = 60, syncWindowDays = 0, notificationsEnabled = false) }
+        assertThat(store.current(5)).isEqualTo(AccountSettings(syncIntervalMinutes = 60, syncWindowDays = 0, notificationsEnabled = false))
+        assertThat(store.current(6).notificationsEnabled).isTrue() // other accounts untouched
+        assertThat(store.appliedWindow(5)).isNull()
+        store.markWindowApplied(5, 0); store.markSynced(5, 1234)
+        assertThat(store.appliedWindow(5)).isEqualTo(0)
+        assertThat(store.lastSynced(5)).isEqualTo(1234)
+        store.forget(5)
+        assertThat(store.current(5)).isEqualTo(AccountSettings())
+    }
+}

@@ -46,6 +46,9 @@ interface AccountRepository {
 
     suspend fun removeAccount(accountId: Long)
 
+    /** Changes the name shown for the account (and used as sender name of its primary identity). */
+    suspend fun renameAccount(accountId: Long, displayName: String) {}
+
     /** Sender identities of an account, the default first. The account address itself is always one of them and cannot be deleted. */
     fun identities(accountId: Long): Flow<List<app.dot.mail.data.model.Identity>> = kotlinx.coroutines.flow.flowOf(emptyList())
 

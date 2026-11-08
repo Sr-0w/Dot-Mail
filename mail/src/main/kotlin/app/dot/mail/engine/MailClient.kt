@@ -104,7 +104,7 @@ class MailClient(val timeoutMs: Int = 30_000) {
         if (!f.delete(false)) throw FolderOpException(FolderOpException.Kind.REJECTED, "The server refused to delete the folder")
     }
 
-    suspend fun sync(endpoint: Endpoint, credentials: Credentials, path: String, cursor: SyncCursor = SyncCursor(), now: Long = System.currentTimeMillis(), limit: Int = 500): HeaderSync = store(endpoint, credentials) { store ->
+    suspend fun sync(endpoint: Endpoint, credentials: Credentials, path: String, cursor: SyncCursor = SyncCursor(), now: Long = System.currentTimeMillis(), limit: Int = 500, windowDays: Int = 30): HeaderSync = store(endpoint, credentials) { store ->
         require(limit in 1..5000)
         folder(store, path) { f ->
             val validity = f.uidValidity
@@ -115,7 +115,8 @@ class MailClient(val timeoutMs: Int = 30_000) {
             f.fetch(inventory, FetchProfile().apply { add(UIDFolder.FetchProfileItem.UID) })
             val existing = inventory.map { f.getUID(it) }.toSet()
             val candidates = if (reset) {
-                f.search(ReceivedDateTerm(ComparisonTerm.GE, Date(now - 30L * 24 * 60 * 60 * 1000))).takeLast(limit).toTypedArray()
+                // windowDays == 0: no date limit (still capped by [limit]).
+                (if (windowDays <= 0) f.messages else f.search(ReceivedDateTerm(ComparisonTerm.GE, Date(now - windowDays * 24L * 60 * 60 * 1000)))).takeLast(limit).toTypedArray()
             } else if (next > cursor.uidNext) f.getMessagesByUID(max(1, cursor.uidNext), UIDFolder.LASTUID).filterNotNull().take(limit).toTypedArray() else emptyArray()
             val failures = mutableListOf<HeaderFailure>()
             try { fetchHeaders(f, candidates, store.hasCapability("X-GM-EXT-1")) }
