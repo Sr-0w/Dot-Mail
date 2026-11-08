@@ -3,6 +3,7 @@ package app.dot.mail.ui.avatar
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import app.dot.design.Dot
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.padding
@@ -13,6 +14,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -48,16 +50,19 @@ fun SenderAvatar(address: EmailAddress, modifier: Modifier = Modifier, size: Dp 
             Avatar(address.displayName, address.email, modifier, size)
         }
     } else {
-        // Same circle, size and hairline in both themes, for photos and logos alike: logos are square artwork
-        // (BIMI is designed to be circle-cropped), so they are cropped to the circle on a white plate, never shown as bare squares.
+        // Same circle, size and hairline in both themes. Photos fill the circle; logos (wordmarks included) are drawn
+        // inset on a neutral white plate so nothing is cropped.
         Box(modifier.size(size).clip(CircleShape).background(if (img.plated) Color.White else Dot.colors.surface)) {
             Image(
                 bitmap = img.bitmap.asImageBitmap(),
                 contentDescription = null, // decorative: the sender's name is already in the row
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.matchParentSize(),
+                contentScale = if (img.plated) ContentScale.Fit else ContentScale.Crop,
+                modifier = if (img.plated) Modifier.align(Alignment.Center).fillMaxSize(LOGO_FRACTION) else Modifier.matchParentSize(),
             )
             Box(Modifier.matchParentSize().border(1.dp, Dot.colors.border, CircleShape))
         }
     }
 }
+
+/** Share of the circle's diameter a logo may use (a square logo inscribed in the circle is ~70%). */
+private const val LOGO_FRACTION = 0.72f

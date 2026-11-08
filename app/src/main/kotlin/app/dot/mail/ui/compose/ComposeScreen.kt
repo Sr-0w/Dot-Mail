@@ -406,6 +406,7 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                         .onFocusChanged { bodyFocused = it.isFocused },
                 )
             }
+            SignatureRow(state, vm)
             state.quotedText?.takeIf { it.isNotBlank() }?.let { quoted ->
                 QuotedReplySection(
                     quoted = quoted,
@@ -439,49 +440,7 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
         )
     }
 
-    if (showLinkDialog) {
-        val initialText = when {
-            richTextState.isLink -> richTextState.selectedLinkText.orEmpty()
-            !richTextState.selection.collapsed -> {
-                val text = richTextState.annotatedString.text
-                val min = richTextState.selection.min.coerceIn(0, text.length)
-                val max = richTextState.selection.max.coerceIn(min, text.length)
-                text.substring(min, max)
-            }
-            else -> ""
-        }
-        val initialUrl = if (richTextState.isLink) richTextState.selectedLinkUrl.orEmpty() else ""
-        InsertLinkDialog(
-            initialText = initialText,
-            initialUrl = initialUrl,
-            isEditing = richTextState.isLink,
-            onDismiss = { showLinkDialog = false },
-            onRemove = {
-                showLinkDialog = false
-                richTextState.removeLink()
-            },
-            onConfirm = { linkText, rawUrl ->
-                showLinkDialog = false
-                val normalizedUrl = normalizeLinkUrl(rawUrl)
-                if (normalizedUrl.isNotEmpty()) {
-                    val display = linkText.ifBlank { normalizedUrl }
-                    when {
-                        richTextState.isLink && display == richTextState.selectedLinkText -> {
-                            richTextState.updateLink(normalizedUrl)
-                        }
-                        !richTextState.selection.collapsed && display == initialText -> {
-                            richTextState.addLinkToSelection(normalizedUrl)
-                        }
-                        else -> {
-                            if (richTextState.isLink) richTextState.removeLink()
-                            if (!richTextState.selection.collapsed) richTextState.removeSelectedText()
-                            richTextState.addLink(text = display, url = normalizedUrl)
-                        }
-                    }
-                }
-            },
-        )
-    }
+    if (showLinkDialog) RichLinkDialog(richTextState) { showLinkDialog = false }
 
     LaunchedEffect(state.loaded) {
         if (state.loaded && draft != null) {
@@ -551,8 +510,50 @@ private fun RichBodyEditor(
     )
 }
 
+/** Insert / edit / remove a link on the current selection of [richTextState]. */
 @Composable
-private fun FormattingToolbar(
+internal fun RichLinkDialog(richTextState: RichTextState, onDismiss: () -> Unit) {
+    val initialText = when {
+        richTextState.isLink -> richTextState.selectedLinkText.orEmpty()
+        !richTextState.selection.collapsed -> {
+            val text = richTextState.annotatedString.text
+            val min = richTextState.selection.min.coerceIn(0, text.length)
+            val max = richTextState.selection.max.coerceIn(min, text.length)
+            text.substring(min, max)
+        }
+        else -> ""
+    }
+    val initialUrl = if (richTextState.isLink) richTextState.selectedLinkUrl.orEmpty() else ""
+    InsertLinkDialog(
+        initialText = initialText,
+        initialUrl = initialUrl,
+        isEditing = richTextState.isLink,
+        onDismiss = onDismiss,
+        onRemove = {
+            onDismiss()
+            richTextState.removeLink()
+        },
+        onConfirm = { linkText, rawUrl ->
+            onDismiss()
+            val normalizedUrl = normalizeLinkUrl(rawUrl)
+            if (normalizedUrl.isNotEmpty()) {
+                val display = linkText.ifBlank { normalizedUrl }
+                when {
+                    richTextState.isLink && display == richTextState.selectedLinkText -> richTextState.updateLink(normalizedUrl)
+                    !richTextState.selection.collapsed && display == initialText -> richTextState.addLinkToSelection(normalizedUrl)
+                    else -> {
+                        if (richTextState.isLink) richTextState.removeLink()
+                        if (!richTextState.selection.collapsed) richTextState.removeSelectedText()
+                        richTextState.addLink(text = display, url = normalizedUrl)
+                    }
+                }
+            }
+        },
+    )
+}
+
+@Composable
+internal fun FormattingToolbar(
     richTextState: RichTextState,
     onLinkClick: () -> Unit,
 ) {
@@ -1107,5 +1108,38 @@ private fun Plain(
             keyboardActions = KeyboardActions(onAny = { onIme() }),
             modifier = Modifier.fillMaxWidth(),
         )
+    }
+}
+
+/** The signature that will be appended to this message, kept apart from the editor so it is never mixed with user text. */
+@Composable
+private fun SignatureRow(state: ComposeState, vm: ComposeViewModel) {
+    val c = Dot.colors
+    val active = state.signatureSender
+    val sender = state.sender
+    var menu by remember { mutableStateOf(false) }
+    val others = state.senders.filter { it.hasSignature && it.key != active?.key }
+    if (active == null && sender?.hasSignature != true && others.isEmpty()) return
+    Box(Modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s)) {
+        Row(
+            Modifier.fillMaxWidth().clickable(role = Role.Button, onClickLabel = stringResource(R.string.compose_signature_options)) { menu = true },
+            verticalAlignment = Alignment.Top,
+        ) {
+            if (active != null) {
+                app.dot.mail.ui.compose.SignaturePreview(
+                    ComposeViewModel.signatureBodyHtml(active).orEmpty(), active.signatureLogo, Modifier.weight(1f),
+                )
+            } else {
+                Text(stringResource(R.string.compose_signature_add), style = Dot.type.callout, color = c.accent, modifier = Modifier.weight(1f))
+            }
+            Icon(Icons.Outlined.ExpandMore, stringResource(R.string.compose_signature_options), Modifier.size(18.dp), tint = c.textTertiary)
+        }
+        DotMenu(menu, { menu = false }) {
+            if (active != null) DotMenuItem(stringResource(R.string.compose_signature_remove), null) { menu = false; vm.removeSignature() }
+            if (active == null && sender?.hasSignature == true) DotMenuItem(stringResource(R.string.compose_signature_add), null) { menu = false; vm.useSignatureOf(sender) }
+            others.forEach { o ->
+                DotMenuItem(stringResource(R.string.compose_signature_use, o.email), null) { menu = false; vm.useSignatureOf(o) }
+            }
+        }
     }
 }

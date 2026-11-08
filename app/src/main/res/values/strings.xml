@@ -745,4 +745,27 @@
     <string name="pdf_no_text">No selectable text in this PDF (it may be a scan).</string>
     <string name="settings_libravatar">Libravatar</string>
     <string name="settings_libravatar_sub">The open, federated alternative to Gravatar. Sends a hash of the sender\'s address to libravatar.org.</string>
+
+    <!-- Signatures -->
+    <string name="identity_signature_placeholder_rich">Write your signature</string>
+    <string name="identity_signature_preview">Preview</string>
+    <string name="identity_signature_import">Import HTML</string>
+    <string name="identity_signature_import_title">Import an HTML signature</string>
+    <string name="identity_signature_import_hint">Paste the HTML here. Scripts, forms, remote content and unsafe markup are removed.</string>
+    <string name="identity_signature_import_file">Choose a file</string>
+    <string name="identity_signature_import_confirm">Import</string>
+    <string name="identity_signature_import_empty">Nothing usable was found in that HTML</string>
+    <string name="identity_signature_logo_add">Add an inline logo</string>
+    <string name="identity_signature_logo_replace">Change logo</string>
+    <string name="identity_signature_logo_remove">Remove logo</string>
+    <string name="identity_signature_logo_note">Stored on this device only and sent inside the message.</string>
+    <string name="identity_signature_logo_failed">That file is not a usable image</string>
+    <string name="identity_signature_logo_desc">Signature logo</string>
+    <string name="identity_signature_new">Add to new messages</string>
+    <string name="identity_signature_reply">Add to replies and forwards</string>
+    <string name="compose_signature">Signature</string>
+    <string name="compose_signature_options">Signature options</string>
+    <string name="compose_signature_remove">Remove from this message</string>
+    <string name="compose_signature_add">Add signature</string>
+    <string name="compose_signature_use">Use signature of %1$s</string>
 </resources>

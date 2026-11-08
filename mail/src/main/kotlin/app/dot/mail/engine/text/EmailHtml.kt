@@ -110,6 +110,21 @@ object EmailHtml {
         }
     }
 
+    /**
+     * Cleans pasted/imported signature HTML to the composer-safe subset (no scripts, forms, remote-loading
+     * markup, event handlers; only http(s)/mailto/tel links) and flattens block `div`s so the result can be
+     * embedded inside a single marked block. Returns "" when nothing visible is left.
+     */
+    fun sanitizeSignature(html: String): String {
+        val cleaned = sanitizeFragment(html)
+            .replace(Regex("(?i)<img\\b[^>]*>"), "") // inline logos are managed separately, never pasted
+            .replace(Regex("(?i)</div>"), "<br>")
+            .replace(Regex("(?i)<div\\b[^>]*>"), "")
+            .replace(Regex("(?i)(<br\\s*/?>\\s*)+$"), "")
+            .trim()
+        return if (isBlankSignature(cleaned)) "" else cleaned
+    }
+
     private fun isBlankSignature(s: String): Boolean {
         val trimmed = s.trim()
         if (trimmed.isEmpty()) return true
@@ -181,7 +196,7 @@ object EmailHtml {
             val width = el.attr("width")
             val height = el.attr("height")
             el.clearAttributes()
-            if (!isSafeHref(src)) {
+            if (!isSafeHref(src) && !SAFE_CID.matches(src)) {
                 el.remove()
                 false
             } else {
@@ -316,6 +331,9 @@ object EmailHtml {
     /** Only http/https/mailto/tel — nothing else ever leaves the anchor. */
     private fun isSafeHref(href: String): Boolean =
         SAFE_HREF.matches(href.trim()) && !href.trim().contains('\u0000')
+
+    /** Inline signature logo: `cid:` references we attach ourselves as a related MIME part. */
+    private val SAFE_CID = Regex("^cid:[A-Za-z0-9._-]{1,64}$")
 
     private val SAFE_HREF = Regex("^(?i)(https?|mailto|tel):[^\\s<>\"']*$")
 

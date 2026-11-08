@@ -41,7 +41,7 @@ class EngineTest {
         val parsed = Mime.parse(parsedMessage)
         assertEquals(out.subject, parsedMessage.subject); assertEquals(out.text, parsed.text)
         assertEquals(out.html, parsed.html); assertEquals(2, parsed.attachments.size)
-        assertEquals("été.txt", parsed.attachments[0].name); assertEquals("logo", parsed.attachments[1].contentId)
+        assertEquals("été.txt", parsed.attachments.single { it.contentId == null }.name); assertEquals("logo", parsed.attachments.single { it.name == "logo.png" }.contentId)
         assertEquals("<stable@example.org>", parsedMessage.messageID)
         assertEquals("<parent@example.org>", parsedMessage.getHeader("In-Reply-To", null))
     }

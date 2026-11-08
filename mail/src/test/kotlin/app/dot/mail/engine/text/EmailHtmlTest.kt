@@ -472,4 +472,26 @@ class EmailHtmlTest {
         assertThat(html).isEqualTo("<p>intro</p><p>• x<br>• y</p>")
         assertThat(EmailHtml.toPlainText(html)).isEqualTo(text)
     }
+
+    @Test fun `compose keeps our cid logo but still drops remote and script images`() {
+        val out = EmailHtml.compose("<p>x</p><img src=\"cid:dotsig-logo\"><img src=\"javascript:alert(1)\"><img src=\"data:text/html,x\">")
+        assertThat(out).contains("cid:dotsig-logo")
+        assertThat(out).doesNotContain("javascript")
+        assertThat(out).doesNotContain("data:text")
+    }
+
+    @Test fun `sanitizeSignature strips unsafe markup but keeps formatting and links`() {
+        val out = EmailHtml.sanitizeSignature(
+            "<div onclick=\"x()\"><b>Alice</b><script>alert(1)</script><br><a href=\"javascript:evil()\">bad</a> " +
+                "<a href=\"https://example.org\" onclick=\"x()\">site</a><img src=\"https://t.example/p.gif\"><form><input></form></div>",
+        )
+        assertThat(out).contains("<b>Alice</b>")
+        assertThat(out).contains("href=\"https://example.org\"")
+        assertThat(out).doesNotContain("script")
+        assertThat(out).doesNotContain("javascript")
+        assertThat(out).doesNotContain("onclick")
+        assertThat(out).doesNotContain("<img")
+        assertThat(out).doesNotContain("<div")
+        assertThat(EmailHtml.sanitizeSignature("<script>x</script>  ")).isEmpty()
+    }
 }

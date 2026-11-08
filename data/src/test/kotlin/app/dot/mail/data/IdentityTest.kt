@@ -103,6 +103,20 @@ class IdentityStoreTest {
         assertThat(primary.replyTo).isEqualTo("alice@home.example")
     }
 
+    @Test fun `signature settings round-trip and default to on`(): Unit {
+        val store = IdentityStore.forTest(context)
+        store.save(Identity(0, account, "Shop", "shop@example.org"), "alice@example.org")
+        var shop = store.resolve(account, "Alice", "alice@example.org")[1]
+        assertThat(shop.signatureOnNew).isTrue()
+        assertThat(shop.signatureOnReply).isTrue()
+        assertThat(shop.signatureLogo).isNull()
+        store.save(shop.copy(signatureHtml = "<b>S</b>", signatureLogo = "1-2.png", signatureOnNew = true, signatureOnReply = false), "alice@example.org")
+        shop = store.resolve(account, "Alice", "alice@example.org")[1]
+        assertThat(shop.signatureLogo).isEqualTo("1-2.png")
+        assertThat(shop.signatureOnReply).isFalse()
+        assertThat(shop.signatureHtml).isEqualTo("<b>S</b>")
+    }
+
     @Test fun `invalid addresses are rejected`(): Unit {
         val store = IdentityStore.forTest(context)
         assertThrows(IllegalArgumentException::class.java) { store.save(Identity(0, account, "x", "not-an-address"), "a@b.co") }
