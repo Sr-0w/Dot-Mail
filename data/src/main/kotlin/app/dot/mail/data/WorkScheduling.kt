@@ -30,10 +30,10 @@ internal object WorkScheduling {
             OneTimeWorkRequestBuilder<SnippetRepairWorker>().setInputData(workDataOf("accountId" to accountId)).setConstraints(network)
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL,10,TimeUnit.SECONDS).build())
     }
-    fun drafts(context: Context, accountId: Long) {
+    fun drafts(context: Context, accountId: Long, delayMs: Long = DRAFT_DEBOUNCE_MS) {
         WorkManager.getInstance(context).enqueueUniqueWork("dotmail.drafts.$accountId",ExistingWorkPolicy.REPLACE,
             OneTimeWorkRequestBuilder<DraftMirrorWorker>().setInputData(workDataOf("accountId" to accountId))
-                .setInitialDelay(DRAFT_DEBOUNCE_MS,TimeUnit.MILLISECONDS).setConstraints(network)
+                .setInitialDelay(delayMs,TimeUnit.MILLISECONDS).setConstraints(network)
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL,10,TimeUnit.SECONDS).build())
     }
     fun outbox(context: Context, id: Long, dueAt: Long, replace: Boolean = false) {
@@ -60,7 +60,7 @@ class DraftMirrorWorker(context: Context, params: WorkerParameters) : CoroutineW
         val graph=GraphRegistry.get(applicationContext)
         val accountId=inputData.getLong("accountId",-1)
         val ok=graph.syncAll(setOf(accountId))
-        if(ok && graph.dao.draftMirrors(accountId).none { it.deleted || it.revision!=it.syncedRevision || it.attemptRevision!=null }) Result.success() else Result.retry()
+        if(ok && graph.dao.draftMirrors(accountId).none { it.deleted || it.revision!=it.syncedRevision || it.attemptRevision!=null } && graph.dao.operations(accountId).none { it.action==OP_TRASH_DRAFT }) Result.success() else Result.retry()
     } catch(e: CancellationException) { throw e } catch(e: Exception) { SyncDiagnostics.warn("Draft mirror worker",e); Result.retry() }
 }
 class OutboxWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {

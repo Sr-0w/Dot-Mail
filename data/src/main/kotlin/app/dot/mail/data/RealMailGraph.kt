@@ -509,7 +509,9 @@ internal class RealMailGraph(
         val drafts = folders.firstOrNull { it.role == "DRAFTS" }
         if (drafts == null || folders.none { it.role == "TRASH" }) { removeDraftAndSource(localId); return }
         if (dao.draftMirror(localId) == null) queueDraftMirror(localId, draft.accountId)
-        dao.draftMirror(localId)?.let { if (it.revision != it.syncedRevision) dao.putDraftMirror(it.copy(dueAt = 0)) }
+        // Upload and move only after the Undo window, so Undo never races the server.
+        dao.draftMirror(localId)?.let { dao.putDraftMirror(it.copy(dueAt = System.currentTimeMillis() + DRAFT_TRASH_GRACE_MS)) }
+        if (scheduling) WorkScheduling.drafts(context, draft.accountId, DRAFT_TRASH_GRACE_MS + 1_000)
         if (dao.operations(draft.accountId).none { it.action == OP_TRASH_DRAFT && it.target == "$localId" })
             dao.insertOperation(OperationRow(accountId = draft.accountId, folderId = drafts.id, validity = 0, uid = 0, action = OP_TRASH_DRAFT, target = "$localId"))
     }

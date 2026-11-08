@@ -71,7 +71,9 @@ class DraftMirroringTest {
         val token=graph.applyUndoable(MessageAction.TRASH,listOf(-id),Mailbox.Unified(FolderRole.DRAFTS))
         assertEquals(listOf(id),token!!.drafts)
         assertTrue(listDrafts().isEmpty()) // hidden at once
-        assertTrue(graph.syncAll())
+        assertTrue(graph.syncAll()) // still inside the Undo window: nothing moves yet
+        assertTrue(remoteTrash().isEmpty()); assertNotNull(db.mail().draft(id))
+        ready(id); assertTrue(graph.syncAll())
         assertTrue(remote().isEmpty())
         val trashed=remoteTrash().single()
         assertEquals("Never uploaded",graph.client.body(config.imap.endpoint(),creds,"Trash",trashed.uid).text)
@@ -84,6 +86,8 @@ class DraftMirroringTest {
         val id=graph.saveDraft(draft("Keep me")); ready(id); assertTrue(graph.syncAll())
         val token=graph.applyUndoable(MessageAction.TRASH,listOf(-id),Mailbox.Unified(FolderRole.DRAFTS))!!
         assertTrue(listDrafts().isEmpty())
+        assertTrue(graph.syncAll()) // the sync started by the action must not beat Undo
+        assertTrue(remoteTrash().isEmpty())
         assertEquals(0,graph.undo(token))
         assertEquals(listOf(id),listDrafts().map { it.draftId })
         assertTrue(graph.syncAll())
@@ -92,7 +96,7 @@ class DraftMirroringTest {
     @Test fun withoutATrashFolderTrashingStillDeletes() = runBlocking {
         val id=graph.saveDraft(draft()); ready(id); assertTrue(graph.syncAll()); assertEquals(1,remote().size)
         graph.apply(MessageAction.TRASH,listOf(-id),Mailbox.Unified(FolderRole.DRAFTS))
-        assertTrue(graph.syncAll()); assertTrue(remote().isEmpty()); assertNull(db.mail().draft(id))
+        assertNull(db.mail().draft(id)); assertTrue(graph.syncAll()); assertTrue(remote().isEmpty())
     }
     @Test fun uncertainAppendRecoversFromDurableStateWithoutDuplicate() = runBlocking {
         val id=graph.saveDraft(draft()); ready(id)

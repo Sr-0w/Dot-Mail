@@ -15,6 +15,8 @@ import java.util.UUID
 internal const val DRAFT_DEBOUNCE_MS = 2_000L
 /** Queued when a local draft is trashed; `target` holds the draft's local id. */
 internal const val OP_TRASH_DRAFT = "TRASH_DRAFT"
+/** A trashed draft stays local this long (a little over the Undo snackbar) before its server copy moves. */
+internal const val DRAFT_TRASH_GRACE_MS = 12_000L
 
 /** Called in the same transaction as the local save/delete/undo. No network on the editor path. */
 internal suspend fun RealMailGraph.queueDraftMirror(id: Long, accountId: Long, clean: Boolean = false) {
@@ -113,7 +115,7 @@ private suspend fun RealMailGraph.trashDraftIfRequested(localId: Long, account: 
     val pending=dao.operations(account.id).firstOrNull { it.action==OP_TRASH_DRAFT && it.target=="$localId" } ?: return
     val mirror=dao.draftMirror(localId)
     if(mirror==null || mirror.deleted || dao.draft(localId)==null) { dao.deleteOperation(pending.id); return }
-    if(mirror.uid<=0 || mirror.folderId!=folder.id || mirror.revision!=mirror.syncedRevision || mirror.attemptRevision!=null) return
+    if(mirror.dueAt>System.currentTimeMillis() || mirror.uid<=0 || mirror.folderId!=folder.id || mirror.revision!=mirror.syncedRevision || mirror.attemptRevision!=null) return
     val trash=dao.folders(account.id).firstOrNull { it.role=="TRASH" } ?: return
     val op=database.withTransaction { dao.operation(pending.id)?.copy(error="IN_FLIGHT")?.also { dao.updateOperation(it) } } ?: return
     try { client.move(config.imap.endpoint(),creds,folder.path,longArrayOf(mirror.uid),trash.path) }
