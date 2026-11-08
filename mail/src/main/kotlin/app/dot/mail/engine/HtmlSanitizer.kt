@@ -267,6 +267,9 @@ object HtmlSanitizer {
         cleaned.select("[class]").forEach { el -> el.classNames().filter { it.startsWith(BG_MARKER) }.forEach(el::removeClass) }
         // Only colour values survive in bgcolor; ids and classes can't collide with anything we inject.
         cleaned.select("[bgcolor]").forEach { if (!it.attr("bgcolor").matches(Regex("#?[a-zA-Z0-9]{1,20}"))) it.removeAttr("bgcolor") }
+        val responsive = Regex("(?i)@media[^{]*max-width").containsMatchIn(sheets)
+        val layout = layoutWidth(cleaned)
+        if (responsive) makeFixedWidthsFluid(cleaned)
         val bodyColour = doc.body().attr("bgcolor").takeIf { it.matches(Regex("#?[a-zA-Z0-9]{1,20}")) }
         val stylesheet = sheets.toString()
         val body = cleaned.body().html()
@@ -278,8 +281,8 @@ object HtmlSanitizer {
             html = html,
             hasRemoteImages = remote,
             blockedRemoteResources = blocked,
-            layoutWidth = layoutWidth(cleaned),
-            responsive = Regex("(?i)@media[^{]*max-width").containsMatchIn(stylesheet),
+            layoutWidth = layout,
+            responsive = responsive,
             trackersBlocked = trackers,
         )
     }
@@ -306,6 +309,36 @@ object HtmlSanitizer {
     }
 
     private const val MAX_LAYOUT_WIDTH = 1280
+    /** Fixed widths at or above this (CSS px) can't fit a phone; narrower ones (icons, columns) are left alone. */
+    private const val FLUID_FROM = 480
+    private val fixedWidthDecl = Regex("(?i)(?<![a-z-])width\\s*:\\s*([0-9]{3,4})(?:\\.[0-9]+)?\\s*px\\s*(!important)?")
+    private val fixedMinWidthDecl = Regex("(?i)(?<![a-z-])min-width\\s*:\\s*([0-9]{3,4})(?:\\.[0-9]+)?\\s*px\\s*(!important)?")
+
+    /**
+     * For mails that ship their own responsive rules, wide fixed widths that no @media rule overrides would still push
+     * the layout past a phone screen (e.g. a footer `<table style="width:640px">`). Like Gmail/Samsung Email, turn them
+     * into "fluid up to that width": `width:100%;max-width:640px`, large `min-width` to 0, and the same for `width=` attrs.
+     */
+    internal fun makeFixedWidthsFluid(doc: Document) {
+        for (el in doc.body().allElements) {
+            val style = el.attr("style")
+            if (style.isNotEmpty()) {
+                val fluid = fixedWidthDecl.replace(style) { m ->
+                    val n = m.groupValues[1].toInt()
+                    if (n >= FLUID_FROM) "width:100%;max-width:${n}px" else m.value
+                }.let { fixedMinWidthDecl.replace(it) { m -> if (m.groupValues[1].toInt() >= FLUID_FROM) "min-width:0" else m.value } }
+                if (fluid != style) el.attr("style", fluid)
+            }
+            if (el.tagName() in setOf("table", "td", "th", "img")) {
+                val n = el.attr("width").trim().removeSuffix("px").toIntOrNull()
+                if (n != null && n >= FLUID_FROM) {
+                    el.attr("width", "100%")
+                    val own = el.attr("style").trim().trimEnd(';')
+                    el.attr("style", (if (own.isEmpty()) "" else "$own;") + "max-width:${n}px")
+                }
+            }
+        }
+    }
     private const val BG_MARKER = "dotbg-"
     private val backgroundTags = setOf("table", "thead", "tbody", "tfoot", "tr", "td", "th", "div")
     private val plainHttpUrl = Regex("(?i)^https?://[a-z0-9._~:/?#@!$&*+,;=%-]+$")

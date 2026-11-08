@@ -248,4 +248,31 @@ class HtmlSanitizerTest {
         assertEquals(1, res.trackersBlocked)
         assertFalse(res.html.contains("sendgrid"))
     }
+
+    // ---- responsive mails with leftover fixed widths (Infomaniak-style Foundation template) --------------------
+
+    @Test fun responsiveMailsGetLeftoverFixedWidthsMadeFluid() {
+        val html = """<style>@media only screen and (max-width: 670px){table.body .container{width:95% !important}}</style>
+            <table class="body"><tr><td><center style="min-width:640px;width:100%">
+            <table class="container" style="margin:0 auto;width:640px"><tr><td>Hi</td></tr></table>
+            <table style="width: 640px;"><tr><td><img width="28" src="cid:x"> footer</td></tr></table>
+            <table width="600"><tr><td style="width:20px">a</td></tr></table>
+            </center></td></tr></table>"""
+        val res = HtmlSanitizer.sanitize(html)
+        assertTrue(res.responsive)
+        assertEquals(640, res.layoutWidth)
+        val doc = Jsoup.parse(res.html)
+        assertFalse(res.html, Regex("(?<![a-z-])width:\\s*640px").containsMatchIn(res.html))
+        assertTrue(doc.select("table").any { it.attr("style").contains("width:100%;max-width:640px") })
+        assertTrue(doc.selectFirst("center")!!.attr("style").contains("min-width:0"))
+        assertEquals("100%", doc.select("table[width]").first()!!.attr("width"))
+        assertTrue(doc.select("table[width]").first()!!.attr("style").contains("max-width:600px"))
+        assertTrue("small widths stay", res.html.contains("width:20px"))
+    }
+
+    @Test fun nonResponsiveFixedDesignsKeepTheirWidths() {
+        val res = HtmlSanitizer.sanitize("<table style=\"width:640px\"><tr><td>x</td></tr></table>")
+        assertFalse(res.responsive)
+        assertTrue(res.html.contains("width:640px"))
+    }
 }
