@@ -23,8 +23,8 @@ internal class StorageBodies(private val graph:RealMailGraph,private val manager
     suspend fun touch(id:Long) { val old=graph.dao.cacheAccess(id); graph.dao.putCacheAccess(CacheAccessRow(id,System.currentTimeMillis(),old?.offlineSaved ?: false)) }
     private suspend fun source(message:MessageRow):Triple<FolderRow,app.dot.mail.data.local.AccountRow,app.dot.mail.engine.Credentials> {
         val pending=if(message.uid<0) graph.pendingMove(message) else null
-        if(message.uid<0 && pending==null) throw MailActionException(MailActionFailure.OPERATION_PENDING,"This message is moving. Try shortly.")
-        val folder=graph.dao.folder(pending?.folderId ?: message.folderId) ?: throw MailActionException(MailActionFailure.FOLDER_UNAVAILABLE,"Message folder unavailable")
+        if(message.uid<0 && pending==null) throw MailActionException(MailActionFailure.OPERATION_PENDING,"This message is moving. Try shortly.",ActionErrorKind.MESSAGE_MOVING)
+        val folder=graph.dao.folder(pending?.folderId ?: message.folderId) ?: throw MailActionException(MailActionFailure.FOLDER_UNAVAILABLE,"Message folder unavailable",ActionErrorKind.MESSAGE_FOLDER_GONE)
         val account=graph.dao.account(message.accountId) ?: error("Account unavailable")
         return Triple(folder.copy(validity=pending?.validity ?: folder.validity),account,graph.credentials(account))
     }

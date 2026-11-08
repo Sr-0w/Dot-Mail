@@ -211,7 +211,7 @@ fun MailDrawer(
                             Text(a.email, style = Dot.type.caption, color = c.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                         if (a.syncState is SyncState.Error) {
-                            Icon(Icons.Outlined.ErrorOutline, stringResource(R.string.drawer_sync_problem, (a.syncState as SyncState.Error).message), Modifier.size(18.dp), tint = c.danger)
+                            Icon(Icons.Outlined.ErrorOutline, stringResource(R.string.drawer_sync_problem, app.dot.mail.ui.common.ErrorText.syncError(a.syncState as SyncState.Error)), Modifier.size(18.dp), tint = c.danger)
                         }
                     }
                 }

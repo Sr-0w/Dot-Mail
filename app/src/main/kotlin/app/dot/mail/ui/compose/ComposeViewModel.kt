@@ -708,6 +708,8 @@ class ComposeViewModel(
                             e is PgpBlocked -> e.message
                             e is app.dot.mail.ui.pgp.OpenKeychain.PgpException && e.cancelled -> str(R.string.compose_pgp_error_cancelled, "Sending was cancelled")
                             e is app.dot.mail.ui.pgp.OpenKeychain.PgpException -> str(R.string.compose_pgp_error_failed, "OpenPGP couldn't protect this message")
+                            e is app.dot.mail.data.model.MailActionException -> app.dot.mail.ui.common.ErrorText.action(e, { id, args -> str(id, "", *args) }, { it.name.lowercase() })
+                                ?: str(R.string.compose_error_send_failed, "Couldn't queue the message")
                             else -> e.message ?: str(R.string.compose_error_send_failed, "Couldn't queue the message")
                         },
                     )

@@ -50,12 +50,12 @@ class DeviceRegressionTest {
     @Test fun invalidRoleAndCrossAccountMoveAreTypedAndAtomic() = runBlocking {
         val account = graph.addAccount(config,"password"); val (inbox, thread) = fixture(account)
         val missing = runCatching { graph.apply(MessageAction.ARCHIVE,listOf(thread)) }.exceptionOrNull()
-        assertEquals(MailActionFailure.FOLDER_UNAVAILABLE,(missing as MailActionException).reason)
+        assertEquals(MailActionFailure.FOLDER_UNAVAILABLE,(missing as MailActionException).reason); assertEquals(ActionErrorKind.NO_ROLE_FOLDER,missing.kind); assertEquals("ARCHIVE",missing.detail)
         assertTrue(db.mail().operations(account).isEmpty())
         val other = graph.addAccount(config.copy(email="b@example.org"),"password")
         val target = db.mail().insertFolder(FolderRow(accountId=other,path="Archive",name="Archive",role="ARCHIVE"))
         val mismatch = runCatching { graph.move(listOf(thread),target) }.exceptionOrNull()
-        assertEquals(MailActionFailure.ACCOUNT_MISMATCH,(mismatch as MailActionException).reason)
+        assertEquals(MailActionFailure.ACCOUNT_MISMATCH,(mismatch as MailActionException).reason); assertEquals(ActionErrorKind.MIXED_ACCOUNTS,mismatch.kind)
         assertEquals(inbox,db.mail().threadMessages(thread).single().folderId)
     }
     @Test fun folderScopedMoveLeavesSentAndOtherCopiesUntouched() = runBlocking {
@@ -113,7 +113,7 @@ class DeviceRegressionTest {
         val source = db.mail().threadMessages(thread).single()
         val sentId = db.mail().insertMessage(source.copy(id=0,folderId=sent,uid=99))
         val failure = runCatching { graph.move(listOf(thread),trash) }.exceptionOrNull()
-        assertEquals(MailActionFailure.SOURCE_REQUIRED,(failure as MailActionException).reason)
+        assertEquals(MailActionFailure.SOURCE_REQUIRED,(failure as MailActionException).reason); assertEquals(ActionErrorKind.SOURCE_REQUIRED,failure.kind)
         assertTrue(db.mail().operations(account).isEmpty())
         graph.apply(MessageAction.TRASH,listOf(ConversationIds.ofMessage(sentId)),Mailbox.InFolder(inbox))
         assertTrue(db.mail().operations(account).isEmpty())
