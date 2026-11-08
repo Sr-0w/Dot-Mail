@@ -211,7 +211,7 @@ internal class RealMailGraph(
         val drafts = if (draftView) dao.folders(t.accountId).filter { it.role == "DRAFTS" }.map { it.id }.toSet() else emptySet()
         val latest = (if (draftView) messages.filter { it.folderId in drafts } else messages).lastOrNull()
         val handle = if (draftView) latest?.let { -it.id } else null
-        return ThreadSummary(t.id, t.accountId, t.subject, Codec.addresses(t.participants), t.snippet, t.lastAt, t.count, t.unread, t.starred, t.attachments, draftId = handle, recipients = latest?.let { Codec.addressField(it.header, "to") }.orEmpty(), category=latest?.let(::messageCategory))
+        return ThreadSummary(t.id, t.accountId, t.subject, Codec.addresses(t.participants), t.snippet, t.lastAt, t.count, t.unread, t.starred, t.attachments, draftId = handle, recipients = latest?.let { Codec.addressField(it.header, "to") }.orEmpty(), category=latest?.let(::messageCategory), encryptionHint=latest?.let { Codec.encryptionHint(it.header) } ?: app.dot.mail.engine.EncryptionHint.NONE)
     }
     private fun paging(where: String, args: List<Any>, draftView: Boolean = false, draftAccount: Long? = null, extra: Sql? = null, orderBy: String = ThreadQuery.orderBy(InboxSort.DATE)): Flow<PagingData<ThreadSummary>> = Pager(PagingConfig(pageSize = 40)) {
         if (extra == null) mailboxSource(where, args, draftView, draftAccount, orderBy) else mailboxSource("($where) AND (${extra.text})", args + extra.args, draftView, draftAccount, orderBy)

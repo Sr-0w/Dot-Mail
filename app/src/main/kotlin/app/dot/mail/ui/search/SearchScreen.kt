@@ -59,6 +59,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Icon
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.outlined.Attachment
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.runtime.mutableStateOf
@@ -314,6 +315,7 @@ internal fun SearchResultRow(r: SearchResult, onClick: () -> Unit) {
     val emphasis = remember(c.accent) { SpanStyle(fontWeight = FontWeight.SemiBold, background = c.accent.copy(alpha = if (c.isDark) 0.30f else 0.16f)) }
     val subject = r.subject.ifBlank { stringResource(R.string.inbox_no_subject) }
     val onServer = stringResource(R.string.search_server_only)
+    val encryptionLabel = stringResource(R.string.pgp_list_encrypted)
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick)
             .semantics(mergeDescendants = true) { if (r.serverOnly) stateDescription = onServer }
@@ -330,6 +332,10 @@ internal fun SearchResultRow(r: SearchResult, onClick: () -> Unit) {
                 )
                 if (t.hasAttachments) {
                     Icon(Icons.Outlined.Attachment, null, Modifier.size(15.dp), tint = c.textTertiary)
+                    Spacer(Modifier.width(6.dp))
+                }
+                if (t.encryptionHint != app.dot.mail.engine.EncryptionHint.NONE) {
+                    Icon(Icons.Outlined.Lock, encryptionLabel, Modifier.size(15.dp), tint = c.textTertiary)
                     Spacer(Modifier.width(6.dp))
                 }
                 Text(Format.listDate(t.lastMessageAt), style = Dot.type.caption, color = c.textTertiary)

@@ -155,6 +155,8 @@ data class ThreadSummary(
     /** Wake-up time (epoch ms); only set for rows of the Snoozed list. */
     val snoozedUntil: Long? = null,
     val category: app.dot.mail.engine.text.Category? = null,
+    /** Explicit encryption MIME classification of the message represented by this row. */
+    val encryptionHint: app.dot.mail.engine.EncryptionHint = app.dot.mail.engine.EncryptionHint.NONE,
 ) {
     val isUnread: Boolean get() = unreadCount > 0
 }
@@ -221,6 +223,8 @@ sealed interface PgpContent {
     /** Inline armour in the plain text (decrypt or verify the text itself). */
     data object InlineEncrypted : PgpContent
     data object InlineSigned : PgpContent
+    /** Explicitly encrypted MIME that Dot Mail cannot decrypt (for example S/MIME enveloped-data). */
+    data object Unsupported : PgpContent
 }
 
 enum class MessageAction { MARK_READ, MARK_UNREAD, STAR, UNSTAR, ARCHIVE, TRASH, SPAM, NOT_SPAM, DELETE_FOREVER }

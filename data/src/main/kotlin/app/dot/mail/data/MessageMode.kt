@@ -58,4 +58,5 @@ internal fun messageSummary(row: MessageRow): ThreadSummary = ThreadSummary(
     messageCount = 1, unreadCount = if (row.unread) 1 else 0, isStarred = row.starred, hasAttachments = row.hasAttachments,
     recipients = Codec.addressField(row.header, "to"),
     category = messageCategory(row),
+    encryptionHint = Codec.encryptionHint(row.header),
 )
