@@ -7,7 +7,7 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd); HOST=${BUILD_HOST:-srobin@192.168.0.232}
 cd "$ROOT"
 [ -z "$(git status --porcelain)" ] || { echo "working tree not clean"; exit 1; }
 scripts/gw :mail:test :data:testDebugUnitTest :app:testDebugUnitTest :app:assembleRelease
-ssh "$HOST" 'source ~/.bashrc; set -e; . ~/.config/dotmail/release-signing.env
+ssh "$HOST" 'source ~/.bashrc; set -e; set -a; . ~/.config/dotmail/release-signing.env; set +a
   cd ~/dotmail/app/build/outputs/apk/release
   in=$(ls *.apk | grep -v signed | head -1)
   BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
