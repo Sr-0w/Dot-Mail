@@ -43,7 +43,7 @@ fun FrostedHeaderLayout(
         // the header actually on screen, so collapsing filters shrink the strong band smoothly instead of leaving it stale.
         val total=expandedHeight+FADE+BLEED
         val visible by androidx.compose.animation.core.animateDpAsState(headerHeight,androidx.compose.animation.core.tween(if(app.dot.design.rememberReducedMotion()) 0 else 220),label="headerBlur")
-        TopEdgeFade(backdrop,1f,Modifier.align(Alignment.TopCenter).bleed(BLEED),height=total,solidUntil=((visible+BLEED)/total).coerceIn(0f,1f),fadeLength=FADE/total)
+        TopEdgeFade(backdrop,1f,Modifier.align(Alignment.TopCenter).bleed(BLEED),height=total,solidUntil=((visible+BLEED)/total).coerceIn(0f,1f),fadeLength=FADE/total,edgeScrim=BLEED+with(density) { WindowInsets.statusBars.getTop(this).toDp() }+12.dp)
         CompositionLocalProvider(LocalHeaderGlass provides HeaderGlass(null)) {
             Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().onSizeChanged { size ->
                 with(density) { size.height.toDp() }.let {

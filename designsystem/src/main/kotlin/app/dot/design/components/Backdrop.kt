@@ -63,8 +63,9 @@ fun Modifier.backdropBlur(backdrop: Backdrop, radius: Dp, background: Color, tin
             noiseFactor(0.05f)
             colorEffects(t.value?.let { listOf(HazeColorEffect.tint(it)) } ?: emptyList())
             mask(m.value)
-            // Edges repeat their own pixels instead of fading into transparent nothing: no dark, pulsing rim.
-            blurredEdgeTreatment(BlurredEdgeTreatment.Rectangle)
+            // Beyond the captured content is transparent (filled by the background), never a repeat of the edge row:
+            // with Clamp, a bright row touching the screen top was smeared over the band, then vanished in one frame.
+            blurredEdgeTreatment(BlurredEdgeTreatment.Unbounded)
         }
     }
     val input = remember(backdrop) { HazeInput.Sources(backdrop.haze) }
