@@ -311,10 +311,11 @@ class MailClient(val timeoutMs: Int = 30_000) {
         val closer = launch(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) { try { awaitCancellation() } finally { runCatching { s.close() } } }
         try { withContext(Dispatchers.IO) {
             f.open(Folder.READ_ONLY)
-            if (!s.hasCapability("IDLE")) return@withContext
+            if (!s.hasCapability("IDLE")) return@withContext false
             f.addMessageCountListener(object : MessageCountAdapter() { override fun messagesAdded(e: MessageCountEvent) { changed() }; override fun messagesRemoved(e: MessageCountEvent) { changed() } })
             f.addMessageChangedListener { changed() }
             while (isActive && f.isOpen) f.idle()
+            true
         } } finally { closer.cancel(); withContext(NonCancellable + Dispatchers.IO) { runCatching { s.close() } } }
     }
     companion object {
