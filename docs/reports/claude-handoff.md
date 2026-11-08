@@ -1,19 +1,37 @@
-# Lead handoff — 2026-11-08 05:10
+# Lead handoff (Claude) — 2026-11-08 08:35
 
-State of `main`: builds; app runs on the owner's phone with a real Infomaniak account (sync, read, send verified).
-Known failing tests: `:mail` IcsTest (Qwen, calendar, in progress on qwen/work).
+## State
+- main is green (`scripts/gw :mail:test :data:testDebugUnitTest :app:testDebugUnitTest :app:assembleDebug`).
+- **v0.1.0-alpha.1 published** (GitHub Releases, signed with the project key, cert SHA-256 12c122aa…f4).
+  `scripts/release.sh <tag> [--prerelease]` now exports the signing env and pins build-tools 35.0.0.
+- Workflow: each agent has a worktree `../wt-<agent>` on `<agent>/work`; PR → Claude squash-merges.
+  `scripts/gw` builds each worktree in its own host dir (`~/dotmail`, `~/dotmail-wt-<agent>`).
+- Room schema: v6 (snoozed). Codex's draft mirroring will be v7.
 
-Workflow: per-agent worktrees `Dot apps/wt-<agent>` on `<agent>/work`; PRs into main, Claude merges (docs/TEAM.md).
-Agents at usage limit: Codex (back ~08:17), Sonnet, Claude. Gemini (TLS hardening + compose bodyHtml wiring) and
-Qwen (calendar .ics parser) may still be working in their worktrees.
+## Done this session (merged)
+HTML fit-to-screen + sanitised stylesheets (security-reviewed by Gemini, #15) · refresh spinner hand-off to
+header progress line + haptic · swipe between conversations (opt-in) · two-pane inbox ≥840dp · calendar invite
+cards (Qwen UI + Ics) · link dialog with IDN/homograph warning and tracking-param stripping · one-click
+unsubscribe (RFC 8058) · PDF preview · folder management (Sonnet, verified live) · persistent remote-image
+permissions (Sonnet) · unthreaded list (Sonnet) · per-account settings (Sonnet) · snooze (Sonnet) · scoped
+moves (Codex #16, thread route carries the source mailbox) · TLS 1.2+/cert errors (Codex #17) · updatePassword
+(Codex #19) · button hierarchy + motion pass + Cc/Bcc animation (Gemini) · FR/DE localisation started (Gemini)
+· engine helpers by Qwen: Links, ListUnsubscribe, Classifier, SnoozePresets, Templates; RELEASES reproducible
+builds, FDROID.md, de-DE store text.
 
-Next steps, in order:
-1. Release smoke test: `build-out/apk/release/app-release.apk` (R8, debug-signed) is built but NOT yet run on the
-   phone — install with `scripts/emu install <apk>` only when the phone is idle; check `DotMail/Sync` logs.
-   Then `scripts/release.sh v0.1.0-alpha.1 --prerelease` (signing key in ~/.config/dotmail, never in git).
-2. Codex: review2 P0-6 (thread moves must only move messages in the current folder, not Sent copies), remaining
-   review2 items, then OAuth docs, instant-notification mode. Use wt-codex.
-3. Sonnet: folder management — fix FolderManagementDataTest (use nested names; GreenMail top-level RENAME/DELETE
-   NPE), verify RENAME/DELETE replay, then drawer UI (long-press Rename/Move/Delete, "New folder") + demo data.
-4. Gemini: wire Draft.bodyHtml in compose, finish TLS audit + send MailClient diffs to Codex.
-5. Claude: review/merge PRs; FEATURE_REQUESTS.md next items (fetch+merge before editing — owner edits on GitHub).
+## In flight
+- Codex: draft mirroring (v7) → iTIP reply (`sendCalendarReply`, then wire InviteCard buttons, myEmail) →
+  instant-notification FGS data API.
+- Sonnet: "Sign in again" dialog → snoozed wake time on rows → attachment browser.
+- Gemini: localisation of inbox/drawer/search/outbox/snooze/widget/notifications/Format.
+- Qwen: scripts/reprotest.sh (J7).
+
+## Needs the phone (only Claude; check foreground/lock first — see memory personal-phone-guard)
+Phone was locked/dozing all morning: nothing visually verified since the alpha. To verify when the owner
+is not using it: Infomaniak device-update mail fits the screen (compare Samsung Email), refresh lifecycle,
+remote-image remember, swipe navigation, PDF preview, Cc/Bcc animation, two-pane in landscape.
+Pinch-to-zoom for HTML is deliberately NOT built yet: needs on-device gesture testing inside the LazyColumn.
+
+## Next candidates (FEATURE_REQUESTS)
+Templates UI in composer (engine ready), classifier wiring (needs headers at sync), notification rules /
+mute, contacts picker (no blanket permission), settings backup/export, newsletter view, pinch-to-zoom.
