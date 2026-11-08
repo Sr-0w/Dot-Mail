@@ -883,4 +883,61 @@
         <item quantity="other">%1$d smart folders: new ones are added.</item>
     </plurals>
     <string name="backup_done_smart">%1$d smart folders added.</string>
+
+    <!-- Recurrence summary -->
+    <string name="rrule_daily">Daily</string>
+    <string name="rrule_weekly">Weekly</string>
+    <string name="rrule_monthly">Monthly</string>
+    <string name="rrule_yearly">Yearly</string>
+    <plurals name="rrule_every_days">
+        <item quantity="one">Every %d day</item>
+        <item quantity="other">Every %d days</item>
+    </plurals>
+    <plurals name="rrule_every_weeks">
+        <item quantity="one">Every %d week</item>
+        <item quantity="other">Every %d weeks</item>
+    </plurals>
+    <plurals name="rrule_every_months">
+        <item quantity="one">Every %d month</item>
+        <item quantity="other">Every %d months</item>
+    </plurals>
+    <plurals name="rrule_every_years">
+        <item quantity="one">Every %d year</item>
+        <item quantity="other">Every %d years</item>
+    </plurals>
+    <string name="rrule_on_every_weekday">every %1$s</string>
+    <string name="rrule_on_first_weekday">on the first %1$s</string>
+    <string name="rrule_on_second_weekday">on the second %1$s</string>
+    <string name="rrule_on_third_weekday">on the third %1$s</string>
+    <string name="rrule_on_fourth_weekday">on the fourth %1$s</string>
+    <string name="rrule_on_fifth_weekday">on the fifth %1$s</string>
+    <string name="rrule_on_last_weekday">on the last %1$s</string>
+    <plurals name="rrule_times">
+        <item quantity="one">%d time</item>
+        <item quantity="other">%d times</item>
+    </plurals>
+    <string name="rrule_until">until %1$s</string>
+
+    <!-- Verify results -->
+    <string name="verify_auth_failed">check your password or app password</string>
+    <string name="verify_connection_failed">couldn’t reach the mail server</string>
+    <string name="verify_certificate">the server certificate couldn’t be verified</string>
+
+    <!-- OAuth errors -->
+    <string name="oauth_error_not_available">Browser sign-in isn’t available in this build.</string>
+    <string name="oauth_error_invalid_email">Enter a valid email address.</string>
+    <string name="oauth_error_account_gone">This account no longer exists.</string>
+    <string name="oauth_error_wrong_account">Sign in with the same provider and address as this account.</string>
+    <string name="oauth_error_storage">The sign-in state couldn’t be saved on this device.</string>
+    <string name="oauth_error_invalid_callback">The sign-in response was not valid. Please start again.</string>
+    <string name="oauth_error_no_pending">No sign-in is waiting to finish. Please start again.</string>
+    <string name="oauth_error_state_lost">The saved sign-in state is unavailable. Please start again.</string>
+    <string name="oauth_error_build_changed">This app’s sign-in configuration changed. Please start again.</string>
+    <string name="oauth_error_complete_failed">Sign-in couldn’t be completed. Please start again.</string>
+    <string name="oauth_error_provider_rejected">The provider refused IMAP or SMTP sign-in. Check the account, IMAP access and SMTP settings.</string>
+    <string name="oauth_error_account_changed">The account changed during sign-in.</string>
+    <string name="oauth_error_expired">Sign-in expired. Please start again.</string>
+    <string name="oauth_error_denied">Sign-in was cancelled or denied.</string>
+    <string name="oauth_error_provider_response">The provider’s response couldn’t be used.</string>
+    <string name="oauth_error_other">Sign-in failed.</string>
 </resources>

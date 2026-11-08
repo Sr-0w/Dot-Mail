@@ -65,7 +65,7 @@ import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.DeleteForever
-import androidx.compose.material.icons.outlined.DriveFileMove
+import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.MarkEmailUnread
@@ -503,7 +503,7 @@ fun ThreadScreen(
                             }
                             DotMenuItem(stringResource(R.string.inbox_action_report_spam), Icons.Outlined.Report) { menu = false; act(MessageAction.SPAM) }
                             DotMenuItem(stringResource(R.string.inbox_action_not_spam), Icons.Outlined.Inbox) { menu = false; act(MessageAction.NOT_SPAM) }
-                            DotMenuItem(stringResource(R.string.inbox_action_move_ellipsis), Icons.Outlined.DriveFileMove) { menu = false; showMove = true }
+                            DotMenuItem(stringResource(R.string.inbox_action_move_ellipsis), Icons.AutoMirrored.Outlined.DriveFileMove) { menu = false; showMove = true }
                             DotMenuItem(stringResource(R.string.inbox_action_delete_forever), Icons.Outlined.DeleteForever, color = c.danger) { menu = false; confirmDelete = true }
                             val oneClick = list?.lastOrNull { it.unsubscribeOneClick != null }?.unsubscribeOneClick
                             val target = list?.lastOrNull { it.unsubscribe != null }?.unsubscribe

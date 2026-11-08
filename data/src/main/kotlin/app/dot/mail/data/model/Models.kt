@@ -258,7 +258,8 @@ data class AccountConfig(
 sealed interface VerifyResult {
     data object Ok : VerifyResult
     data class AuthFailed(val message: String) : VerifyResult
-    data class ConnectionFailed(val message: String) : VerifyResult
+    /** [kind] lets the UI show a translated reason; [message] is English for logs and tests. */
+    data class ConnectionFailed(val message: String, val kind: app.dot.mail.engine.ConnectionFailure? = null) : VerifyResult
     data class CertificateProblem(val message: String) : VerifyResult
 }
 
@@ -281,7 +282,9 @@ data class OutboxItem(
 // OAuth client IDs belong to the build maintainer; no project borrows another app's registration.
 enum class OAuthProvider { GOOGLE, MICROSOFT }
 data class OAuthAvailability(val provider: OAuthProvider, val available: Boolean, val reason: String?)
-class OAuthException(message: String) : Exception(message)
+/** Machine-readable reason of an [OAuthException]; the UI maps it to a translated message. */
+enum class OAuthError { NOT_AVAILABLE, INVALID_EMAIL, ACCOUNT_GONE, WRONG_ACCOUNT, STORAGE, INVALID_CALLBACK, NO_PENDING, STATE_LOST, BUILD_CHANGED, COMPLETE_FAILED, PROVIDER_REJECTED, ACCOUNT_CHANGED, EXPIRED, DENIED, PROVIDER_RESPONSE, OTHER }
+class OAuthException(message: String, val code: OAuthError = OAuthError.OTHER) : Exception(message)
 
 enum class MailActionFailure { FOLDER_UNAVAILABLE, ACCOUNT_MISMATCH, OPERATION_PENDING, SOURCE_REQUIRED }
 class MailActionException(val reason: MailActionFailure, message: String) : Exception(message)

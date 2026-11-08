@@ -79,7 +79,7 @@ import androidx.compose.material.icons.outlined.Attachment
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.DriveFileMove
+import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.Mail
@@ -879,7 +879,7 @@ private fun SelectionBar(
                     DotMenuItem(stringResource(R.string.inbox_action_star), Icons.Outlined.StarOutline) { menu = false; onAction(MessageAction.STAR) }
                     DotMenuItem(stringResource(R.string.inbox_action_snooze_ellipsis), Icons.Outlined.Snooze) { menu = false; onSnooze() }
                     DotMenuItem(stringResource(if (allMuted) R.string.inbox_action_unmute else R.string.inbox_action_mute), if (allMuted) Icons.Outlined.NotificationsActive else Icons.Outlined.NotificationsOff) { menu = false; onMute() }
-                    DotMenuItem(stringResource(R.string.inbox_action_move_ellipsis), Icons.Outlined.DriveFileMove) { menu = false; onMove() }
+                    DotMenuItem(stringResource(R.string.inbox_action_move_ellipsis), Icons.AutoMirrored.Outlined.DriveFileMove) { menu = false; onMove() }
                     if (role == FolderRole.SPAM) DotMenuItem(stringResource(R.string.inbox_action_not_spam), Icons.Outlined.Inbox) { menu = false; onAction(MessageAction.NOT_SPAM) }
                     else DotMenuItem(stringResource(R.string.inbox_action_report_spam), Icons.Outlined.Report) { menu = false; onAction(MessageAction.SPAM) }
                 }

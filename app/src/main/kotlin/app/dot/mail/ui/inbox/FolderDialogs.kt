@@ -10,7 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.DriveFileMove
+import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -102,7 +102,7 @@ fun FolderDialogs(
                     ) { on -> rules.setFolderNotify(dialog.folder.id, dialog.folder.role.name, on) }
                     if (dialog.folder.role == FolderRole.CUSTOM) {
                         ListRow(stringResource(R.string.drawer_folder_rename), icon = Icons.Outlined.Edit, onClick = { onChange(FolderDialog.Rename(dialog.folder)) })
-                        ListRow(stringResource(R.string.drawer_folder_move_into_ellipsis), icon = Icons.Outlined.DriveFileMove, onClick = { onChange(FolderDialog.Move(dialog.folder)) })
+                        ListRow(stringResource(R.string.drawer_folder_move_into_ellipsis), icon = Icons.AutoMirrored.Outlined.DriveFileMove, onClick = { onChange(FolderDialog.Move(dialog.folder)) })
                         ListRow(stringResource(R.string.drawer_folder_delete), icon = Icons.Outlined.DeleteOutline, titleColor = c.danger, onClick = { onChange(FolderDialog.Delete(dialog.folder)) })
                     }
                 }

@@ -883,4 +883,61 @@
         <item quantity="other">%1$d dossiers intelligents : les nouveaux sont ajoutés.</item>
     </plurals>
     <string name="backup_done_smart">%1$d dossiers intelligents ajoutés.</string>
+
+    <!-- Recurrence summary -->
+    <string name="rrule_daily">Tous les jours</string>
+    <string name="rrule_weekly">Toutes les semaines</string>
+    <string name="rrule_monthly">Tous les mois</string>
+    <string name="rrule_yearly">Tous les ans</string>
+    <plurals name="rrule_every_days">
+        <item quantity="one">Tous les %d jour</item>
+        <item quantity="other">Tous les %d jours</item>
+    </plurals>
+    <plurals name="rrule_every_weeks">
+        <item quantity="one">Toutes les %d semaine</item>
+        <item quantity="other">Toutes les %d semaines</item>
+    </plurals>
+    <plurals name="rrule_every_months">
+        <item quantity="one">Tous les %d mois</item>
+        <item quantity="other">Tous les %d mois</item>
+    </plurals>
+    <plurals name="rrule_every_years">
+        <item quantity="one">Tous les %d an</item>
+        <item quantity="other">Tous les %d ans</item>
+    </plurals>
+    <string name="rrule_on_every_weekday">chaque %1$s</string>
+    <string name="rrule_on_first_weekday">le premier %1$s</string>
+    <string name="rrule_on_second_weekday">le deuxième %1$s</string>
+    <string name="rrule_on_third_weekday">le troisième %1$s</string>
+    <string name="rrule_on_fourth_weekday">le quatrième %1$s</string>
+    <string name="rrule_on_fifth_weekday">le cinquième %1$s</string>
+    <string name="rrule_on_last_weekday">le dernier %1$s</string>
+    <plurals name="rrule_times">
+        <item quantity="one">%d fois</item>
+        <item quantity="other">%d fois</item>
+    </plurals>
+    <string name="rrule_until">jusqu’au %1$s</string>
+
+    <!-- Verify results -->
+    <string name="verify_auth_failed">vérifiez votre mot de passe ou mot de passe d’application</string>
+    <string name="verify_connection_failed">impossible de joindre le serveur de messagerie</string>
+    <string name="verify_certificate">le certificat du serveur n’a pas pu être vérifié</string>
+
+    <!-- OAuth errors -->
+    <string name="oauth_error_not_available">La connexion par navigateur n’est pas disponible dans cette version.</string>
+    <string name="oauth_error_invalid_email">Saisissez une adresse e-mail valide.</string>
+    <string name="oauth_error_account_gone">Ce compte n’existe plus.</string>
+    <string name="oauth_error_wrong_account">Connectez-vous avec le même fournisseur et la même adresse que ce compte.</string>
+    <string name="oauth_error_storage">L’état de connexion n’a pas pu être enregistré sur cet appareil.</string>
+    <string name="oauth_error_invalid_callback">La réponse de connexion n’était pas valide. Recommencez.</string>
+    <string name="oauth_error_no_pending">Aucune connexion en attente. Recommencez.</string>
+    <string name="oauth_error_state_lost">L’état de connexion enregistré est indisponible. Recommencez.</string>
+    <string name="oauth_error_build_changed">La configuration de connexion de l’application a changé. Recommencez.</string>
+    <string name="oauth_error_complete_failed">La connexion n’a pas pu aboutir. Recommencez.</string>
+    <string name="oauth_error_provider_rejected">Le fournisseur a refusé la connexion IMAP ou SMTP. Vérifiez le compte, l’accès IMAP et les réglages SMTP.</string>
+    <string name="oauth_error_account_changed">Le compte a changé pendant la connexion.</string>
+    <string name="oauth_error_expired">La connexion a expiré. Recommencez.</string>
+    <string name="oauth_error_denied">La connexion a été annulée ou refusée.</string>
+    <string name="oauth_error_provider_response">La réponse du fournisseur n’est pas exploitable.</string>
+    <string name="oauth_error_other">La connexion a échoué.</string>
 </resources>

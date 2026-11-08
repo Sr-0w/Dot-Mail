@@ -883,4 +883,61 @@
         <item quantity="other">%1$d intelligente Ordner: neue werden hinzugefügt.</item>
     </plurals>
     <string name="backup_done_smart">%1$d intelligente Ordner hinzugefügt.</string>
+
+    <!-- Recurrence summary -->
+    <string name="rrule_daily">Täglich</string>
+    <string name="rrule_weekly">Wöchentlich</string>
+    <string name="rrule_monthly">Monatlich</string>
+    <string name="rrule_yearly">Jährlich</string>
+    <plurals name="rrule_every_days">
+        <item quantity="one">Alle %d Tag</item>
+        <item quantity="other">Alle %d Tage</item>
+    </plurals>
+    <plurals name="rrule_every_weeks">
+        <item quantity="one">Alle %d Woche</item>
+        <item quantity="other">Alle %d Wochen</item>
+    </plurals>
+    <plurals name="rrule_every_months">
+        <item quantity="one">Alle %d Monat</item>
+        <item quantity="other">Alle %d Monate</item>
+    </plurals>
+    <plurals name="rrule_every_years">
+        <item quantity="one">Alle %d Jahr</item>
+        <item quantity="other">Alle %d Jahre</item>
+    </plurals>
+    <string name="rrule_on_every_weekday">jeden %1$s</string>
+    <string name="rrule_on_first_weekday">am ersten %1$s</string>
+    <string name="rrule_on_second_weekday">am zweiten %1$s</string>
+    <string name="rrule_on_third_weekday">am dritten %1$s</string>
+    <string name="rrule_on_fourth_weekday">am vierten %1$s</string>
+    <string name="rrule_on_fifth_weekday">am fünften %1$s</string>
+    <string name="rrule_on_last_weekday">am letzten %1$s</string>
+    <plurals name="rrule_times">
+        <item quantity="one">%d Mal</item>
+        <item quantity="other">%d Mal</item>
+    </plurals>
+    <string name="rrule_until">bis %1$s</string>
+
+    <!-- Verify results -->
+    <string name="verify_auth_failed">prüfen Sie Ihr Passwort oder App-Passwort</string>
+    <string name="verify_connection_failed">der Mailserver ist nicht erreichbar</string>
+    <string name="verify_certificate">das Serverzertifikat konnte nicht überprüft werden</string>
+
+    <!-- OAuth errors -->
+    <string name="oauth_error_not_available">Die Anmeldung im Browser ist in diesem Build nicht verfügbar.</string>
+    <string name="oauth_error_invalid_email">Geben Sie eine gültige E-Mail-Adresse ein.</string>
+    <string name="oauth_error_account_gone">Dieses Konto existiert nicht mehr.</string>
+    <string name="oauth_error_wrong_account">Melden Sie sich mit demselben Anbieter und derselben Adresse wie bei diesem Konto an.</string>
+    <string name="oauth_error_storage">Der Anmeldestatus konnte auf diesem Gerät nicht gespeichert werden.</string>
+    <string name="oauth_error_invalid_callback">Die Anmeldeantwort war ungültig. Bitte erneut beginnen.</string>
+    <string name="oauth_error_no_pending">Keine Anmeldung wartet auf Abschluss. Bitte erneut beginnen.</string>
+    <string name="oauth_error_state_lost">Der gespeicherte Anmeldestatus ist nicht verfügbar. Bitte erneut beginnen.</string>
+    <string name="oauth_error_build_changed">Die Anmeldekonfiguration der App hat sich geändert. Bitte erneut beginnen.</string>
+    <string name="oauth_error_complete_failed">Die Anmeldung konnte nicht abgeschlossen werden. Bitte erneut beginnen.</string>
+    <string name="oauth_error_provider_rejected">Der Anbieter hat die IMAP- oder SMTP-Anmeldung abgelehnt. Prüfen Sie Konto, IMAP-Zugriff und SMTP-Einstellungen.</string>
+    <string name="oauth_error_account_changed">Das Konto hat sich während der Anmeldung geändert.</string>
+    <string name="oauth_error_expired">Die Anmeldung ist abgelaufen. Bitte erneut beginnen.</string>
+    <string name="oauth_error_denied">Die Anmeldung wurde abgebrochen oder verweigert.</string>
+    <string name="oauth_error_provider_response">Die Antwort des Anbieters war nicht verwendbar.</string>
+    <string name="oauth_error_other">Anmeldung fehlgeschlagen.</string>
 </resources>

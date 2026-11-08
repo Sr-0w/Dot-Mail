@@ -9,11 +9,11 @@ import androidx.compose.material.icons.outlined.Drafts
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.ShoppingBag
-import androidx.compose.material.icons.outlined.ReceiptLong
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Report
-import androidx.compose.material.icons.outlined.Send
+import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.AllInbox
 import androidx.annotation.StringRes
@@ -62,11 +62,10 @@ object Format {
         else then.format(fullDate.withLocale(locale))
     }
 
-    fun size(bytes: Long): String = when {
-        bytes < 1024 -> "$bytes B"
-        bytes < 1024 * 1024 -> "${(bytes / 1024.0).let { if (it < 10) "%.1f".format(it) else it.toInt().toString() }} KB"
-        else -> "%.1f MB".format(bytes / (1024.0 * 1024.0))
-    }
+    /** File size in the user's language and number format ("1.2 MB" / "1,2 Mo" / "1,2 MB"), via the platform formatter. */
+    fun size(context: android.content.Context, bytes: Long): String = android.text.format.Formatter.formatShortFileSize(context, bytes.coerceAtLeast(0))
+
+    @Composable fun size(bytes: Long): String = size(androidx.compose.ui.platform.LocalContext.current, bytes)
 
     /** "Yesterday" / "Today" in the user's language, from ICU (no string table to maintain). English if ICU is unavailable (JVM tests). */
     private fun relativeDay(locale: Locale, yesterday: Boolean): String = runCatching {
@@ -105,7 +104,7 @@ object Format {
 
     fun roleIcon(role: FolderRole): ImageVector = when (role) {
         FolderRole.INBOX -> Icons.Outlined.Inbox
-        FolderRole.SENT -> Icons.Outlined.Send
+        FolderRole.SENT -> Icons.AutoMirrored.Outlined.Send
         FolderRole.DRAFTS -> Icons.Outlined.Drafts
         FolderRole.ARCHIVE -> Icons.Outlined.Archive
         FolderRole.TRASH -> Icons.Outlined.Delete
@@ -116,7 +115,7 @@ object Format {
         FolderRole.SNOOZED -> Icons.Outlined.Snooze
         FolderRole.NEWSLETTERS -> Icons.Outlined.Email
         FolderRole.PURCHASES -> Icons.Outlined.ShoppingBag
-        FolderRole.BILLS -> Icons.Outlined.ReceiptLong
+        FolderRole.BILLS -> Icons.AutoMirrored.Outlined.ReceiptLong
         FolderRole.NOTIFICATIONS -> Icons.Outlined.Notifications
         FolderRole.SOCIAL -> Icons.Outlined.Groups
     }

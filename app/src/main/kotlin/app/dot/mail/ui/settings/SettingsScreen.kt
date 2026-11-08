@@ -44,8 +44,8 @@ import androidx.compose.material.icons.outlined.MarkEmailRead
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Public
-import androidx.compose.material.icons.outlined.Reply
-import androidx.compose.material.icons.outlined.ReplyAll
+import androidx.compose.material.icons.automirrored.outlined.Reply
+import androidx.compose.material.icons.automirrored.outlined.ReplyAll
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.ShieldMoon
 import androidx.compose.material.icons.outlined.Storefront
@@ -281,10 +281,10 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
                 listOf(ComposeFormat.RICH to stringResource(R.string.settings_format_rich), ComposeFormat.PLAIN to stringResource(R.string.settings_format_plain)),
             ) { f -> settings.update { it.copy(defaultFormat = f) } }
             UndoSetting(prefs.undoSendSeconds) { s -> settings.update { it.copy(undoSendSeconds = s) } }
-            ToggleRow(stringResource(R.string.settings_reply_all), stringResource(R.string.settings_reply_all_sub), Icons.Outlined.ReplyAll, prefs.replyAllByDefault) { v ->
+            ToggleRow(stringResource(R.string.settings_reply_all), stringResource(R.string.settings_reply_all_sub), Icons.AutoMirrored.Outlined.ReplyAll, prefs.replyAllByDefault) { v ->
                 settings.update { it.copy(replyAllByDefault = v) }
             }
-            ToggleRow(stringResource(R.string.settings_include_original), stringResource(R.string.settings_include_original_sub), Icons.Outlined.Reply, prefs.includeOriginal) { v ->
+            ToggleRow(stringResource(R.string.settings_include_original), stringResource(R.string.settings_include_original_sub), Icons.AutoMirrored.Outlined.Reply, prefs.includeOriginal) { v ->
                 settings.update { it.copy(includeOriginal = v) }
             }
             Divider()
@@ -362,7 +362,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
                 value = withContext(Dispatchers.IO) { context.cacheDir.walkTopDown().filter { it.isFile }.sumOf { it.length() } }
             }
             ListRow(
-                stringResource(R.string.settings_clear_cache), subtitle = stringResource(R.string.settings_clear_cache_sub, formatSize(cacheBytes)),
+                stringResource(R.string.settings_clear_cache), subtitle = stringResource(R.string.settings_clear_cache_sub, app.dot.mail.ui.common.Format.size(cacheBytes)),
                 icon = Icons.Outlined.DeleteSweep,
                 onClick = {
                     scope.launch {
@@ -472,11 +472,6 @@ private val LICENCES = listOf(
 @Composable
 private fun Divider() = Hairline(Modifier.padding(vertical = DotSpacing.s))
 
-private fun formatSize(bytes: Long): String = when {
-    bytes < 1024 -> "$bytes B"
-    bytes < 1024 * 1024 -> "${bytes / 1024} KB"
-    else -> "%.1f MB".format(bytes / 1048576.0)
-}
 
 @Composable
 private fun swipeName(a: SwipeAction) = stringResource(when (a) {

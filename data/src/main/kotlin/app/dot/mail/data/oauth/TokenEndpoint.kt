@@ -23,7 +23,7 @@ internal class HttpsTokenEndpoint : TokenEndpoint {
             val status = connection.responseCode
             val raw = (if (status in 200..299) connection.inputStream else connection.errorStream)?.use { input ->
                 val output = java.io.ByteArrayOutputStream(); val buffer = ByteArray(4096)
-                while (true) { val count = input.read(buffer); if (count < 0) break; if (output.size() + count > 65_536) throw OAuthException("Provider response was too large"); output.write(buffer,0,count) }
+                while (true) { val count = input.read(buffer); if (count < 0) break; if (output.size() + count > 65_536) throw OAuthException("Provider response was too large", app.dot.mail.data.model.OAuthError.PROVIDER_RESPONSE); output.write(buffer,0,count) }
                 output.toString("UTF-8")
             }.orEmpty()
             val result = runCatching { JSONObject(raw) }.getOrElse { throw TokenEndpointException(false) }
