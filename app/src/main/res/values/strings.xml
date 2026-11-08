@@ -1065,4 +1065,8 @@
     <string name="aliases_create">Create random alias</string>
     <string name="aliases_disable">Disable</string>
     <string name="aliases_enable">Enable</string>
+    <string name="aliases_test">Test connection</string>
+    <string name="aliases_remove_key">Remove key</string>
+    <string name="aliases_copy">Copy</string>
+    <string name="aliases_error">Could not reach the alias provider. Check the key and try again.</string>
 </resources>

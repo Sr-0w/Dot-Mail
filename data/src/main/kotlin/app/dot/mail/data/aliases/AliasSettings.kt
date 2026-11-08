@@ -14,7 +14,7 @@ class AliasSettings internal constructor(context: Context, private val vault: Cr
 
     fun remove(provider: String) { require(provider in PROVIDERS); prefs.edit().remove(provider).apply() }
 
-    internal fun key(provider: String): String? = prefs.getString(provider, null)?.let { vault.decrypt("aliases:$provider", it) }
+    fun key(provider: String): String? = prefs.getString(provider, null)?.let { vault.decrypt("aliases:$provider", it) }
 
     companion object {
         private val PROVIDERS = setOf("simplelogin", "addy")

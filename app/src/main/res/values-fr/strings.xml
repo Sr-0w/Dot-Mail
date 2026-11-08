@@ -1065,4 +1065,8 @@
     <string name="aliases_create">Créer un alias aléatoire</string>
     <string name="aliases_disable">Désactiver</string>
     <string name="aliases_enable">Activer</string>
+    <string name="aliases_test">Tester la connexion</string>
+    <string name="aliases_remove_key">Supprimer la clé</string>
+    <string name="aliases_copy">Copier</string>
+    <string name="aliases_error">Impossible de joindre le fournisseur d’alias. Vérifiez la clé et réessayez.</string>
 </resources>

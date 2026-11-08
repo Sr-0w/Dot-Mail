@@ -1065,4 +1065,8 @@
     <string name="aliases_create">Zufälligen Alias erstellen</string>
     <string name="aliases_disable">Deaktivieren</string>
     <string name="aliases_enable">Aktivieren</string>
+    <string name="aliases_test">Verbindung testen</string>
+    <string name="aliases_remove_key">Schlüssel entfernen</string>
+    <string name="aliases_copy">Kopieren</string>
+    <string name="aliases_error">Alias-Anbieter nicht erreichbar. Prüfen Sie den Schlüssel und versuchen Sie es erneut.</string>
 </resources>

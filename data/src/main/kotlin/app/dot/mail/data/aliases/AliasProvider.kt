@@ -11,10 +11,10 @@ interface AliasProvider {
     fun create(apiKey: String): EmailAlias
     fun setEnabled(apiKey: String, id: String, enabled: Boolean): EmailAlias
 }
-internal fun request(url: String, key: String, auth: (String)->String, method: String="GET", body: JSONObject?=null): JSONObject {
+internal fun request(url: String, key: String, header: String, auth: (String)->String, method: String="GET", body: JSONObject?=null): JSONObject {
     val c = (URL(url).openConnection() as HttpURLConnection).apply {
         requestMethod=method; connectTimeout=10000; readTimeout=10000
-        setRequestProperty("Accept","application/json"); setRequestProperty("Authorization",auth(key))
+        setRequestProperty("Accept","application/json"); setRequestProperty(header,auth(key))
         if(body!=null){ doOutput=true; setRequestProperty("Content-Type","application/json"); outputStream.use{it.write(body.toString().toByteArray())} }
     }
     try {
@@ -22,8 +22,14 @@ internal fun request(url: String, key: String, auth: (String)->String, method: S
         val stream=if(code in 200..299)c.inputStream else c.errorStream
         val text=stream?.bufferedReader()?.use{it.readText()} ?: "{}"
         check(code in 200..299) { "Alias provider request failed ($code)" }
-        return JSONObject(text)
+        return if (text.isBlank()) JSONObject() else JSONObject(text)
     } finally { c.disconnect() }
+}
+internal fun alias(json: JSONObject): EmailAlias? {
+    val value = json.optJSONObject("data") ?: json
+    val email = value.optString("email", value.optString("alias"))
+    if (email.isBlank()) return null
+    return EmailAlias(value.optString("id", email), email, value.optBoolean("active", value.optBoolean("enabled", true)))
 }
 internal fun aliases(json: JSONObject): List<EmailAlias> {
     val array=json.optJSONArray("aliases") ?: json.optJSONObject("data")?.optJSONArray("data") ?: json.optJSONArray("data") ?: JSONArray()
