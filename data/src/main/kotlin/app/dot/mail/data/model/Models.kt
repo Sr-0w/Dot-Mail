@@ -40,6 +40,8 @@ enum class FolderRole {
     INBOX, SENT, DRAFTS, ARCHIVE, TRASH, SPAM, ALL_MAIL, STARRED, CUSTOM,
     /** Virtual: only used as Mailbox.Unified(SNOOZED), the list of snoozed conversations. Never stored on a folder. */
     SNOOZED,
+    /** Virtual built-in newsletter category, across accounts; never a server folder. */
+    NEWSLETTERS,
 }
 
 data class Folder(
@@ -82,6 +84,7 @@ data class ThreadSummary(
     val recipients: List<EmailAddress> = emptyList(),
     /** Wake-up time (epoch ms); only set for rows of the Snoozed list. */
     val snoozedUntil: Long? = null,
+    val category: app.dot.mail.engine.text.Category? = null,
 ) {
     val isUnread: Boolean get() = unreadCount > 0
 }
@@ -123,6 +126,8 @@ data class Message(
     val unsubscribe: String?,
     /** RFC 8058 one-click unsubscribe endpoint (https POST "List-Unsubscribe=One-Click"), when the sender offers it. */
     val unsubscribeOneClick: String? = null,
+    val listId: String? = null,
+    val category: app.dot.mail.engine.text.Category? = null,
 )
 
 /** Body is null on [Message] until it has been downloaded. */

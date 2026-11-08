@@ -1,0 +1,9 @@
+# Built-in classification and Newsletters mailbox
+
+Message.category and ThreadSummary.category are nullable engine.text.Category fields, appended with null defaults. Message.listId exposes the raw List-Id value. Header sync runs Classifier.classify with built-in rules only and writes category/listId to message header JSON; no schema change or persisted user rules. Thread rows use the latest cached message category; single-message rows use their own category.
+
+Mailbox.Unified(FolderRole.NEWSLETTERS) works in conversation and single-message modes across accounts. It includes newsletter-category messages in incoming/archive/custom/all-mail folders and excludes Sent, Trash, Spam and Drafts. Actions intersect the category's eligible source messages, preserving Sent copies; snoozed rows retain existing visibility behavior. Labels/icon and empty-state exhaustive branches are the only app edits; Claude owns navigation/screens.
+
+IMAP HEADER.FIELDS cannot request wildcard field names. The engine fetches exact List-Id, List-Unsubscribe, Precedence, Auto-Submitted, Feedback-ID, X-Mailchimp-ID/EID, X-Campaign, X-Campaign-ID, X-CampaignId and X-GitHub-Reason fields. Classifier input values are bounded; BODYSTRUCTURE supplies PDF presence. No body or all-headers fetch is introduced. Other vendor spellings can be added explicitly later. Existing cached messages get a bounded metadata backfill (at most 200 per folder per sync) without resetting cursors or storing full bodies.
+
+Validation: scripts/gw :mail:test :data:testDebugUnitTest :app:compileDebugKotlin. GreenMail headers exercise mailing lists, bulk precedence, campaign/Mailchimp, GitHub and auto-generated signals, PDF-assisted billing, public metadata and legacy backfill. Repository tests cover cross-account virtual paging, single-message mode, hidden roles, subject-text spoof resistance and scoped actions. No new dependency, schema change, live-account write or phone access.

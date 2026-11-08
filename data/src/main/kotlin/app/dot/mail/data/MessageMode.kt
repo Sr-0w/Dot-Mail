@@ -34,7 +34,8 @@ internal fun RealMailGraph.messagesPaging(mailbox: Mailbox): Flow<PagingData<Thr
         is Mailbox.Unified -> {
             if (mailbox.role == FolderRole.DRAFTS) { emitAll(threads(mailbox)); return@flow }
             if (mailbox.role == FolderRole.SNOOZED) { emitAll(snoozedMessagesPaging()); return@flow }
-            "folderId IN (SELECT id FROM folders WHERE role=?)" to listOf<Any>(mailbox.role.name)
+            if(mailbox.role==FolderRole.NEWSLETTERS) "id IN (SELECT n.id FROM messages n JOIN folders f ON f.id=n.folderId WHERE ${newsletterPredicate("n","f")})" to emptyList<Any>()
+            else "folderId IN (SELECT id FROM folders WHERE role=?)" to listOf<Any>(mailbox.role.name)
         }
     }
     val sql = "SELECT $MESSAGE_META FROM messages WHERE $where AND NOT EXISTS(SELECT 1 FROM snoozed z WHERE z.resurfacedAt IS NULL AND (z.messageId=messages.id OR (z.messageId IS NULL AND z.threadId=messages.threadId))) ORDER BY sentAt DESC,id DESC"
@@ -49,4 +50,5 @@ internal fun messageSummary(row: MessageRow): ThreadSummary = ThreadSummary(
     participants = Codec.addressField(row.header, "from"), snippet = row.snippet, lastMessageAt = row.sentAt,
     messageCount = 1, unreadCount = if (row.unread) 1 else 0, isStarred = row.starred, hasAttachments = row.hasAttachments,
     recipients = Codec.addressField(row.header, "to"),
+    category = messageCategory(row),
 )
