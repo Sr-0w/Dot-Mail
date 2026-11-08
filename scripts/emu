@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Drives the test device (the owner's phone over wireless adb by default; DEVICE=serial to override).
-#   scripts/emu install [apk]      install (default build-out/apk/debug/app-debug.apk) and launch
+#   scripts/emu install [apk]      install (default build-out/apk/debug/app-debug.apk); relaunch only if it was in front
 #   scripts/emu shot out.png       screenshot to a local file
 #   scripts/emu input tap X Y | text T | keyevent K   guarded input (refused unless Dot Mail is in front)
 #   scripts/emu adb <args...>      any adb command on the device (not for input/screenshots)
@@ -21,7 +21,10 @@ case "$cmd" in
     [ -n "$ep" ] && "$ADB" connect "$ep" ;;
   install)
     apk=${1:-$ROOT/build-out/apk/debug/app-debug.apk}
-    "$ADB" -s "$DEVICE" install -r -t "$apk" >/dev/null && "$ADB" -s "$DEVICE" shell am start -n app.dot.mail/.MainActivity >/dev/null && echo installed ;;
+    # Relaunch only if Dot Mail was already in front: never pull it over an app the owner is using.
+    fg=$("$ADB" -s "$DEVICE" shell dumpsys activity activities | grep -m1 -E "topResumedActivity" || true)
+    "$ADB" -s "$DEVICE" install -r -t "$apk" >/dev/null || exit 1
+    case "$fg" in *app.dot.mail*) "$ADB" -s "$DEVICE" shell am start -n app.dot.mail/.MainActivity >/dev/null; echo "installed (relaunched)" ;; *) echo "installed (not launched: Dot Mail was not in front)" ;; esac ;;
   shot)
     out=${1:?output png}
     fg=$("$ADB" -s "$DEVICE" shell dumpsys activity activities | grep -m1 -E "topResumedActivity|mResumedActivity" || true)
