@@ -78,7 +78,7 @@ enum class ButtonStyle { Primary, Secondary, Ghost, Danger }
 
 /** Solid fill of primary actions: Accent Blue with >= 4.7:1 contrast against a white label in both themes. */
 @Composable
-internal fun primaryFill(): Color = if (Dot.colors.isDark) Color(0xFF476CE8) else Dot.colors.accent
+internal fun primaryFill(): Color = Dot.colors.accentFill
 
 /**
  * The one button. Primary is a solid Accent Blue fill (priority, never glass); Secondary a hairline outline;
@@ -169,7 +169,7 @@ fun DotPrimaryButton(
     val pressed by interaction.collectIsPressedAsState()
     val reduceMotion = rememberReducedMotion()
     // Solid Accent Blue fill with >= 4.7:1 WCAG AA contrast against white foreground in both themes.
-    val accentFill = if (c.isDark) Color(0xFF476CE8) else c.accent
+    val accentFill = c.accentFill
     val bgAnimated by animateColorAsState(
         when {
             !enabled -> accentFill.copy(alpha = 0.35f)
@@ -229,7 +229,7 @@ fun DotPrimaryButton(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val reduceMotion = rememberReducedMotion()
-    val accentFill = if (c.isDark) Color(0xFF476CE8) else c.accent
+    val accentFill = c.accentFill
     val bgAnimated by animateColorAsState(
         when {
             !enabled -> accentFill.copy(alpha = 0.35f)
