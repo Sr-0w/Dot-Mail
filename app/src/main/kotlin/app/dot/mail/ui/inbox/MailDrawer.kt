@@ -125,6 +125,10 @@ fun MailDrawer(
                         DrawerItem("Snoozed", Format.roleIcon(FolderRole.SNOOZED), snoozed.takeIf { it > 0 }, selected = isCurrent, onClick = { onOpen(Mailbox.Unified(FolderRole.SNOOZED)) })
                     }
                 }
+                item {
+                    val box = Mailbox.Unified(FolderRole.NEWSLETTERS)
+                    DrawerItem(Format.roleName(FolderRole.NEWSLETTERS), Format.roleIcon(FolderRole.NEWSLETTERS), null, selected = current == box, onClick = { onOpen(box) })
+                }
                 val focused = state.accounts.firstOrNull { it.id == state.focusedAccountId }
                 if (focused != null) {
                     item { SectionLabel(focused.email, Modifier.padding(top = DotSpacing.m)) }

@@ -1,0 +1,8 @@
+• Les e-mails HTML s'adaptent à l'écran (styles responsives conservés, filtrés)
+• Images distantes : mémorisées par message, expéditeur ou domaine
+• Dossiers : créer, renommer, supprimer ; brouillons synchronisés
+• Report, vue Newsletters, désabonnement en un clic
+• Invitations : accepter / peut-être / refuser, ajouter à l'agenda
+• Pièces jointes et aperçu PDF intégré
+• Modèles, choix de contacts, règles de notification, sauvegarde
+• Deux volets sur tablette, balayage et raccourcis clavier
