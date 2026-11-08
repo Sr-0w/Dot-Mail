@@ -3,6 +3,8 @@ package app.dot.mail.ui.avatar
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import app.dot.design.Dot
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -46,15 +48,16 @@ fun SenderAvatar(address: EmailAddress, modifier: Modifier = Modifier, size: Dp 
             Avatar(address.displayName, address.email, modifier, size)
         }
     } else {
-        Box(
-            modifier.size(size).clip(CircleShape).background(if (img.plated) Color.White else Color.Transparent),
-        ) {
+        // Same circle, size and hairline in both themes, for photos and logos alike: logos are square artwork
+        // (BIMI is designed to be circle-cropped), so they are cropped to the circle on a white plate, never shown as bare squares.
+        Box(modifier.size(size).clip(CircleShape).background(if (img.plated) Color.White else Dot.colors.surface)) {
             Image(
                 bitmap = img.bitmap.asImageBitmap(),
                 contentDescription = null, // decorative: the sender's name is already in the row
-                contentScale = if (img.plated) ContentScale.Fit else ContentScale.Crop,
-                modifier = Modifier.size(size).then(if (img.plated) Modifier.padding(size * 0.14f) else Modifier),
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize(),
             )
+            Box(Modifier.matchParentSize().border(1.dp, Dot.colors.border, CircleShape))
         }
     }
 }

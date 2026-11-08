@@ -306,7 +306,7 @@ fun InboxScreen(
                         visible = anySyncing && !refreshing,
                         enter = androidx.compose.animation.fadeIn(tween(DotMotion.fast)),
                         exit = androidx.compose.animation.fadeOut(tween(DotMotion.medium)),
-                    ) { app.dot.design.components.DotLinearProgress(modifier = Modifier.fillMaxWidth()) }
+                    ) { app.dot.design.components.DotLinearProgress(modifier = Modifier.fillMaxWidth(), showTrack = false) }
                 }
                 PullToRefreshBox(
                     isRefreshing = refreshing,
@@ -692,7 +692,8 @@ fun ThreadRow(
                     Icon(Icons.Outlined.Star, null, Modifier.size(16.dp), tint = c.star)
                 }
             }
-            if (!compact && thread.snippet.isNotBlank()) {
+            // A preview of only an ellipsis / punctuation is no preview: no empty third line.
+            if (!compact && thread.snippet.any { it.isLetterOrDigit() }) {
                 Spacer(Modifier.height(2.dp))
                 Text(thread.snippet, style = Dot.type.callout, color = c.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }

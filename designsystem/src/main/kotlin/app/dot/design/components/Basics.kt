@@ -108,14 +108,14 @@ fun DotButton(
     }
     val bgAnimated by animateColorAsState(
         when {
-            !enabled && style == ButtonStyle.Primary -> c.surfaceRaised
+            !enabled && style == ButtonStyle.Primary -> bg.copy(alpha = 0.35f)
             pressed && style == ButtonStyle.Primary -> bg.copy(alpha = 0.86f)
             pressed -> c.surfaceRaised
             else -> bg
         },
         DotMotion.fastSpec(reduceMotion), label = "btn",
     )
-    val fgFinal = if (enabled) fg else c.textTertiary
+    val fgFinal = if (enabled) fg else if (style == ButtonStyle.Primary) Color.White.copy(alpha = 0.7f) else c.textTertiary
     Row(
         modifier
             // Clickable outermost so the 48dp touch target of compact buttons is fully tappable.
@@ -172,13 +172,13 @@ fun DotPrimaryButton(
     val accentFill = if (c.isDark) Color(0xFF476CE8) else c.accent
     val bgAnimated by animateColorAsState(
         when {
-            !enabled -> c.surfaceRaised
+            !enabled -> accentFill.copy(alpha = 0.35f)
             pressed -> accentFill.copy(alpha = 0.86f)
             else -> accentFill
         },
         DotMotion.fastSpec(reduceMotion), label = "primary-btn",
     )
-    val fgFinal = if (enabled) Color.White else c.textTertiary
+    val fgFinal = if (enabled) Color.White else Color.White.copy(alpha = 0.7f)
     Row(
         modifier
             .clickable(
@@ -232,13 +232,13 @@ fun DotPrimaryButton(
     val accentFill = if (c.isDark) Color(0xFF476CE8) else c.accent
     val bgAnimated by animateColorAsState(
         when {
-            !enabled -> c.surfaceRaised
+            !enabled -> accentFill.copy(alpha = 0.35f)
             pressed -> accentFill.copy(alpha = 0.86f)
             else -> accentFill
         },
         DotMotion.fastSpec(reduceMotion), label = "primary-icon-btn",
     )
-    val fgFinal = if (enabled) Color.White else c.textTertiary
+    val fgFinal = if (enabled) Color.White else Color.White.copy(alpha = 0.7f)
     val visualSize = if (compact) 40.dp else 48.dp
     Box(
         modifier
