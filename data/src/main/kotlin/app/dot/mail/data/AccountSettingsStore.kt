@@ -15,6 +15,9 @@ data class AccountSettings(
     /** Only mail from the last N days is downloaded when a folder is (re)synced; 0 = everything (up to 5000 per folder). UI offers 14 / 30 / 90 / 0. */
     val syncWindowDays: Int = 30,
     val notificationsEnabled: Boolean = true,
+    /** OpenPGP defaults for new messages from this account (used only when OpenKeychain is installed). */
+    val pgpSignDefault: Boolean = false,
+    val pgpEncryptDefault: Boolean = false,
 )
 
 /** Settings that apply to syncing as a whole. */
@@ -46,6 +49,8 @@ class AccountSettingsStore private constructor(context: Context) {
             syncIntervalMinutes = prefs.getInt("$id.interval", d.syncIntervalMinutes),
             syncWindowDays = prefs.getInt("$id.window", d.syncWindowDays),
             notificationsEnabled = prefs.getBoolean("$id.notify", d.notificationsEnabled),
+            pgpSignDefault = prefs.getBoolean("$id.pgpSign", d.pgpSignDefault),
+            pgpEncryptDefault = prefs.getBoolean("$id.pgpEncrypt", d.pgpEncryptDefault),
         )
     }
 
@@ -68,6 +73,8 @@ class AccountSettingsStore private constructor(context: Context) {
             putInt("$accountId.interval", next.syncIntervalMinutes)
             putInt("$accountId.window", next.syncWindowDays)
             putBoolean("$accountId.notify", next.notificationsEnabled)
+            putBoolean("$accountId.pgpSign", next.pgpSignDefault)
+            putBoolean("$accountId.pgpEncrypt", next.pgpEncryptDefault)
         }
     }
 

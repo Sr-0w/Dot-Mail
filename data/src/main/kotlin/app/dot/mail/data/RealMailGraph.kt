@@ -459,7 +459,9 @@ internal class RealMailGraph(
         val json = org.json.JSONObject(Codec.draft(cached)).put("attachmentSources", sources).toString()
         val id = database.withTransaction {
             val id = dao.putDraft(DraftRow(draft.localId, draft.accountId, json, maxOf(System.currentTimeMillis(),(previous?.updatedAt ?: 0)+1), previous?.sourceMessageId))
-            queueDraftMirror(id,draft.accountId)
+            // An encrypted message is never uploaded as a server draft (it would sit there as plaintext). If an earlier,
+            // unencrypted copy was already mirrored, that copy is removed.
+            if (draft.pgpEncrypt) dao.draftMirror(id)?.let { dao.putDraftMirror(it.copy(deleted = true, dueAt = 0)) } else queueDraftMirror(id,draft.accountId)
             id
         }
         if (scheduling) WorkScheduling.drafts(context,draft.accountId)
@@ -480,6 +482,7 @@ internal class RealMailGraph(
             d.copy(localId = id)
         } }
     }
+    internal suspend fun removeDraftAndSourcePublic(localId: Long) = removeDraftAndSource(localId)
     private suspend fun removeDraftAndSource(localId: Long) {
         val draft = dao.draft(localId)
         var mirror = dao.draftMirror(localId)
@@ -521,6 +524,7 @@ internal class RealMailGraph(
         if(draft.localId!=0L) requestSync()
         id
     }
+    override suspend fun sendProtected(draft: Draft, undoWindowMs: Long, protector: PgpProtector): Long = queueProtected(draft, undoWindowMs, protector)
     override suspend fun cancelSend(outboxId: Long): Boolean = withContext(Dispatchers.IO) {
         val cancelled=database.withTransaction {
             val row=dao.outbox(outboxId) ?: return@withTransaction null
@@ -571,7 +575,7 @@ internal class RealMailGraph(
         dao.appendingOutbox().forEach { dao.transitionOutbox(it.id, "APPENDING", "APPEND", "Sent; saving its copy will resume") }
         if (scheduling) dao.pendingOutbox().forEach { WorkScheduling.outbox(context, it.id, it.dueAt) }
     }
-    private suspend fun cacheAttachments(draft: Draft): Pair<Draft, org.json.JSONObject> {
+    internal suspend fun cacheAttachments(draft: Draft): Pair<Draft, org.json.JSONObject> {
         require(draft.attachmentUris.size <= 50) { "Too many attachments" }
         val previous = if (draft.localId != 0L) dao.draft(draft.localId)?.let { org.json.JSONObject(it.json).optJSONObject("attachmentSources") } else null
         val sources = org.json.JSONObject()

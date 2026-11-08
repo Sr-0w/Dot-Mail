@@ -999,4 +999,22 @@
     <string name="pgp_get_openkeychain">Get OpenKeychain</string>
     <string name="inbox_undo">Undo</string>
     <string name="inbox_undo_partial">Some messages couldn’t be put back; they will be after the next sync.</string>
+
+    <!-- OpenPGP compose -->
+    <string name="account_section_pgp">OpenPGP</string>
+    <string name="account_pgp_sign">Sign new messages</string>
+    <string name="account_pgp_sign_sub">Starts every new message from this account signed (OpenKeychain).</string>
+    <string name="account_pgp_encrypt">Encrypt new messages</string>
+    <string name="account_pgp_encrypt_sub">Starts every new message from this account encrypted. You can switch it off per message.</string>
+    <string name="compose_pgp_sign">Sign</string>
+    <string name="compose_pgp_encrypt">Encrypt</string>
+    <string name="compose_pgp_checking">Checking recipients\' keys…</string>
+    <string name="compose_pgp_missing">No OpenPGP key for %1$s. They could not read an encrypted message.</string>
+    <string name="compose_pgp_send_unencrypted">Send unencrypted</string>
+    <string name="compose_pgp_remove_recipients">Remove them</string>
+    <string name="compose_pgp_no_own_key">You have no key for %1$s, so you will not be able to read this message in Sent.</string>
+    <string name="compose_pgp_error_missing_keys">Some recipients have no key. Remove them or send unencrypted.</string>
+    <string name="compose_pgp_error_failed">OpenPGP couldn’t protect this message. It was not sent.</string>
+    <string name="compose_pgp_error_cancelled">Sending was cancelled. The message was not sent.</string>
+    <string name="compose_pgp_draft_local">Encrypted drafts stay on this device and are not uploaded.</string>
 </resources>

@@ -75,6 +75,77 @@ object OpenKeychain {
         return Signature(verdict, s.primaryUserId)
     }
 
+    // ---- composing: key lookup, detached signing, encryption --------------------------------------------------------
+
+    /** One OpenKeychain call without the reader's decrypt specifics: either its result, or what it needs from the user. */
+    sealed interface Step {
+        class Done(val result: Intent, val output: ByteArray) : Step
+        class NeedsUser(val intent: PendingIntent) : Step
+        class Failed(val message: String?) : Step
+    }
+
+    /** [cancelled]: the user dismissed OpenKeychain's screen; otherwise [message] is its error, if any. */
+    class PgpException(message: String?, val cancelled: Boolean = false) : Exception(message)
+
+    private suspend fun call(context: Context, resume: Intent?, input: ByteArray?, build: Intent.() -> Unit): Step = withService(context) { service ->
+        val request = (resume ?: Intent()).apply(build)
+        val out = ByteArrayOutputStream()
+        val result = OpenPgpApi(context, service).executeApi(request, input?.inputStream(), out)
+        when (result.getIntExtra(OpenPgpApi.RESULT_CODE, OpenPgpApi.RESULT_CODE_ERROR)) {
+            OpenPgpApi.RESULT_CODE_SUCCESS -> Step.Done(result, out.toByteArray())
+            OpenPgpApi.RESULT_CODE_USER_INTERACTION_REQUIRED ->
+                result.parcelable<PendingIntent>(OpenPgpApi.RESULT_INTENT)?.let { Step.NeedsUser(it) } ?: Step.Failed(null)
+            else -> Step.Failed(result.parcelable<OpenPgpError>(OpenPgpApi.RESULT_ERROR)?.message)
+        }
+    }
+
+    /** Runs [step] until done, handing OpenKeychain's own screens (passphrase, key choice) to [interact]. Null from it = cancelled. */
+    private suspend fun interactive(interact: suspend (PendingIntent) -> Intent?, step: suspend (Intent?) -> Step): Step.Done {
+        var resume: Intent? = null
+        repeat(6) {
+            when (val s = step(resume)) {
+                is Step.Done -> return s
+                is Step.Failed -> throw PgpException(s.message)
+                is Step.NeedsUser -> resume = interact(s.intent) ?: throw PgpException(null, cancelled = true)
+            }
+        }
+        throw PgpException(null)
+    }
+
+    /** Key ids OpenKeychain has for [email], or an empty array when there is none (or the choice is ambiguous). */
+    suspend fun keyIds(context: Context, email: String): LongArray =
+        when (val s = call(context, null, null) { action = OpenPgpApi.ACTION_GET_KEY_IDS; putExtra(OpenPgpApi.EXTRA_USER_IDS, arrayOf(email)) }) {
+            is Step.Done -> s.result.getLongArrayExtra(OpenPgpApi.RESULT_KEY_IDS) ?: LongArray(0)
+            else -> LongArray(0)
+        }
+
+    /** The key to sign with for [userId]; OpenKeychain may ask the user to choose once. */
+    suspend fun signKeyId(context: Context, userId: String, interact: suspend (PendingIntent) -> Intent?): Long =
+        interactive(interact) { resume -> call(context, resume, null) { action = OpenPgpApi.ACTION_GET_SIGN_KEY_ID; putExtra(OpenPgpApi.EXTRA_USER_ID, userId) } }
+            .result.getLongExtra(OpenPgpApi.EXTRA_SIGN_KEY_ID, 0L).takeIf { it != 0L } ?: throw PgpException(null)
+
+    /** Detached, ASCII-armoured signature over [data] and the hash algorithm used (as a PGP/MIME micalg). */
+    suspend fun detachedSign(context: Context, data: ByteArray, signKeyId: Long, interact: suspend (PendingIntent) -> Intent?): Pair<ByteArray, String?> {
+        val done = interactive(interact) { resume ->
+            call(context, resume, data) { action = OpenPgpApi.ACTION_DETACHED_SIGN; putExtra(OpenPgpApi.EXTRA_REQUEST_ASCII_ARMOR, true); putExtra(OpenPgpApi.EXTRA_SIGN_KEY_ID, signKeyId) }
+        }
+        val signature = done.result.getByteArrayExtra(OpenPgpApi.RESULT_DETACHED_SIGNATURE) ?: throw PgpException(null)
+        return signature to micalg(done.result.getStringExtra(OpenPgpApi.RESULT_SIGNATURE_MICALG))
+    }
+
+    /** ASCII-armoured ciphertext of [data] for [keyIds], also signed when [signKeyId] is given. */
+    suspend fun encrypt(context: Context, data: ByteArray, keyIds: LongArray, signKeyId: Long?, interact: suspend (PendingIntent) -> Intent?): ByteArray =
+        interactive(interact) { resume ->
+            call(context, resume, data) {
+                action = if (signKeyId != null) OpenPgpApi.ACTION_SIGN_AND_ENCRYPT else OpenPgpApi.ACTION_ENCRYPT
+                putExtra(OpenPgpApi.EXTRA_REQUEST_ASCII_ARMOR, true); putExtra(OpenPgpApi.EXTRA_KEY_IDS, keyIds)
+                if (signKeyId != null) putExtra(OpenPgpApi.EXTRA_SIGN_KEY_ID, signKeyId)
+            }
+        }.output
+
+    /** OpenKeychain reports e.g. "SHA256"; PGP/MIME wants "pgp-sha256". */
+    internal fun micalg(raw: String?): String? = raw?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }?.let { if (it.startsWith("pgp-")) it else "pgp-$it" }
+
     @Suppress("DEPRECATION")
     private inline fun <reified T : android.os.Parcelable> Intent.parcelable(key: String): T? =
         if (android.os.Build.VERSION.SDK_INT >= 33) getParcelableExtra(key, T::class.java) else getParcelableExtra(key)

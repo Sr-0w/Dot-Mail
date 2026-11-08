@@ -999,4 +999,22 @@
     <string name="pgp_get_openkeychain">Obtenir OpenKeychain</string>
     <string name="inbox_undo">Annuler</string>
     <string name="inbox_undo_partial">Certains messages n’ont pas pu être remis en place ; ils le seront à la prochaine synchronisation.</string>
+
+    <!-- OpenPGP compose -->
+    <string name="account_section_pgp">OpenPGP</string>
+    <string name="account_pgp_sign">Signer les nouveaux messages</string>
+    <string name="account_pgp_sign_sub">Chaque nouveau message de ce compte est signé par défaut (OpenKeychain).</string>
+    <string name="account_pgp_encrypt">Chiffrer les nouveaux messages</string>
+    <string name="account_pgp_encrypt_sub">Chaque nouveau message de ce compte est chiffré par défaut. Désactivable message par message.</string>
+    <string name="compose_pgp_sign">Signer</string>
+    <string name="compose_pgp_encrypt">Chiffrer</string>
+    <string name="compose_pgp_checking">Vérification des clés des destinataires…</string>
+    <string name="compose_pgp_missing">Pas de clé OpenPGP pour %1$s. Cette personne ne pourrait pas lire un message chiffré.</string>
+    <string name="compose_pgp_send_unencrypted">Envoyer sans chiffrer</string>
+    <string name="compose_pgp_remove_recipients">Les retirer</string>
+    <string name="compose_pgp_no_own_key">Vous n’avez pas de clé pour %1$s : vous ne pourrez pas relire ce message dans Envoyés.</string>
+    <string name="compose_pgp_error_missing_keys">Certains destinataires n’ont pas de clé. Retirez-les ou envoyez sans chiffrer.</string>
+    <string name="compose_pgp_error_failed">OpenPGP n’a pas pu protéger ce message. Il n’a pas été envoyé.</string>
+    <string name="compose_pgp_error_cancelled">Envoi annulé. Le message n’a pas été envoyé.</string>
+    <string name="compose_pgp_draft_local">Les brouillons chiffrés restent sur cet appareil et ne sont pas envoyés au serveur.</string>
 </resources>

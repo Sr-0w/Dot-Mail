@@ -242,6 +242,9 @@ data class Draft(
      * text/plain rendering (EmailHtml.toPlainText); the message is sent as multipart/alternative.
      */
     val bodyHtml: String? = null,
+    /** OpenPGP (via OpenKeychain): sign / encrypt this message when sending. Encrypted drafts are never mirrored to the server. */
+    val pgpSign: Boolean = false,
+    val pgpEncrypt: Boolean = false,
 )
 
 // ---------- Account setup ----------
