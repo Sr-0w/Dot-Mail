@@ -971,4 +971,12 @@
     <string name="search_server_error">Le serveur n’a pas pu être interrogé. Résultats de cet appareil affichés.</string>
     <string name="search_server_only">Sur le serveur</string>
     <string name="search_result_in_folder">dans %1$s</string>
+
+    <!-- Density, reading typography, accessibility -->
+    <string name="settings_density_spacious">Aéré</string>
+    <string name="settings_reader_font">Police de lecture</string>
+    <string name="settings_reader_font_inter">Inter</string>
+    <string name="settings_reader_font_system">Système</string>
+    <string name="settings_reader_font_serif">Serif</string>
+    <string name="settings_reader_line_height">Interligne de lecture</string>
 </resources>

@@ -971,4 +971,12 @@
     <string name="search_server_error">The server couldn’t be searched. Showing results from this device.</string>
     <string name="search_server_only">On server</string>
     <string name="search_result_in_folder">in %1$s</string>
+
+    <!-- Density, reading typography, accessibility -->
+    <string name="settings_density_spacious">Spacious</string>
+    <string name="settings_reader_font">Reading typeface</string>
+    <string name="settings_reader_font_inter">Inter</string>
+    <string name="settings_reader_font_system">System</string>
+    <string name="settings_reader_font_serif">Serif</string>
+    <string name="settings_reader_line_height">Reading line height</string>
 </resources>

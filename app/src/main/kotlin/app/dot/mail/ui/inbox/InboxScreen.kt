@@ -18,6 +18,7 @@ import androidx.compose.ui.input.key.key
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.foundation.rememberScrollState
 import app.dot.design.components.DotButton
 import app.dot.design.components.ButtonStyle
@@ -488,7 +489,8 @@ private fun ThreadList(
                         selected = t.threadId in selection,
                         muted = t.threadId in mutedThreads,
                         selectionMode = selection.isNotEmpty(),
-                        compact = density == Density.COMPACT,
+                        density = density,
+                        onAction = { a -> if (a == RowAction.SNOOZE) onSnooze(t) else a.toMessageAction(t)?.let { onSwipe(it, t) } },
                         onClick = { onOpen(t) },
                         onLongClick = { onToggleSelect(t.threadId) },
                     )
@@ -638,20 +640,57 @@ private fun swipeVisual(action: SwipeAction, t: ThreadSummary): Pair<ImageVector
     SwipeAction.NONE -> Icons.Outlined.Mail to ""
 }
 
+/** What TalkBack offers on a conversation row besides opening it. */
+enum class RowAction { ARCHIVE, DELETE, STAR, READ, SNOOZE }
+
+private fun RowAction.toMessageAction(t: ThreadSummary): MessageAction? = when (this) {
+    RowAction.ARCHIVE -> MessageAction.ARCHIVE
+    RowAction.DELETE -> MessageAction.TRASH
+    RowAction.STAR -> if (t.isStarred) MessageAction.UNSTAR else MessageAction.STAR
+    RowAction.READ -> if (t.isUnread) MessageAction.MARK_READ else MessageAction.MARK_UNREAD
+    RowAction.SNOOZE -> null
+}
+
+/** Real row metrics per density: padding, avatar, preview lines. Compact drops the avatar and the preview. */
+internal data class RowMetrics(val vPad: androidx.compose.ui.unit.Dp, val avatar: androidx.compose.ui.unit.Dp, val showAvatar: Boolean, val snippetLines: Int, val lineGap: androidx.compose.ui.unit.Dp) {
+    companion object {
+        fun of(density: Density) = when (density) {
+            Density.COMPACT -> RowMetrics(10.dp, 40.dp, false, 0, 2.dp)
+            Density.COMFORTABLE -> RowMetrics(14.dp, 40.dp, true, 1, 2.dp)
+            Density.SPACIOUS -> RowMetrics(20.dp, 48.dp, true, 2, 4.dp)
+        }
+    }
+}
+
+@Composable
+private fun rowActions(t: ThreadSummary, run: (RowAction) -> Unit): List<androidx.compose.ui.semantics.CustomAccessibilityAction> = listOf(
+    androidx.compose.ui.semantics.CustomAccessibilityAction(stringResource(R.string.inbox_action_archive)) { run(RowAction.ARCHIVE); true },
+    androidx.compose.ui.semantics.CustomAccessibilityAction(stringResource(R.string.inbox_action_delete)) { run(RowAction.DELETE); true },
+    androidx.compose.ui.semantics.CustomAccessibilityAction(stringResource(if (t.isStarred) R.string.thread_remove_star else R.string.inbox_action_star)) { run(RowAction.STAR); true },
+    androidx.compose.ui.semantics.CustomAccessibilityAction(stringResource(if (t.isUnread) R.string.inbox_action_mark_read else R.string.inbox_action_mark_unread)) { run(RowAction.READ); true },
+    androidx.compose.ui.semantics.CustomAccessibilityAction(stringResource(R.string.inbox_action_snooze)) { run(RowAction.SNOOZE); true },
+)
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ThreadRow(
     thread: ThreadSummary,
+    modifier: Modifier = Modifier,
     selected: Boolean,
     /** Conversation is muted: a small glyph, new mail doesn't notify. */
     muted: Boolean = false,
     showRecipients: Boolean = false,
     myAddresses: Set<String> = emptySet(),
     selectionMode: Boolean,
-    compact: Boolean,
+    density: Density,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    /** Screen-reader actions (archive, delete, star, read, snooze); null = none (e.g. search results). */
+    onAction: ((RowAction) -> Unit)? = null,
 ) {
+    val m = RowMetrics.of(density)
+    val compact = !m.showAvatar
+    val actions = if (onAction != null) rowActions(thread, onAction) else emptyList()
     val c = Dot.colors
     val haptics = LocalHapticFeedback.current
     val reducedMotion = rememberReducedMotion()
@@ -669,7 +708,7 @@ fun ThreadRow(
         stringResource(R.string.inbox_to_prefix, thread.recipients.joinToString(", ") { it.displayName.substringBefore(' ').ifBlank { it.displayName } })
     } else if (thread.draftId != null && thread.recipients.isEmpty()) stringResource(R.string.inbox_draft_label) else senderLine(thread, myAddresses, stringResource(R.string.inbox_me), stringResource(R.string.inbox_unknown_sender))
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .background(bg)
             .combinedClickable(
@@ -678,6 +717,7 @@ fun ThreadRow(
                 onLongClickLabel = stringResource(R.string.inbox_select),
             )
             .semantics(mergeDescendants = true) {
+                if (actions.isNotEmpty()) customActions = actions
                 stateDescription = buildString {
                     if (unread) append(unreadLabel).append(" ")
                     if (thread.isStarred) append(starredLabel).append(" ")
@@ -685,7 +725,7 @@ fun ThreadRow(
                     if (selected) append(selectedLabel)
                 }
             }
-            .padding(start = 6.dp, end = DotSpacing.gutter, top = if (compact) 10.dp else 14.dp, bottom = if (compact) 10.dp else 14.dp),
+            .padding(start = 6.dp, end = DotSpacing.gutter, top = m.vPad, bottom = m.vPad),
         verticalAlignment = if (compact) Alignment.CenterVertically else Alignment.Top,
     ) {
         // Unread marker lives in the left gutter so text columns stay aligned.
@@ -711,7 +751,7 @@ fun ThreadRow(
                     if (sel) SelectCircle(selected)
                     else {
                         val first = if (showRecipients) thread.recipients.firstOrNull() ?: thread.participants.lastOrNull() else thread.participants.lastOrNull()
-                        app.dot.mail.ui.avatar.SenderAvatar(first ?: app.dot.mail.data.model.EmailAddress("?"))
+                        app.dot.mail.ui.avatar.SenderAvatar(first ?: app.dot.mail.data.model.EmailAddress("?"), size = m.avatar)
                     }
                 }
             }
@@ -789,9 +829,9 @@ fun ThreadRow(
                 }
             }
             // A preview of only an ellipsis / punctuation is no preview: no empty third line.
-            if (!compact && thread.snippet.any { it.isLetterOrDigit() }) {
-                Spacer(Modifier.height(2.dp))
-                Text(thread.snippet, style = Dot.type.callout, color = c.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (m.snippetLines > 0 && thread.snippet.any { it.isLetterOrDigit() }) {
+                Spacer(Modifier.height(m.lineGap))
+                Text(thread.snippet, style = Dot.type.callout, color = c.textTertiary, maxLines = m.snippetLines, overflow = TextOverflow.Ellipsis)
             }
         }
     }

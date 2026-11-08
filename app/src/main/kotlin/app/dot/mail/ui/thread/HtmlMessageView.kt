@@ -42,13 +42,16 @@ fun HtmlMessageView(
     layoutWidth: Int = 0,
     /** The email adapts to narrow screens itself, so it is laid out at the device width. */
     responsive: Boolean = false,
+    font: app.dot.mail.ReaderFont = app.dot.mail.ReaderFont.INTER,
+    /** Line height as a percentage of the font size. */
+    lineHeightPercent: Int = 155,
 ) {
     androidx.compose.foundation.layout.BoxWithConstraints(modifier) {
     // WebView CSS pixels == dp. A fixed-width design wider than the space we have is laid out at its own
     // width and the overview mode scales it down to fit — like Gmail / Samsung Email — instead of clipping.
     val available = maxWidth.value.toInt().coerceAtLeast(1)
     val viewportWidth = if (!responsive && layoutWidth > available) layoutWidth + 2 * BODY_MARGIN else 0
-    val document = remember(html, dark, textColor, linkColor, viewportWidth) { wrap(html, dark, textColor, linkColor, viewportWidth) }
+    val document = remember(html, dark, textColor, linkColor, viewportWidth, font, lineHeightPercent) { wrap(html, dark, textColor, linkColor, viewportWidth, font, lineHeightPercent) }
     val currentOnLink by androidx.compose.runtime.rememberUpdatedState(onLink)
     val linkHandler: (String) -> Unit = remember { { url -> currentOnLink(url) } }
     // The WebView's theme (algorithmic darkening) is fixed at creation: recreate it when the theme flips.
@@ -86,7 +89,7 @@ fun HtmlMessageView(
                 if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
                     WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, dark)
                 }
-                webViewClient = SafeClient(allowRemote, inlineUris, ctx.contentResolver, linkHandler)
+                webViewClient = SafeClient(allowRemote, inlineUris, ctx.contentResolver, linkHandler, ctx.resources)
                 tag = null
             }
         },
@@ -95,7 +98,7 @@ fun HtmlMessageView(
             if (client == null || client.allowRemote != allowRemote || client.inline != inlineUris) {
                 web.settings.blockNetworkLoads = !allowRemote
                 web.settings.blockNetworkImage = !allowRemote
-                web.webViewClient = SafeClient(allowRemote, inlineUris, web.context.contentResolver, linkHandler)
+                web.webViewClient = SafeClient(allowRemote, inlineUris, web.context.contentResolver, linkHandler, web.context.resources)
             }
             if (web.settings.textZoom != textZoom) web.settings.textZoom = textZoom
             if (web.tag != document) {
@@ -118,6 +121,7 @@ private class SafeClient(
     val inline: Set<String>,
     private val resolver: android.content.ContentResolver,
     val onLink: (String) -> Unit,
+    private val resources: android.content.res.Resources? = null,
 ) : WebViewClient() {
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
         if (request.isForMainFrame || request.hasGesture()) onLink(request.url.toString())
@@ -131,28 +135,58 @@ private class SafeClient(
             scheme == "content" && url in inline -> runCatching {
                 WebResourceResponse(resolver.getType(request.url) ?: "application/octet-stream", null, resolver.openInputStream(request.url))
             }.getOrElse { EMPTY() }
+            scheme == "dotfont" -> fontResponse(request.url.host)
             scheme == "data" -> null
             (scheme == "http" || scheme == "https") && allowRemote -> null
             else -> EMPTY()
         }
     }
 
+    /** Serves only the four bundled Inter faces to the page's own @font-face rules; anything else is blocked. */
+    private fun fontResponse(name: String?): WebResourceResponse {
+        val id = when (name) {
+            "inter_regular" -> app.dot.design.R.font.inter_regular
+            "inter_italic" -> app.dot.design.R.font.inter_italic
+            "inter_medium" -> app.dot.design.R.font.inter_medium
+            "inter_semibold" -> app.dot.design.R.font.inter_semibold
+            else -> return EMPTY()
+        }
+        val res = resources ?: return EMPTY()
+        return runCatching {
+            WebResourceResponse("font/ttf", null, 200, "OK", mapOf("Access-Control-Allow-Origin" to "*"), res.openRawResource(id))
+        }.getOrElse { EMPTY() }
+    }
+
     @Suppress("FunctionName")
     private fun EMPTY() = WebResourceResponse("text/plain", "utf-8", 204, "Blocked", emptyMap(), ByteArrayInputStream(ByteArray(0)))
 }
 
+internal fun fontStack(font: app.dot.mail.ReaderFont) = when (font) {
+    app.dot.mail.ReaderFont.INTER -> "'DotInter',sans-serif"
+    app.dot.mail.ReaderFont.SYSTEM -> "sans-serif"
+    app.dot.mail.ReaderFont.SERIF -> "serif"
+}
+
+/** The bundled Inter faces, loaded through the app-internal dotfont: scheme (see SafeClient). */
+internal fun fontFaces(font: app.dot.mail.ReaderFont): String = if (font != app.dot.mail.ReaderFont.INTER) "" else
+    listOf("inter_regular" to "400,normal", "inter_italic" to "400,italic", "inter_medium" to "500,normal", "inter_semibold" to "600,normal").joinToString("") { (name, spec) ->
+        val (weight, style) = spec.split(',')
+        "@font-face{font-family:'DotInter';src:url('dotfont://$name');font-weight:$weight;font-style:$style;}\n"
+    }
+
 private fun css(color: Int) = String.format("#%06X", 0xFFFFFF and color)
 
 /** Base styles: our type, readable measure, nothing wider than the screen. */
-private fun wrap(body: String, dark: Boolean, textColor: Int, linkColor: Int, viewportWidth: Int): String = """
+private fun wrap(body: String, dark: Boolean, textColor: Int, linkColor: Int, viewportWidth: Int, font: app.dot.mail.ReaderFont, lineHeightPercent: Int): String = """
 <!DOCTYPE html><html><head>
 <meta charset="utf-8">
 ${if (viewportWidth > 0) "<meta name=\"viewport\" content=\"width=$viewportWidth\">" else "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"}
 ${if (dark) "" else "<meta name=\"color-scheme\" content=\"light\">"}
 <style>
+${fontFaces(font)}:root{--dot-font:${fontStack(font)};--dot-line:${lineHeightPercent.coerceIn(120, 200) / 100.0};}
 html,body{margin:0;padding:0;background:transparent;}
 ${if (viewportWidth > 0) "body{padding:0 ${BODY_MARGIN}px;}" else ""}
-body{font-family:sans-serif;font-size:15px;line-height:1.55;${if (dark) "" else "color:${css(textColor)};"}word-wrap:break-word;overflow-wrap:break-word;-webkit-text-size-adjust:100%;}
+body{font-family:var(--dot-font);font-size:15px;line-height:var(--dot-line);${if (dark) "" else "color:${css(textColor)};"}word-wrap:break-word;overflow-wrap:break-word;-webkit-text-size-adjust:100%;}
 /* Break only tokens longer than the line (URLs, hashes); never split ordinary words or squeeze table columns. */
 td,th{word-break:normal;}
 ${if (dark) "" else "a{color:${css(linkColor)};}"}
