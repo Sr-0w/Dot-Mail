@@ -24,8 +24,11 @@ class OpenKeychainService(private val context: Context) : PgpService {
     override fun protector(senderEmail: String, interact: suspend (PendingIntent) -> Intent?) = PgpProtector { entity, sign, encrypt, recipients ->
         val signKey = if (sign) OpenKeychain.signKeyId(context, senderEmail, interact) else null
         if (encrypt) {
-            val ids = recipients.flatMap { OpenKeychain.keyIds(context, it).toList() }.distinct().toLongArray()
-            if (ids.isEmpty()) throw OpenKeychain.PgpException(null)
+            // Every recipient needs a key: encrypting to the others would silently leave someone unable to read it.
+            val perRecipient = recipients.associateWith { OpenKeychain.keyIds(context, it) }
+            val missing = perRecipient.filter { (email, ids) -> ids.isEmpty() && !email.equals(senderEmail, ignoreCase = true) }.keys // own copy: optional
+            if (missing.isNotEmpty()) throw OpenKeychain.PgpException("No OpenPGP key for ${missing.joinToString()}")
+            val ids = perRecipient.values.flatMap { it.toList() }.distinct().toLongArray()
             PgpProtected(ciphertext = OpenKeychain.encrypt(context, entity, ids, signKey, interact))
         } else {
             val (signature, micalg) = OpenKeychain.detachedSign(context, entity, requireNotNull(signKey), interact)

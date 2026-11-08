@@ -510,7 +510,8 @@ internal class RealMailGraph(
         val draft = dao.draft(localId) ?: return
         val folders = dao.folders(draft.accountId)
         val drafts = folders.firstOrNull { it.role == "DRAFTS" }
-        if (drafts == null || folders.none { it.role == "TRASH" }) { removeDraftAndSource(localId); return }
+        // An encrypted draft never goes to the server, not even to its Trash: it is deleted on the device.
+        if (drafts == null || folders.none { it.role == "TRASH" } || Codec.draft(draft.json).pgpEncrypt) { removeDraftAndSource(localId); return }
         if (dao.draftMirror(localId) == null) queueDraftMirror(localId, draft.accountId)
         // Upload and move only after the Undo window, so Undo never races the server.
         dao.draftMirror(localId)?.let { dao.putDraftMirror(it.copy(dueAt = System.currentTimeMillis() + DRAFT_TRASH_GRACE_MS)) }
