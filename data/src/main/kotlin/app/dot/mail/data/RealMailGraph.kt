@@ -27,7 +27,7 @@ internal object GraphRegistry {
     @Volatile private var graph: RealMailGraph? = null
     fun get(context: Context): RealMailGraph = graph ?: synchronized(this) {
         graph ?: RealMailGraph(context.applicationContext,
-            Room.databaseBuilder(context.applicationContext, MailDatabase::class.java, "dotmail.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build(),
+            Room.databaseBuilder(context.applicationContext, MailDatabase::class.java, "dotmail.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build(),
             KeystoreCredentialVault()).also { graph = it; it.start() }
     }
 }
@@ -38,7 +38,7 @@ internal class RealMailGraph(
     internal val database: MailDatabase,
     private val vault: CredentialVault,
     internal val client: MailClient = MailClient(),
-    private val scheduling: Boolean = true,
+    internal val scheduling: Boolean = true,
     oauthClients: Map<OAuthProvider, String> = mapOf(OAuthProvider.GOOGLE to BuildConfig.OAUTH_GOOGLE_CLIENT_ID, OAuthProvider.MICROSOFT to BuildConfig.OAUTH_MICROSOFT_CLIENT_ID),
     tokenEndpoint: TokenEndpoint = HttpsTokenEndpoint(),
 ) : AccountRepository, MailRepository, ComposeRepository {
@@ -68,7 +68,7 @@ internal class RealMailGraph(
         OutboxItem(row.id, row.accountId, draft.subject, (draft.to + draft.cc + draft.bcc).distinctBy { it.email }, row.dueAt, state, row.error,
             row.state in setOf("UNCERTAIN", "APPEND") || (row.state == "PENDING" && row.error != null), row.state in setOf("PENDING", "APPEND", "UNCERTAIN"))
     } }.flowOn(Dispatchers.IO)
-    internal fun start() { if (scheduling) { WorkScheduling.periodic(context); ForegroundIdle(this).start(); scope.launch { recoverOutbox() } } }
+    internal fun start() { if (scheduling) { WorkScheduling.periodic(context); ForegroundIdle(this).start(); scope.launch { recoverOutbox() }; scope.launch { resurfaceDue() } } }
     internal suspend fun credentials(row: AccountRow): Credentials = withContext(Dispatchers.IO) {
         if (Codec.config(row.config).authType == AuthType.OAUTH2) oauth.credentials(row.id) else try { Credentials(vault.decrypt(row.email, row.secret)) }
         catch(e:java.security.GeneralSecurityException) { dao.syncError(row.id,"Saved credentials are unavailable. Sign in again.",true); throw ReauthenticationRequired(e) }
@@ -127,10 +127,12 @@ internal class RealMailGraph(
         mailboxSource(where, args, draftView, draftAccount)
     }.flow.map { data -> data.map { summary(it, draftView) } }
     internal fun mailboxSource(where: String, args: List<Any>, draftView: Boolean, draftAccount: Long?): PagingSource<Int, ThreadRow> {
-        val remote = "SELECT t.* FROM threads t WHERE t.count>0 AND ($where)" + if (draftView) " AND NOT EXISTS(SELECT 1 FROM drafts d JOIN messages m ON m.id=d.sourceMessageId WHERE m.threadId=t.id)" else ""
-        val local = if (draftView) " UNION ALL SELECT -id AS id,accountId,'' AS subject,'[]' AS participants,'' AS snippet,updatedAt AS lastAt,1 AS count,0 AS unread,0 AS starred,0 AS attachments FROM drafts" + if (draftAccount != null) " WHERE accountId=?" else "" else ""
+        val bump = "(SELECT z.resurfacedAt FROM snoozed z WHERE z.threadId=t.id AND z.messageId IS NULL AND z.resurfacedAt IS NOT NULL ORDER BY z.resurfacedAt DESC LIMIT 1)"
+        val hidden = " AND NOT EXISTS(SELECT 1 FROM snoozed z WHERE z.threadId=t.id AND z.messageId IS NULL AND z.resurfacedAt IS NULL)"
+        val remote = "SELECT t.*, MAX(t.lastAt, COALESCE($bump,0)) AS sortAt FROM threads t WHERE t.count>0 AND ($where)$hidden" + if (draftView) " AND NOT EXISTS(SELECT 1 FROM drafts d JOIN messages m ON m.id=d.sourceMessageId WHERE m.threadId=t.id)" else ""
+        val local = if (draftView) " UNION ALL SELECT -id AS id,accountId,'' AS subject,'[]' AS participants,'' AS snippet,updatedAt AS lastAt,1 AS count,0 AS unread,0 AS starred,0 AS attachments,updatedAt AS sortAt FROM drafts" + if (draftAccount != null) " WHERE accountId=?" else "" else ""
         val params = args + if (draftView && draftAccount != null) listOf(draftAccount) else emptyList()
-        return dao.page(SimpleSQLiteQuery("SELECT * FROM ($remote$local) ORDER BY lastAt DESC,id DESC", params.toTypedArray()))
+        return dao.page(SimpleSQLiteQuery("SELECT * FROM ($remote$local) ORDER BY sortAt DESC,id DESC", params.toTypedArray()))
     }
     override fun threads(mailbox: Mailbox): Flow<PagingData<ThreadSummary>> = flow {
         when (mailbox) {
@@ -138,7 +140,7 @@ internal class RealMailGraph(
                 val folder = dao.folder(mailbox.folderId)
                 emitAll(paging("EXISTS(SELECT 1 FROM messages m WHERE m.threadId=t.id AND m.folderId=?)", listOf(mailbox.folderId), folder?.role == "DRAFTS", folder?.accountId))
             }
-            is Mailbox.Unified -> emitAll(paging("EXISTS(SELECT 1 FROM messages m JOIN folders f ON f.id=m.folderId WHERE m.threadId=t.id AND f.role=?)", listOf(mailbox.role.name), mailbox.role == FolderRole.DRAFTS))
+            is Mailbox.Unified -> if (mailbox.role == FolderRole.SNOOZED) emitAll(snoozedThreadsPaging()) else emitAll(paging("EXISTS(SELECT 1 FROM messages m JOIN folders f ON f.id=m.folderId WHERE m.threadId=t.id AND f.role=?)", listOf(mailbox.role.name), mailbox.role == FolderRole.DRAFTS))
         }
     }
     override fun search(query: String, accountId: Long?): Flow<PagingData<ThreadSummary>> = flow {
@@ -332,6 +334,9 @@ internal class RealMailGraph(
             }
         }; requestSync()
     }
+    override suspend fun snooze(threadIds: Collection<Long>, untilMillis: Long) = snoozeLocal(threadIds, untilMillis)
+    override suspend fun unsnooze(threadIds: Collection<Long>) = unsnoozeLocal(threadIds)
+    override fun snoozedCount(): Flow<Int> = dao.observeSnoozedCount()
     override fun messages(mailbox: Mailbox): Flow<PagingData<ThreadSummary>> = messagesPaging(mailbox)
     override suspend fun createFolder(accountId: Long, parentFolderId: Long?, name: String): Long = createFolderLocal(accountId, parentFolderId, name)
     override suspend fun renameFolder(folderId: Long, newName: String) = relocateFolderLocal(folderId, keepParent = true, newParentId = null, newName = newName)

@@ -21,6 +21,12 @@ data class AttachmentRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val 
 data class DraftRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val accountId: Long, val json: String, @ColumnInfo(defaultValue = "0") val updatedAt: Long = 0, val sourceMessageId: Long? = null)
 @Entity(tableName = "outbox", foreignKeys = [ForeignKey(entity = AccountRow::class, parentColumns = ["id"], childColumns = ["accountId"], onDelete = ForeignKey.CASCADE)], indices = [Index("accountId"), Index(value = ["state", "dueAt"])])
 data class OutboxRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val accountId: Long, val draft: String, val dueAt: Long, val state: String = "PENDING", val mimePath: String? = null, val error: String? = null)
+/**
+ * Local-only snooze (IMAP has no standard one; nothing moves on the server). [messageId] null = the whole thread.
+ * Hidden while [resurfacedAt] is null; once due it stays (visible) for a while so the thread sorts to the top as "new".
+ */
+@Entity(tableName = "snoozed", foreignKeys = [ForeignKey(entity = AccountRow::class, parentColumns = ["id"], childColumns = ["accountId"], onDelete = ForeignKey.CASCADE)], indices = [Index("accountId"), Index("threadId"), Index("until")])
+data class SnoozeRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val accountId: Long, val threadId: Long, val messageId: Long? = null, val until: Long, val createdAt: Long, val resurfacedAt: Long? = null)
 @Entity(tableName = "operations", foreignKeys = [ForeignKey(entity = AccountRow::class, parentColumns = ["id"], childColumns = ["accountId"], onDelete = ForeignKey.CASCADE)], indices = [Index("accountId")])
 data class OperationRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val accountId: Long, val folderId: Long, val validity: Long, val uid: Long, val action: String, val target: String? = null, val attempts: Int = 0, val error: String? = null, val messageLocalId: Long? = null, val desiredSeen: Boolean? = null, val desiredStarred: Boolean? = null)
 @Entity(tableName = "contacts", primaryKeys = ["accountId", "email"], foreignKeys = [ForeignKey(entity = AccountRow::class, parentColumns = ["id"], childColumns = ["accountId"], onDelete = ForeignKey.CASCADE)])
@@ -48,18 +54,29 @@ interface MailDao {
     @Query("SELECT * FROM folders WHERE accountId=:account") suspend fun folders(account: Long): List<FolderRow>
     @Query("SELECT * FROM folders WHERE id=:id") suspend fun folder(id: Long): FolderRow?
     @Insert suspend fun insertFolder(row: FolderRow): Long
+    @Insert suspend fun insertSnooze(row: SnoozeRow): Long
+    @Query("DELETE FROM snoozed WHERE threadId=:thread AND messageId IS NULL") suspend fun deleteThreadSnooze(thread: Long)
+    @Query("DELETE FROM snoozed WHERE threadId=:thread") suspend fun deleteAllSnoozesOfThread(thread: Long)
+    @Query("DELETE FROM snoozed WHERE messageId=:message") suspend fun deleteMessageSnooze(message: Long)
+    @Query("SELECT id FROM snoozed WHERE threadId=:thread AND resurfacedAt IS NULL") suspend fun activeSnoozeIdsOfThread(thread: Long): List<Long>
+    @Query("SELECT id FROM snoozed WHERE messageId=:message AND resurfacedAt IS NULL") suspend fun activeSnoozeIdsOfMessage(message: Long): List<Long>
+    @Query("SELECT * FROM snoozed WHERE resurfacedAt IS NULL AND until<=:now ORDER BY until") suspend fun dueSnoozes(now: Long): List<SnoozeRow>
+    @Query("UPDATE snoozed SET resurfacedAt=:now WHERE id=:id") suspend fun resurfaceSnooze(id: Long, now: Long)
+    @Query("DELETE FROM snoozed WHERE resurfacedAt IS NOT NULL AND resurfacedAt<:before") suspend fun pruneSnoozes(before: Long)
+    @Query("SELECT COUNT(*) FROM snoozed WHERE resurfacedAt IS NULL") fun observeSnoozedCount(): Flow<Int>
+    @Query("SELECT * FROM snoozed ORDER BY id") suspend fun allSnoozes(): List<SnoozeRow>
     @Query("DELETE FROM folders WHERE id=:id") suspend fun deleteFolderRow(id: Long)
     /** Local ids of folders whose deletion is queued: hidden from the UI meanwhile. */
     @Query("SELECT uid FROM operations WHERE action='FOLDER_DELETE'") fun observeDeletingFolderIds(): Flow<List<Long>>
     @Update suspend fun updateFolder(row: FolderRow)
-    @RawQuery(observedEntities = [ThreadRow::class, MessageRow::class, FolderRow::class, DraftRow::class, BodyTextRow::class, SearchMatchRow::class]) fun page(query: SupportSQLiteQuery): PagingSource<Int, ThreadRow>
+    @RawQuery(observedEntities = [ThreadRow::class, MessageRow::class, FolderRow::class, DraftRow::class, BodyTextRow::class, SearchMatchRow::class, SnoozeRow::class]) fun page(query: SupportSQLiteQuery): PagingSource<Int, ThreadRow>
     @Query("SELECT $MESSAGE_META FROM messages WHERE threadId=:id ORDER BY sentAt,id") fun observeThread(id: Long): Flow<List<MessageRow>>
     @Query("SELECT $MESSAGE_META FROM messages WHERE threadId=:id ORDER BY sentAt,id") suspend fun threadMessages(id: Long): List<MessageRow>
     @Query("SELECT $MESSAGE_META FROM messages WHERE folderId=:id") suspend fun folderMessages(id: Long): List<MessageRow>
     @Query("SELECT $MESSAGE_META FROM messages WHERE id=:id") suspend fun message(id: Long): MessageRow?
     @Query("SELECT $MESSAGE_META FROM messages WHERE id=:id") fun observeMessage(id: Long): Flow<List<MessageRow>>
     /** Single-message list (conversation grouping off). Columns must be MESSAGE_META so bodies stay out of the cursor. */
-    @RawQuery(observedEntities = [MessageRow::class, FolderRow::class]) fun pageMessages(query: SupportSQLiteQuery): PagingSource<Int, MessageRow>
+    @RawQuery(observedEntities = [MessageRow::class, FolderRow::class, SnoozeRow::class]) fun pageMessages(query: SupportSQLiteQuery): PagingSource<Int, MessageRow>
     @Query("SELECT $MESSAGE_META FROM messages WHERE folderId=:folder AND uid=:uid") suspend fun byUid(folder: Long, uid: Long): MessageRow?
     @Query("SELECT $MESSAGE_META FROM messages WHERE folderId=:folder AND uid<0") suspend fun pendingMoves(folder: Long): List<MessageRow>
     @Query("UPDATE messages SET threadId=:target WHERE threadId=:source") suspend fun mergeMessages(source: Long, target: Long)
@@ -121,7 +138,7 @@ interface MailDao {
     @Query("SELECT email, name, MAX(lastSeen) AS lastSeen, accountId FROM contacts WHERE email LIKE :prefix ESCAPE '!' OR name LIKE :prefix ESCAPE '!' GROUP BY email ORDER BY lastSeen DESC LIMIT :limit") suspend fun contacts(prefix: String, limit: Int): List<ContactRow>
 }
 
-@Database(entities = [AccountRow::class, FolderRow::class, ThreadRow::class, ThreadKeyRow::class, MessageRow::class, AttachmentRow::class, DraftRow::class, OutboxRow::class, OperationRow::class, ContactRow::class, BodyTextRow::class, SearchMatchRow::class], version = 5, exportSchema = true)
+@Database(entities = [AccountRow::class, FolderRow::class, ThreadRow::class, ThreadKeyRow::class, MessageRow::class, AttachmentRow::class, DraftRow::class, OutboxRow::class, OperationRow::class, ContactRow::class, BodyTextRow::class, SearchMatchRow::class, SnoozeRow::class], version = 6, exportSchema = true)
 abstract class MailDatabase : RoomDatabase() { abstract fun mail(): MailDao }
 
 internal val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
@@ -158,5 +175,14 @@ internal val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
         db.execSQL("CREATE TABLE IF NOT EXISTS body_text (messageId INTEGER NOT NULL, chunk INTEGER NOT NULL, text TEXT NOT NULL, PRIMARY KEY(messageId,chunk), FOREIGN KEY(messageId) REFERENCES messages(id) ON DELETE CASCADE)")
         db.execSQL("CREATE TABLE IF NOT EXISTS search_matches (queryHash TEXT NOT NULL, messageId INTEGER NOT NULL, PRIMARY KEY(queryHash,messageId), FOREIGN KEY(messageId) REFERENCES messages(id) ON DELETE CASCADE)")
         db.execSQL("CREATE INDEX IF NOT EXISTS index_search_matches_messageId ON search_matches(messageId)")
+    }
+}
+
+internal val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS snoozed (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, accountId INTEGER NOT NULL, threadId INTEGER NOT NULL, messageId INTEGER, until INTEGER NOT NULL, createdAt INTEGER NOT NULL, resurfacedAt INTEGER, FOREIGN KEY(accountId) REFERENCES accounts(id) ON UPDATE NO ACTION ON DELETE CASCADE )")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_snoozed_accountId ON snoozed(accountId)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_snoozed_threadId ON snoozed(threadId)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_snoozed_until ON snoozed(until)")
     }
 }

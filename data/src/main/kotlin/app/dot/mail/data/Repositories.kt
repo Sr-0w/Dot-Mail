@@ -97,6 +97,17 @@ interface MailRepository {
     /** Move only messages visible in [sourceMailbox]; other copies/replies in the conversation stay put. */
     suspend fun move(threadIds: Collection<Long>, targetFolderId: Long, sourceMailbox: Mailbox) = move(threadIds, targetFolderId)
 
+    // ---- Snooze: local only, nothing changes on the server. Ids may be real or virtual (ConversationIds) thread ids. ----
+
+    /** Hides the conversations (or single messages) until [untilMillis], then they return to the top of the list, with a notification if the account allows it. */
+    suspend fun snooze(threadIds: Collection<Long>, untilMillis: Long) { throw UnsupportedOperationException() }
+
+    /** Brings snoozed conversations back at once. */
+    suspend fun unsnooze(threadIds: Collection<Long>) { throw UnsupportedOperationException() }
+
+    /** Number of currently snoozed items (drives the drawer entry). The list itself is Mailbox.Unified(FolderRole.SNOOZED), ordered by wake-up time. */
+    fun snoozedCount(): Flow<Int> = kotlinx.coroutines.flow.flowOf(0)
+
     // ---- Folder management. Local change is immediate; the server command is queued and replayed on sync. ----
     // All throw FolderException(reason) for refusals. If the server later refuses (name taken meanwhile, folder
     // gone), the server wins: the local change is rolled back and the account shows a sync error saying why.

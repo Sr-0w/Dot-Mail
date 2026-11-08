@@ -103,7 +103,7 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
             folders.filter { it.accountId == accountId }.map { f -> f.copy(unreadCount = msgs.count { it.folderId == f.id && it.isUnread }) }
         }
 
-        override fun threads(mailbox: Mailbox): Flow<PagingData<ThreadSummary>> = combine(messages, accountsState, drafts) { msgs, accts, localDrafts ->
+        override fun threads(mailbox: Mailbox): Flow<PagingData<ThreadSummary>> = combine(messages, accountsState, drafts, snoozed) { msgs, accts, localDrafts, snz ->
             val draftsBox = when (mailbox) {
                 is Mailbox.Unified -> mailbox.role == FolderRole.DRAFTS
                 is Mailbox.InFolder -> folders.firstOrNull { it.id == mailbox.folderId }?.role == FolderRole.DRAFTS
@@ -119,11 +119,13 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
             val inBox = when (mailbox) {
                 is Mailbox.Unified -> {
                     val fIds = folders.filter { it.role == mailbox.role }.map { it.id }.toSet()
-                    if (mailbox.role == FolderRole.STARRED) msgs.filter { it.isStarred } else msgs.filter { it.folderId in fIds }
+                    if (mailbox.role == FolderRole.SNOOZED) msgs.filter { it.threadId in snz.keys }
+                    else if (mailbox.role == FolderRole.STARRED) msgs.filter { it.isStarred } else msgs.filter { it.folderId in fIds }
                 }
                 is Mailbox.InFolder -> msgs.filter { it.folderId == mailbox.folderId }
-            }.filter { it.accountId in ids }
-            PagingData.from(draftRows + summaries(inBox))
+            }.filter { it.accountId in ids && (isSnoozedBox(mailbox) || it.threadId !in snz.keys) }
+            val rows = summaries(inBox)
+            PagingData.from(draftRows + if (isSnoozedBox(mailbox)) rows.sortedBy { snz[it.threadId] } else rows)
         }
 
         override fun search(query: String, accountId: Long?): Flow<PagingData<ThreadSummary>> = messages.map { msgs ->
@@ -140,12 +142,15 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
 
         private fun targets(m: Message, ids: Collection<Long>) = m.threadId in ids || ConversationIds.ofMessage(m.id) in ids
 
-        override fun messages(mailbox: Mailbox): Flow<PagingData<ThreadSummary>> = combine(messages, accountsState) { msgs, accts ->
+        private fun isSnoozedBox(mailbox: Mailbox) = mailbox is Mailbox.Unified && mailbox.role == FolderRole.SNOOZED
+
+        override fun messages(mailbox: Mailbox): Flow<PagingData<ThreadSummary>> = combine(messages, accountsState, snoozed) { msgs, accts, snz ->
             val ids = accts.map { it.id }.toSet()
             val inBox = when (mailbox) {
-                is Mailbox.Unified -> { val fIds = folders.filter { it.role == mailbox.role }.map { it.id }.toSet(); msgs.filter { it.folderId in fIds } }
+                is Mailbox.Unified -> if (mailbox.role == FolderRole.SNOOZED) msgs.filter { it.threadId in snz.keys || ConversationIds.ofMessage(it.id) in snz.keys }
+                    else { val fIds = folders.filter { it.role == mailbox.role }.map { it.id }.toSet(); msgs.filter { it.folderId in fIds } }
                 is Mailbox.InFolder -> msgs.filter { it.folderId == mailbox.folderId }
-            }.filter { it.accountId in ids }.sortedByDescending { it.sentAt }
+            }.filter { it.accountId in ids && (isSnoozedBox(mailbox) || (it.threadId !in snz.keys && ConversationIds.ofMessage(it.id) !in snz.keys)) }.sortedByDescending { it.sentAt }
             PagingData.from(inBox.map { m ->
                 ThreadSummary(
                     threadId = ConversationIds.ofMessage(m.id), accountId = m.accountId, subject = m.subject, participants = listOf(m.from),
@@ -192,6 +197,18 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
 
         override suspend fun move(threadIds: Collection<Long>, targetFolderId: Long) =
             messages.update { list -> list.map { if (targets(it, threadIds)) it.copy(folderId = targetFolderId) else it } }
+
+        // ---- Snooze (in memory): wake-up times by thread id; hidden from lists until due, shown in the Snoozed list.
+        private val snoozed = MutableStateFlow<Map<Long, Long>>(emptyMap())
+
+        override suspend fun snooze(threadIds: Collection<Long>, untilMillis: Long) {
+            require(untilMillis > System.currentTimeMillis()) { "Pick a time in the future" }
+            snoozed.update { it + threadIds.filter { id -> id > 0 }.associateWith { untilMillis } }
+        }
+
+        override suspend fun unsnooze(threadIds: Collection<Long>) = snoozed.update { it - threadIds.toSet() }
+
+        override fun snoozedCount(): Flow<Int> = snoozed.map { it.size }
 
         override suspend fun refresh(mailbox: Mailbox) = delay(700)
 

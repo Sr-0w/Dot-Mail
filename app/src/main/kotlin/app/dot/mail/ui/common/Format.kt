@@ -2,6 +2,7 @@ package app.dot.mail.ui.common
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Archive
+import androidx.compose.material.icons.outlined.Snooze
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Drafts
 import androidx.compose.material.icons.outlined.Folder
@@ -68,6 +69,7 @@ object Format {
         FolderRole.ALL_MAIL -> "All mail"
         FolderRole.STARRED -> "Starred"
         FolderRole.CUSTOM -> "Folder"
+        FolderRole.SNOOZED -> "Snoozed"
     }
 
     fun roleIcon(role: FolderRole): ImageVector = when (role) {
@@ -80,6 +82,7 @@ object Format {
         FolderRole.ALL_MAIL -> Icons.Outlined.AllInbox
         FolderRole.STARRED -> Icons.Outlined.StarOutline
         FolderRole.CUSTOM -> Icons.Outlined.Folder
+        FolderRole.SNOOZED -> Icons.Outlined.Snooze
     }
 
     /** Display order of system folders in the drawer. */

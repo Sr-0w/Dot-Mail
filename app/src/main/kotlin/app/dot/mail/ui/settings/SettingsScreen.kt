@@ -433,6 +433,7 @@ private fun swipeName(a: SwipeAction) = when (a) {
     SwipeAction.TRASH -> "Delete"
     SwipeAction.READ_TOGGLE -> "Mark read / unread"
     SwipeAction.STAR_TOGGLE -> "Star / unstar"
+    SwipeAction.SNOOZE -> "Snooze"
     SwipeAction.NONE -> "Nothing"
 }
 
