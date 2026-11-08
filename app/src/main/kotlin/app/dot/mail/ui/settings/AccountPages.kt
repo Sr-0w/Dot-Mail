@@ -42,6 +42,7 @@ import app.dot.design.components.DotTopBar
 import app.dot.design.components.Hairline
 import app.dot.design.components.ListRow
 import app.dot.design.components.SectionLabel
+import app.dot.design.components.dotSurfaceEnter
 import app.dot.mail.LocalMailGraph
 import app.dot.mail.data.IdentityStore
 import app.dot.mail.data.model.Account
@@ -175,6 +176,7 @@ internal fun IdentityEditorPage(account: Account, identityId: Long, onBack: () -
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
+            modifier = Modifier.dotSurfaceEnter(),
             containerColor = c.surface,
             shape = DotShapes.large,
             title = { Text("Delete ${existing?.email}?", style = Dot.type.title, color = c.textPrimary) },

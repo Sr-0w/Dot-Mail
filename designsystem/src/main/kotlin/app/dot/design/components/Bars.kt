@@ -31,8 +31,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.dot.design.Dot
+import app.dot.design.DotMotion
 import app.dot.design.DotShapes
 import app.dot.design.DotSpacing
+import app.dot.design.rememberReducedMotion
 
 /**
  * Minimal top bar: at least 56dp, background-coloured, a hairline appears only once content scrolls
@@ -48,7 +50,12 @@ fun DotTopBar(
     actions: @Composable RowScope.() -> Unit = {},
     titleContent: (@Composable () -> Unit)? = null,
 ) {
-    val lineColor by animateColorAsState(if (elevated) Dot.colors.border else Color.Transparent, label = "bar-line")
+    val reducedMotion = rememberReducedMotion()
+    val lineColor by animateColorAsState(
+        if (elevated) Dot.colors.border else Color.Transparent,
+        animationSpec = DotMotion.fastSpec(reducedMotion),
+        label = "bar-line",
+    )
     Column(modifier.background(Dot.colors.background).windowInsetsPadding(WindowInsets.statusBars)) {
         Row(
             // Min height, not fixed: title + subtitle must not clip at large font scales.

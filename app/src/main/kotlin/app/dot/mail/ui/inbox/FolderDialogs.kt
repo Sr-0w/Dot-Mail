@@ -31,6 +31,7 @@ import app.dot.design.components.DotMenu
 import app.dot.design.components.DotMenuItem
 import app.dot.design.components.DotTextField
 import app.dot.design.components.ListRow
+import app.dot.design.components.dotSurfaceEnter
 import app.dot.mail.LocalMailGraph
 import app.dot.mail.data.model.Folder
 import app.dot.mail.data.model.FolderRole
@@ -79,6 +80,7 @@ fun FolderDialogs(
     when (dialog) {
         is FolderDialog.Options -> AlertDialog(
             onDismissRequest = onDismiss,
+            modifier = Modifier.dotSurfaceEnter(),
             containerColor = c.surface,
             shape = DotShapes.large,
             title = { Text(dialog.folder.name, style = Dot.type.title, color = c.textPrimary) },
@@ -97,6 +99,7 @@ fun FolderDialogs(
             var parent by remember { mutableStateOf<Long?>(null) }
             AlertDialog(
                 onDismissRequest = onDismiss,
+                modifier = Modifier.dotSurfaceEnter(),
                 containerColor = c.surface,
                 shape = DotShapes.large,
                 title = { Text("New folder", style = Dot.type.title, color = c.textPrimary) },
@@ -119,6 +122,7 @@ fun FolderDialogs(
             var name by remember { mutableStateOf(dialog.folder.name) }
             AlertDialog(
                 onDismissRequest = onDismiss,
+                modifier = Modifier.dotSurfaceEnter(),
                 containerColor = c.surface,
                 shape = DotShapes.large,
                 title = { Text("Rename folder", style = Dot.type.title, color = c.textPrimary) },
@@ -136,6 +140,7 @@ fun FolderDialogs(
             var parent by remember { mutableStateOf<Long?>(null) }
             AlertDialog(
                 onDismissRequest = onDismiss,
+                modifier = Modifier.dotSurfaceEnter(),
                 containerColor = c.surface,
                 shape = DotShapes.large,
                 title = { Text("Move ${dialog.folder.name}", style = Dot.type.title, color = c.textPrimary) },
@@ -157,6 +162,7 @@ fun FolderDialogs(
             val hasMail = dialog.folder.totalCount > 0
             AlertDialog(
                 onDismissRequest = onDismiss,
+                modifier = Modifier.dotSurfaceEnter(),
                 containerColor = c.surface,
                 shape = DotShapes.large,
                 title = { Text("Delete ${dialog.folder.name}?", style = Dot.type.title, color = c.textPrimary) },
