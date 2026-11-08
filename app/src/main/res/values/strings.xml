@@ -511,7 +511,7 @@
     <string name="settings_sender_pictures_intro">Initials are used unless you turn a source on. Every source below except contacts asks another server, which learns that you received mail from that sender.</string>
     <string name="settings_contact_photos">Contact photos</string>
     <string name="settings_contact_photos_denied">Contacts permission was denied. Allow it in system settings to use this.</string>
-    <string name="settings_contact_photos_sub">Photos from your address book. Stays on this device.</string>
+    <string name="settings_contact_photos_sub">Photos from your address book, and address-book matches when you type a recipient. Stays on this device.</string>
     <string name="settings_gravatar">Gravatar</string>
     <string name="settings_gravatar_sub">Sends a hash of the sender\'s address to gravatar.com.</string>
     <string name="settings_brand_logos">Brand logos</string>

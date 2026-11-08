@@ -511,7 +511,7 @@
     <string name="settings_sender_pictures_intro">Es werden Initialen verwendet, sofern Sie keine Quelle aktivieren. Jede Quelle außer den Kontakten fragt einen anderen Server an, der so erfährt, dass Sie Post von diesem Absender erhalten haben.</string>
     <string name="settings_contact_photos">Kontaktfotos</string>
     <string name="settings_contact_photos_denied">Der Zugriff auf Kontakte wurde abgelehnt. Erlauben Sie ihn in den Systemeinstellungen, um dies zu nutzen.</string>
-    <string name="settings_contact_photos_sub">Fotos aus Ihrem Adressbuch. Bleibt auf diesem Gerät.</string>
+    <string name="settings_contact_photos_sub">Fotos aus Ihrem Adressbuch und Adressbuch-Vorschläge bei der Empfängereingabe. Bleibt auf diesem Gerät.</string>
     <string name="settings_gravatar">Gravatar</string>
     <string name="settings_gravatar_sub">Sendet einen Hash der Absenderadresse an gravatar.com.</string>
     <string name="settings_brand_logos">Markenlogos</string>

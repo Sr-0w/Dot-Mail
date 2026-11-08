@@ -473,7 +473,10 @@ internal class RealMailGraph(
         catch(_:TimeoutCancellationException) { throw MailSyncException("Sync timed out. Please retry.") }
     }
     override suspend fun suggestContacts(prefix: String, limit: Int): List<EmailAddress> = withContext(Dispatchers.IO) {
-        dao.contacts(prefix.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%", limit.coerceIn(1, 50)).map { EmailAddress(it.email, it.name) }
+        val cap = limit.coerceIn(1, 50)
+        val history = dao.contacts(prefix.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%", cap).map { EmailAddress(it.email, it.name) }
+        // Address-book matches only fill what mail history left over, and only when the permission was already granted.
+        if (history.size >= cap) history else mergeSuggestions(history, addressBook.suggest(prefix, cap), cap)
     }
     private val draftLock = Mutex()
     override suspend fun saveDraft(draft: Draft): Long = withContext(Dispatchers.IO) { draftLock.withLock {
