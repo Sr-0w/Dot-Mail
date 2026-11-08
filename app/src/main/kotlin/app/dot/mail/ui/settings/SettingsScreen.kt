@@ -163,6 +163,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             SettingsTarget.SmartFolders -> smartPage = true
             SettingsTarget.Categories -> categoriesPage = true
             SettingsTarget.RemoteImages -> remoteImagesPage = true
+            SettingsTarget.Aliases -> aliasesPage = true
         }
     }
     BackHandler(enabled = accountPage != 0L || remoteImagesPage || categoriesPage || smartPage || storagePage || aliasesPage) {

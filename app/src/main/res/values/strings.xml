@@ -1059,12 +1059,11 @@
     <string name="outbox_edit_unavailable">It is already being sent and can\'t be edited.</string>
     <string name="aliases_title">Aliases</string>
     <string name="aliases_subtitle">Manage SimpleLogin or addy.io aliases</string>
-    <string name="aliases_back">Back</string>
     <string name="aliases_api_key">API key</string>
-    <string name="aliases_connect">Connect and load</string>
     <string name="aliases_create">Create random alias</string>
-    <string name="aliases_disable">Disable</string>
-    <string name="aliases_enable">Enable</string>
+    <string name="aliases_limit_note">Showing only the first page of aliases from this provider.</string>
+    <string name="aliases_remove_title">Remove API key?</string>
+    <string name="aliases_remove_body">The saved API key and aliases loaded for this provider will be removed from this device.</string>
     <string name="aliases_test">Test connection</string>
     <string name="aliases_remove_key">Remove key</string>
     <string name="aliases_copy">Copy</string>

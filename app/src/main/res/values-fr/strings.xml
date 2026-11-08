@@ -1059,12 +1059,11 @@
     <string name="outbox_edit_unavailable">Il est déjà en cours d’envoi et ne peut plus être modifié.</string>
     <string name="aliases_title">Alias</string>
     <string name="aliases_subtitle">Gérer les alias SimpleLogin ou addy.io</string>
-    <string name="aliases_back">Retour</string>
     <string name="aliases_api_key">Clé API</string>
-    <string name="aliases_connect">Connecter et charger</string>
     <string name="aliases_create">Créer un alias aléatoire</string>
-    <string name="aliases_disable">Désactiver</string>
-    <string name="aliases_enable">Activer</string>
+    <string name="aliases_limit_note">Seule la première page d’alias de ce fournisseur est affichée.</string>
+    <string name="aliases_remove_title">Supprimer la clé API ?</string>
+    <string name="aliases_remove_body">La clé API enregistrée et les alias chargés pour ce fournisseur seront supprimés de cet appareil.</string>
     <string name="aliases_test">Tester la connexion</string>
     <string name="aliases_remove_key">Supprimer la clé</string>
     <string name="aliases_copy">Copier</string>

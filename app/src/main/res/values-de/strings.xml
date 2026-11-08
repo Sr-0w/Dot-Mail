@@ -1059,12 +1059,11 @@
     <string name="outbox_edit_unavailable">Es wird bereits gesendet und kann nicht mehr bearbeitet werden.</string>
     <string name="aliases_title">Aliasse</string>
     <string name="aliases_subtitle">SimpleLogin- oder addy.io-Aliasse verwalten</string>
-    <string name="aliases_back">Zurück</string>
     <string name="aliases_api_key">API-Schlüssel</string>
-    <string name="aliases_connect">Verbinden und laden</string>
     <string name="aliases_create">Zufälligen Alias erstellen</string>
-    <string name="aliases_disable">Deaktivieren</string>
-    <string name="aliases_enable">Aktivieren</string>
+    <string name="aliases_limit_note">Es wird nur die erste Alias-Seite dieses Anbieters angezeigt.</string>
+    <string name="aliases_remove_title">API-Schlüssel entfernen?</string>
+    <string name="aliases_remove_body">Der gespeicherte API-Schlüssel und die geladenen Aliasse dieses Anbieters werden von diesem Gerät entfernt.</string>
     <string name="aliases_test">Verbindung testen</string>
     <string name="aliases_remove_key">Schlüssel entfernen</string>
     <string name="aliases_copy">Kopieren</string>

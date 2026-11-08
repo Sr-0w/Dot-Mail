@@ -465,9 +465,14 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                         val domain = alias.email.substringAfterLast('@', "").lowercase()
                         val hasDomain = account?.identities.orEmpty().any { it.email.substringAfterLast('@', "").equals(domain, true) }
                         if (hasDomain && account != null) {
-                            val identity = Identity(0, account.id, alias.email.substringBefore('@'), alias.email)
-                            val id = graph.accounts.saveIdentity(identity)
-                            vm.setSender(Sender(account.id, id, identity.name, identity.email))
+                            val existing = existingIdentity(account.identities, alias.email)
+                            if (existing != null) {
+                                vm.setSender(Sender(account.id, existing.id, existing.name, existing.email, existing.signature, existing.signatureHtml, existing.isDefault, existing.signatureLogo, existing.signatureOnNew, existing.signatureOnReply))
+                            } else {
+                                val identity = Identity(0, account.id, alias.email.substringBefore('@'), alias.email)
+                                val id = graph.accounts.saveIdentity(identity)
+                                vm.setSender(Sender(account.id, id, identity.name, identity.email))
+                            }
                         } else {
                             (context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("email alias", alias.email))
                             Toast.makeText(context, R.string.aliases_reply_to_guidance, Toast.LENGTH_LONG).show()
@@ -522,6 +527,9 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
         }
     }
 }
+
+internal fun existingIdentity(identities: List<Identity>, email: String): Identity? =
+    identities.firstOrNull { it.email.equals(email, ignoreCase = true) }
 
 @Composable
 private fun RichBodyEditor(

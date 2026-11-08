@@ -9,7 +9,7 @@ data class EmailAlias(val id: String, val email: String, val active: Boolean)
 interface AliasProvider {
     fun list(apiKey: String): List<EmailAlias>
     fun create(apiKey: String): EmailAlias
-    fun setEnabled(apiKey: String, id: String, enabled: Boolean): EmailAlias
+    fun setEnabled(apiKey: String, alias: EmailAlias, enabled: Boolean): EmailAlias
 }
 internal fun request(url: String, key: String, header: String, auth: (String)->String, method: String="GET", body: JSONObject?=null): JSONObject {
     val c = (URL(url).openConnection() as HttpURLConnection).apply {

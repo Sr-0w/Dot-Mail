@@ -15,10 +15,10 @@ class AddyClient(private val baseUrl: String = "https://app.addy.io/api/v1") : A
         return alias(result) ?: error("Provider returned no alias")
     }
 
-    override fun setEnabled(apiKey: String, id: String, enabled: Boolean): EmailAlias {
-        val encoded = java.net.URLEncoder.encode(id, Charsets.UTF_8.name())
-        val result = if (enabled) request("$baseUrl/active-aliases", apiKey, "Authorization", { "Bearer $it" }, "POST", JSONObject().put("id", id))
+    override fun setEnabled(apiKey: String, alias: EmailAlias, enabled: Boolean): EmailAlias {
+        val encoded = java.net.URLEncoder.encode(alias.id, Charsets.UTF_8.name())
+        if (enabled) request("$baseUrl/active-aliases", apiKey, "Authorization", { "Bearer $it" }, "POST", JSONObject().put("id", alias.id))
         else request("$baseUrl/active-aliases/$encoded", apiKey, "Authorization", { "Bearer $it" }, "DELETE")
-        return alias(result) ?: EmailAlias(id, "", enabled)
+        return alias.copy(active=enabled)
     }
 }
