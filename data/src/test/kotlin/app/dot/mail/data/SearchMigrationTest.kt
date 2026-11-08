@@ -40,7 +40,7 @@ class SearchMigrationTest {
             override fun onUpgrade(db:SupportSQLiteDatabase,oldVersion:Int,newVersion:Int)=error("Room owns upgrade")
         }).build())
         helper.writableDatabase; helper.close()
-        val upgraded=Room.databaseBuilder(context,MailDatabase::class.java,name).addMigrations(MIGRATION_7_8).allowMainThreadQueries().build()
+        val upgraded=Room.databaseBuilder(context,MailDatabase::class.java,name).addMigrations(MIGRATION_7_8,MIGRATION_8_9).allowMainThreadQueries().build()
         val graph=RealMailGraph(context,upgraded,object:CredentialVault {
             override fun encrypt(accountEmail:String,secret:String)=secret
             override fun decrypt(accountEmail:String,encrypted:String)=encrypted

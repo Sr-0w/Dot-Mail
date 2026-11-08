@@ -176,6 +176,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
     val contactsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
         contactsGranted = ok
         contactsDenied = !ok
+        scope.launch { graph.mail.refreshKnownContacts() }
         if (ok) settings.update { it.copy(contactPhotos = true) }
     }
     // Permission revoked in system settings while the toggle was on: show it off.

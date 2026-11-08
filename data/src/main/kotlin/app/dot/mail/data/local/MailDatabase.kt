@@ -13,11 +13,11 @@ data class FolderRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val acco
 data class ThreadRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val accountId: Long, val subject: String, val participants: String = "[]", val snippet: String = "", val lastAt: Long = 0, val count: Int = 0, val unread: Int = 0, val starred: Boolean = false, val attachments: Boolean = false)
 @Entity(tableName = "thread_keys", primaryKeys = ["accountId", "key"], foreignKeys = [ForeignKey(entity = ThreadRow::class, parentColumns = ["id"], childColumns = ["threadId"], onDelete = ForeignKey.CASCADE)], indices = [Index("threadId")])
 data class ThreadKeyRow(val accountId: Long, val key: String, val threadId: Long)
-@Entity(tableName = "messages", foreignKeys = [ForeignKey(entity = FolderRow::class, parentColumns = ["id"], childColumns = ["folderId"], onDelete = ForeignKey.CASCADE), ForeignKey(entity = ThreadRow::class, parentColumns = ["id"], childColumns = ["threadId"], onDelete = ForeignKey.CASCADE)], indices = [Index(value = ["folderId", "uid"], unique = true), Index("threadId"), Index("accountId"), Index(value = ["threadId", "sentAt"]), Index(value = ["folderId", "messageIdKey"])])
+@Entity(tableName = "messages", foreignKeys = [ForeignKey(entity = FolderRow::class, parentColumns = ["id"], childColumns = ["folderId"], onDelete = ForeignKey.CASCADE), ForeignKey(entity = ThreadRow::class, parentColumns = ["id"], childColumns = ["threadId"], onDelete = ForeignKey.CASCADE)], indices = [Index(value = ["folderId", "uid"], unique = true), Index("threadId"), Index("accountId"), Index(value = ["threadId", "sentAt"]), Index(value = ["folderId", "messageIdKey"]), Index("bodyPath"),Index(value=["accountId","sentAt","id"])])
 data class MessageRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val accountId: Long, val folderId: Long, val threadId: Long, val uid: Long, val header: String, val subject: String, val sentAt: Long, val unread: Boolean, val starred: Boolean, val hasAttachments: Boolean, val snippet: String = "", val text: String? = null, val html: String? = null, val bodyLoaded: Boolean = false, val remoteImages: Boolean = false, val senderSearch: String = "", val recipientSearch: String = "", @ColumnInfo(defaultValue = "0") val snippetFetched: Boolean = false, val bodyPath: String? = null, val messageIdKey: String? = null)
 /** Just enough of a message to re-run classification rules. */
 data class HeaderOnly(val id: Long, val subject: String, val header: String)
-@Entity(tableName = "attachments", foreignKeys = [ForeignKey(entity = MessageRow::class, parentColumns = ["id"], childColumns = ["messageId"], onDelete = ForeignKey.CASCADE)], indices = [Index("messageId")])
+@Entity(tableName = "attachments", foreignKeys = [ForeignKey(entity = MessageRow::class, parentColumns = ["id"], childColumns = ["messageId"], onDelete = ForeignKey.CASCADE)], indices = [Index("messageId"),Index("localUri")])
 data class AttachmentRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val messageId: Long, val partId: String, val name: String, val mime: String, val size: Long, val cid: String?, val inline: Boolean, val localUri: String?)
 @Entity(tableName = "drafts", foreignKeys = [ForeignKey(entity = AccountRow::class, parentColumns = ["id"], childColumns = ["accountId"], onDelete = ForeignKey.CASCADE)], indices = [Index("accountId"), Index(value = ["sourceMessageId"], unique = true)])
 data class DraftRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val accountId: Long, val json: String, @ColumnInfo(defaultValue = "0") val updatedAt: Long = 0, val sourceMessageId: Long? = null)
@@ -34,7 +34,7 @@ data class SnoozeRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val acco
 @Entity(tableName = "operations", foreignKeys = [ForeignKey(entity = AccountRow::class, parentColumns = ["id"], childColumns = ["accountId"], onDelete = ForeignKey.CASCADE)], indices = [Index("accountId")])
 data class OperationRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val accountId: Long, val folderId: Long, val validity: Long, val uid: Long, val action: String, val target: String? = null, val attempts: Int = 0, val error: String? = null, val messageLocalId: Long? = null, val desiredSeen: Boolean? = null, val desiredStarred: Boolean? = null)
 @Entity(tableName = "contacts", primaryKeys = ["accountId", "email"], foreignKeys = [ForeignKey(entity = AccountRow::class, parentColumns = ["id"], childColumns = ["accountId"], onDelete = ForeignKey.CASCADE)])
-data class ContactRow(val accountId: Long, val email: String, val name: String?, val lastSeen: Long)
+data class ContactRow(val accountId: Long, val email: String, val name: String?, val lastSeen: Long, @ColumnInfo(defaultValue="0") val corresponded:Boolean=false)
 
 @Entity(tableName = "body_text", primaryKeys = ["messageId", "chunk"], foreignKeys = [ForeignKey(entity = MessageRow::class, parentColumns = ["id"], childColumns = ["messageId"], onDelete = ForeignKey.CASCADE)])
 data class BodyTextRow(val messageId: Long, val chunk: Int, val text: String)
@@ -47,6 +47,49 @@ internal const val MESSAGE_META = "id,accountId,folderId,threadId,uid,header,sub
 
 @Dao
 interface MailDao {
+    @Query("DELETE FROM message_senders WHERE messageId=:id") suspend fun clearMessageSenders(id:Long)
+    @Insert(onConflict=OnConflictStrategy.IGNORE) suspend fun putMessageSender(row:MessageSenderRow)
+    @Insert(onConflict=OnConflictStrategy.IGNORE) suspend fun putDeviceContacts(rows:List<DeviceContactRow>)
+    @Insert(onConflict=OnConflictStrategy.REPLACE) suspend fun deviceContactState(row:DeviceContactStateRow)
+    @Query("DELETE FROM device_contacts WHERE generation!=:generation") suspend fun pruneDeviceContacts(generation:Long)
+    @Query("DELETE FROM device_contacts") suspend fun clearDeviceContacts()
+    @Query("SELECT email FROM device_contacts WHERE generation=(SELECT generation FROM device_contact_state WHERE id=1 AND allowed=1)") suspend fun deviceContactEmails():List<String>
+
+    @Query("SELECT m.id,m.threadId,m.bodyPath,CASE WHEN m.uid<0 OR f.role='DRAFTS' OR COALESCE(c.offlineSaved,0)=1 OR EXISTS(SELECT 1 FROM snoozed s WHERE s.resurfacedAt IS NULL AND (s.messageId=m.id OR s.threadId=m.threadId)) OR EXISTS(SELECT 1 FROM drafts d WHERE d.sourceMessageId=m.id) OR EXISTS(SELECT 1 FROM operations o WHERE o.accountId=m.accountId AND (o.messageLocalId=m.id OR (o.folderId=m.folderId AND o.uid=m.uid))) THEN 1 ELSE 0 END AS protected FROM messages m JOIN folders f ON f.id=m.folderId LEFT JOIN cache_access c ON c.messageId=m.id WHERE m.accountId=:account AND m.id>:after ORDER BY m.id LIMIT 32") suspend fun storagePathBatch(account:Long,after:Long):List<StoragePathRow>
+    @Query("SELECT EXISTS(SELECT 1 FROM messages m JOIN folders f ON f.id=m.folderId LEFT JOIN cache_access c ON c.messageId=m.id WHERE m.id=:id AND (m.uid<0 OR f.role='DRAFTS' OR COALESCE(c.offlineSaved,0)=1 OR EXISTS(SELECT 1 FROM snoozed s WHERE s.resurfacedAt IS NULL AND (s.messageId=m.id OR s.threadId=m.threadId)) OR EXISTS(SELECT 1 FROM drafts d WHERE d.sourceMessageId=m.id) OR EXISTS(SELECT 1 FROM operations o WHERE o.accountId=m.accountId AND (o.messageLocalId=m.id OR (o.folderId=m.folderId AND o.uid=m.uid)))))") suspend fun protectedMessage(id:Long):Boolean
+    @Query("SELECT EXISTS(SELECT 1 FROM messages WHERE bodyPath=:path)") suspend fun bodyPathReferenced(path:String):Boolean
+    @Query("SELECT EXISTS(SELECT 1 FROM attachments WHERE localUri=:uri)") suspend fun attachmentUriReferenced(uri:String):Boolean
+    @Query("SELECT id,accountId,substr(json,instr(json,'\"attachments\":'),65536) AS attachmentJson FROM drafts WHERE id>:after ORDER BY id LIMIT 20") suspend fun draftCacheReferences(after:Long):List<CacheReferenceRow>
+    @Query("SELECT id,accountId,substr(draft,instr(draft,'\"attachments\":'),65536) AS attachmentJson FROM outbox WHERE id>:after AND state IN('PENDING','SUBMITTING','APPEND','APPENDING','UNCERTAIN') ORDER BY id LIMIT 20") suspend fun outboxCacheReferences(after:Long):List<CacheReferenceRow>
+    @Query("SELECT COALESCE(SUM(length(CAST(d.body AS BLOB))+length(CAST(d.files AS BLOB))+length(CAST(d.attachmentText AS BLOB))),0)*2 FROM search_documents d JOIN messages m ON m.id=d.messageId WHERE m.accountId=:id") suspend fun indexedTextBytes(id:Long):Long
+
+    @Query("SELECT * FROM cache_access WHERE messageId=:id") suspend fun cacheAccess(id:Long):CacheAccessRow?
+    @Insert(onConflict=OnConflictStrategy.REPLACE) suspend fun putCacheAccess(row:CacheAccessRow)
+    @Query("SELECT messageId FROM cache_access WHERE offlineSaved=1") fun observeOfflineSaved():Flow<List<Long>>
+    @Query("SELECT * FROM offline_folders WHERE folderId=:id") suspend fun offlineFolder(id:Long):OfflineFolderRow?
+    @Insert(onConflict=OnConflictStrategy.REPLACE) suspend fun putOfflineFolder(row:OfflineFolderRow)
+    @Query("UPDATE offline_folders SET beforeUid=0,scanThrough=0,complete=0,visitedAt=0,headerFailures=0 WHERE complete=1 AND folderId IN(SELECT id FROM folders WHERE accountId=:id)") suspend fun restartCompletedOfflineFolders(id:Long)
+    @Query("SELECT COALESCE(SUM(headerFailures),0) FROM offline_folders WHERE folderId IN(SELECT id FROM folders WHERE accountId=:id)") suspend fun offlineHeaderFailures(id:Long):Int
+    @Query("DELETE FROM offline_folders WHERE folderId IN(SELECT id FROM folders WHERE accountId=:id)") suspend fun resetOfflineFolders(id:Long)
+    @Query("SELECT (SELECT COUNT(*) FROM messages m LEFT JOIN cache_access c ON c.messageId=m.id WHERE " + STORAGE_SELECTION + ") AS headers,(SELECT COUNT(*) FROM messages m LEFT JOIN cache_access c ON c.messageId=m.id WHERE " + STORAGE_SELECTION + " AND m.bodyLoaded=1) AS bodies,(SELECT COUNT(*) FROM attachments a JOIN messages m ON m.id=a.messageId LEFT JOIN cache_access c ON c.messageId=m.id WHERE " + STORAGE_SELECTION + ") AS attachments,(SELECT COUNT(*) FROM attachments a JOIN messages m ON m.id=a.messageId LEFT JOIN cache_access c ON c.messageId=m.id WHERE " + STORAGE_SELECTION + " AND a.localUri IS NOT NULL) AS downloadedAttachments,(SELECT COALESCE(SUM(total),0) FROM folders WHERE accountId=:id) AS serverTotal") fun observeOfflineCounts(id:Long,keep:Int=0,afterDate:Long=0):Flow<OfflineCounts>
+    @Query("SELECT COUNT(*) FROM messages WHERE accountId=:id") suspend fun cachedMessageCount(id:Long):Int
+    @Query("SELECT COUNT(*) FROM messages WHERE accountId=:id AND bodyLoaded=1") suspend fun cachedBodyCount(id:Long):Int
+    @Query("SELECT COALESCE(SUM(total),0) FROM folders WHERE accountId=:id") suspend fun serverMessageCount(id:Long):Int
+    @Query("SELECT m.id,m.bodyLoaded,m.sentAt,m.folderId,m.uid,COALESCE(c.accessedAt,0) AS accessedAt,COALESCE(c.offlineSaved,0) AS offlineSaved FROM messages m LEFT JOIN cache_access c ON c.messageId=m.id WHERE m.accountId=:account AND m.id>:after ORDER BY m.id LIMIT :limit") suspend fun storageCandidates(account:Long,after:Long,limit:Int):List<StorageCandidate>
+    @Query("SELECT m.id FROM messages m LEFT JOIN cache_access c ON c.messageId=m.id WHERE m.bodyLoaded=1 ORDER BY COALESCE(c.accessedAt,0),m.sentAt LIMIT :limit OFFSET :offset") suspend fun globalEvictionCandidates(limit:Int,offset:Int):List<Long>
+    @Query("SELECT m.id FROM messages m LEFT JOIN cache_access c ON c.messageId=m.id WHERE m.accountId=:account AND m.bodyLoaded=1 ORDER BY COALESCE(c.accessedAt,0),m.sentAt LIMIT :limit OFFSET :offset") suspend fun evictionCandidates(account:Long,limit:Int,offset:Int):List<Long>
+    @Query("SELECT m.id FROM messages m LEFT JOIN cache_access c ON c.messageId=m.id WHERE " + STORAGE_SELECTION + " AND (:downloadAll OR COALESCE(c.offlineSaved,0)=1) AND (c.downloadError IS NULL OR c.failureAt<:retryBefore) AND (m.bodyLoaded=0 OR (:attachments AND EXISTS(SELECT 1 FROM attachments a WHERE a.messageId=m.id AND a.localUri IS NULL))) ORDER BY m.sentAt DESC,m.id DESC LIMIT :limit OFFSET :offset") suspend fun offlineBodyCandidates(id:Long,attachments:Boolean,downloadAll:Boolean,retryBefore:Long,limit:Int,offset:Int,keep:Int=0,afterDate:Long=0):List<Long>
+    @Query("SELECT m.id FROM messages m WHERE m.accountId=:account AND m.uid>0 AND NOT EXISTS(SELECT 1 FROM cache_access c WHERE c.messageId=m.id AND c.offlineSaved=1) AND NOT EXISTS(SELECT 1 FROM folders f WHERE f.id=m.folderId AND f.role='DRAFTS') AND NOT EXISTS(SELECT 1 FROM drafts d WHERE d.sourceMessageId=m.id) AND NOT EXISTS(SELECT 1 FROM operations o WHERE o.accountId=m.accountId AND (o.messageLocalId=m.id OR (o.folderId=m.folderId AND o.uid=m.uid))) ORDER BY m.sentAt DESC,m.id DESC LIMIT 200 OFFSET (:keep+:skip)") suspend fun outsideLatest(account:Long,keep:Int,skip:Int=0):List<Long>
+    @Query("SELECT m.id FROM messages m WHERE m.accountId=:account AND m.sentAt<:cutoff AND m.uid>0 AND NOT EXISTS(SELECT 1 FROM cache_access c WHERE c.messageId=m.id AND c.offlineSaved=1) AND NOT EXISTS(SELECT 1 FROM folders f WHERE f.id=m.folderId AND f.role='DRAFTS') AND NOT EXISTS(SELECT 1 FROM drafts d WHERE d.sourceMessageId=m.id) AND NOT EXISTS(SELECT 1 FROM operations o WHERE o.accountId=m.accountId AND (o.messageLocalId=m.id OR (o.folderId=m.folderId AND o.uid=m.uid))) ORDER BY m.sentAt LIMIT :limit OFFSET :skip") suspend fun outsideAge(account:Long,cutoff:Long,limit:Int,skip:Int=0):List<Long>
+    @Query("SELECT sentAt FROM messages WHERE accountId=:account ORDER BY sentAt DESC,id DESC LIMIT 1 OFFSET :offset") suspend fun messageDateAt(account:Long,offset:Int):Long?
+    @Query("SELECT id FROM messages WHERE accountId=:account ORDER BY sentAt DESC,id DESC LIMIT :limit") suspend fun latestMessageIds(account:Long,limit:Int):List<Long>
+    @Query("DELETE FROM attachments WHERE id=:id") suspend fun deleteAttachment(id:Long)
+    @Query("UPDATE cache_access SET failureAt=0,downloadError=NULL WHERE messageId IN(SELECT id FROM messages WHERE accountId=:id)") suspend fun clearDownloadErrors(id:Long)
+    @Query("SELECT COUNT(*) FROM cache_access c JOIN messages m ON m.id=c.messageId WHERE m.accountId=:id AND c.downloadError IS NOT NULL") suspend fun downloadErrorCount(id:Long):Int
+    @Update suspend fun updateAttachment(row:AttachmentRow)
+    @Query("UPDATE messages SET bodyLoaded=0,bodyPath=NULL,text=NULL,html=NULL,remoteImages=0 WHERE id=:id") suspend fun evictBody(id:Long)
+    @Query("UPDATE attachments SET localUri=NULL WHERE messageId=:id") suspend fun evictAttachments(id:Long)
+
     @Query("SELECT * FROM search_pending ORDER BY messageId LIMIT :limit") suspend fun searchPending(limit: Int): List<SearchPendingRow>
     @Query("DELETE FROM search_matches WHERE queryHash NOT IN(SELECT queryHash FROM search_matches GROUP BY queryHash ORDER BY MAX(rowid) DESC LIMIT 32)") suspend fun pruneSearchMatches()
     @Query("SELECT COUNT(*) FROM search_pending") suspend fun searchPendingCount(): Int
@@ -89,14 +132,14 @@ interface MailDao {
     /** Local ids of folders whose deletion is queued: hidden from the UI meanwhile. */
     @Query("SELECT uid FROM operations WHERE action='FOLDER_DELETE'") fun observeDeletingFolderIds(): Flow<List<Long>>
     @Update suspend fun updateFolder(row: FolderRow)
-    @RawQuery(observedEntities = [ThreadRow::class, MessageRow::class, FolderRow::class, DraftRow::class, OperationRow::class, BodyTextRow::class, SearchMatchRow::class, SnoozeRow::class]) fun page(query: SupportSQLiteQuery): PagingSource<Int, ThreadRow>
+    @RawQuery(observedEntities = [ThreadRow::class, MessageRow::class, FolderRow::class, DraftRow::class, OperationRow::class, BodyTextRow::class, SearchMatchRow::class, SnoozeRow::class, ContactRow::class, MessageSenderRow::class, DeviceContactRow::class, DeviceContactStateRow::class]) fun page(query: SupportSQLiteQuery): PagingSource<Int, ThreadRow>
     @Query("SELECT $MESSAGE_META FROM messages WHERE threadId=:id ORDER BY sentAt,id") fun observeThread(id: Long): Flow<List<MessageRow>>
     @Query("SELECT $MESSAGE_META FROM messages WHERE threadId=:id ORDER BY sentAt,id") suspend fun threadMessages(id: Long): List<MessageRow>
     @Query("SELECT $MESSAGE_META FROM messages WHERE folderId=:id") suspend fun folderMessages(id: Long): List<MessageRow>
     @Query("SELECT $MESSAGE_META FROM messages WHERE id=:id") suspend fun message(id: Long): MessageRow?
     @Query("SELECT $MESSAGE_META FROM messages WHERE id=:id") fun observeMessage(id: Long): Flow<List<MessageRow>>
     /** Single-message list (conversation grouping off). Columns must be MESSAGE_META so bodies stay out of the cursor. */
-    @RawQuery(observedEntities = [MessageRow::class, FolderRow::class, SnoozeRow::class]) fun pageMessages(query: SupportSQLiteQuery): PagingSource<Int, MessageRow>
+    @RawQuery(observedEntities = [MessageRow::class, FolderRow::class, SnoozeRow::class, ContactRow::class, MessageSenderRow::class, DeviceContactRow::class, DeviceContactStateRow::class]) fun pageMessages(query: SupportSQLiteQuery): PagingSource<Int, MessageRow>
     @Query("SELECT $MESSAGE_META FROM messages WHERE folderId=:folder AND uid=:uid") suspend fun byUid(folder: Long, uid: Long): MessageRow?
     @Query("SELECT $MESSAGE_META FROM messages WHERE folderId=:folder AND uid<0") suspend fun pendingMoves(folder: Long): List<MessageRow>
     @Query("UPDATE messages SET threadId=:target WHERE threadId=:source") suspend fun mergeMessages(source: Long, target: Long)
@@ -126,6 +169,7 @@ interface MailDao {
     @Query("DELETE FROM messages WHERE folderId=:id") suspend fun clearFolder(id: Long)
     @Insert suspend fun insertThread(row: ThreadRow): Long
     @Update suspend fun updateThread(row: ThreadRow)
+    @Query("SELECT EXISTS(SELECT 1 FROM messages WHERE threadId=:id)") suspend fun threadHasMessages(id:Long):Boolean
     @Query("SELECT * FROM threads WHERE id=:id") suspend fun threadRow(id: Long): ThreadRow?
     @Query("SELECT threadId FROM thread_keys WHERE accountId=:account AND `key`=:key") suspend fun threadKey(account: Long, key: String): Long?
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putKey(row: ThreadKeyRow)
@@ -165,11 +209,13 @@ interface MailDao {
     @Query("SELECT * FROM operations WHERE id=:id") suspend fun operation(id: Long): OperationRow?
     @Query("DELETE FROM operations WHERE id=:id") suspend fun deleteOperation(id: Long)
     @Update suspend fun updateOperation(row: OperationRow)
-    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putContact(row: ContactRow)
-    @Query("SELECT email, name, MAX(lastSeen) AS lastSeen, accountId FROM contacts WHERE email LIKE :prefix ESCAPE '!' OR name LIKE :prefix ESCAPE '!' GROUP BY email ORDER BY lastSeen DESC LIMIT :limit") suspend fun contacts(prefix: String, limit: Int): List<ContactRow>
+    @Insert(onConflict=OnConflictStrategy.IGNORE) suspend fun insertContact(row:ContactRow):Long
+    @Query("UPDATE contacts SET name=CASE WHEN :at>=lastSeen AND :name IS NOT NULL THEN :name ELSE name END,lastSeen=MAX(lastSeen,:at),corresponded=CASE WHEN corresponded=1 OR :known THEN 1 ELSE 0 END WHERE accountId=:account AND email=:email") suspend fun mergeContact(account:Long,email:String,name:String?,at:Long,known:Boolean)
+    @Transaction suspend fun putContact(row:ContactRow) { insertContact(row); mergeContact(row.accountId,row.email,row.name,row.lastSeen,row.corresponded) }
+    @Query("SELECT email, name, MAX(lastSeen) AS lastSeen, accountId, MAX(corresponded) AS corresponded FROM contacts WHERE email LIKE :prefix ESCAPE '!' OR name LIKE :prefix ESCAPE '!' GROUP BY email ORDER BY lastSeen DESC LIMIT :limit") suspend fun contacts(prefix: String, limit: Int): List<ContactRow>
 }
 
-@Database(entities = [AccountRow::class, FolderRow::class, ThreadRow::class, ThreadKeyRow::class, MessageRow::class, AttachmentRow::class, DraftRow::class, OutboxRow::class, OperationRow::class, ContactRow::class, BodyTextRow::class, SearchMatchRow::class, SnoozeRow::class, DraftMirrorRow::class, SearchDocumentRow::class, MessageFtsRow::class, SearchPendingRow::class], version = 8, exportSchema = true)
+@Database(entities = [AccountRow::class, FolderRow::class, ThreadRow::class, ThreadKeyRow::class, MessageRow::class, AttachmentRow::class, DraftRow::class, OutboxRow::class, OperationRow::class, ContactRow::class, BodyTextRow::class, SearchMatchRow::class, SnoozeRow::class, DraftMirrorRow::class, SearchDocumentRow::class, MessageFtsRow::class, SearchPendingRow::class, CacheAccessRow::class, OfflineFolderRow::class, MessageSenderRow::class, DeviceContactRow::class, DeviceContactStateRow::class], version = 9, exportSchema = true)
 abstract class MailDatabase : RoomDatabase() { abstract fun mail(): MailDao }
 
 internal val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
@@ -235,5 +281,21 @@ internal val MIGRATION_7_8 = object : androidx.room.migration.Migration(7, 8) {
         db.execSQL("DELETE FROM body_text") // Superseded unbounded LIKE chunks; the bounded FTS worker backfills cached files.
         installSearchTriggers(db)
         db.execSQL("INSERT OR IGNORE INTO search_pending(messageId,revision) SELECT id,1 FROM messages")
+    }
+}
+
+internal val MIGRATION_8_9 = object : androidx.room.migration.Migration(8,9) {
+    override fun migrate(db:androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE contacts ADD COLUMN corresponded INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("CREATE TABLE IF NOT EXISTS message_senders (messageId INTEGER NOT NULL,email TEXT NOT NULL,PRIMARY KEY(messageId,email),FOREIGN KEY(messageId) REFERENCES messages(id) ON DELETE CASCADE)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_message_senders_email ON message_senders(email)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS device_contacts (email TEXT NOT NULL,generation INTEGER NOT NULL,PRIMARY KEY(email,generation))")
+        db.execSQL("CREATE TABLE IF NOT EXISTS device_contact_state (id INTEGER NOT NULL PRIMARY KEY,generation INTEGER NOT NULL,allowed INTEGER NOT NULL)")
+        backfillCorrespondence(db)
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_messages_accountId_sentAt_id ON messages(accountId,sentAt,id)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_messages_bodyPath ON messages(bodyPath)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_attachments_localUri ON attachments(localUri)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS cache_access (messageId INTEGER NOT NULL PRIMARY KEY, accessedAt INTEGER NOT NULL, offlineSaved INTEGER NOT NULL, failureAt INTEGER NOT NULL, downloadError TEXT, FOREIGN KEY(messageId) REFERENCES messages(id) ON DELETE CASCADE)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS offline_folders (folderId INTEGER NOT NULL PRIMARY KEY, validity INTEGER NOT NULL, beforeUid INTEGER NOT NULL, scanThrough INTEGER NOT NULL, completedThrough INTEGER NOT NULL, complete INTEGER NOT NULL, visitedAt INTEGER NOT NULL, headerFailures INTEGER NOT NULL, FOREIGN KEY(folderId) REFERENCES folders(id) ON DELETE CASCADE)")
     }
 }

@@ -1,6 +1,7 @@
 package app.dot.mail.data
 
 import android.net.Uri
+import androidx.room.withTransaction
 import app.dot.mail.data.local.OutboxRow
 import app.dot.mail.data.model.Draft
 import app.dot.mail.data.model.EmailAddress
@@ -19,7 +20,8 @@ internal suspend fun RealMailGraph.queueCalendarReply(messageId: Long, partstat:
     val identities = identityStore.resolve(account.id,account.name,account.email)
     val invitations = dao.attachments(messageId).filter { it.mime.startsWith("text/calendar",true) || it.name.endsWith(".ics",true) }
         .flatMap { part ->
-            val uri = part.localUri ?: error("Invitation attachment is not available")
+            val uri = part.localUri ?: try { storage.bodies.open(part.id,maxBytes=512L*1024) }
+            catch(e:IllegalArgumentException) { if(e.message?.contains("exceeds download limit")==true) throw IllegalArgumentException("Invitation is too large",e) else throw e }
             val bytes = context.contentResolver.openInputStream(Uri.parse(uri))?.use { input ->
                 val output=java.io.ByteArrayOutputStream()
                 val buffer=ByteArray(8192)
@@ -45,7 +47,7 @@ internal suspend fun RealMailGraph.queueCalendarReply(messageId: Long, partstat:
     require(listOfNotNull(invite.organizer.email,invite.organizer.name).none { '\r' in it || '\n' in it }) { "Invalid organizer address" }
     jakarta.mail.internet.InternetAddress(invite.organizer.email).validate()
     val dueAt=System.currentTimeMillis()+5_000
-    val id=dao.insertOutbox(OutboxRow(accountId=account.id,draft=JSONObject(Codec.draft(draft)).put("calendarReply",reply).put("calendarSender",identity.email).toString(),dueAt=dueAt))
+    val id=database.withTransaction { val id=dao.insertOutbox(OutboxRow(accountId=account.id,draft=JSONObject(Codec.draft(draft)).put("calendarReply",reply).put("calendarSender",identity.email).toString(),dueAt=dueAt)); markCorresponded(account.id,draft.to); id }
     if(scheduling) WorkScheduling.outbox(context,id,dueAt)
     id
 }

@@ -269,6 +269,52 @@ class MailClient(val timeoutMs: Int = 30_000, private val timing: (String,Long) 
         val directory = java.io.File.createTempFile("dotmail-body-", "").apply { delete(); mkdirs() }
         return try { rawBody(endpoint,credentials,path,uid,expectedValidity,directory) { Mime.parse(it) } } finally { directory.deleteRecursively() }
     }
+    /** Bounded backwards page. Sequence lookup handles a checkpoint UID expunged between runs. */
+    suspend fun headerPage(endpoint:Endpoint,credentials:Credentials,path:String,beforeUid:Long=0,limit:Int=200,expectedValidity:Long?=null):HeaderPage = readStore(endpoint,credentials) { s -> folder(s,path) { f ->
+        require(limit in 1..200 && beforeUid>=0)
+        if(expectedValidity!=null) require(f.uidValidity==expectedValidity) { "Folder UIDVALIDITY changed" }
+        var end=f.messageCount
+        if(beforeUid>0) {
+            val previous=f.getMessageByUID(beforeUid)
+            if(previous!=null) end=previous.messageNumber-1
+            else {
+                var low=1; var high=end; var answer=0
+                while(low<=high) { val mid=(low+high).ushr(1); if(f.getUID(f.getMessage(mid))<beforeUid) { answer=mid; low=mid+1 } else high=mid-1 }
+                end=answer
+            }
+        }
+        if(end<=0) return@folder HeaderPage(f.uidValidity,f.uidNext,emptyList(),beforeUid,false)
+        val start=maxOf(1,end-limit+1)
+        val messages=f.getMessages(start,end)
+        fetchHeaders(f,messages,s.hasCapability("X-GM-EXT-1"))
+        val failures=ArrayList<HeaderFailure>()
+        val headers=messages.mapNotNull { message -> try { header(f,message) } catch(e:Exception) { failures+=HeaderFailure(f.getUID(message),e); null } }
+        HeaderPage(f.uidValidity,f.uidNext,headers,messages.minOf { f.getUID(it) },start>1,failures)
+    } }
+    /** Fetch only selected MIME parts; omitted attachments retain metadata and never cross the network. */
+    suspend fun cacheBodyParts(endpoint:Endpoint,credentials:Credentials,path:String,uid:Long,directory:java.io.File,expectedValidity:Long,includeAttachments:Boolean=false,maxBytes:Long=25L*1024*1024):CachedBody { val job=currentCoroutineContext()[Job]; return readStore(endpoint,credentials) { s -> folder(s,path) { f ->
+        require(uid>0 && f.uidValidity==expectedValidity) { "Folder UIDVALIDITY changed" }
+        val message=f.getMessageByUID(uid) as? IMAPMessage ?: throw MessageRemovedException("Message no longer available")
+        message.setPeek(true)
+        f.fetch(arrayOf(message),FetchProfile().apply { add(FetchProfile.Item.CONTENT_INFO) })
+        timed("body_parts") { Mime.cache(message,directory,maxBytes,includeAttachments) { job?.ensureActive() } }
+    } } }
+    /** An explicit attachment read downloads that part only, leaving the body and other attachments alone. */
+    suspend fun cacheAttachment(endpoint:Endpoint,credentials:Credentials,path:String,uid:Long,partId:String,directory:java.io.File,expectedValidity:Long,maxBytes:Long=512L*1024*1024):CachedPart { val job=currentCoroutineContext()[Job]; return readStore(endpoint,credentials) { s -> folder(s,path) { f ->
+        require(uid>0 && f.uidValidity==expectedValidity) { "Folder UIDVALIDITY changed" }
+        val message=f.getMessageByUID(uid) as? IMAPMessage ?: throw MessageRemovedException("Message no longer available")
+        message.setPeek(true)
+        f.fetch(arrayOf(message),FetchProfile().apply { add(FetchProfile.Item.CONTENT_INFO) })
+        require(partId=="1" || partId.startsWith("1.")) { "Invalid MIME part" }
+        var part:Part=message
+        for(index in partId.split('.').drop(1)) {
+            val child=index.toIntOrNull() ?: throw IllegalArgumentException("Invalid MIME part")
+            val source=part.dataHandler.dataSource as? MultipartDataSource ?: throw MessageRemovedException("Attachment no longer available")
+            require(child in 0 until source.count) { "Attachment no longer available" }
+            part=source.getBodyPart(child)
+        }
+        timed("attachment_part") { Mime.cache(part,directory,maxBytes,true) { job?.ensureActive() }.attachments.single().copy(partId=partId) }
+    } } }
     suspend fun cacheBody(endpoint: Endpoint, credentials: Credentials, path: String, uid: Long, directory: java.io.File, expectedValidity: Long? = null): CachedBody =
         rawBody(endpoint,credentials,path,uid,expectedValidity,directory) { Mime.cache(it, directory) }
     /** Bounded partial text previews only. Never changes flags or populates a complete body. */

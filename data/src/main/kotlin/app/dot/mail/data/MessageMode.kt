@@ -27,6 +27,7 @@ internal suspend fun RealMailGraph.threadOrMessageRows(threadId: Long): List<Mes
  * (local drafts are not messages). Rows are ThreadSummaries with a virtual thread id so the list UI is unchanged.
  */
 internal fun RealMailGraph.messagesPaging(mailbox: Mailbox, options: app.dot.mail.data.model.ListOptions = app.dot.mail.data.model.ListOptions()): Flow<PagingData<ThreadSummary>> = flow {
+    if(options.filters.fromContacts) addressBook.refresh()
     val (where, args) = when (mailbox) {
         is Mailbox.Smart -> { emitAll(threads(mailbox, options)); return@flow }
         is Mailbox.InFolder -> {

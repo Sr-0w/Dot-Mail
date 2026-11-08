@@ -27,7 +27,7 @@ internal object GraphRegistry {
     @Volatile private var graph: RealMailGraph? = null
     fun get(context: Context): RealMailGraph = graph ?: synchronized(this) {
         graph ?: RealMailGraph(context.applicationContext,
-            Room.databaseBuilder(context.applicationContext, MailDatabase::class.java, "dotmail.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8).build(),
+            Room.databaseBuilder(context.applicationContext, MailDatabase::class.java, "dotmail.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9).build(),
             KeystoreCredentialVault()).also { graph = it; it.start() }
     }
 }
@@ -58,7 +58,37 @@ internal class RealMailGraph(
     override fun search(query:String,scope:SearchScope):Flow<PagingData<SearchResult>> = fullSearch.search(query,scope)
     override fun searchProgress(query:String,scope:SearchScope):Flow<SearchProgress> = fullSearch.progress(query,scope)
 
-    private val bodyLocks = java.util.concurrent.ConcurrentHashMap<Long, Mutex>()
+    internal val storage=StorageManager(this)
+    internal val addressBook=AddressBookIndex(this)
+    override suspend fun refreshKnownContacts() { addressBook.refresh(force=true) }
+    override val globalStorageLimit:Flow<Long> = storage.preferences.version.map { storage.preferences.globalLimit() }.distinctUntilChanged()
+    override suspend fun setGlobalStorageLimit(bytes:Long) { storage.globalLimit(bytes) }
+    override fun storagePolicy(accountId:Long):Flow<StoragePolicy> = storage.preferences.version.map { storage.preferences.policy(accountId) }.distinctUntilChanged()
+    override suspend fun setStoragePolicy(accountId:Long,policy:StoragePolicy) { storage.setPolicy(accountId,policy) }
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override fun offlineProgress(accountId:Long):Flow<OfflineProgress> = storagePolicy(accountId).flatMapLatest { activePolicy -> combine(storage.preferences.version,dao.observeOfflineCounts(accountId,if(activePolicy.retention==RetentionMode.LATEST_MESSAGES) activePolicy.latestMessages else 0,if(activePolicy.retention==RetentionMode.LAST_DAYS) System.currentTimeMillis()-activePolicy.days*86400000L else 0),storage.signals,if(scheduling) androidx.work.WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow("dotmail.offline.$accountId") else flowOf(emptyList())) { _,counts,_,work ->
+        val stored=storage.preferences.progress(accountId); val policy=storage.preferences.policy(accountId)
+        val target=when(policy.retention) { RetentionMode.ALL->counts.serverTotal; RetentionMode.LATEST_MESSAGES->maxOf(counts.headers,minOf(counts.serverTotal,policy.latestMessages)); RetentionMode.LAST_DAYS->if(stored.state in setOf(OfflineState.COMPLETE,OfflineState.PARTIAL)) counts.headers else 0 }
+        val incomplete=policy.downloadBodies && (counts.bodies<counts.headers || (policy.downloadAttachments && counts.downloadedAttachments<counts.attachments))
+        val pending=stored.state in setOf(OfflineState.QUEUED,OfflineState.DOWNLOADING,OfflineState.WAITING_FOR_NETWORK,OfflineState.WAITING_FOR_CHARGING)
+        val state=when {
+            storage.preferences.paused(accountId)->OfflineState.PAUSED
+            pending && !storage.downloads.networkAllowed(policy)->OfflineState.WAITING_FOR_NETWORK
+            pending && policy.chargingOnly && !storage.downloads.charging()->OfflineState.WAITING_FOR_CHARGING
+            stored.state==OfflineState.COMPLETE && incomplete->OfflineState.PARTIAL
+            scheduling && stored.state==OfflineState.DOWNLOADING && work.none { it.state==androidx.work.WorkInfo.State.RUNNING }->OfflineState.QUEUED
+            stored.state in setOf(OfflineState.WAITING_FOR_NETWORK,OfflineState.WAITING_FOR_CHARGING)->OfflineState.QUEUED
+            else->stored.state
+        }
+        stored.copy(cachedMessages=counts.headers,totalMessages=target,downloadedBodies=counts.bodies,downloadedAttachments=counts.downloadedAttachments,totalAttachments=counts.attachments,state=state)
+    }.distinctUntilChanged() }.flowOn(Dispatchers.IO)
+    override suspend fun pauseOfflineDownload(accountId:Long) { storage.pause(accountId) }
+    override suspend fun resumeOfflineDownload(accountId:Long) { storage.resume(accountId) }
+    override suspend fun setOfflineSaved(messageIds:Collection<Long>,saved:Boolean) { storage.saveOffline(messageIds,saved) }
+    override fun offlineSavedMessages():Flow<Set<Long>> = dao.observeOfflineSaved().map { it.toSet() }
+    override suspend fun storageUsage():StorageUsage = storage.usage()
+    override suspend fun clearCachedMail(accountId:Long):CacheCleanupResult = storage.clear(accountId)
+
     private val oauth = OAuthManager(context, database, vault, oauthClients, tokenEndpoint)
     internal val syncing = MutableStateFlow<Set<Long>>(emptySet())
     override val accounts: Flow<List<Account>> = combine(dao.observeAccounts(), syncing, identityStore.version, AccountSettingsStore.get(context).lastSyncedAll) { rows, active, _, synced -> rows.map { row ->
@@ -80,7 +110,7 @@ internal class RealMailGraph(
     internal val foregroundIdle by lazy { ForegroundIdle(this) }
     override val instantNotifications: Flow<Boolean> = AccountSettingsStore.get(context).sync.map { it.instantNotifications }.distinctUntilChanged()
     override suspend fun setInstantNotificationsEnabled(enabled: Boolean): Boolean = changeInstantNotifications(enabled)
-    internal fun start() { if (scheduling) { scope.launch { searchIndex.ensure(); dao.observeSearchPendingCount().collect { if(it>0) WorkScheduling.searchIndex(context) } }; WorkScheduling.periodic(context); foregroundIdle.start(); scope.launch { recoverOutbox(); dao.accounts().forEach { account -> if(dao.draftMirrors(account.id).isNotEmpty()) WorkScheduling.drafts(context,account.id) } }; scope.launch { resurfaceDue() }; scope.launch { recoverSnippetRepairs() } } }
+    internal fun start() { if (scheduling) { addressBook.start(); scope.launch { dao.accounts().forEach { account -> if(storage.preferences.configured(account.id) && !storage.preferences.paused(account.id) && storage.preferences.progress(account.id).state !in setOf(OfflineState.COMPLETE,OfflineState.PARTIAL)) WorkScheduling.offline(context,account.id,storage.preferences.policy(account.id)) } }; scope.launch { searchIndex.ensure(); dao.observeSearchPendingCount().collect { if(it>0) WorkScheduling.searchIndex(context) } }; WorkScheduling.periodic(context); foregroundIdle.start(); scope.launch { recoverOutbox(); dao.accounts().forEach { account -> if(dao.draftMirrors(account.id).isNotEmpty()) WorkScheduling.drafts(context,account.id) } }; scope.launch { resurfaceDue() }; scope.launch { recoverSnippetRepairs() } } }
     internal suspend fun credentials(row: AccountRow): Credentials = withContext(Dispatchers.IO) {
         if (Codec.config(row.config).authType == AuthType.OAUTH2) oauth.credentials(row.id) else try { Credentials(vault.decrypt(row.email, row.secret)) }
         catch(e:java.security.GeneralSecurityException) { dao.syncError(row.id,"Saved credentials are unavailable. Sign in again.",true); throw ReauthenticationRequired(e) }
@@ -150,7 +180,7 @@ internal class RealMailGraph(
         result
     }
 
-    override suspend fun removeAccount(accountId: Long) = withContext(Dispatchers.IO) { syncLock.withLock { dao.deleteAccount(accountId); identityStore.forget(accountId); smartFolders.forgetAccount(accountId); AccountSettingsStore.get(context).forget(accountId); File(context.filesDir, "attachments/$accountId").deleteRecursively(); File(context.filesDir, "outbox/$accountId").deleteRecursively(); Unit } }
+    override suspend fun removeAccount(accountId: Long) = withContext(Dispatchers.IO) { syncLock.withLock { dao.deleteAccount(accountId); identityStore.forget(accountId); storage.preferences.forget(accountId); if(scheduling) WorkScheduling.cancelOffline(context,accountId); smartFolders.forgetAccount(accountId); AccountSettingsStore.get(context).forget(accountId); File(context.filesDir, "bodies/$accountId").deleteRecursively(); File(context.filesDir, "attachments/$accountId").deleteRecursively(); File(context.filesDir, "outbox/$accountId").deleteRecursively(); storage.invalidate(accountId); Unit } }
     override fun folders(accountId: Long): Flow<List<app.dot.mail.data.model.Folder>> = combine(dao.observeFolders(accountId), dao.observeDeletingFolderIds()) { rows, deleting -> rows.filter { it.id !in deleting } }.map { rows -> rows.map { app.dot.mail.data.model.Folder(it.id, it.accountId, it.path, it.name, FolderRole.valueOf(it.role), it.unread, it.total) } }
 
     override suspend fun reclassifyAll() {
@@ -200,6 +230,7 @@ internal class RealMailGraph(
     internal suspend fun ownEmailsForFilters(): List<String> = ownEmails()
     private suspend fun ownEmails(): List<String> = dao.accounts().flatMap { a -> identityStore.resolve(a.id, a.name, a.email).map { it.email } }
     override fun threads(mailbox: Mailbox, options: ListOptions): Flow<PagingData<ThreadSummary>> = flow {
+        if(options.filters.fromContacts) addressBook.refresh()
         val extra = ThreadQuery.filters(options.filters, if (options.filters.toMe) ownEmails() else emptyList())
         val order = ThreadQuery.orderBy(options.sort)
         fun p(where: String, args: List<Any>, draftView: Boolean = false, draftAccount: Long? = null) = paging(where, args, draftView, draftAccount, extra, order)
@@ -213,52 +244,37 @@ internal class RealMailGraph(
         }
     }
     override fun search(query: String, accountId: Long?): Flow<PagingData<ThreadSummary>> = fullSearch.search(query,SearchScope(accountIds=accountId?.let { setOf(it) } ?: emptySet())).map { page -> page.map { it.thread } }
-    override fun thread(threadId: Long): Flow<List<app.dot.mail.data.model.Message>> = (if (ConversationIds.isMessage(threadId)) dao.observeMessage(ConversationIds.messageIdOf(threadId)) else dao.observeThread(threadId)).map { allRows ->
+    override fun thread(threadId: Long): Flow<List<app.dot.mail.data.model.Message>> = (if (ConversationIds.isMessage(threadId)) dao.observeMessage(ConversationIds.messageIdOf(threadId)) else dao.observeThread(threadId)).onStart { storage.watch(threadId,true) }.onCompletion { storage.watch(threadId,false) }.map { allRows ->
         val rows = allRows.groupBy { Codec.field(it.header, "messageId") ?: "local:${it.id}" }.values.map { copies -> copies.firstOrNull { it.bodyLoaded } ?: copies.first() }.sortedBy { it.sentAt }
         val attachments = dao.attachmentsFor(rows.map { it.id }).groupBy { it.messageId }
         rows.map { row ->
         app.dot.mail.data.model.Message(row.id, row.accountId, row.folderId, row.threadId, Codec.addressField(row.header, "from").firstOrNull() ?: EmailAddress(""), Codec.addressField(row.header, "to"), Codec.addressField(row.header, "cc"), Codec.addressField(row.header, "bcc"), Codec.addressField(row.header, "replyTo"), row.subject, row.sentAt, row.snippet, row.unread, row.starred,
             bodyStore.read(row), attachments[row.id].orEmpty().map(::attachment), Codec.field(row.header, "messageId"), Codec.strings(Codec.field(row.header, "refs") ?: "[]"), Codec.field(row.header, "unsubscribe"), Codec.field(row.header, "unsubOneClick"),listId=Codec.field(row.header,"listId"),category=messageCategory(row))
     } }.flowOn(Dispatchers.IO)
-    private fun attachment(a: AttachmentRow) = Attachment(a.id, a.messageId, a.name, a.mime, a.size, a.cid, a.inline, a.localUri)
-    private fun attachmentFile(accountId: Long, name: String = UUID.randomUUID().toString()): File = File(context.filesDir, "attachments/$accountId/$name").also { it.parentFile!!.mkdirs() }
-    private fun safeFileName(name: String): String = name.map { if (it == '/' || it == '\\' || it.isISOControl()) '_' else it }.joinToString("").take(180).ifBlank { "attachment" }
-    private fun uri(file: File): String = FileProvider.getUriForFile(context, "${context.packageName}.attachments", file).toString()
-    override suspend fun loadBody(messageId: Long) = withContext(Dispatchers.IO) { bodyLocks.getOrPut(messageId) { Mutex() }.withLock {
-        val message = dao.message(messageId) ?: return@withLock
-        if (message.bodyLoaded) return@withLock
-        val pending = if (message.uid < 0) pendingMove(message) else null
-        if (message.uid < 0 && pending == null) throw MailActionException(MailActionFailure.OPERATION_PENDING, "This message is moving. Try opening it shortly.")
-        val folder = dao.folder(pending?.folderId ?: message.folderId) ?: throw MailActionException(MailActionFailure.FOLDER_UNAVAILABLE, "Message folder is no longer available")
-        val account = requireNotNull(dao.account(message.accountId)); val config = Codec.config(account.config)
-        val directory = File(context.filesDir,"bodies/${account.id}/${UUID.randomUUID()}")
-        val body = client.cacheBody(config.imap.endpoint(), credentials(account), folder.path, pending?.uid ?: message.uid, directory, pending?.validity ?: folder.validity)
-        val parts = body.attachments.map { part ->
-            val file=attachmentFile(account.id,"${UUID.randomUUID()}/${safeFileName(part.name)}")
-            if (!part.file.renameTo(file)) { part.file.copyTo(file); part.file.delete() }
-            AttachmentRow(messageId=messageId,partId=part.partId,name=part.name,mime=part.mimeType,size=file.length(),cid=part.contentId,inline=part.inline,localUri=uri(file))
+    internal fun attachment(a: AttachmentRow) = Attachment(a.id, a.messageId, a.name, a.mime, a.size, a.cid, a.inline, a.localUri)
+    internal fun attachmentFile(accountId: Long, name: String = UUID.randomUUID().toString()): File = File(context.filesDir, "attachments/$accountId/$name").also { it.parentFile!!.mkdirs() }
+    internal fun safeFileName(name:String):String {
+        val result=StringBuilder(); var bytes=0; var stopped=false
+        name.codePoints().forEach { cp ->
+            if(!stopped) {
+                val value=if(cp=='/'.code || cp=='\\'.code || Character.isISOControl(cp)) "_" else String(Character.toChars(cp))
+                val size=value.toByteArray(Charsets.UTF_8).size
+                if(bytes+size>180) stopped=true else { result.append(value); bytes+=size }
+            }
         }
-        val temporary = message.copy(bodyLoaded=true,bodyPath=directory.absolutePath)
-        val preview = bodyStore.read(temporary)
-        val remote = preview?.html?.let { HtmlSanitizer.sanitize(it).hasRemoteImages } ?: false
-        val snippet = app.dot.mail.engine.text.Snippets.fromBody(preview?.plainText,preview?.html)
-        database.withTransaction {
-            val current = dao.message(messageId)
-            if(current==null) { directory.deleteRecursively(); return@withTransaction }
-            dao.clearAttachments(messageId); parts.forEach { dao.insertAttachment(it) }
-            dao.updateMessage(current.copy(text=null,html=null,bodyPath=directory.absolutePath,bodyLoaded=true,snippetFetched=true,remoteImages=remote,snippet=snippet,hasAttachments=parts.any { !it.inline }))
-            rebuildThread(message.threadId)
-        }
-    } }
-    override suspend fun openAttachment(attachment: Attachment): String = withContext(Dispatchers.IO) {
-        dao.attachment(attachment.id)?.localUri ?: run { loadBody(attachment.messageId); dao.attachment(attachment.id)?.localUri ?: error("Attachment no longer available") }
+        return result.toString().takeUnless { it.isBlank() || it=="." || it==".." } ?: "attachment"
     }
+    internal fun uri(file: File): String = FileProvider.getUriForFile(context, "${context.packageName}.attachments", file).toString()
+    override suspend fun loadBody(messageId:Long) { storage.ensureBody(messageId) }
+    override suspend fun openAttachment(attachment:Attachment):String = storage.open(attachment.id)
     internal suspend fun upsertHeader(folder: FolderRow, header: Header, rebuild: Boolean = true): Pair<Long, Boolean> {
+        if(folder.role=="SENT") markCorresponded(folder.accountId,(header.to+header.cc+header.bcc).map { EmailAddress(it.email,it.name) },header.sentAt)
         val old = dao.byUid(folder.id, header.uid) ?: header.messageId?.let { mid -> dao.pendingMessage(folder.id,mid) ?: dao.unkeyedPending(folder.id).firstNotNullOfOrNull { id -> dao.message(id)?.takeIf { Codec.field(it.header,"messageId")==mid } } }
         if (old != null) {
             // Pending optimistic changes win until replay completes.
             val pending = dao.operations(folder.accountId).any { it.messageLocalId == old.id || (it.folderId == folder.id && it.uid == header.uid && it.validity == folder.validity) }
             dao.updateMessage(old.copy(uid = header.uid, header=Codec.header(header), messageIdKey=header.messageId, unread = if (pending) old.unread else !header.flags.seen, starred = if (pending) old.starred else header.flags.starred))
+            if(old.header!=Codec.header(header)) indexSenders(old.id,header)
             if(rebuild) rebuildThread(old.threadId); return old.threadId to false
         }
         val keys = Threading.keys(header)
@@ -271,8 +287,9 @@ internal class RealMailGraph(
             val previous = dao.threadKey(folder.accountId, key)?.let { dao.threadRow(it) }
             if (previous == null || previous.lastAt <= header.sentAt) dao.putKey(ThreadKeyRow(folder.accountId, key, threadId))
         }
-        dao.insertMessage(MessageRow(accountId = folder.accountId, folderId = folder.id, threadId = threadId, uid = header.uid, header = Codec.header(header), messageIdKey=header.messageId, senderSearch = header.from.joinToString(" ") { "${it.name.orEmpty()} ${it.email}" }, recipientSearch = header.to.joinToString(" ") { "${it.name.orEmpty()} ${it.email}" }, subject = header.subject, sentAt = header.sentAt, unread = !header.flags.seen, starred = header.flags.starred, hasAttachments = header.hasAttachments))
-        (header.from + header.to + header.cc).forEach { dao.putContact(ContactRow(folder.accountId, it.email, it.name, header.sentAt)) }
+        val localId=dao.insertMessage(MessageRow(accountId = folder.accountId, folderId = folder.id, threadId = threadId, uid = header.uid, header = Codec.header(header), messageIdKey=header.messageId, senderSearch = header.from.joinToString(" ") { "${it.name.orEmpty()} ${it.email}" }, recipientSearch = header.to.joinToString(" ") { "${it.name.orEmpty()} ${it.email}" }, subject = header.subject, sentAt = header.sentAt, unread = !header.flags.seen, starred = header.flags.starred, hasAttachments = header.hasAttachments))
+        indexSenders(localId,header)
+        (header.from + header.to + header.cc).forEach { address -> canonicalContactEmail(address.email)?.let { dao.putContact(ContactRow(folder.accountId,it,address.name?.take(512),header.sentAt)) } }
         if(rebuild) rebuildThread(threadId); return threadId to true
     }
     internal suspend fun rebuildThread(id: Long) {
@@ -298,7 +315,7 @@ internal class RealMailGraph(
         } else dao.insertOperation(OperationRow(accountId = message.accountId, folderId = source.id, validity = source.validity, uid = message.uid, action = "MOVE", target = target.path, messageLocalId = message.id))
         dao.updateMessage(message.copy(folderId = target.id, uid = -message.id, messageIdKey=message.messageIdKey ?: Codec.field(message.header,"messageId")))
     }
-    private suspend fun pendingMove(message: MessageRow): OperationRow? {
+    internal suspend fun pendingMove(message: MessageRow): OperationRow? {
         val candidates = dao.operations(message.accountId).filter { it.action == "MOVE" && (it.messageLocalId == message.id || it.messageLocalId == null) }
         return candidates.firstOrNull { it.messageLocalId == message.id } ?: candidates.filter { it.target == dao.folder(message.folderId)?.path }.singleOrNull()
     }
@@ -478,6 +495,7 @@ internal class RealMailGraph(
         val messageId = -localId
         dao.draftForMessage(messageId)?.let { return Codec.draft(it.json).copy(localId = it.id) }
         loadBody(messageId)
+        storage.ensureAttachments(messageId)
         return draftLock.withLock { database.withTransaction {
             dao.draftForMessage(messageId)?.let { return@withTransaction Codec.draft(it.json).copy(localId = it.id) }
             val message = dao.message(messageId) ?: return@withTransaction null
@@ -524,6 +542,7 @@ internal class RealMailGraph(
     }
     override suspend fun prepareReply(messageId: Long, mode: ReplyMode): Draft = withContext(Dispatchers.IO) {
         loadBody(messageId)
+        if(mode==ReplyMode.FORWARD) storage.ensureAttachments(messageId)
         val m = requireNotNull(dao.message(messageId)); val account = requireNotNull(dao.account(m.accountId))
         val from = Codec.addressField(m.header, "replyTo").ifEmpty { Codec.addressField(m.header, "from") }
         val to = if (mode == ReplyMode.FORWARD) emptyList() else from
@@ -543,7 +562,7 @@ internal class RealMailGraph(
         requireNotNull(dao.account(draft.accountId))
         val frozen = cacheAttachments(draft).first
         val due = maxOf(System.currentTimeMillis() + undoWindowMs.coerceIn(0, 60_000), draft.scheduledAt ?: 0)
-        val id = database.withTransaction { val id = dao.insertOutbox(OutboxRow(accountId = draft.accountId, draft = Codec.draft(frozen), dueAt = due)); if (draft.localId != 0L) removeDraftAndSource(draft.localId); id }
+        val id = database.withTransaction { val id = dao.insertOutbox(OutboxRow(accountId = draft.accountId, draft = Codec.draft(frozen), dueAt = due)); markCorresponded(draft.accountId,frozen.to+frozen.cc+frozen.bcc); if (draft.localId != 0L) removeDraftAndSource(draft.localId); id }
         if (scheduling) WorkScheduling.outbox(context, id, due)
         if(draft.localId!=0L) requestSync()
         id
@@ -620,7 +639,7 @@ internal class RealMailGraph(
                 val file = attachmentFile(draft.accountId, "${UUID.randomUUID()}/$safeName")
                 try {
                     context.contentResolver.openInputStream(parsedUri)!!.use { input -> file.outputStream().use { output -> copyBounded(input, output, (25 * 1024 * 1024 - total).toInt()) } }
-                    total += file.length()
+                    total += file.length(); storage.changed(draft.accountId,file.length())
                 } catch (e: Exception) { file.delete(); throw e }
                 uri(file).also { sources.put(source, it) }
             }

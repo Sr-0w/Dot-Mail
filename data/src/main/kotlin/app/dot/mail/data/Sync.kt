@@ -32,7 +32,7 @@ internal suspend fun RealMailGraph.syncAll(
             async { limit.withPermit { syncAccount(account,scheduled,primaryMailbox,onReady) } }
         }.awaitAll()
     }
-    try { cacheCleanup.run() } catch(e:Exception) { SyncDiagnostics.warn("Private cache cleanup",e) }
+    try { if(cacheCleanup.run()) storage.invalidateAll() } catch(e:Exception) { SyncDiagnostics.warn("Private cache cleanup",e) }
     results.all { it }
 }
 
@@ -43,7 +43,8 @@ private suspend fun RealMailGraph.syncAccount(
     onReady:suspend (Long,RemoteFolder,Boolean,String?)->Unit,
 ):Boolean {
     val settings=AccountSettingsStore.get(context)
-    val preferences=settings.current(account.id)
+    val storedPolicy=storage.preferences.takeIf { it.configured(account.id) }?.policy(account.id)
+    val preferences=settings.current(account.id).let { current -> if(storedPolicy==null) current else current.copy(syncWindowDays=if(storedPolicy.retention==app.dot.mail.data.model.RetentionMode.LAST_DAYS) storedPolicy.days else 0) }
     if(scheduled && (account.authError || !isScheduledSyncDue(preferences,settings.lastSynced(account.id)))) return true
     syncing.update { it+account.id }
     var stage="Connect"
@@ -58,7 +59,7 @@ private suspend fun RealMailGraph.syncAccount(
             var warning:String?=null
             val previousWindow=settings.appliedWindow(account.id)
             if(previousWindow!=null && previousWindow!=preferences.syncWindowDays && dao.operations(account.id).isEmpty()) {
-                dao.folders(account.id).forEach { dao.updateFolder(it.copy(validity=0,nextUid=1,modSeq=-1)) }
+                dao.folders(account.id).forEach { dao.updateFolder(it.copy(nextUid=1,modSeq=-1)) }
             }
             stage="Folder commands"
             runFolderOps(account,config,credentials).let { if(!it.success) success=false; warning=it.warning }
@@ -80,7 +81,7 @@ private suspend fun RealMailGraph.syncAccount(
             val abort=java.util.concurrent.atomic.AtomicBoolean(false)
             suspend fun synchronize(folder:RemoteFolder):MailboxSyncOutcome {
                 if(abort.get()) return MailboxSyncOutcome(false)
-                val result=syncOneFolder(account,config,credentials,folder,if(preferences.syncWindowDays<=0) 5000 else 500,preferences.syncWindowDays) { ok,reason -> onReady(account.id,folder,ok,reason) }
+                val result=syncOneFolder(account,config,credentials,folder,if(storedPolicy!=null) minOf(500,if(storedPolicy.retention==app.dot.mail.data.model.RetentionMode.LATEST_MESSAGES) storedPolicy.latestMessages else 500) else if(preferences.syncWindowDays<=0) 5000 else 500,preferences.syncWindowDays) { ok,reason -> onReady(account.id,folder,ok,reason) }
                 if(result.failure?.transient==true) abort.set(true)
                 return result
             }
@@ -100,6 +101,7 @@ private suspend fun RealMailGraph.syncAccount(
             if(success && warning==null) {
                 settings.markWindowApplied(account.id,preferences.syncWindowDays)
                 settings.markSynced(account.id)
+                if(scheduling && storage.preferences.configured(account.id) && !storage.preferences.paused(account.id)) WorkScheduling.offline(context,account.id,storage.preferences.policy(account.id))
             }
             val operationError=dao.operations(account.id).firstNotNullOfOrNull { it.error }
             dao.syncError(account.id,warning ?: if(results.any { it.deferredExpunge }) "Move marked originals deleted; server lacks targeted expunge"

@@ -86,45 +86,57 @@ object Mime {
         return message
     }
     /** Streams decoded MIME parts into caller-owned private files, retaining no attachment arrays. */
-    fun cache(part: Part, directory: java.io.File, maxBytes: Long = 25L * 1024 * 1024): CachedBody {
+    fun cache(part: Part, directory: java.io.File, maxBytes: Long = 25L * 1024 * 1024,includeAttachments:Boolean=true,checkCancelled:()->Unit={}): CachedBody {
         directory.mkdirs()
         val texts = mutableListOf<java.io.File>(); val htmls = mutableListOf<java.io.File>(); val attachments = mutableListOf<CachedPart>()
+        val metadata=mutableListOf<RemotePart>()
         var remaining = maxBytes
-        fun save(p: Part, name: String): java.io.File = java.io.File(directory, name).also { file ->
-            p.inputStream.use { input -> file.outputStream().use { output ->
-                val buffer = ByteArray(8192)
-                while (true) { val count = input.read(buffer); if (count < 0) break; require(count <= remaining) { "Message exceeds download limit" }; remaining -= count; output.write(buffer,0,count) }
-            } }
+        var partCount=0
+        fun output(file:java.io.File):java.io.OutputStream = object:java.io.FilterOutputStream(file.outputStream()) {
+            override fun write(value:Int) { checkCancelled(); require(remaining>0) { "Message exceeds download limit" }; remaining--; out.write(value) }
+            override fun write(bytes:ByteArray,offset:Int,length:Int) { checkCancelled(); require(length<=remaining) { "Message exceeds download limit" }; remaining-=length; out.write(bytes,offset,length) }
         }
-        fun visit(p: Part, id: String, depth: Int) {
+        fun save(p: Part, name: String): java.io.File = java.io.File(directory,name).also { file ->
+            p.inputStream.use { input -> output(file).use { target -> input.copyTo(target,8192) } }
+        }
+        fun visit(p: Part, id: String, depth: Int,materialized:Boolean=false) {
+            checkCancelled()
             require(depth < 40) { "MIME nesting limit exceeded" }
+            require(++partCount<=512) { "MIME part limit exceeded" }
             val type = safeType(p)
             val disposition = runCatching { p.disposition }.getOrNull()
             val name = runCatching { p.fileName }.getOrNull()
-            val cid = runCatching { p.getHeader("Content-ID")?.firstOrNull()?.trim()?.trim('<','>') }.getOrNull()
+            val cid = runCatching { p.getHeader("Content-ID")?.firstOrNull()?.trim()?.trim('<','>')?.takeIf { it.length<=512 } }.getOrNull()
             if (type == "multipart/encrypted" && Pgp.protocol(p) == "application/pgp-encrypted") {
                 // PGP/MIME (RFC 3156): keep only the ciphertext; the reader decrypts it in memory through OpenKeychain.
                 val multipart = p.content as Multipart
-                if (multipart.count >= 2) save(multipart.getBodyPart(1), Pgp.ENCRYPTED_FILE) else for (i in 0 until multipart.count) visit(multipart.getBodyPart(i), "$id.$i", depth+1)
+                if (multipart.count >= 2) save(multipart.getBodyPart(1), Pgp.ENCRYPTED_FILE) else for (i in 0 until multipart.count) visit(multipart.getBodyPart(i), "$id.$i", depth+1,materialized)
             } else if (type == "multipart/signed" && Pgp.protocol(p) == "application/pgp-signature") {
                 // Keep the signed entity byte-for-byte (headers + body, CRLF) and the detached signature for verification;
                 // the signed content is still shown normally.
                 val multipart = p.content as Multipart
                 if (multipart.count >= 2) {
-                    java.io.File(directory, Pgp.SIGNED_FILE).outputStream().use { out -> multipart.getBodyPart(0).writeTo(out) }
+                    val raw=java.io.File(directory,"signed-entity-$id.tmp")
+                    output(raw).use { out -> multipart.getBodyPart(0).writeTo(out) }
+                    raw.copyTo(java.io.File(directory,Pgp.SIGNED_FILE),overwrite=true)
                     save(multipart.getBodyPart(1), Pgp.SIGNATURE_FILE)
-                    visit(multipart.getBodyPart(0), "$id.0", depth+1)
-                } else for (i in 0 until multipart.count) visit(multipart.getBodyPart(i), "$id.$i", depth+1)
+                    // The signed envelope already contains its attachments. Read cached bytes, preserving
+                    // the original verification entity and avoiding a second network transfer.
+                    jakarta.mail.util.SharedFileInputStream(raw).use { input -> visit(MimeBodyPart(input),"$id.0",depth+1,true) }
+                    raw.delete()
+                } else for (i in 0 until multipart.count) visit(multipart.getBodyPart(i), "$id.$i", depth+1,materialized)
             } else if (type.startsWith("multipart/")) {
                 val multipart = p.content as Multipart
-                for (i in 0 until multipart.count) visit(multipart.getBodyPart(i), "$id.$i", depth+1)
+                for (i in 0 until multipart.count) visit(multipart.getBodyPart(i), "$id.$i", depth+1,materialized)
             } else if (name != null || disposition.equals(Part.ATTACHMENT,true) || type !in setOf("text/plain","text/html") || cid != null) {
-                attachments += CachedPart(id, name?.let { runCatching { MimeUtility.decodeText(it) }.getOrDefault(it) } ?: "attachment", type, cid, disposition.equals(Part.INLINE,true) || (cid != null && !disposition.equals(Part.ATTACHMENT,true)), save(p,"part-$id"))
+                val filename=(name?.let { runCatching { MimeUtility.decodeText(it) }.getOrDefault(it) } ?: "attachment").let { raw -> if(raw.length<=1024) raw else raw.substring(0,if(Character.isHighSurrogate(raw[1023])) 1023 else 1024) }
+                val inline=disposition.equals(Part.INLINE,true) || (cid != null && !disposition.equals(Part.ATTACHMENT,true))
+                metadata+=RemotePart(id,filename,type,cid,inline,runCatching { p.size.toLong() }.getOrDefault(-1))
+                if(includeAttachments || inline || materialized) attachments += CachedPart(id,filename,type,cid,inline,save(p,"part-$id"))
             } else {
-                val raw = save(p,"text-$id")
                 val charset = runCatching { jakarta.mail.internet.ContentType(p.contentType).getParameter("charset")?.let { java.nio.charset.Charset.forName(it) } }.getOrNull() ?: Charsets.UTF_8
-                val utf = java.io.File(directory,"utf-$id")
-                raw.reader(charset).use { input -> utf.writer(Charsets.UTF_8).use { output -> input.copyTo(output) } }; raw.delete()
+                val utf=java.io.File(directory,"utf-$id")
+                p.inputStream.reader(charset).use { input -> output(utf).writer(Charsets.UTF_8).use { target -> input.copyTo(target) } }
                 if (type=="text/html") htmls += utf else texts += utf
             }
         }
@@ -134,7 +146,7 @@ object Mime {
             target.outputStream().use { out -> files.forEachIndexed { index,file -> if(index>0) out.write(10); file.inputStream().use { it.copyTo(out) }; file.delete() } }
             return target
         }
-        try { visit(part,"1",0); return CachedBody(join(texts,"plain.txt"),join(htmls,"body.html"),attachments) }
+        try { visit(part,"1",0); return CachedBody(join(texts,"plain.txt"),join(htmls,"body.html"),attachments,metadata) }
         catch (e: Exception) { directory.deleteRecursively(); throw e }
     }
     private fun safeType(part: Part): String = runCatching { part.contentType.substringBefore(';').trim().lowercase() }.getOrDefault("application/octet-stream")
