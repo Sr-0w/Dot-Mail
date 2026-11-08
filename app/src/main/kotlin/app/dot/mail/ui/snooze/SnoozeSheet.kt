@@ -28,12 +28,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import app.dot.design.Dot
 import app.dot.design.DotShapes
 import app.dot.design.DotSpacing
 import app.dot.design.components.ButtonStyle
 import app.dot.design.components.DotButton
 import app.dot.design.components.ListRow
+import app.dot.mail.R
 import app.dot.mail.engine.time.describe
 import app.dot.mail.engine.time.presets
 import java.time.Instant
@@ -60,14 +62,14 @@ fun SnoozeSheet(onDismiss: () -> Unit, onPick: (Long) -> Unit) {
     var picking by remember { mutableStateOf(false) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = c.surface, shape = DotShapes.sheet, dragHandle = null) {
-        Text("Snooze until", style = Dot.type.title, color = c.textPrimary, modifier = Modifier.padding(DotSpacing.gutter))
+        Text(stringResource(R.string.snooze_title), style = Dot.type.title, color = c.textPrimary, modifier = Modifier.padding(DotSpacing.gutter))
         options.forEach { o ->
             ListRow(
-                title = o.label, subtitle = describe(o.at, now, Locale.getDefault(), use24h), icon = Icons.Outlined.Schedule,
+                title = presetLabel(o.id, o.label), subtitle = describeWake(context, o.at.toInstant().toEpochMilli(), now), icon = Icons.Outlined.Schedule,
                 onClick = { onPick(o.at.toInstant().toEpochMilli()) },
             )
         }
-        ListRow("Pick date & time", icon = Icons.Outlined.CalendarMonth, onClick = { picking = true })
+        ListRow(stringResource(R.string.snooze_pick_date_time), icon = Icons.Outlined.CalendarMonth, onClick = { picking = true })
         Spacer(Modifier.navigationBarsPadding().height(DotSpacing.l))
     }
     if (picking) DateTimeDialog(use24h, onDismiss = { picking = false }, onPick = onPick)
@@ -81,6 +83,7 @@ private fun DateTimeDialog(use24h: Boolean, onDismiss: () -> Unit, onPick: (Long
     val today = remember { LocalDate.now(zone) }
     var step by remember { mutableStateOf(0) } // 0 = date, 1 = time
     var error by remember { mutableStateOf<String?>(null) }
+    val futureError = stringResource(R.string.snooze_error_future)
     val dateState = rememberDatePickerState(
         initialSelectedDateMillis = today.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
         selectableDates = object : SelectableDates {
@@ -122,18 +125,35 @@ private fun DateTimeDialog(use24h: Boolean, onDismiss: () -> Unit, onPick: (Long
             }
         },
         confirmButton = {
-            DotButton(if (step == 0) "Next" else "Snooze", compact = true, onClick = {
+            DotButton(stringResource(if (step == 0) R.string.snooze_next else R.string.snooze_confirm), compact = true, onClick = {
                 if (step == 0) {
                     if (dateState.selectedDateMillis != null) step = 1
                 } else {
                     val day = Instant.ofEpochMilli(dateState.selectedDateMillis ?: return@DotButton).atZone(ZoneOffset.UTC).toLocalDate()
                     val at = LocalDateTime.of(day, LocalTime.of(timeState.hour, timeState.minute)).atZone(zone)
-                    if (at.toInstant().toEpochMilli() <= System.currentTimeMillis()) error = "Pick a time in the future." else onPick(at.toInstant().toEpochMilli())
+                    if (at.toInstant().toEpochMilli() <= System.currentTimeMillis()) error = futureError else onPick(at.toInstant().toEpochMilli())
                 }
             })
         },
         dismissButton = {
-            DotButton(if (step == 0) "Cancel" else "Back", { if (step == 0) onDismiss() else { step = 0; error = null } }, style = ButtonStyle.Ghost, compact = true)
+            DotButton(stringResource(if (step == 0) R.string.snooze_cancel else R.string.snooze_back), { if (step == 0) onDismiss() else { step = 0; error = null } }, style = ButtonStyle.Ghost, compact = true)
         },
     )
 }
+
+/** The engine's English preset label, replaced by the translated one for the known presets. */
+@Composable
+private fun presetLabel(id: String, fallback: String): String = when (id) {
+    "later_today" -> stringResource(R.string.snooze_later_today)
+    "this_evening" -> stringResource(R.string.snooze_this_evening_label)
+    "tomorrow" -> stringResource(R.string.snooze_tomorrow)
+    "this_weekend" -> stringResource(R.string.snooze_this_weekend)
+    "next_week" -> stringResource(R.string.snooze_next_week)
+    else -> fallback
+}
+
+/** "Today 14:30", "Tomorrow 08:00", "Sat 08:00", "12 Dec 08:00" in the user's language and clock style. */
+fun describeWake(context: android.content.Context, epochMillis: Long, nowMillis: ZonedDateTime = ZonedDateTime.now()): String = describe(
+    Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()), nowMillis, Locale.getDefault(), DateFormat.is24HourFormat(context),
+    todayLabel = context.getString(R.string.snooze_today), tomorrowLabel = context.getString(R.string.snooze_tomorrow),
+)

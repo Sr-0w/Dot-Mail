@@ -110,4 +110,256 @@
     <string name="setup_error_auth_failed">Anmeldung fehlgeschlagen: %1$s</string>
     <string name="setup_error_connection_failed">Verbindung fehlgeschlagen: %1$s</string>
     <string name="setup_error_certificate">Dem Zertifikat des Servers wird nicht vertraut: %1$s</string>
+
+    <!-- Inbox, drawer, search, outbox, snooze, widget -->
+    <string name="inbox_open_mailboxes">Postfächer öffnen</string>
+    <string name="inbox_search">Suche</string>
+    <string name="inbox_all_accounts">Alle Konten</string>
+    <string name="inbox_compose">Verfassen</string>
+    <string name="inbox_role_inbox">Posteingang</string>
+    <string name="inbox_role_sent">Gesendet</string>
+    <string name="inbox_role_drafts">Entwürfe</string>
+    <string name="inbox_role_archive">Archiv</string>
+    <string name="inbox_role_trash">Papierkorb</string>
+    <string name="inbox_role_spam">Spam</string>
+    <string name="inbox_role_all_mail">Alle E-Mails</string>
+    <string name="inbox_role_starred">Markiert</string>
+    <string name="inbox_role_custom">Ordner</string>
+    <string name="inbox_role_snoozed">Zurückgestellt</string>
+    <string name="inbox_failing_single_account">%1$s: %2$s</string>
+    <plurals name="inbox_failing_accounts">
+        <item quantity="one">%1$d Konto: %2$s</item>
+        <item quantity="other">%1$d Konten: %2$s</item>
+    </plurals>
+    <string name="inbox_sync_problem">Synchronisierungsproblem</string>
+    <string name="inbox_sign_in_again_suffix"> — erneut anmelden</string>
+    <plurals name="inbox_confirm_trash_title">
+        <item quantity="one">In den Papierkorb verschieben?</item>
+        <item quantity="other">%1$d Unterhaltungen in den Papierkorb verschieben?</item>
+    </plurals>
+    <string name="inbox_delete">Löschen</string>
+    <string name="inbox_cancel">Abbrechen</string>
+    <string name="inbox_move_to">Verschieben nach</string>
+    <string name="inbox_error_load_title">E-Mails konnten nicht geladen werden</string>
+    <string name="inbox_error_load_body">Verbindung prüfen und zum Wiederholen nach unten ziehen.</string>
+    <string name="inbox_empty_inbox_title">Alles erledigt</string>
+    <string name="inbox_empty_inbox_body">Neue E-Mails erscheinen hier.</string>
+    <string name="inbox_empty_starred_title">Keine markierten E-Mails</string>
+    <string name="inbox_empty_starred_body">Markieren Sie eine Unterhaltung, um sie griffbereit zu halten.</string>
+    <string name="inbox_empty_drafts_title">Keine Entwürfe</string>
+    <string name="inbox_empty_drafts_body">Nicht gesendete Nachrichten werden hier automatisch gespeichert.</string>
+    <string name="inbox_empty_sent_title">Noch nichts gesendet</string>
+    <string name="inbox_empty_sent_body">Gesendete Nachrichten erscheinen hier.</string>
+    <string name="inbox_empty_spam_title">Kein Spam</string>
+    <string name="inbox_empty_spam_body">Verdächtige E-Mails landen hier.</string>
+    <string name="inbox_empty_trash_title">Der Papierkorb ist leer</string>
+    <string name="inbox_empty_trash_body">Gelöschte Unterhaltungen bleiben eine Weile hier.</string>
+    <string name="inbox_empty_snoozed_title">Nichts zurückgestellt</string>
+    <string name="inbox_empty_snoozed_body">Zurückgestellte Unterhaltungen warten hier bis zum gewählten Zeitpunkt.</string>
+    <string name="inbox_empty_folder_title">Nichts vorhanden</string>
+    <string name="inbox_empty_folder_body">Dieser Ordner ist leer.</string>
+    <string name="inbox_action_archive">Archivieren</string>
+    <string name="inbox_action_delete">Löschen</string>
+    <string name="inbox_action_toggle_read">Gelesenstatus umschalten</string>
+    <string name="inbox_action_toggle_star">Markierung umschalten</string>
+    <string name="inbox_action_snooze">Zurückstellen</string>
+    <string name="inbox_to_prefix">An %1$s</string>
+    <string name="inbox_draft_label">Entwurf</string>
+    <string name="inbox_select">Auswählen</string>
+    <string name="inbox_deselect">Auswahl aufheben</string>
+    <string name="inbox_state_unread">Ungelesen.</string>
+    <string name="inbox_state_starred">Markiert.</string>
+    <string name="inbox_state_has_attachments">Hat Anhänge.</string>
+    <string name="inbox_state_selected">Ausgewählt.</string>
+    <string name="inbox_selected">Ausgewählt</string>
+    <plurals name="inbox_messages_count">
+        <item quantity="one">%1$d Nachricht</item>
+        <item quantity="other">%1$d Nachrichten</item>
+    </plurals>
+    <string name="inbox_no_subject">(kein Betreff)</string>
+    <string name="inbox_me">ich</string>
+    <string name="inbox_unknown_sender">(unbekannter Absender)</string>
+    <plurals name="inbox_selected_count">
+        <item quantity="one">%1$d ausgewählt</item>
+        <item quantity="other">%1$d ausgewählt</item>
+    </plurals>
+    <string name="inbox_clear_selection">Auswahl aufheben</string>
+    <string name="inbox_action_unsnooze">Zurückstellen aufheben</string>
+    <string name="inbox_action_delete_forever">Endgültig löschen</string>
+    <string name="inbox_action_mark_read">Als gelesen markieren</string>
+    <string name="inbox_more_actions">Weitere Aktionen</string>
+    <string name="inbox_action_mark_unread">Als ungelesen markieren</string>
+    <string name="inbox_action_star">Markieren</string>
+    <string name="inbox_action_snooze_ellipsis">Zurückstellen…</string>
+    <string name="inbox_action_move_ellipsis">Verschieben nach…</string>
+    <string name="inbox_action_not_spam">Kein Spam</string>
+    <string name="inbox_action_report_spam">Als Spam melden</string>
+    <plurals name="inbox_archived_toast">
+        <item quantity="one">Unterhaltung archiviert</item>
+        <item quantity="other">%1$d Unterhaltungen archiviert</item>
+    </plurals>
+    <plurals name="inbox_trashed_toast">
+        <item quantity="one">Unterhaltung in den Papierkorb verschoben</item>
+        <item quantity="other">%1$d Unterhaltungen in den Papierkorb verschoben</item>
+    </plurals>
+    <plurals name="inbox_spam_toast">
+        <item quantity="one">Unterhaltung als Spam markiert</item>
+        <item quantity="other">%1$d Unterhaltungen als Spam markiert</item>
+    </plurals>
+    <plurals name="inbox_not_spam_toast">
+        <item quantity="one">Unterhaltung in den Posteingang verschoben</item>
+        <item quantity="other">%1$d Unterhaltungen in den Posteingang verschoben</item>
+    </plurals>
+    <plurals name="inbox_deleted_toast">
+        <item quantity="one">Unterhaltung gelöscht</item>
+        <item quantity="other">%1$d Unterhaltungen gelöscht</item>
+    </plurals>
+    <plurals name="inbox_snoozed_toast">
+        <item quantity="one">Zurückgestellt</item>
+        <item quantity="other">%1$d Unterhaltungen zurückgestellt</item>
+    </plurals>
+    <plurals name="inbox_unsnoozed_toast">
+        <item quantity="one">Wieder in Ihrer Liste</item>
+        <item quantity="other">%1$d Unterhaltungen sind zurück</item>
+    </plurals>
+    <plurals name="inbox_moved_toast">
+        <item quantity="one">Verschoben</item>
+        <item quantity="other">%1$d Unterhaltungen verschoben</item>
+    </plurals>
+    <string name="inbox_error_action_failed">Diese Aktion konnte nicht ausgeführt werden</string>
+    <string name="inbox_error_snooze_failed">Zurückstellen fehlgeschlagen</string>
+    <string name="inbox_error_unsnooze_failed">Aufheben fehlgeschlagen</string>
+    <string name="inbox_error_move_failed">Verschieben fehlgeschlagen</string>
+    <string name="inbox_sync_still_running">Wird im Hintergrund weiter synchronisiert</string>
+    <string name="inbox_error_refresh_failed">Aktualisierung fehlgeschlagen</string>
+    <string name="inbox_today">Heute</string>
+    <string name="inbox_yesterday">Gestern</string>
+    <string name="inbox_just_now">Gerade eben</string>
+    <plurals name="inbox_relative_minutes_ago">
+        <item quantity="one">Vor %1$d Min.</item>
+        <item quantity="other">Vor %1$d Min.</item>
+    </plurals>
+    <plurals name="inbox_relative_hours_ago">
+        <item quantity="one">Vor %1$d Std.</item>
+        <item quantity="other">Vor %1$d Std.</item>
+    </plurals>
+    <plurals name="inbox_relative_days_ago">
+        <item quantity="one">Vor %1$d Tag</item>
+        <item quantity="other">Vor %1$d Tagen</item>
+    </plurals>
+    <string name="drawer_all_inboxes">Alle Posteingänge</string>
+    <string name="drawer_outbox">Postausgang</string>
+    <string name="drawer_outbox_needs_attention">Postausgang · prüfen</string>
+    <string name="drawer_snoozed">Zurückgestellt</string>
+    <string name="drawer_folders_section">Ordner</string>
+    <string name="drawer_new_folder">Neuer Ordner</string>
+    <string name="drawer_accounts_section">Konten</string>
+    <string name="drawer_sync_problem">Synchronisierungsproblem: %1$s</string>
+    <string name="drawer_add_account">Konto hinzufügen</string>
+    <string name="drawer_settings">Einstellungen</string>
+    <string name="drawer_folder_options">Ordneroptionen</string>
+    <string name="drawer_folder_error_generic">Ordner konnte nicht geändert werden.</string>
+    <string name="drawer_folder_rename">Umbenennen</string>
+    <string name="drawer_folder_move_into_ellipsis">Verschieben in…</string>
+    <string name="drawer_folder_delete">Löschen</string>
+    <string name="drawer_folder_close">Schließen</string>
+    <string name="drawer_folder_name_label">Name</string>
+    <string name="drawer_folder_create">Erstellen</string>
+    <string name="drawer_folder_cancel">Abbrechen</string>
+    <string name="drawer_folder_rename_title">Ordner umbenennen</string>
+    <string name="drawer_folder_move_title">%1$s verschieben</string>
+    <string name="drawer_folder_move_into_label">Verschieben in</string>
+    <string name="drawer_folder_move_action">Verschieben</string>
+    <string name="drawer_folder_delete_title">%1$s löschen?</string>
+    <string name="drawer_folder_delete_empty_body">Der Ordner ist leer. Er wird auch auf Ihrem Mailserver gelöscht.</string>
+    <plurals name="drawer_folder_delete_move_trash_body">
+        <item quantity="one">Die %1$d Nachricht wird zuerst in den Papierkorb verschoben, danach wird der Ordner auf Ihrem Mailserver gelöscht.</item>
+        <item quantity="other">Die %1$d Nachrichten werden zuerst in den Papierkorb verschoben, danach wird der Ordner auf Ihrem Mailserver gelöscht.</item>
+    </plurals>
+    <string name="drawer_folder_delete_no_trash_body">Dieser Ordner enthält noch Nachrichten und es gibt keinen Papierkorb, in den sie verschoben werden können.</string>
+    <string name="drawer_folder_move_trash_and_delete">In den Papierkorb verschieben und löschen</string>
+    <string name="drawer_folder_inside_label">In</string>
+    <string name="drawer_folder_top_level">Oberste Ebene</string>
+    <string name="search_placeholder">Alle Konten durchsuchen</string>
+    <string name="search_error_title">Suche fehlgeschlagen</string>
+    <string name="search_error_body">Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.</string>
+    <string name="search_no_results_title">Keine Ergebnisse</string>
+    <string name="search_no_results_body">Keine Treffer für „%1$s“ in heruntergeladenen E-Mails oder auf Ihren Servern.</string>
+    <string name="search_hints_intro">Suchen Sie nach Absender, Betreff oder Wörtern in der Nachricht.</string>
+    <string name="search_hint_from">E-Mails eines Absenders</string>
+    <string name="search_hint_to">An eine Adresse gesendete E-Mails</string>
+    <string name="search_hint_subject">Wörter im Betreff</string>
+    <string name="search_hint_attachment">Nur mit Anhängen</string>
+    <string name="search_hint_state">Nach Status</string>
+    <string name="outbox_title">Postausgang</string>
+    <string name="outbox_busy_toast">Diese Nachricht wird gerade verarbeitet. Versuchen Sie es gleich noch einmal.</string>
+    <string name="outbox_empty_title">Der Postausgang ist leer</string>
+    <string name="outbox_empty_body">Geplante und ausstehende Nachrichten erscheinen hier.</string>
+    <string name="outbox_no_subject">(kein Betreff)</string>
+    <string name="outbox_to_prefix">An %1$s</string>
+    <string name="outbox_retry">Wiederholen</string>
+    <string name="outbox_delete">Löschen</string>
+    <string name="outbox_send_again_title">Erneut senden?</string>
+    <string name="outbox_send_again_body">Die Verbindung wurde beim Senden dieser Nachricht unterbrochen; möglicherweise wurde sie bereits zugestellt. Prüfen Sie Ihren Gesendet-Ordner oder fragen Sie den Empfänger, bevor Sie sie erneut senden.</string>
+    <string name="outbox_send_anyway">Trotzdem senden</string>
+    <string name="outbox_cancel">Abbrechen</string>
+    <string name="outbox_state_scheduled">Geplant · %1$s</string>
+    <string name="outbox_state_waiting_retry">Wartet auf Wiederholung</string>
+    <string name="outbox_state_queued">In Warteschlange</string>
+    <string name="outbox_state_sending">Wird gesendet…</string>
+    <string name="outbox_state_saving_sent">Wird in Gesendet gespeichert…</string>
+    <string name="outbox_state_needs_review">Überprüfung erforderlich</string>
+    <string name="snooze_title">Zurückstellen bis</string>
+    <string name="snooze_later_today">Später heute</string>
+    <string name="snooze_this_evening">Heute Abend</string>
+    <string name="snooze_tomorrow">Morgen</string>
+    <string name="snooze_this_weekend">Dieses Wochenende</string>
+    <string name="snooze_next_week">Nächste Woche</string>
+    <string name="snooze_today_at">Heute %1$s</string>
+    <string name="snooze_tomorrow_at">Morgen %1$s</string>
+    <string name="snooze_pick_date_time">Datum und Uhrzeit wählen</string>
+    <string name="snooze_next">Weiter</string>
+    <string name="snooze_confirm">Zurückstellen</string>
+    <string name="snooze_cancel">Abbrechen</string>
+    <string name="snooze_back">Zurück</string>
+    <string name="snooze_error_future">Wählen Sie einen Zeitpunkt in der Zukunft.</string>
+    <string name="widget_description">Anzahl ungelesener Nachrichten und neueste ungelesene Unterhaltungen</string>
+    <string name="widget_inbox_header">POSTEINGANG</string>
+    <string name="widget_all_caught_up">Alles erledigt</string>
+    <plurals name="widget_unread_label">
+        <item quantity="one">ungelesen</item>
+        <item quantity="other">ungelesen</item>
+    </plurals>
+    <string name="widget_open_to_read">Zum Lesen Dot Mail öffnen</string>
+    <string name="widget_unknown_sender">(unbekannter Absender)</string>
+    <string name="widget_no_subject">(kein Betreff)</string>
+
+    <!-- Inbox: mute -->
+    <string name="inbox_action_mute">Stummschalten</string>
+    <string name="inbox_action_unmute">Stummschaltung aufheben</string>
+    <string name="inbox_muted">Stummgeschaltet</string>
+    <string name="inbox_muted_toast">Stummgeschaltet: neue Nachrichten melden sich nicht</string>
+    <string name="inbox_unmuted_toast">Stummschaltung aufgehoben</string>
+    <string name="inbox_error_mute_failed">Stummschaltung konnte nicht geändert werden</string>
+
+    <!-- Inbox: sign-in banner & misc -->
+    <string name="inbox_banner_open_settings">Einstellungen öffnen</string>
+    <string name="inbox_banner_sign_in_again">Erneut anmelden</string>
+    <string name="inbox_failing_prefix_single">%1$s: </string>
+    <plurals name="inbox_failing_prefix_many">
+        <item quantity="one">%1$d Konto: </item>
+        <item quantity="other">%1$d Konten: </item>
+    </plurals>
+    <string name="inbox_snoozed_until">Bis %1$s</string>
+    <string name="inbox_error_load_generic">E-Mails konnten nicht geladen werden</string>
+
+    <!-- Drawer additions -->
+    <string name="drawer_attachments">Anhänge</string>
+    <string name="drawer_folder_notify_title">Bei neuen E-Mails benachrichtigen</string>
+    <string name="drawer_folder_notify_inbox_default">Für den Posteingang standardmäßig aktiv.</string>
+    <string name="drawer_folder_notify_other_default">Für andere Ordner standardmäßig aus.</string>
+
+    <!-- Snooze additions -->
+    <string name="snooze_today">Heute</string>
+    <string name="snooze_this_evening_label">Heute Abend</string>
 </resources>

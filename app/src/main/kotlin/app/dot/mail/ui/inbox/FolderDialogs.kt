@@ -34,6 +34,9 @@ import app.dot.design.components.DotMenuItem
 import app.dot.design.components.DotTextField
 import app.dot.design.components.ListRow
 import app.dot.design.components.dotSurfaceEnter
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import app.dot.mail.R
 import app.dot.mail.LocalMailGraph
 import app.dot.mail.data.model.Folder
 import app.dot.mail.data.model.FolderRole
@@ -69,13 +72,14 @@ fun FolderDialogs(
     val c = Dot.colors
     var error by remember(dialog) { mutableStateOf<String?>(null) }
     var busy by remember(dialog) { mutableStateOf(false) }
+    val genericError = stringResource(R.string.drawer_folder_error_generic)
 
     fun run(block: suspend () -> Unit) {
         busy = true; error = null
         scope.launch {
             try { block(); onDismiss() }
             catch (e: kotlinx.coroutines.CancellationException) { throw e }
-            catch (e: Exception) { error = e.message ?: "Couldn't change the folder." }
+            catch (e: Exception) { error = e.message ?: genericError }
             finally { busy = false }
         }
     }
@@ -93,17 +97,17 @@ fun FolderDialogs(
                     val overrides by rules.folderOverrides.collectAsStateWithLifecycle()
                     val notify = app.dot.mail.data.NotificationRules.effective(overrides, dialog.folder.id, dialog.folder.role.name)
                     app.dot.mail.ui.settings.ToggleRow(
-                        "Notify for new mail", if (dialog.folder.role == FolderRole.INBOX) "On by default for the Inbox." else "Off by default for other folders.",
+                        stringResource(R.string.drawer_folder_notify_title), stringResource(if (dialog.folder.role == FolderRole.INBOX) R.string.drawer_folder_notify_inbox_default else R.string.drawer_folder_notify_other_default),
                         Icons.Outlined.Notifications, notify,
                     ) { on -> rules.setFolderNotify(dialog.folder.id, dialog.folder.role.name, on) }
                     if (dialog.folder.role == FolderRole.CUSTOM) {
-                        ListRow("Rename", icon = Icons.Outlined.Edit, onClick = { onChange(FolderDialog.Rename(dialog.folder)) })
-                        ListRow("Move into…", icon = Icons.Outlined.DriveFileMove, onClick = { onChange(FolderDialog.Move(dialog.folder)) })
-                        ListRow("Delete", icon = Icons.Outlined.DeleteOutline, titleColor = c.danger, onClick = { onChange(FolderDialog.Delete(dialog.folder)) })
+                        ListRow(stringResource(R.string.drawer_folder_rename), icon = Icons.Outlined.Edit, onClick = { onChange(FolderDialog.Rename(dialog.folder)) })
+                        ListRow(stringResource(R.string.drawer_folder_move_into_ellipsis), icon = Icons.Outlined.DriveFileMove, onClick = { onChange(FolderDialog.Move(dialog.folder)) })
+                        ListRow(stringResource(R.string.drawer_folder_delete), icon = Icons.Outlined.DeleteOutline, titleColor = c.danger, onClick = { onChange(FolderDialog.Delete(dialog.folder)) })
                     }
                 }
             },
-            confirmButton = { DotButton("Close", onDismiss, style = ButtonStyle.Ghost, compact = true) },
+            confirmButton = { DotButton(stringResource(R.string.drawer_folder_close), onDismiss, style = ButtonStyle.Ghost, compact = true) },
         )
 
         FolderDialog.New -> {
@@ -114,19 +118,19 @@ fun FolderDialogs(
                 modifier = Modifier.dotSurfaceEnter(),
                 containerColor = c.surface,
                 shape = DotShapes.large,
-                title = { Text("New folder", style = Dot.type.title, color = c.textPrimary) },
+                title = { Text(stringResource(R.string.drawer_new_folder), style = Dot.type.title, color = c.textPrimary) },
                 text = {
                     Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(DotSpacing.m)) {
-                        DotTextField(name, { name = it; error = null }, label = "Name", isError = error != null, supporting = error)
+                        DotTextField(name, { name = it; error = null }, label = stringResource(R.string.drawer_folder_name_label), isError = error != null, supporting = error)
                         ParentPicker(folders, exclude = null, selected = parent, onSelect = { parent = it })
                     }
                 },
                 confirmButton = {
-                    DotButton("Create", enabled = name.isNotBlank() && !busy, loading = busy, compact = true, onClick = {
+                    DotButton(stringResource(R.string.drawer_folder_create), enabled = name.isNotBlank() && !busy, loading = busy, compact = true, onClick = {
                         run { graph.mail.createFolder(accountId, parent, name) }
                     })
                 },
-                dismissButton = { DotButton("Cancel", onDismiss, style = ButtonStyle.Ghost, compact = true) },
+                dismissButton = { DotButton(stringResource(R.string.drawer_folder_cancel), onDismiss, style = ButtonStyle.Ghost, compact = true) },
             )
         }
 
@@ -137,14 +141,14 @@ fun FolderDialogs(
                 modifier = Modifier.dotSurfaceEnter(),
                 containerColor = c.surface,
                 shape = DotShapes.large,
-                title = { Text("Rename folder", style = Dot.type.title, color = c.textPrimary) },
-                text = { DotTextField(name, { name = it; error = null }, label = "Name", isError = error != null, supporting = error) },
+                title = { Text(stringResource(R.string.drawer_folder_rename_title), style = Dot.type.title, color = c.textPrimary) },
+                text = { DotTextField(name, { name = it; error = null }, label = stringResource(R.string.drawer_folder_name_label), isError = error != null, supporting = error) },
                 confirmButton = {
-                    DotButton("Rename", enabled = name.isNotBlank() && name.trim() != dialog.folder.name && !busy, loading = busy, compact = true, onClick = {
+                    DotButton(stringResource(R.string.drawer_folder_rename), enabled = name.isNotBlank() && name.trim() != dialog.folder.name && !busy, loading = busy, compact = true, onClick = {
                         run { graph.mail.renameFolder(dialog.folder.id, name) }
                     })
                 },
-                dismissButton = { DotButton("Cancel", onDismiss, style = ButtonStyle.Ghost, compact = true) },
+                dismissButton = { DotButton(stringResource(R.string.drawer_folder_cancel), onDismiss, style = ButtonStyle.Ghost, compact = true) },
             )
         }
 
@@ -155,17 +159,17 @@ fun FolderDialogs(
                 modifier = Modifier.dotSurfaceEnter(),
                 containerColor = c.surface,
                 shape = DotShapes.large,
-                title = { Text("Move ${dialog.folder.name}", style = Dot.type.title, color = c.textPrimary) },
+                title = { Text(stringResource(R.string.drawer_folder_move_title, dialog.folder.name), style = Dot.type.title, color = c.textPrimary) },
                 text = {
                     Column {
-                        ParentPicker(folders, exclude = dialog.folder, selected = parent, onSelect = { parent = it }, label = "Move into")
+                        ParentPicker(folders, exclude = dialog.folder, selected = parent, onSelect = { parent = it }, label = stringResource(R.string.drawer_folder_move_into_label))
                         error?.let { Text(it, style = Dot.type.caption, color = c.danger, modifier = Modifier.padding(top = DotSpacing.s)) }
                     }
                 },
                 confirmButton = {
-                    DotButton("Move", enabled = !busy, loading = busy, compact = true, onClick = { run { graph.mail.moveFolder(dialog.folder.id, parent) } })
+                    DotButton(stringResource(R.string.drawer_folder_move_action), enabled = !busy, loading = busy, compact = true, onClick = { run { graph.mail.moveFolder(dialog.folder.id, parent) } })
                 },
-                dismissButton = { DotButton("Cancel", onDismiss, style = ButtonStyle.Ghost, compact = true) },
+                dismissButton = { DotButton(stringResource(R.string.drawer_folder_cancel), onDismiss, style = ButtonStyle.Ghost, compact = true) },
             )
         }
 
@@ -177,14 +181,14 @@ fun FolderDialogs(
                 modifier = Modifier.dotSurfaceEnter(),
                 containerColor = c.surface,
                 shape = DotShapes.large,
-                title = { Text("Delete ${dialog.folder.name}?", style = Dot.type.title, color = c.textPrimary) },
+                title = { Text(stringResource(R.string.drawer_folder_delete_title, dialog.folder.name), style = Dot.type.title, color = c.textPrimary) },
                 text = {
                     Column {
                         Text(
                             when {
-                                !hasMail -> "The folder is empty. It will also be deleted on your mail server."
-                                trash != null -> "Its ${dialog.folder.totalCount} messages move to Trash first, then the folder is deleted on your mail server."
-                                else -> "This folder still contains messages and there is no Trash folder to move them to."
+                                !hasMail -> stringResource(R.string.drawer_folder_delete_empty_body)
+                                trash != null -> pluralStringResource(R.plurals.drawer_folder_delete_move_trash_body, dialog.folder.totalCount, dialog.folder.totalCount)
+                                else -> stringResource(R.string.drawer_folder_delete_no_trash_body)
                             },
                             style = Dot.type.callout, color = c.textSecondary,
                         )
@@ -193,12 +197,12 @@ fun FolderDialogs(
                 },
                 confirmButton = {
                     DotButton(
-                        if (hasMail) "Move to Trash and delete" else "Delete", style = ButtonStyle.Danger,
+                        stringResource(if (hasMail) R.string.drawer_folder_move_trash_and_delete else R.string.drawer_folder_delete), style = ButtonStyle.Danger,
                         enabled = !busy && (!hasMail || trash != null), loading = busy, compact = true,
                         onClick = { run { graph.mail.deleteFolder(dialog.folder.id, if (hasMail) trash?.id else null); onDeleted(dialog.folder.id) } },
                     )
                 },
-                dismissButton = { DotButton("Cancel", onDismiss, style = ButtonStyle.Ghost, compact = true) },
+                dismissButton = { DotButton(stringResource(R.string.drawer_folder_cancel), onDismiss, style = ButtonStyle.Ghost, compact = true) },
             )
         }
     }
@@ -206,18 +210,18 @@ fun FolderDialogs(
 
 /** "Top level" plus every custom folder (indented by depth) except [exclude] and its subfolders. */
 @Composable
-private fun ParentPicker(folders: List<Folder>, exclude: Folder?, selected: Long?, onSelect: (Long?) -> Unit, label: String = "Inside") {
+private fun ParentPicker(folders: List<Folder>, exclude: Folder?, selected: Long?, onSelect: (Long?) -> Unit, label: String = stringResource(R.string.drawer_folder_inside_label)) {
     var open by remember { mutableStateOf(false) }
     val options = folders.filter { it.role == FolderRole.CUSTOM && !isSameOrDescendant(it, exclude) }.sortedBy { it.path.lowercase() }
     val current = options.firstOrNull { it.id == selected }
     Box {
         ListRow(
-            label, subtitle = current?.path ?: "Top level", onClick = { open = true },
+            label, subtitle = current?.path ?: stringResource(R.string.drawer_folder_top_level), onClick = { open = true },
             contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 8.dp),
         )
         DotMenu(open, { open = false }) {
             Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState())) {
-                DotMenuItem("Top level", null) { open = false; onSelect(null) }
+                DotMenuItem(stringResource(R.string.drawer_folder_top_level), null) { open = false; onSelect(null) }
                 options.forEach { f -> DotMenuItem(f.path, null) { open = false; onSelect(f.id) } }
             }
         }

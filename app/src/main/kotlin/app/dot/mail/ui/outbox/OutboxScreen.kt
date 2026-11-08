@@ -42,6 +42,8 @@ import app.dot.design.components.DotTopBar
 import app.dot.design.components.EmptyState
 import app.dot.design.components.Hairline
 import app.dot.design.components.dotSurfaceEnter
+import androidx.compose.ui.res.stringResource
+import app.dot.mail.R
 import app.dot.mail.LocalMailGraph
 import app.dot.mail.data.model.OutboxItem
 import app.dot.mail.data.model.OutboxState
@@ -57,13 +59,14 @@ fun OutboxScreen(onBack: () -> Unit) {
     var confirmDuplicate by remember { mutableStateOf<OutboxItem?>(null) }
     val snackbar = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
-    fun busy(ok: Boolean) { if (!ok) scope.launch { snackbar.showSnackbar("This message is being processed. Try again in a moment.") } }
+    val busyText = stringResource(R.string.outbox_busy_toast)
+    fun busy(ok: Boolean) { if (!ok) scope.launch { snackbar.showSnackbar(busyText) } }
     val c = Dot.colors
     Box(Modifier.fillMaxSize().background(c.background)) {
     Column(Modifier.fillMaxSize()) {
-        DotTopBar(title = "Outbox", elevated = listState.canScrollBackward, navigation = { BackButton(onBack) })
+        DotTopBar(title = stringResource(R.string.outbox_title), elevated = listState.canScrollBackward, navigation = { BackButton(onBack) })
         if (items.isEmpty()) {
-            EmptyState(Icons.Outlined.Outbox, "Outbox is empty", "Scheduled and pending messages appear here.")
+            EmptyState(Icons.Outlined.Outbox, stringResource(R.string.outbox_empty_title), stringResource(R.string.outbox_empty_body))
             return@Column
         }
         LazyColumn(state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp), modifier = Modifier.navigationBarsPadding()) {
@@ -71,13 +74,13 @@ fun OutboxScreen(onBack: () -> Unit) {
                 Column(Modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.l)) {
                     Row {
                         Text(
-                            item.subject.ifBlank { "(no subject)" }, style = Dot.type.headline, color = c.textPrimary,
+                            item.subject.ifBlank { stringResource(R.string.outbox_no_subject) }, style = Dot.type.headline, color = c.textPrimary,
                             maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
                         )
                         Text(stateLabel(item), style = Dot.type.caption, color = if (item.state == OutboxState.NEEDS_REVIEW || item.error != null) c.danger else c.textTertiary)
                     }
                     Text(
-                        "To " + item.recipients.joinToString(", ") { it.displayName },
+                        stringResource(R.string.outbox_to_prefix, item.recipients.joinToString(", ") { it.displayName }),
                         style = Dot.type.callout, color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                     item.error?.let {
@@ -88,13 +91,13 @@ fun OutboxScreen(onBack: () -> Unit) {
                         Spacer(Modifier.height(DotSpacing.m))
                         Row(horizontalArrangement = Arrangement.spacedBy(DotSpacing.s)) {
                             if (item.canRetry) {
-                                DotButton("Retry", compact = true, style = ButtonStyle.Secondary, onClick = {
+                                DotButton(stringResource(R.string.outbox_retry), compact = true, style = ButtonStyle.Secondary, onClick = {
                                     if (item.state == OutboxState.NEEDS_REVIEW) confirmDuplicate = item
                                     else scope.launch { busy(graph.compose.retrySend(item.id)) }
                                 })
                             }
                             if (item.canDelete) {
-                                DotButton("Delete", compact = true, style = ButtonStyle.Ghost, onClick = { scope.launch { busy(graph.compose.deleteOutbox(item.id)) } })
+                                DotButton(stringResource(R.string.outbox_delete), compact = true, style = ButtonStyle.Ghost, onClick = { scope.launch { busy(graph.compose.deleteOutbox(item.id)) } })
                             }
                         }
                     }
@@ -111,28 +114,29 @@ fun OutboxScreen(onBack: () -> Unit) {
             modifier = Modifier.dotSurfaceEnter(),
             containerColor = c.surface,
             shape = DotShapes.large,
-            title = { Text("Send again?", style = Dot.type.title, color = c.textPrimary) },
+            title = { Text(stringResource(R.string.outbox_send_again_title), style = Dot.type.title, color = c.textPrimary) },
             text = {
                 Text(
-                    "The connection dropped while this message was being sent, so it may already have been delivered. " +
-                        "Check your Sent folder or ask the recipient before sending it again.",
+                    stringResource(R.string.outbox_send_again_body),
                     style = Dot.type.callout, color = c.textSecondary,
                 )
             },
             confirmButton = {
-                DotButton("Send anyway", compact = true, onClick = {
+                DotButton(stringResource(R.string.outbox_send_anyway), compact = true, onClick = {
                     confirmDuplicate = null
                     scope.launch { busy(graph.compose.retrySend(item.id, confirmPossibleDuplicate = true)) }
                 })
             },
-            dismissButton = { DotButton("Cancel", { confirmDuplicate = null }, style = ButtonStyle.Ghost, compact = true) },
+            dismissButton = { DotButton(stringResource(R.string.outbox_cancel), { confirmDuplicate = null }, style = ButtonStyle.Ghost, compact = true) },
         )
     }
 }
 
+@Composable
 private fun stateLabel(item: OutboxItem): String = when (item.state) {
-    OutboxState.QUEUED -> if (item.sendAt > System.currentTimeMillis() + 60_000) "Scheduled · " + Format.listDate(item.sendAt) else if (item.error != null) "Waiting to retry" else "Queued"
-    OutboxState.SENDING -> "Sending…"
-    OutboxState.SAVING_SENT -> "Saving to Sent…"
-    OutboxState.NEEDS_REVIEW -> "Needs review"
+    OutboxState.QUEUED -> if (item.sendAt > System.currentTimeMillis() + 60_000) stringResource(R.string.outbox_state_scheduled, Format.listDate(item.sendAt))
+        else stringResource(if (item.error != null) R.string.outbox_state_waiting_retry else R.string.outbox_state_queued)
+    OutboxState.SENDING -> stringResource(R.string.outbox_state_sending)
+    OutboxState.SAVING_SENT -> stringResource(R.string.outbox_state_saving_sent)
+    OutboxState.NEEDS_REVIEW -> stringResource(R.string.outbox_state_needs_review)
 }

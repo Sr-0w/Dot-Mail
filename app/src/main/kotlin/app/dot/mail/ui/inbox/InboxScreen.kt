@@ -143,6 +143,9 @@ import app.dot.design.components.UnreadDot
 import app.dot.design.components.dotShimmer
 import app.dot.design.components.dotSurfaceEnter
 import app.dot.design.rememberReducedMotion
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import app.dot.mail.R
 import app.dot.mail.Density
 import app.dot.mail.LocalMailGraph
 import app.dot.mail.LocalSettings
@@ -168,7 +171,8 @@ fun InboxScreen(
 ) {
     val graph = LocalMailGraph.current
     val appSettings = LocalSettings.current
-    val vm: InboxViewModel = viewModel { InboxViewModel(graph, createSavedStateHandle(), appSettings.ui.map { it.conversationView }) }
+    val appResources = androidx.compose.ui.platform.LocalContext.current.applicationContext.resources
+    val vm: InboxViewModel = viewModel { InboxViewModel(graph, createSavedStateHandle(), appSettings.ui.map { it.conversationView }, resources = appResources) }
     val prefs by LocalSettings.current.ui.collectAsStateWithLifecycle()
     val mailbox by vm.mailbox.collectAsStateWithLifecycle()
     val header by vm.header.collectAsStateWithLifecycle()
@@ -265,8 +269,8 @@ fun InboxScreen(
                             title = header.title,
                             subtitle = header.subtitle,
                             elevated = listState.canScrollBackward,
-                            navigation = { DotIconButton(Icons.Outlined.Menu, "Open mailboxes", onClick = { scope.launch { drawerState.open() } }) },
-                            actions = { DotIconButton(Icons.Outlined.Search, "Search", onClick = onSearch) },
+                            navigation = { DotIconButton(Icons.Outlined.Menu, stringResource(R.string.inbox_open_mailboxes), onClick = { scope.launch { drawerState.open() } }) },
+                            actions = { DotIconButton(Icons.Outlined.Search, stringResource(R.string.inbox_search), onClick = onSearch) },
                         )
                     }
                 }
@@ -280,7 +284,7 @@ fun InboxScreen(
                         Modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.xs)
                             .clip(DotShapes.medium).background(Dot.colors.surface)
                             .combinedClickable(
-                                onClickLabel = if (authFailing != null) "Sign in again" else "Open settings",
+                                onClickLabel = stringResource(if (authFailing != null) R.string.inbox_banner_sign_in_again else R.string.inbox_banner_open_settings),
                                 onClick = { if (authFailing != null) signInAccount = authFailing else onSettings() },
                             ).padding(horizontal = DotSpacing.m, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -288,8 +292,8 @@ fun InboxScreen(
                         Icon(Icons.Outlined.WifiOff, null, Modifier.size(18.dp), tint = Dot.colors.danger)
                         Spacer(Modifier.width(DotSpacing.s))
                         Text(
-                            (if (failing.size == 1) failing.first().email + ": " else "${failing.size} accounts: ") +
-                                (err?.message ?: "sync problem") + if (err?.isAuthError == true) " — sign in again" else "",
+                            (if (failing.size == 1) stringResource(R.string.inbox_failing_prefix_single, failing.first().email) else pluralStringResource(R.plurals.inbox_failing_prefix_many, failing.size, failing.size)) +
+                                (err?.message ?: stringResource(R.string.inbox_sync_problem)) + if (err?.isAuthError == true) stringResource(R.string.inbox_sign_in_again_suffix) else "",
                             style = Dot.type.caption, color = Dot.colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis,
                         )
                     }
@@ -338,7 +342,7 @@ fun InboxScreen(
             }
             app.dot.design.components.DotFrostedPill(
                 icon = Icons.Outlined.Edit,
-                label = "Compose",
+                label = stringResource(R.string.inbox_compose),
                 expanded = !listState.canScrollBackward,
                 onClick = onCompose,
                 modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(DotSpacing.xl),
@@ -350,9 +354,9 @@ fun InboxScreen(
     pendingTrash?.let { ids ->
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { pendingTrash = null }, modifier = Modifier.dotSurfaceEnter(), containerColor = Dot.colors.surface, shape = DotShapes.large,
-            title = { Text(if (ids.size == 1) "Move to trash?" else "Move ${ids.size} conversations to trash?", style = Dot.type.title, color = Dot.colors.textPrimary) },
-            confirmButton = { app.dot.design.components.DotButton("Delete", { pendingTrash = null; vm.act(MessageAction.TRASH, ids) }, style = app.dot.design.components.ButtonStyle.Danger, compact = true) },
-            dismissButton = { app.dot.design.components.DotButton("Cancel", { pendingTrash = null }, style = app.dot.design.components.ButtonStyle.Ghost, compact = true) },
+            title = { Text(pluralStringResource(R.plurals.inbox_confirm_trash_title, ids.size, ids.size), style = Dot.type.title, color = Dot.colors.textPrimary) },
+            confirmButton = { app.dot.design.components.DotButton(stringResource(R.string.inbox_delete), { pendingTrash = null; vm.act(MessageAction.TRASH, ids) }, style = app.dot.design.components.ButtonStyle.Danger, compact = true) },
+            dismissButton = { app.dot.design.components.DotButton(stringResource(R.string.inbox_cancel), { pendingTrash = null }, style = app.dot.design.components.ButtonStyle.Ghost, compact = true) },
         )
     }
     signInAccount?.let { account ->
@@ -371,7 +375,7 @@ fun InboxScreen(
             shape = DotShapes.sheet,
             dragHandle = null,
         ) {
-            Text("Move to", style = Dot.type.title, color = Dot.colors.textPrimary, modifier = Modifier.padding(DotSpacing.gutter))
+            Text(stringResource(R.string.inbox_move_to), style = Dot.type.title, color = Dot.colors.textPrimary, modifier = Modifier.padding(DotSpacing.gutter))
             drawer.folders.sortedWith(compareBy({ Format.roleOrder.indexOf(it.role).let { i -> if (i < 0) 99 else i } }, { it.path })).forEach { f ->
                 ListRow(
                     title = if (f.role == FolderRole.CUSTOM) f.path else Format.roleName(f.role),
@@ -404,7 +408,7 @@ private fun ThreadList(
     when {
         threads.itemCount == 0 && refresh is LoadState.Loading -> SkeletonList()
         threads.itemCount == 0 && refresh is LoadState.Error -> EmptyState(
-            Icons.Outlined.WifiOff, "Couldn't load mail", refresh.error.message ?: "Check your connection and pull to retry.",
+            Icons.Outlined.WifiOff, stringResource(R.string.inbox_error_load_title), refresh.error.message ?: stringResource(R.string.inbox_error_load_body),
         )
         threads.itemCount == 0 -> LazyColumn(Modifier.fillMaxSize()) {
             // Must be scrollable for pull-to-refresh to work on an empty list.
@@ -456,16 +460,16 @@ private fun ThreadList(
 @Composable
 private fun EmptyFor(role: FolderRole?) {
     val (title, msg) = when (role) {
-        FolderRole.INBOX, null -> "All caught up" to "New mail will appear here."
-        FolderRole.STARRED -> "No starred mail" to "Star a conversation to keep it close."
-        FolderRole.DRAFTS -> "No drafts" to "Unsent messages are saved here automatically."
-        FolderRole.SENT -> "Nothing sent yet" to "Messages you send appear here."
-        FolderRole.SPAM -> "No spam" to "Suspicious mail lands here."
-        FolderRole.TRASH -> "Trash is empty" to "Deleted conversations stay here for a while."
-        FolderRole.SNOOZED -> "Nothing snoozed" to "Snoozed conversations wait here until their time."
-        else -> "Nothing here" to "This folder is empty."
+        FolderRole.INBOX, null -> R.string.inbox_empty_inbox_title to R.string.inbox_empty_inbox_body
+        FolderRole.STARRED -> R.string.inbox_empty_starred_title to R.string.inbox_empty_starred_body
+        FolderRole.DRAFTS -> R.string.inbox_empty_drafts_title to R.string.inbox_empty_drafts_body
+        FolderRole.SENT -> R.string.inbox_empty_sent_title to R.string.inbox_empty_sent_body
+        FolderRole.SPAM -> R.string.inbox_empty_spam_title to R.string.inbox_empty_spam_body
+        FolderRole.TRASH -> R.string.inbox_empty_trash_title to R.string.inbox_empty_trash_body
+        FolderRole.SNOOZED -> R.string.inbox_empty_snoozed_title to R.string.inbox_empty_snoozed_body
+        else -> R.string.inbox_empty_folder_title to R.string.inbox_empty_folder_body
     }
-    EmptyState(if (role == FolderRole.INBOX || role == null) Icons.Outlined.Inbox else Format.roleIcon(role), title, msg)
+    EmptyState(if (role == FolderRole.INBOX || role == null) Icons.Outlined.Inbox else Format.roleIcon(role), stringResource(title), stringResource(msg))
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -528,12 +532,13 @@ private fun toMessageAction(action: SwipeAction, t: ThreadSummary): MessageActio
     SwipeAction.SNOOZE, SwipeAction.NONE -> null
 }
 
+@Composable
 private fun swipeVisual(action: SwipeAction, t: ThreadSummary): Pair<ImageVector, String> = when (action) {
-    SwipeAction.ARCHIVE -> Icons.Outlined.Archive to "Archive"
-    SwipeAction.TRASH -> Icons.Outlined.Delete to "Delete"
-    SwipeAction.READ_TOGGLE -> (if (t.isUnread) Icons.Outlined.MarkEmailRead else Icons.Outlined.MarkEmailUnread) to "Toggle read"
-    SwipeAction.STAR_TOGGLE -> (if (t.isStarred) Icons.Outlined.StarOutline else Icons.Outlined.Star) to "Toggle star"
-    SwipeAction.SNOOZE -> Icons.Outlined.Snooze to "Snooze"
+    SwipeAction.ARCHIVE -> Icons.Outlined.Archive to stringResource(R.string.inbox_action_archive)
+    SwipeAction.TRASH -> Icons.Outlined.Delete to stringResource(R.string.inbox_action_delete)
+    SwipeAction.READ_TOGGLE -> (if (t.isUnread) Icons.Outlined.MarkEmailRead else Icons.Outlined.MarkEmailUnread) to stringResource(R.string.inbox_action_toggle_read)
+    SwipeAction.STAR_TOGGLE -> (if (t.isStarred) Icons.Outlined.StarOutline else Icons.Outlined.Star) to stringResource(R.string.inbox_action_toggle_star)
+    SwipeAction.SNOOZE -> Icons.Outlined.Snooze to stringResource(R.string.inbox_action_snooze)
     SwipeAction.NONE -> Icons.Outlined.Mail to ""
 }
 
@@ -560,9 +565,13 @@ fun ThreadRow(
         label = "row-bg",
     )
     val unread = thread.isUnread
+    val unreadLabel = stringResource(R.string.inbox_state_unread)
+    val starredLabel = stringResource(R.string.inbox_state_starred)
+    val attachmentsLabel = stringResource(R.string.inbox_state_has_attachments)
+    val selectedLabel = stringResource(R.string.inbox_state_selected)
     val sender = if (showRecipients && thread.recipients.isNotEmpty()) {
-        "To " + thread.recipients.joinToString(", ") { it.displayName.substringBefore(' ').ifBlank { it.displayName } }
-    } else if (thread.draftId != null && thread.recipients.isEmpty()) "Draft" else senderLine(thread, myAddresses)
+        stringResource(R.string.inbox_to_prefix, thread.recipients.joinToString(", ") { it.displayName.substringBefore(' ').ifBlank { it.displayName } })
+    } else if (thread.draftId != null && thread.recipients.isEmpty()) stringResource(R.string.inbox_draft_label) else senderLine(thread, myAddresses, stringResource(R.string.inbox_me), stringResource(R.string.inbox_unknown_sender))
     Row(
         Modifier
             .fillMaxWidth()
@@ -570,14 +579,14 @@ fun ThreadRow(
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); onLongClick() },
-                onLongClickLabel = "Select",
+                onLongClickLabel = stringResource(R.string.inbox_select),
             )
             .semantics(mergeDescendants = true) {
                 stateDescription = buildString {
-                    if (unread) append("Unread. ")
-                    if (thread.isStarred) append("Starred. ")
-                    if (thread.hasAttachments) append("Has attachments. ")
-                    if (selected) append("Selected.")
+                    if (unread) append(unreadLabel).append(" ")
+                    if (thread.isStarred) append(starredLabel).append(" ")
+                    if (thread.hasAttachments) append(attachmentsLabel).append(" ")
+                    if (selected) append(selectedLabel)
                 }
             }
             .padding(start = 6.dp, end = DotSpacing.gutter, top = if (compact) 10.dp else 14.dp, bottom = if (compact) 10.dp else 14.dp),
@@ -588,7 +597,7 @@ fun ThreadRow(
             if (unread) UnreadDot(size = 7.dp)
         }
         if (!compact) {
-            Box(Modifier.clip(CircleShape).combinedClickable(onClickLabel = if (selected) "Deselect" else "Select", onClick = onLongClick).clearAndSetSemantics { }) {
+            Box(Modifier.clip(CircleShape).combinedClickable(onClickLabel = stringResource(if (selected) R.string.inbox_deselect else R.string.inbox_select), onClick = onLongClick).clearAndSetSemantics { }) {
                 AnimatedContent(
                     targetState = selected || selectionMode,
                     transitionSpec = {
@@ -645,7 +654,7 @@ fun ThreadRow(
                 }
                 Spacer(Modifier.width(DotSpacing.s))
                 if (muted) {
-                    Icon(Icons.Outlined.NotificationsOff, "Muted", Modifier.size(15.dp), tint = c.textTertiary)
+                    Icon(Icons.Outlined.NotificationsOff, stringResource(R.string.inbox_muted), Modifier.size(15.dp), tint = c.textTertiary)
                     Spacer(Modifier.width(6.dp))
                 }
                 if (thread.hasAttachments) {
@@ -656,10 +665,7 @@ fun ThreadRow(
                     // Snoozed list: when it comes back matters more than when it arrived.
                     val context = androidx.compose.ui.platform.LocalContext.current
                     Text(
-                        "Until " + app.dot.mail.engine.time.describe(
-                            java.time.Instant.ofEpochMilli(thread.snoozedUntil!!).atZone(java.time.ZoneId.systemDefault()), java.time.ZonedDateTime.now(),
-                            java.util.Locale.getDefault(), android.text.format.DateFormat.is24HourFormat(context),
-                        ),
+                        stringResource(R.string.inbox_snoozed_until, app.dot.mail.ui.snooze.describeWake(context, thread.snoozedUntil!!)),
                         style = Dot.type.caption.copy(fontWeight = FontWeight.Medium), color = c.accent,
                     )
                 } else Text(
@@ -671,7 +677,7 @@ fun ThreadRow(
             Spacer(Modifier.height(2.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    thread.subject.ifBlank { "(no subject)" },
+                    thread.subject.ifBlank { stringResource(R.string.inbox_no_subject) },
                     style = Dot.type.callout.copy(fontWeight = if (unread) FontWeight.Medium else FontWeight.Normal),
                     color = if (unread) c.textPrimary else c.textSecondary,
                     maxLines = 1,
@@ -691,13 +697,13 @@ fun ThreadRow(
     }
 }
 
-private fun senderLine(t: ThreadSummary, me: Set<String> = emptySet()): String {
+private fun senderLine(t: ThreadSummary, me: Set<String>, meLabel: String, unknownLabel: String): String {
     fun short(a: app.dot.mail.data.model.EmailAddress) =
-        if (a.email.lowercase() in me) "me" else a.displayName.substringBefore(' ').ifBlank { a.displayName }
+        if (a.email.lowercase() in me) meLabel else a.displayName.substringBefore(' ').ifBlank { a.displayName }
     val names = t.participants.map(::short).distinct()
     return when {
-        names.isEmpty() -> "(unknown sender)"
-        t.participants.size == 1 -> t.participants.first().let { if (it.email.lowercase() in me) "me" else it.displayName }
+        names.isEmpty() -> unknownLabel
+        t.participants.size == 1 -> t.participants.first().let { if (it.email.lowercase() in me) meLabel else it.displayName }
         names.size <= 3 -> names.joinToString(", ")
         else -> names.first() + " … " + names.takeLast(2).joinToString(", ")
     }
@@ -729,7 +735,7 @@ private fun SelectCircle(selected: Boolean, size: Int = 40) {
         if (selected || checkAlpha > 0.01f) {
             Icon(
                 Icons.Outlined.Check,
-                if (selected) "Selected" else null,
+                if (selected) stringResource(R.string.inbox_selected) else null,
                 Modifier
                     .size((size / 2).dp)
                     .graphicsLayer {
@@ -757,25 +763,25 @@ private fun SelectionBar(
 ) {
     var menu by remember { mutableStateOf(false) }
     DotTopBar(
-        title = "$count selected",
+        title = pluralStringResource(R.plurals.inbox_selected_count, count, count),
         elevated = true,
-        navigation = { DotIconButton(Icons.Outlined.Close, "Clear selection", onClick = onClose) },
+        navigation = { DotIconButton(Icons.Outlined.Close, stringResource(R.string.inbox_clear_selection), onClick = onClose) },
         actions = {
-            if (role == FolderRole.SNOOZED) DotIconButton(Icons.Outlined.Snooze, "Unsnooze", onClick = onUnsnooze)
-            if (role != FolderRole.ARCHIVE) DotIconButton(Icons.Outlined.Archive, "Archive", onClick = { onAction(MessageAction.ARCHIVE) })
-            if (role == FolderRole.TRASH) DotIconButton(Icons.Outlined.Delete, "Delete forever", onClick = { onAction(MessageAction.DELETE_FOREVER) })
-            else DotIconButton(Icons.Outlined.Delete, "Delete", onClick = { onAction(MessageAction.TRASH) })
-            DotIconButton(Icons.Outlined.MarkEmailRead, "Mark as read", onClick = { onAction(MessageAction.MARK_READ) })
+            if (role == FolderRole.SNOOZED) DotIconButton(Icons.Outlined.Snooze, stringResource(R.string.inbox_action_unsnooze), onClick = onUnsnooze)
+            if (role != FolderRole.ARCHIVE) DotIconButton(Icons.Outlined.Archive, stringResource(R.string.inbox_action_archive), onClick = { onAction(MessageAction.ARCHIVE) })
+            if (role == FolderRole.TRASH) DotIconButton(Icons.Outlined.Delete, stringResource(R.string.inbox_action_delete_forever), onClick = { onAction(MessageAction.DELETE_FOREVER) })
+            else DotIconButton(Icons.Outlined.Delete, stringResource(R.string.inbox_action_delete), onClick = { onAction(MessageAction.TRASH) })
+            DotIconButton(Icons.Outlined.MarkEmailRead, stringResource(R.string.inbox_action_mark_read), onClick = { onAction(MessageAction.MARK_READ) })
             Box {
-                DotIconButton(Icons.Outlined.MoreVert, "More actions", onClick = { menu = true })
+                DotIconButton(Icons.Outlined.MoreVert, stringResource(R.string.inbox_more_actions), onClick = { menu = true })
                 DotMenu(menu, onDismiss = { menu = false }) {
-                    DotMenuItem("Mark as unread", Icons.Outlined.MarkEmailUnread) { menu = false; onAction(MessageAction.MARK_UNREAD) }
-                    DotMenuItem("Star", Icons.Outlined.StarOutline) { menu = false; onAction(MessageAction.STAR) }
-                    DotMenuItem("Snooze…", Icons.Outlined.Snooze) { menu = false; onSnooze() }
-                    DotMenuItem(if (allMuted) "Unmute" else "Mute", if (allMuted) Icons.Outlined.NotificationsActive else Icons.Outlined.NotificationsOff) { menu = false; onMute() }
-                    DotMenuItem("Move to…", Icons.Outlined.DriveFileMove) { menu = false; onMove() }
-                    if (role == FolderRole.SPAM) DotMenuItem("Not spam", Icons.Outlined.Inbox) { menu = false; onAction(MessageAction.NOT_SPAM) }
-                    else DotMenuItem("Report spam", Icons.Outlined.Report) { menu = false; onAction(MessageAction.SPAM) }
+                    DotMenuItem(stringResource(R.string.inbox_action_mark_unread), Icons.Outlined.MarkEmailUnread) { menu = false; onAction(MessageAction.MARK_UNREAD) }
+                    DotMenuItem(stringResource(R.string.inbox_action_star), Icons.Outlined.StarOutline) { menu = false; onAction(MessageAction.STAR) }
+                    DotMenuItem(stringResource(R.string.inbox_action_snooze_ellipsis), Icons.Outlined.Snooze) { menu = false; onSnooze() }
+                    DotMenuItem(stringResource(if (allMuted) R.string.inbox_action_unmute else R.string.inbox_action_mute), if (allMuted) Icons.Outlined.NotificationsActive else Icons.Outlined.NotificationsOff) { menu = false; onMute() }
+                    DotMenuItem(stringResource(R.string.inbox_action_move_ellipsis), Icons.Outlined.DriveFileMove) { menu = false; onMove() }
+                    if (role == FolderRole.SPAM) DotMenuItem(stringResource(R.string.inbox_action_not_spam), Icons.Outlined.Inbox) { menu = false; onAction(MessageAction.NOT_SPAM) }
+                    else DotMenuItem(stringResource(R.string.inbox_action_report_spam), Icons.Outlined.Report) { menu = false; onAction(MessageAction.SPAM) }
                 }
             }
         },
@@ -786,6 +792,7 @@ private fun SelectionBar(
 @Composable
 private fun ComposeButton(expanded: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val c = Dot.colors
+    val composeLabel = stringResource(R.string.inbox_compose)
     val haptics = LocalHapticFeedback.current
     Row(
         modifier
@@ -793,14 +800,14 @@ private fun ComposeButton(expanded: Boolean, onClick: () -> Unit, modifier: Modi
             .clip(DotShapes.large)
             .background(c.inverse)
             .combinedClickable(onClick = { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); onClick() })
-            .semantics { contentDescription = "Compose" }
+            .semantics { contentDescription = composeLabel }
             .padding(horizontal = 17.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
         Icon(Icons.Outlined.Edit, null, Modifier.size(20.dp), tint = c.onInverse)
         AnimatedVisibility(expanded, enter = expandHorizontally() + fadeIn(), exit = shrinkHorizontally() + fadeOut()) {
-            Text("Compose", style = Dot.type.label, color = c.onInverse, modifier = Modifier.padding(start = 10.dp, end = 2.dp))
+            Text(composeLabel, style = Dot.type.label, color = c.onInverse, modifier = Modifier.padding(start = 10.dp, end = 2.dp))
         }
     }
 }

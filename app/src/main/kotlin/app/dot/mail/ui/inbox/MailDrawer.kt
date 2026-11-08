@@ -45,6 +45,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.res.stringResource
+import app.dot.mail.R
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -98,7 +100,7 @@ fun MailDrawer(
                 if (state.accounts.size > 1) {
                     item {
                         DrawerItem(
-                            label = "All inboxes",
+                            label = stringResource(R.string.drawer_all_inboxes),
                             icon = Icons.Outlined.AllInbox,
                             count = null,
                             selected = current == Mailbox.Unified(FolderRole.INBOX),
@@ -109,7 +111,7 @@ fun MailDrawer(
                 if (outboxCount > 0) {
                     item {
                         DrawerItem(
-                            label = if (outboxNeedsAttention) "Outbox · needs attention" else "Outbox",
+                            label = stringResource(if (outboxNeedsAttention) R.string.drawer_outbox_needs_attention else R.string.drawer_outbox),
                             icon = Icons.Outlined.Outbox,
                             count = outboxCount,
                             selected = false,
@@ -122,7 +124,7 @@ fun MailDrawer(
                     val snoozed by graph.mail.snoozedCount().collectAsStateWithLifecycle(0)
                     val isCurrent = current == Mailbox.Unified(FolderRole.SNOOZED)
                     if (snoozed > 0 || isCurrent) {
-                        DrawerItem("Snoozed", Format.roleIcon(FolderRole.SNOOZED), snoozed.takeIf { it > 0 }, selected = isCurrent, onClick = { onOpen(Mailbox.Unified(FolderRole.SNOOZED)) })
+                        DrawerItem(stringResource(R.string.drawer_snoozed), Format.roleIcon(FolderRole.SNOOZED), snoozed.takeIf { it > 0 }, selected = isCurrent, onClick = { onOpen(Mailbox.Unified(FolderRole.SNOOZED)) })
                     }
                 }
                 val focused = state.accounts.firstOrNull { it.id == state.focusedAccountId }
@@ -142,7 +144,7 @@ fun MailDrawer(
                         )
                     }
                     val custom = state.folders.filter { it.role == FolderRole.CUSTOM }.sortedBy { it.path.lowercase() }
-                    item { SectionLabel("Folders", Modifier.padding(top = DotSpacing.m)) }
+                    item { SectionLabel(stringResource(R.string.drawer_folders_section), Modifier.padding(top = DotSpacing.m)) }
                     run {
                         items(custom, key = { "c" + it.id }) { f ->
                             val depth = f.path.count { it == '/' || it == '.' }.coerceAtMost(3)
@@ -157,13 +159,13 @@ fun MailDrawer(
                             )
                         }
                     }
-                    item { DrawerItem("New folder", Icons.Outlined.CreateNewFolder, null, selected = false, navigation = false, onClick = { folderDialog = FolderDialog.New }) }
+                    item { DrawerItem(stringResource(R.string.drawer_new_folder), Icons.Outlined.CreateNewFolder, null, selected = false, navigation = false, onClick = { folderDialog = FolderDialog.New }) }
                 }
-                item { DrawerItem("Attachments", Icons.Outlined.AttachFile, null, selected = false, navigation = false, onClick = onAttachments) }
+                item { DrawerItem(stringResource(R.string.drawer_attachments), Icons.Outlined.AttachFile, null, selected = false, navigation = false, onClick = onAttachments) }
                 item {
                     Spacer(Modifier.height(DotSpacing.l))
                     Hairline(Modifier.padding(horizontal = DotSpacing.gutter))
-                    SectionLabel("Accounts", Modifier.padding(top = DotSpacing.m))
+                    SectionLabel(stringResource(R.string.drawer_accounts_section), Modifier.padding(top = DotSpacing.m))
                 }
                 items(state.accounts, key = { "a" + it.id }) { a ->
                     Row(
@@ -182,17 +184,17 @@ fun MailDrawer(
                             Text(a.email, style = Dot.type.caption, color = c.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                         if (a.syncState is SyncState.Error) {
-                            Icon(Icons.Outlined.ErrorOutline, "Sync problem: ${(a.syncState as SyncState.Error).message}", Modifier.size(18.dp), tint = c.danger)
+                            Icon(Icons.Outlined.ErrorOutline, stringResource(R.string.drawer_sync_problem, (a.syncState as SyncState.Error).message), Modifier.size(18.dp), tint = c.danger)
                         }
                     }
                 }
                 item {
-                    DrawerItem("Add account", Icons.Outlined.Add, null, selected = false, navigation = false, onClick = onAddAccount)
+                    DrawerItem(stringResource(R.string.drawer_add_account), Icons.Outlined.Add, null, selected = false, navigation = false, onClick = onAddAccount)
                 }
             }
             Hairline()
             Box(Modifier.windowInsetsPadding(WindowInsets.navigationBars).padding(vertical = DotSpacing.s)) {
-                DrawerItem("Settings", Icons.Outlined.Settings, null, selected = false, navigation = false, onClick = onSettings)
+                DrawerItem(stringResource(R.string.drawer_settings), Icons.Outlined.Settings, null, selected = false, navigation = false, onClick = onSettings)
             }
         }
     }
@@ -219,7 +221,7 @@ private fun DrawerItem(
             .padding(horizontal = 10.dp, vertical = 1.dp)
             .clip(DotShapes.medium)
             .background(if (selected) c.surfaceRaised else Color.Transparent)
-            .combinedClickable(role = if (navigation) Role.Tab else Role.Button, onLongClickLabel = "Folder options", onLongClick = onLongClick, onClick = onClick)
+            .combinedClickable(role = if (navigation) Role.Tab else Role.Button, onLongClickLabel = stringResource(R.string.drawer_folder_options), onLongClick = onLongClick, onClick = onClick)
             .then(if (navigation) Modifier.semantics { this.selected = selected } else Modifier)
             .heightIn(min = 48.dp)
             .padding(start = (10 + indent).dp, end = 12.dp, top = 8.dp, bottom = 8.dp),

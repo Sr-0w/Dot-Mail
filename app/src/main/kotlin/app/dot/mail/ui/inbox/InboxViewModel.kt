@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import app.dot.mail.R
 import app.dot.mail.data.MailGraph
 import app.dot.mail.data.model.Account
 import app.dot.mail.data.model.Folder
@@ -42,7 +43,12 @@ class InboxViewModel(
     private val saved: SavedStateHandle,
     /** Settings → "Group into conversations"; false lists single messages. */
     private val grouped: Flow<Boolean> = kotlinx.coroutines.flow.flowOf(true),
+    /** Application resources: messages built here follow the app language. */
+    private val resources: android.content.res.Resources,
 ) : ViewModel() {
+    private fun str(@androidx.annotation.StringRes id: Int, vararg args: Any) = resources.getString(id, *args)
+    private fun plural(@androidx.annotation.PluralsRes id: Int, n: Int) = resources.getQuantityString(id, n, n)
+
 
     private val _mailbox = MutableStateFlow(restoreMailbox())
     val mailbox: StateFlow<Mailbox> = _mailbox.asStateFlow()
@@ -80,21 +86,21 @@ class InboxViewModel(
     val header: StateFlow<InboxHeader> = combine(_mailbox, drawer, accounts, openedFolder) { box, d, accts, opened ->
         when (box) {
             is Mailbox.Unified -> InboxHeader(
-                title = app.dot.mail.ui.common.Format.roleName(box.role),
-                subtitle = if (accts.size > 1) "All accounts" else accts.firstOrNull()?.email,
+                title = app.dot.mail.ui.common.Format.roleName(resources, box.role),
+                subtitle = if (accts.size > 1) str(R.string.inbox_all_accounts) else accts.firstOrNull()?.email,
                 role = box.role,
             )
             is Mailbox.InFolder -> {
                 val folder = d.folders.firstOrNull { it.id == box.folderId } ?: opened?.takeIf { it.id == box.folderId }
                 val account = accts.firstOrNull { it.id == folder?.accountId }
                 InboxHeader(
-                    title = folder?.let { if (it.role == FolderRole.CUSTOM) it.name else app.dot.mail.ui.common.Format.roleName(it.role) } ?: "",
+                    title = folder?.let { if (it.role == FolderRole.CUSTOM) it.name else app.dot.mail.ui.common.Format.roleName(resources, it.role) } ?: "",
                     subtitle = account?.email,
                     role = folder?.role,
                 )
             }
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), InboxHeader("Inbox", null, FolderRole.INBOX))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), InboxHeader(str(R.string.inbox_role_inbox), null, FolderRole.INBOX))
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val threads: Flow<PagingData<ThreadSummary>> =
@@ -131,7 +137,7 @@ class InboxViewModel(
                     _selection.value = emptySet()
                     confirmation(action, count)?.let { _events.send(it) }
                 }
-                .onFailure { _events.send(it.message ?: "That action couldn't be completed") }
+                .onFailure { _events.send(it.message ?: str(R.string.inbox_error_action_failed)) }
         }
     }
 
@@ -141,9 +147,9 @@ class InboxViewModel(
             runCatching { graph.mail.snooze(ids.toList(), untilMillis) }
                 .onSuccess {
                     _selection.value = emptySet()
-                    _events.send(if (ids.size == 1) "Snoozed" else "Snoozed ${ids.size} conversations")
+                    _events.send(plural(R.plurals.inbox_snoozed_toast, ids.size))
                 }
-                .onFailure { _events.send(it.message ?: "Couldn't snooze") }
+                .onFailure { _events.send(it.message ?: str(R.string.inbox_error_snooze_failed)) }
         }
     }
 
@@ -153,9 +159,9 @@ class InboxViewModel(
             runCatching { graph.mail.setMuted(ids.toList(), muted) }
                 .onSuccess {
                     _selection.value = emptySet()
-                    _events.send(if (muted) "Muted: new mail won't notify" else "Unmuted")
+                    _events.send(str(if (muted) R.string.inbox_muted_toast else R.string.inbox_unmuted_toast))
                 }
-                .onFailure { _events.send(it.message ?: "Couldn't change mute") }
+                .onFailure { _events.send(it.message ?: str(R.string.inbox_error_mute_failed)) }
         }
     }
 
@@ -163,8 +169,8 @@ class InboxViewModel(
         if (ids.isEmpty()) return
         viewModelScope.launch {
             runCatching { graph.mail.unsnooze(ids.toList()) }
-                .onSuccess { _selection.value = emptySet(); _events.send(if (ids.size == 1) "Back in your list" else "${ids.size} conversations are back") }
-                .onFailure { _events.send(it.message ?: "Couldn't unsnooze") }
+                .onSuccess { _selection.value = emptySet(); _events.send(plural(R.plurals.inbox_unsnoozed_toast, ids.size)) }
+                .onFailure { _events.send(it.message ?: str(R.string.inbox_error_unsnooze_failed)) }
         }
     }
 
@@ -176,9 +182,9 @@ class InboxViewModel(
             runCatching { graph.mail.move(ids, folderId, source) }
                 .onSuccess {
                     _selection.value = emptySet()
-                    _events.send(if (ids.size == 1) "Moved" else "Moved ${ids.size} conversations")
+                    _events.send(plural(R.plurals.inbox_moved_toast, ids.size))
                 }
-                .onFailure { _events.send(it.message ?: "Couldn't move") }
+                .onFailure { _events.send(it.message ?: str(R.string.inbox_error_move_failed)) }
         }
     }
 
@@ -191,7 +197,7 @@ class InboxViewModel(
             val sync = launch {
                 // Bounded: nothing may stay "syncing" forever if a server hangs.
                 runCatching { kotlinx.coroutines.withTimeout(60_000) { graph.mail.refresh(_mailbox.value) } }
-                    .onFailure { _events.send(if (it is kotlinx.coroutines.TimeoutCancellationException) "Still syncing in the background" else it.message ?: "Couldn't refresh") }
+                    .onFailure { _events.send(if (it is kotlinx.coroutines.TimeoutCancellationException) str(R.string.inbox_sync_still_running) else it.message ?: str(R.string.inbox_error_refresh_failed)) }
                 _syncing.value = false
             }
             // The pull spinner is only the "got it" confirmation: it leaves after a short beat (never over the list
@@ -203,16 +209,13 @@ class InboxViewModel(
         }
     }
 
-    private fun confirmation(action: MessageAction, n: Int): String? {
-        val what = if (n == 1) "Conversation" else "$n conversations"
-        return when (action) {
-            MessageAction.ARCHIVE -> "$what archived"
-            MessageAction.TRASH -> "$what moved to trash"
-            MessageAction.SPAM -> "$what marked as spam"
-            MessageAction.NOT_SPAM -> "$what moved to inbox"
-            MessageAction.DELETE_FOREVER -> "$what deleted"
-            else -> null
-        }
+    private fun confirmation(action: MessageAction, n: Int): String? = when (action) {
+        MessageAction.ARCHIVE -> plural(R.plurals.inbox_archived_toast, n)
+        MessageAction.TRASH -> plural(R.plurals.inbox_trashed_toast, n)
+        MessageAction.SPAM -> plural(R.plurals.inbox_spam_toast, n)
+        MessageAction.NOT_SPAM -> plural(R.plurals.inbox_not_spam_toast, n)
+        MessageAction.DELETE_FOREVER -> plural(R.plurals.inbox_deleted_toast, n)
+        else -> null
     }
 
     private fun restoreMailbox(): Mailbox {
