@@ -8,9 +8,11 @@ import java.text.Normalizer
 internal sealed interface SettingsTarget {
     data class Section(val section: SettingsSection) : SettingsTarget
     data class Account(val accountId: Long) : SettingsTarget
+    data object Storage : SettingsTarget
     data object SmartFolders : SettingsTarget
     data object Categories : SettingsTarget
     data object RemoteImages : SettingsTarget
+    data object Aliases : SettingsTarget
 }
 
 /** Sections of the Settings page, in display order; each has an anchor the page can scroll to. */
@@ -81,9 +83,11 @@ internal object SettingsIndex {
         SettingsEntry(R.string.settings_categories, R.string.settings_categories_sub, SettingsSection.NOTIFICATIONS, SettingsTarget.Categories, R.string.settings_kw_folders),
         SettingsEntry(R.string.settings_remote_images, section = SettingsSection.PRIVACY, target = SettingsTarget.RemoteImages, keywords = R.string.settings_kw_privacy),
         SettingsEntry(R.string.settings_block_pixels, R.string.settings_block_pixels_sub, SettingsSection.PRIVACY, keywords = R.string.settings_kw_privacy),
+        SettingsEntry(R.string.aliases_title, R.string.aliases_subtitle, SettingsSection.COMPOSING, SettingsTarget.Aliases),
         SettingsEntry(R.string.settings_app_lock, R.string.settings_app_lock_sub, SettingsSection.PRIVACY, keywords = R.string.settings_kw_lock),
         SettingsEntry(R.string.settings_lock_after, section = SettingsSection.PRIVACY, keywords = R.string.settings_kw_lock),
         SettingsEntry(R.string.settings_hide_recents, R.string.settings_hide_recents_sub, SettingsSection.PRIVACY, keywords = R.string.settings_kw_privacy),
+        SettingsEntry(R.string.storage_title, R.string.storage_progress, SettingsSection.STORAGE, target = SettingsTarget.Storage, keywords = R.string.storage_keywords),
         SettingsEntry(R.string.settings_clear_cache, section = SettingsSection.STORAGE, keywords = R.string.settings_kw_storage),
         SettingsEntry(R.string.backup_export, R.string.backup_export_sub, SettingsSection.BACKUP, keywords = R.string.settings_kw_backup),
         SettingsEntry(R.string.backup_import, R.string.backup_import_sub, SettingsSection.BACKUP, keywords = R.string.settings_kw_backup),

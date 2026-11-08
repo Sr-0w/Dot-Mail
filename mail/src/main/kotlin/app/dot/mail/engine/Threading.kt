@@ -17,8 +17,8 @@ object Threading {
         }
         header.messageId?.let { add("id:$it") }
     }.distinct()
-    fun mayFallback(header: Header): Boolean = header.gmailThreadId == null && header.references.isEmpty() && header.inReplyTo == null &&
-        (header.messageId == null || Regex("(?i)^(?:re|fw|fwd|aw|sv)(?:\\[\\d+])?:").containsMatchIn(header.subject.trim()))
+    /** A reply-looking subject is not proof of a relationship when ordinary Message-IDs exist. */
+    fun mayFallback(header: Header): Boolean = header.gmailThreadId == null && header.references.isEmpty() && header.inReplyTo == null && header.messageId == null
     fun fallbackKey(header: Header): String? {
         val subject = normalizeSubject(header.subject).takeIf { it.isNotEmpty() } ?: return null
         val peers = (header.from + header.to + header.cc).map { it.email.lowercase(Locale.ROOT) }.distinct().sorted().joinToString(",")

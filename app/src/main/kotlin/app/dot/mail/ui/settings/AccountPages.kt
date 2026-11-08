@@ -77,7 +77,7 @@ internal fun AccountPage(account: Account, onBack: () -> Unit, onEditIdentity: (
             androidx.compose.foundation.layout.Spacer(Modifier.height(topPadding.calculateTopPadding()))
 
             (account.syncState as? SyncState.Error)?.let { err ->
-                Text(err.message, style = Dot.type.callout, color = c.danger, modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.m))
+                Text(app.dot.mail.ui.common.ErrorText.syncError(err), style = Dot.type.callout, color = c.danger, modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.m))
             }
             val context = LocalContext.current
             val graph = LocalMailGraph.current

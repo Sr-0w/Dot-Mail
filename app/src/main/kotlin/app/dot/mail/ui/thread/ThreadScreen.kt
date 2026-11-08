@@ -99,6 +99,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.LinkAnnotation
@@ -174,6 +176,10 @@ class ThreadViewModel(
 ) : ViewModel() {
     private fun str(@androidx.annotation.StringRes id: Int, vararg args: Any) = resources.getString(id, *args)
 
+    /** Next / previous conversation of the list this reader was opened from (null when there is none to go to). */
+    fun neighbour(forward: Boolean, order: ConversationOrder = ThreadOrder.current): Long? =
+        if (forward) order.next(threadId, source) else order.previous(threadId, source)
+
     val messages: StateFlow<List<Message>?> =
         graph.mail.thread(threadId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -248,7 +254,7 @@ class ThreadViewModel(
         viewModelScope.launch {
             runCatching { if (source != null) graph.mail.move(listOf(threadId), folderId, source) else @Suppress("DEPRECATION") graph.mail.move(listOf(threadId), folderId) }
                 .onSuccess { _events.send(ThreadEvent.Close) }
-                .onFailure { _events.send(ThreadEvent.Message(it.message ?: str(R.string.inbox_error_move_failed))) }
+                .onFailure { _events.send(ThreadEvent.Message(app.dot.mail.ui.common.ErrorText.of(resources, it, R.string.inbox_error_move_failed))) }
         }
     }
 
@@ -262,7 +268,7 @@ class ThreadViewModel(
         viewModelScope.launch {
             runCatching { graph.mail.setMuted(listOf(threadId), muted) }
                 .onSuccess { _events.send(ThreadEvent.Message(str(if (muted) R.string.inbox_muted_toast else R.string.inbox_unmuted_toast))) }
-                .onFailure { _events.send(ThreadEvent.Message(it.message ?: str(R.string.inbox_error_mute_failed))) }
+                .onFailure { _events.send(ThreadEvent.Message(app.dot.mail.ui.common.ErrorText.of(resources, it, R.string.inbox_error_mute_failed))) }
         }
     }
 
@@ -270,7 +276,7 @@ class ThreadViewModel(
         viewModelScope.launch {
             runCatching { graph.mail.snooze(listOf(threadId), untilMillis) }
                 .onSuccess { _events.send(ThreadEvent.Close) }
-                .onFailure { _events.send(ThreadEvent.Message(it.message ?: str(R.string.inbox_error_snooze_failed))) }
+                .onFailure { _events.send(ThreadEvent.Message(app.dot.mail.ui.common.ErrorText.of(resources, it, R.string.inbox_error_snooze_failed))) }
         }
     }
 
@@ -297,7 +303,7 @@ class ThreadViewModel(
                         else -> Unit
                     }
                 }
-                .onFailure { _events.send(ThreadEvent.Message(it.message ?: str(R.string.inbox_error_action_failed))) }
+                .onFailure { _events.send(ThreadEvent.Message(app.dot.mail.ui.common.ErrorText.of(resources, it, R.string.inbox_error_action_failed))) }
         }
     }
 
@@ -364,8 +370,8 @@ fun ThreadScreen(
             when (e) {
                 is ThreadEvent.CloseWithUndo -> {
                     val target = when (prefs.afterAction) {
-                        app.dot.mail.AfterAction.NEXT -> ThreadOrder.after(threadId)
-                        app.dot.mail.AfterAction.PREVIOUS -> ThreadOrder.before(threadId)
+                        app.dot.mail.AfterAction.NEXT -> vm.neighbour(true)
+                        app.dot.mail.AfterAction.PREVIOUS -> vm.neighbour(false)
                         app.dot.mail.AfterAction.LIST -> null
                     }
                     // Back to the list: it shows the same Undo snackbar as a swipe. Jumping to the next/previous
@@ -374,8 +380,8 @@ fun ThreadScreen(
                 }
                 ThreadEvent.Close -> {
                     val target = when (prefs.afterAction) {
-                        app.dot.mail.AfterAction.NEXT -> ThreadOrder.after(threadId)
-                        app.dot.mail.AfterAction.PREVIOUS -> ThreadOrder.before(threadId)
+                        app.dot.mail.AfterAction.NEXT -> vm.neighbour(true)
+                        app.dot.mail.AfterAction.PREVIOUS -> vm.neighbour(false)
                         app.dot.mail.AfterAction.LIST -> null
                     }
                     if (target != null) onOpenAdjacent(target) else onBack()
@@ -418,6 +424,8 @@ fun ThreadScreen(
     }
     val showChrome = chromeVisible || !listState.canScrollBackward || !listState.canScrollForward
     val reducedMotionChrome = app.dot.design.rememberReducedMotion()
+    val nextLabel = stringResource(R.string.thread_action_next_conversation)
+    val previousLabel = stringResource(R.string.thread_action_previous_conversation)
     val chromeTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 60.dp
     val chromeBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 84.dp
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -447,14 +455,14 @@ fun ThreadScreen(
                     Key.Delete -> { act(MessageAction.TRASH); true }
                     Key.U -> { act(MessageAction.MARK_UNREAD); true }
                     Key.S -> { act(if (list?.any { it.isStarred } == true) MessageAction.UNSTAR else MessageAction.STAR); true }
-                    Key.J -> { ThreadOrder.after(threadId)?.let(onOpenAdjacent); true }
-                    Key.K -> { ThreadOrder.before(threadId)?.let(onOpenAdjacent); true }
+                    Key.J -> { vm.neighbour(true)?.let(onOpenAdjacent); true }
+                    Key.K -> { vm.neighbour(false)?.let(onOpenAdjacent); true }
                     Key.Escape -> { onBack(); true }
                     else -> false
                 }
             }
             .swipeBetweenConversations(enabled = prefs.swipeBetweenMessages) { forward ->
-                val target = if (forward) ThreadOrder.after(threadId) else ThreadOrder.before(threadId)
+                val target = if (forward) vm.neighbour(true) else vm.neighbour(false)
                 if (target != null) {
                     haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.GestureEnd)
                     onOpenAdjacent(target)
@@ -1141,42 +1149,49 @@ private fun AttachmentStrip(files: List<Attachment>, onOpen: (Attachment, Boolea
     }
 }
 
-/** Order of the list the user came from, for "after archive: open next/previous". */
 /**
- * Optional sideways swipe to the next (leftwards) / previous (rightwards) conversation. It only *observes* touches
- * (Initial pass, nothing consumed) so scrolling, text selection, links and the HTML view behave as before. It ignores
- * gestures that start in the system Back edge zones, multi-touch (pinch), slow drags and anything mostly vertical.
+ * Optional sideways swipe to the next (leftwards) / previous (rightwards) conversation. It only *observes* touches, on
+ * the Final pass, so everything below it has already had its say: a pinch or a pan while zoomed, a horizontally scrolling
+ * HTML message, a text-selection drag or a link press consume their events and then never count as a swipe. It also
+ * ignores the system Back-gesture edge zones, multi-touch, slow/long-press drags and anything mostly vertical.
  */
 private fun Modifier.swipeBetweenConversations(enabled: Boolean, onSwipe: (forward: Boolean) -> Unit): Modifier =
     if (!enabled) this else pointerInput(Unit) {
-        val edge = 24.dp.toPx()
-        val distance = 96.dp.toPx()
+        val edge = SwipeGuard.edgeDp.dp.toPx()
+        val distance = SwipeGuard.distanceDp.dp.toPx()
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
             if (down.position.x < edge || down.position.x > size.width - edge) return@awaitEachGesture
             val start = down.position
             val startedAt = down.uptimeMillis
-            var end = start
             while (true) {
-                val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
-                if (event.changes.size > 1) return@awaitEachGesture
+                val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Final)
+                if (event.changes.size > 1 || event.changes.any { it.isConsumed }) return@awaitEachGesture
                 val change = event.changes.firstOrNull { it.id == down.id } ?: return@awaitEachGesture
-                end = change.position
                 if (!change.pressed) {
-                    val dx = end.x - start.x
-                    val dy = end.y - start.y
-                    val quick = change.uptimeMillis - startedAt < 700
-                    if (quick && kotlin.math.abs(dx) > distance && kotlin.math.abs(dx) > 2.5f * kotlin.math.abs(dy)) onSwipe(dx < 0)
+                    val dx = change.position.x - start.x
+                    val dy = change.position.y - start.y
+                    val direction = SwipeGuard.resolve(dx, dy, change.uptimeMillis - startedAt, distance)
+                    if (direction != null) onSwipe(direction)
                     return@awaitEachGesture
                 }
             }
         }
     }
 
-object ThreadOrder {
-    @Volatile var ids: List<Long> = emptyList()
-    fun after(id: Long): Long? = ids.indexOf(id).takeIf { it >= 0 }?.let { ids.getOrNull(it + 1) }
-    fun before(id: Long): Long? = ids.indexOf(id).takeIf { it > 0 }?.let { ids.getOrNull(it - 1) }
+/** The pure part of the swipe decision, kept free of Compose so it is unit-tested. */
+internal object SwipeGuard {
+    const val edgeDp = 24
+    const val distanceDp = 96
+    const val maxMillis = 700L
+    const val dominance = 2.5f
+
+    /** true = forward (swipe left), false = back (swipe right), null = not a conversation swipe. */
+    fun resolve(dx: Float, dy: Float, millis: Long, distance: Float): Boolean? {
+        val quick = millis < maxMillis
+        val horizontal = kotlin.math.abs(dx) > distance && kotlin.math.abs(dx) > dominance * kotlin.math.abs(dy)
+        return if (quick && horizontal) dx < 0 else null
+    }
 }
 
 private const val CHROME_SCROLL_THRESHOLD = 6f

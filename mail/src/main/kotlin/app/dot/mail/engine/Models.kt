@@ -21,6 +21,7 @@ data class Header(
     val classificationHeaders: Map<String, List<String>> = emptyMap(),
     val hasPdfAttachment: Boolean = false,
     val attachmentNames: List<String> = emptyList(),
+    val encryptionHint: EncryptionHint = EncryptionHint.NONE,
 )
 data class SearchBatch(val uidValidity: Long, val headers: List<Header>, val limited: Boolean = false)
 data class HeaderFailure(val uid: Long, val error: Exception)
@@ -41,7 +42,7 @@ data class OutgoingMail(
 
 data class CachedPart(val partId: String, val name: String, val mimeType: String, val contentId: String?, val inline: Boolean, val file: java.io.File)
 data class RemotePart(val partId:String,val name:String,val mimeType:String,val contentId:String?,val inline:Boolean,val size:Long)
-data class CachedBody(val text: java.io.File?, val html: java.io.File?, val attachments: List<CachedPart>,val parts:List<RemotePart> = emptyList())
+data class CachedBody(val text: java.io.File?, val html: java.io.File?, val attachments: List<CachedPart>,val parts:List<RemotePart> = emptyList(), val encryptionHint: EncryptionHint = EncryptionHint.NONE)
 data class HeaderPage(val validity:Long,val uidNext:Long,val headers:List<Header>,val nextBeforeUid:Long,val hasMore:Boolean,val failures:List<HeaderFailure> = emptyList())
 
 data class DraftInventory(val validity: Long, val activeUids: Set<Long>)

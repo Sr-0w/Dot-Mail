@@ -36,4 +36,8 @@ class SettingsMatcherTest {
     @Test fun `blank query gives nothing`() {
         assertThat(SettingsMatcher.match("   ", hits)).isEmpty()
     }
+
+    @Test fun `aliases are discoverable from settings search`() {
+        assertThat(SettingsIndex.entries.any { it.title == app.dot.mail.R.string.aliases_title && it.target == SettingsTarget.Aliases }).isTrue()
+    }
 }

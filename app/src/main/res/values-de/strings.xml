@@ -203,6 +203,10 @@
         <item quantity="one">Unterhaltung archiviert</item>
         <item quantity="other">%1$d Unterhaltungen archiviert</item>
     </plurals>
+    <plurals name="inbox_draft_trashed_toast">
+        <item quantity="one">Entwurf in den Papierkorb verschoben</item>
+        <item quantity="other">%1$d Entwürfe in den Papierkorb verschoben</item>
+    </plurals>
     <plurals name="inbox_trashed_toast">
         <item quantity="one">Unterhaltung in den Papierkorb verschoben</item>
         <item quantity="other">%1$d Unterhaltungen in den Papierkorb verschoben</item>
@@ -353,10 +357,10 @@
     <!-- Inbox: sign-in banner & misc -->
     <string name="inbox_banner_open_settings">Einstellungen öffnen</string>
     <string name="inbox_banner_sign_in_again">Erneut anmelden</string>
-    <string name="inbox_failing_prefix_single">%1$s: </string>
-    <plurals name="inbox_failing_prefix_many">
-        <item quantity="one">%1$d Konto: </item>
-        <item quantity="other">%1$d Konten: </item>
+    <string name="inbox_failing_line_single">%1$s: %2$s</string>
+    <plurals name="inbox_failing_line_many">
+        <item quantity="one">%1$d Konto: %2$s</item>
+        <item quantity="other">%1$d Konten: %2$s</item>
     </plurals>
     <string name="inbox_snoozed_until">Bis %1$s</string>
     <string name="inbox_error_load_generic">E-Mails konnten nicht geladen werden</string>
@@ -507,7 +511,7 @@
     <string name="settings_sender_pictures_intro">Es werden Initialen verwendet, sofern Sie keine Quelle aktivieren. Jede Quelle außer den Kontakten fragt einen anderen Server an, der so erfährt, dass Sie Post von diesem Absender erhalten haben.</string>
     <string name="settings_contact_photos">Kontaktfotos</string>
     <string name="settings_contact_photos_denied">Der Zugriff auf Kontakte wurde abgelehnt. Erlauben Sie ihn in den Systemeinstellungen, um dies zu nutzen.</string>
-    <string name="settings_contact_photos_sub">Fotos aus Ihrem Adressbuch. Bleibt auf diesem Gerät.</string>
+    <string name="settings_contact_photos_sub">Fotos aus Ihrem Adressbuch und Adressbuch-Vorschläge bei der Empfängereingabe. Bleibt auf diesem Gerät.</string>
     <string name="settings_gravatar">Gravatar</string>
     <string name="settings_gravatar_sub">Sendet einen Hash der Absenderadresse an gravatar.com.</string>
     <string name="settings_brand_logos">Markenlogos</string>
@@ -1005,11 +1009,14 @@
     <string name="pgp_install_encrypted">Diese Nachricht ist verschlüsselt. Installieren Sie OpenKeychain, um sie zu lesen.</string>
     <string name="pgp_install_signed">Diese Nachricht ist signiert. Installieren Sie OpenKeychain, um sie zu prüfen.</string>
     <string name="pgp_get_openkeychain">OpenKeychain holen</string>
-    <string name="inbox_undo">Rückgängig</string>
-    <string name="inbox_undo_partial">Einige Nachrichten konnten nicht zurückgelegt werden; das geschieht bei der nächsten Synchronisierung.</string>
+    <string name="pgp_unsupported_encryption">Nicht unterstützte Verschlüsselung</string>
+    <string name="pgp_unsupported_encryption_body">Diese Nachricht verwendet ein verschlüsseltes Format, das Dot Mail noch nicht lesen kann. Der Inhalt bleibt verborgen.</string>
+    <string name="pgp_list_encrypted">Verschlüsselte Nachricht</string>
+        <string name="inbox_undo">Rückgängig</string>
+        <string name="inbox_undo_partial">Einige Nachrichten konnten nicht zurückgelegt werden; das geschieht bei der nächsten Synchronisierung.</string>
 
     <!-- OLED theme -->
-    <string name="settings_theme_oled">OLED</string>
+        <string name="settings_theme_oled">OLED</string>
     <!-- OpenPGP compose -->
     <string name="account_section_pgp">OpenPGP</string>
     <string name="account_pgp_sign">Neue Nachrichten signieren</string>
@@ -1053,4 +1060,40 @@
     <string name="outbox_reschedule">Neu planen</string>
     <string name="outbox_reschedule_title">Senden um</string>
     <string name="outbox_edit_unavailable">Es wird bereits gesendet und kann nicht mehr bearbeitet werden.</string>
+    <string name="aliases_title">Aliasse</string>
+    <string name="aliases_subtitle">SimpleLogin- oder addy.io-Aliasse verwalten</string>
+    <string name="aliases_api_key">API-Schlüssel</string>
+    <string name="aliases_create">Zufälligen Alias erstellen</string>
+    <string name="aliases_limit_note">Es wird nur die erste Alias-Seite dieses Anbieters angezeigt.</string>
+    <string name="aliases_remove_title">API-Schlüssel entfernen?</string>
+    <string name="aliases_remove_body">Der gespeicherte API-Schlüssel und die geladenen Aliasse dieses Anbieters werden von diesem Gerät entfernt.</string>
+    <string name="aliases_test">Verbindung testen</string>
+    <string name="aliases_remove_key">Schlüssel entfernen</string>
+    <string name="aliases_copy">Kopieren</string>
+    <string name="aliases_error">Alias-Anbieter nicht erreichbar. Prüfen Sie den Schlüssel und versuchen Sie es erneut.</string>
+    <string name="compose_use_alias">Alias verwenden…</string>
+    <string name="compose_aliases_empty">Bei Ihren verbundenen Anbietern sind keine Aliase verfügbar.</string>
+    <string name="aliases_reply_to_guidance">Diese Alias-Domain gehört nicht zu Ihren Identitäten. Die Adresse wurde kopiert; verwenden Sie sie als Antwort-an-Hinweis.</string>
+
+    <!-- Typed error texts -->
+    <string name="sync_problem_folder">ein Ordner ist auf dem Server nicht verfügbar</string>
+    <string name="sync_problem_parse">die Antwort des Servers konnte nicht gelesen werden</string>
+    <string name="sync_problem_database">die lokale Maildatenbank konnte nicht aktualisiert werden</string>
+    <string name="sync_problem_unexpected">der Server lieferte unerwartete Daten</string>
+    <string name="sync_problem_headers">einige Nachrichtenköpfe konnten nicht gelesen werden – neuer Versuch</string>
+    <string name="inbox_refresh_failed_reason">Aktualisierung fehlgeschlagen: %1$s</string>
+    <string name="action_error_message_moving">Diese Nachricht wird gerade verschoben. Versuchen Sie es gleich noch einmal.</string>
+    <string name="action_error_message_folder_gone">Der Ordner dieser Nachricht ist nicht mehr verfügbar.</string>
+    <string name="action_error_destination_other_account">Wählen Sie ein Ziel im selben Konto.</string>
+    <string name="action_error_move_syncing">Dieses Verschieben wird noch synchronisiert. Versuchen Sie es gleich noch einmal.</string>
+    <string name="action_error_move_sending">Dieses Verschieben wird an den Server gesendet. Versuchen Sie es gleich noch einmal.</string>
+    <string name="action_error_source_required">Wählen Sie das Quellpostfach, bevor Sie diese Unterhaltung verschieben.</string>
+    <string name="action_error_no_role_folder">Dieses Konto hat keinen Ordner „%1$s“.</string>
+    <string name="action_error_message_syncing">Diese Nachricht wird noch synchronisiert. Versuchen Sie es gleich noch einmal.</string>
+    <string name="action_error_destination_gone">Der Zielordner ist nicht mehr verfügbar.</string>
+    <string name="action_error_local_draft_move">Öffnen oder verwerfen Sie einen lokalen Entwurf, statt ihn zu verschieben.</string>
+    <string name="action_error_mixed_accounts">Wählen Sie Unterhaltungen und ein Ziel im selben Konto.</string>
+    <string name="action_error_draft_account_change">Beginnen Sie einen neuen Entwurf, um ein anderes Konto zu verwenden.</string>
+    <string name="thread_action_next_conversation">Nächste Unterhaltung</string>
+    <string name="thread_action_previous_conversation">Vorherige Unterhaltung</string>
 </resources>

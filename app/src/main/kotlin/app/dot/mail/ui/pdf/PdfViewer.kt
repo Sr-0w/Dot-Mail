@@ -63,6 +63,7 @@ import app.dot.design.components.DotTopBar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -103,9 +104,30 @@ fun PdfViewerDialog(
     }
 }
 
-private class PdfDocument(val fd: ParcelFileDescriptor, val renderer: PdfRenderer) {
+/**
+ * Serialises page rendering and closing. PdfRenderer refuses to close while a page is open (and pdfium must not lose its
+ * file descriptor mid-render), so leaving the viewer - Back, rotation, the message closing - waits for a render in
+ * flight instead of racing it, and renders that start afterwards see [closed] and do nothing.
+ */
+internal class PdfGate(private val onClose: () -> Unit) {
     val lock = Mutex()
-    fun close() { runCatching { renderer.close() }; runCatching { fd.close() } }
+    @Volatile var closed = false
+        private set // written from the UI thread only
+
+    /** Runs [render] under the lock unless the document is already closed. */
+    suspend fun <T : Any> render(render: () -> T?): T? = lock.withLock { if (closed) null else render() }
+
+    /** Closes once, after any render in flight; safe to call from the UI thread and more than once. */
+    fun close(scope: kotlinx.coroutines.CoroutineScope) {
+        if (closed) return
+        closed = true
+        scope.launch { lock.withLock { runCatching { onClose() } } }
+    }
+}
+
+private class PdfDocument(val fd: ParcelFileDescriptor, val renderer: PdfRenderer) {
+    val gate = PdfGate { runCatching { renderer.close() }; runCatching { fd.close() } }
+    fun close() = gate.close(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO))
 }
 
 @Composable
@@ -165,7 +187,7 @@ private fun PdfPage(pdf: PdfDocument, index: Int, widthPx: Int) {
     val c = Dot.colors
     val bitmap by produceState<Bitmap?>(null, pdf, index, widthPx) {
         value = withContext(Dispatchers.IO) {
-            pdf.lock.withLock {
+            pdf.gate.render {
                 runCatching {
                     pdf.renderer.openPage(index).use { page ->
                         val height = (widthPx.toLong() * page.height / page.width.coerceAtLeast(1)).toInt().coerceIn(1, 4 * widthPx)

@@ -40,7 +40,11 @@ data class Identity(
 sealed interface SyncState {
     data object Idle : SyncState
     data object Syncing : SyncState
-    data class Error(val message: String, val isAuthError: Boolean = false, val errorKind: app.dot.mail.engine.ConnectionFailure? = null) : SyncState {
+    data class Error(
+        val message: String, val isAuthError: Boolean = false, val errorKind: app.dot.mail.engine.ConnectionFailure? = null,
+        /** Finer cause when [errorKind] is OTHER (or absent), and the folder role the failure happened in, if any. */
+        val problem: SyncProblem? = null, val folderRole: String? = null,
+    ) : SyncState {
         val canRetry:Boolean get() = !isAuthError
     }
 }
@@ -151,6 +155,8 @@ data class ThreadSummary(
     /** Wake-up time (epoch ms); only set for rows of the Snoozed list. */
     val snoozedUntil: Long? = null,
     val category: app.dot.mail.engine.text.Category? = null,
+    /** Explicit encryption MIME classification of the message represented by this row. */
+    val encryptionHint: app.dot.mail.engine.EncryptionHint = app.dot.mail.engine.EncryptionHint.NONE,
 ) {
     val isUnread: Boolean get() = unreadCount > 0
 }
@@ -217,6 +223,8 @@ sealed interface PgpContent {
     /** Inline armour in the plain text (decrypt or verify the text itself). */
     data object InlineEncrypted : PgpContent
     data object InlineSigned : PgpContent
+    /** Explicitly encrypted MIME that Dot Mail cannot decrypt (for example S/MIME enveloped-data). */
+    data object Unsupported : PgpContent
 }
 
 enum class MessageAction { MARK_READ, MARK_UNREAD, STAR, UNSTAR, ARCHIVE, TRASH, SPAM, NOT_SPAM, DELETE_FOREVER }
@@ -308,8 +316,27 @@ enum class OAuthError { NOT_AVAILABLE, INVALID_EMAIL, ACCOUNT_GONE, WRONG_ACCOUN
 class OAuthException(message: String, val code: OAuthError = OAuthError.OTHER) : Exception(message)
 
 enum class MailActionFailure { FOLDER_UNAVAILABLE, ACCOUNT_MISMATCH, OPERATION_PENDING, SOURCE_REQUIRED }
-class MailActionException(val reason: MailActionFailure, message: String) : Exception(message)
-class MailSyncException(message: String) : Exception(message)
+
+/**
+ * What exactly was refused. The UI turns each kind into text in the user's language; [MailActionException.message] stays English
+ * for logs and tests only. [MailActionException.detail] carries a value for the text (e.g. the missing folder role), never prose.
+ */
+enum class ActionErrorKind {
+    MESSAGE_MOVING, MESSAGE_FOLDER_GONE, DESTINATION_OTHER_ACCOUNT, MOVE_SYNCING, MOVE_SENDING, SOURCE_REQUIRED,
+    NO_ROLE_FOLDER, MESSAGE_SYNCING, DESTINATION_GONE, LOCAL_DRAFT_MOVE, MIXED_ACCOUNTS, DRAFT_ACCOUNT_CHANGE, OTHER,
+}
+class MailActionException(
+    val reason: MailActionFailure, message: String,
+    val kind: ActionErrorKind = ActionErrorKind.OTHER, val detail: String? = null,
+) : Exception(message)
+
+/** Why a synchronisation failed, beyond the connection-level [app.dot.mail.engine.ConnectionFailure]. */
+enum class SyncProblem {
+    SERVER_NAME, TIMEOUT, UNREACHABLE, TLS, FOLDER_UNAVAILABLE, CONNECTION_CLOSED, PARSE, DATABASE, EMPTY_RESULT, INCONSISTENT,
+    HEADERS_UNREADABLE, AUTH, OTHER,
+}
+/** [kind] and [connection] let the UI explain a failed refresh in the user's language; [message] is English for logs. */
+class MailSyncException(message: String, val kind: SyncProblem = SyncProblem.OTHER, val connection: app.dot.mail.engine.ConnectionFailure? = null) : Exception(message)
 
 /** Why a folder command was refused before anything was sent to the server. */
 enum class FolderFailure {

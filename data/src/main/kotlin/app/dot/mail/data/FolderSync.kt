@@ -30,22 +30,21 @@ internal suspend fun RealMailGraph.syncOneFolder(account:AccountRow,config:Accou
         }
         val initialCursor = SyncCursor(if(folder.nextUid==1L && folder.modSeq<0) 0 else folder.validity, folder.nextUid, folder.modSeq,folder.total)
         var result = client.sync(config.imap.endpoint(), creds, folder.path, initialCursor, limit = windowLimit, windowDays = windowDays)
-        val cached=dao.folderMessages(folder.id)
-        val pending=dao.operations(account.id).any { it.folderId==folder.id }
-        val needsMetadata=cached.any { it.uid>0 && (Codec.field(it.header,"category")==null || Codec.field(it.header,"attachmentNames")==null) }
-        val needsPreview=cached.any { !it.snippetFetched && (it.bodyLoaded || (it.uid>0 && it.snippet.isNotBlank())) } || cached.sortedByDescending { it.sentAt }.take(200).any { it.uid>0 && !it.snippetFetched && !it.bodyLoaded }
+        val pending=dao.hasFolderOperations(folder.id)
+        val needsMetadata=dao.folderNeedsMetadata(folder.id)
+        val needsPreview=dao.folderNeedsPreviews(folder.id)
         if(result.unchanged && !pending && !needsMetadata && !needsPreview) {
             if(folder.name!=remote.name || folder.role!=remote.role.name || folder.unread!=remote.unread || folder.total!=remote.total)
                 dao.updateFolder(folder.copy(name=remote.name,role=remote.role.name,unread=remote.unread,total=remote.total))
             ready(true,null)
             return MailboxSyncOutcome()
         }
-        if(result.unchanged) result=result.copy(existingUids=cached.filter { it.uid>0 }.map { it.uid }.toSet())
         if (result.failures.isNotEmpty()) {
             result.failures.forEach { SyncDiagnostics.warn("Header UID=${it.uid} account=${account.id} folderRole=${remote.role}", it.error, redactions) }
             headerWarning = "Folder ${remote.role}: some message headers could not be read; retrying"
         }
-        val missing=dao.folderMessages(folder.id).filter { it.uid>0 && (Codec.field(it.header,"category")==null || Codec.field(it.header,"attachmentNames")==null) && result.headers.none { h -> h.uid==it.uid } }.take(200)
+        val fetched=result.headers.map { it.uid }.toSet()
+        val missing=dao.folderMetadataRepairs(folder.id).filter { it.uid !in fetched }
         if(missing.isNotEmpty() && !result.reset) {
             try { result=result.copy(headers=result.headers+client.headers(config.imap.endpoint(),creds,folder.path,missing.map { it.uid }.toLongArray(),result.cursor.uidValidity)) }
             catch(e: CancellationException) { throw e } catch(e: Exception) { SyncDiagnostics.warn("Classification metadata account=${account.id} folderRole=${remote.role}",e,redactions) }
@@ -124,26 +123,45 @@ private suspend fun RealMailGraph.replayFolderOperations(account:AccountRow,conf
     return ReplayOutcome(success,replayed,deferredExpunge)
 }
 
-private suspend fun RealMailGraph.applyFolderHeaders(account:AccountRow,folder:FolderRow,remote:RemoteFolder,result:HeaderSync):List<Triple<Long,String,Long>> {
+internal suspend fun RealMailGraph.applyFolderHeaders(account:AccountRow,folder:FolderRow,remote:RemoteFolder,result:HeaderSync):List<Triple<Long,String,Long>> {
     val notificationRules=NotificationRules.get(context)
     val notifications = mutableListOf<Triple<Long, String, Long>>()
     val dbStart=System.nanoTime()
     database.withTransaction {
-        val old = dao.folderMessages(folder.id)
-        if (result.reset && dao.folder(folder.id)?.validity!=result.cursor.uidValidity) old.filter { it.uid > 0 }.forEach { dao.deleteMessage(it.id) }
-        else if(!result.unchanged) old.filter { it.uid > 0 && it.uid !in result.existingUids }.forEach { dao.deleteMessage(it.id) }
+        val old = if(result.unchanged) emptyList() else dao.folderInventory(folder.id)
+        val oldByUid=old.associateBy { it.uid }
+        val changedThreads=linkedSetOf<Long>()
+        val removed=if(result.reset && dao.folder(folder.id)?.validity!=result.cursor.uidValidity) old.filter { it.uid>0 }
+            else if(!result.unchanged) old.filter { it.uid>0 && it.uid !in result.existingUids } else emptyList()
+        removed.forEach { dao.deleteMessage(it.id); changedThreads+=it.threadId }
         val operations = dao.operations(account.id)
         val pending = operations.filter { it.folderId == folder.id && it.validity == result.cursor.uidValidity }.map { it.uid }.toSet()
         val pendingLocalIds = operations.mapNotNull { it.messageLocalId }.toSet()
-        result.headers.filter { !it.flags.deleted && it.uid !in pending }.forEach { header ->
-            val (thread, fresh) = upsertHeader(folder.copy(validity = result.cursor.uidValidity), header)
+        val headerUids=result.headers.map { it.uid }.toHashSet()
+        // The final flag inventory wins if a server updates flags between its header/flag FETCHes.
+        val headerFlags=result.flags.asSequence().filter { it.uid in headerUids }.associateBy { it.uid }
+        result.headers.map { header -> headerFlags[header.uid]?.let { header.copy(flags=it) } ?: header }
+            .filter { !it.flags.deleted && it.uid !in pending }.forEach { header ->
+            val (thread, fresh) = upsertHeader(folder.copy(validity = result.cursor.uidValidity), header, rebuild=false)
+            changedThreads+=thread
             if (fresh && !result.reset) dao.deleteThreadSnooze(thread) // new mail in a snoozed conversation wakes it
             if (fresh && !result.reset && !header.flags.seen && notificationRules.notifyForFolder(folder.id, remote.role.name) && !notificationRules.isMuted(thread)) notifications += Triple(thread, header.subject, folder.id)
         }
-        result.flags.filter { it.uid !in pending }.forEach { flag -> dao.byUid(folder.id, flag.uid)?.let { row ->
-            if (row.id !in pendingLocalIds) { if (flag.deleted) dao.deleteMessage(row.id) else dao.updateMessage(row.copy(unread = !flag.seen, starred = flag.starred)) }
-        } }
-        (old.map { it.threadId } + dao.folderMessages(folder.id).map { it.threadId }).distinct().forEach { rebuildThread(it) }
+        result.flags.filter { it.uid !in pending }.forEach { flag ->
+            val state=oldByUid[flag.uid] ?: dao.byUid(folder.id,flag.uid)?.let { FolderMessageState(it.id,it.uid,it.threadId,it.unread,it.starred) }
+            if(state!=null && state.id !in pendingLocalIds) {
+                if(flag.deleted) { dao.deleteMessage(state.id); changedThreads+=state.threadId }
+                else if(state.unread != !flag.seen || state.starred!=flag.starred) {
+                    // Fetch full metadata only for changed flags, preserving headers and cached bodies.
+                    dao.message(state.id)?.let { row ->
+                        val updated=row.copy(unread=!flag.seen,starred=flag.starred)
+                        if(updated!=row) dao.updateMessage(updated)
+                    }
+                    changedThreads+=state.threadId
+                }
+            }
+        }
+        changedThreads.forEach { rebuildThread(it) }
         dao.updateFolder(folder.copy(name = remote.name, role = remote.role.name, unread = remote.unread, total = result.cursor.messageCount.takeIf { it>=0 } ?: remote.total, validity = result.cursor.uidValidity, nextUid = result.cursor.uidNext, modSeq = result.cursor.highestModSeq))
     }
     client.recordTiming("db",(System.nanoTime()-dbStart)/1_000_000)

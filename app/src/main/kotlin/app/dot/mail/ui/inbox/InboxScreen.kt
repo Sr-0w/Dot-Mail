@@ -25,6 +25,7 @@ import androidx.compose.foundation.rememberScrollState
 import app.dot.design.components.DotButton
 import app.dot.design.components.ButtonStyle
 import app.dot.mail.data.model.Mailbox
+import androidx.compose.material.icons.outlined.Drafts
 import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material.icons.outlined.Check
@@ -86,6 +87,7 @@ import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.Mail
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.MarkEmailRead
 import androidx.compose.material.icons.outlined.MarkEmailUnread
 import androidx.compose.material.icons.outlined.Menu
@@ -329,8 +331,10 @@ fun InboxScreen(
                         Icon(Icons.Outlined.WifiOff, null, Modifier.size(18.dp), tint = Dot.colors.danger)
                         Spacer(Modifier.width(DotSpacing.s))
                         Text(
-                            (if (failing.size == 1) stringResource(R.string.inbox_failing_prefix_single, failing.first().email) else pluralStringResource(R.plurals.inbox_failing_prefix_many, failing.size, failing.size)) +
-                                syncErrorText(err) + if (err?.isAuthError == true) stringResource(R.string.inbox_sign_in_again_suffix) else "",
+                            syncErrorText(err).plus(if (err?.isAuthError == true) stringResource(R.string.inbox_sign_in_again_suffix) else "").let { detail ->
+                                if (failing.size == 1) stringResource(R.string.inbox_failing_line_single, failing.first().email, detail)
+                                else pluralStringResource(R.plurals.inbox_failing_line_many, failing.size, failing.size, detail)
+                            },
                             style = Dot.type.caption, color = Dot.colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
@@ -399,6 +403,7 @@ fun InboxScreen(
                         role = header.role,
                         filtered = filtersActive.any,
                         smart = mailbox is Mailbox.Smart,
+                        mailbox = mailbox,
                         onOpen = { t ->
                             when {
                                 selection.isNotEmpty() -> vm.toggleSelection(t.threadId)
@@ -479,6 +484,7 @@ private fun ThreadList(
     role: FolderRole?,
     filtered: Boolean,
     smart: Boolean,
+    mailbox: Mailbox,
     onOpen: (ThreadSummary) -> Unit,
     onToggleSelect: (Long) -> Unit,
     onSwipe: (MessageAction, ThreadSummary) -> Unit,
@@ -496,7 +502,7 @@ private fun ThreadList(
             item { EmptyFor(role, filtered, smart) }
         }
         else -> {
-            LaunchedEffect(threads.itemSnapshotList.items) { app.dot.mail.ui.thread.ThreadOrder.ids = threads.itemSnapshotList.items.map { it.threadId } }
+            LaunchedEffect(mailbox, threads.itemSnapshotList.items) { app.dot.mail.ui.thread.ThreadOrder.record(mailbox, threads.itemSnapshotList.items.map { it.threadId }) }
             LazyColumn(
             state = listState,
             modifier = edge.fillMaxSize(),
@@ -690,6 +696,22 @@ private fun swipeVisual(action: SwipeAction, t: ThreadSummary): Pair<ImageVector
     SwipeAction.NONE -> Icons.Outlined.Mail to ""
 }
 
+/**
+ * Whose avatar a row shows: the recipient for rows that list recipients (Sent, Drafts), else the latest sender. Null when
+ * there is nobody yet (a new draft with no recipient), where the row draws a neutral draft icon instead of a placeholder letter.
+ */
+internal fun avatarAddress(thread: ThreadSummary, showRecipients: Boolean): app.dot.mail.data.model.EmailAddress? =
+    if (showRecipients) thread.recipients.firstOrNull() ?: thread.participants.lastOrNull() else thread.participants.lastOrNull()
+
+/** The avatar of a draft that has no recipient yet: a quiet circle with the Drafts glyph, never a made-up initial. */
+@Composable
+private fun DraftAvatar(size: androidx.compose.ui.unit.Dp) {
+    val c = Dot.colors
+    Box(Modifier.size(size).clip(CircleShape).background(c.surfaceRaised), contentAlignment = Alignment.Center) {
+        Icon(Icons.Outlined.Drafts, null, Modifier.size(size * 0.5f), tint = c.textSecondary)
+    }
+}
+
 /** What TalkBack offers on a conversation row besides opening it. */
 enum class RowAction { ARCHIVE, DELETE, STAR, READ, SNOOZE }
 
@@ -753,6 +775,7 @@ fun ThreadRow(
     val unreadLabel = stringResource(R.string.inbox_state_unread)
     val starredLabel = stringResource(R.string.inbox_state_starred)
     val attachmentsLabel = stringResource(R.string.inbox_state_has_attachments)
+    val encryptionLabel = stringResource(R.string.pgp_list_encrypted)
     val selectedLabel = stringResource(R.string.inbox_state_selected)
     val sender = if (showRecipients && thread.recipients.isNotEmpty()) {
         stringResource(R.string.inbox_to_prefix, thread.recipients.joinToString(", ") { it.displayName.substringBefore(' ').ifBlank { it.displayName } })
@@ -772,6 +795,7 @@ fun ThreadRow(
                     if (unread) append(unreadLabel).append(" ")
                     if (thread.isStarred) append(starredLabel).append(" ")
                     if (thread.hasAttachments) append(attachmentsLabel).append(" ")
+                    if (thread.encryptionHint != app.dot.mail.engine.EncryptionHint.NONE) append(encryptionLabel).append(" ")
                     if (selected) append(selectedLabel)
                 }
             }
@@ -800,8 +824,10 @@ fun ThreadRow(
                 ) { sel ->
                     if (sel) SelectCircle(selected)
                     else {
-                        val first = if (showRecipients) thread.recipients.firstOrNull() ?: thread.participants.lastOrNull() else thread.participants.lastOrNull()
-                        app.dot.mail.ui.avatar.SenderAvatar(first ?: app.dot.mail.data.model.EmailAddress("?"), size = m.avatar)
+                        val first = avatarAddress(thread, showRecipients)
+                        if (first != null) app.dot.mail.ui.avatar.SenderAvatar(first, size = m.avatar)
+                        else if (thread.draftId != null) DraftAvatar(m.avatar)
+                        else app.dot.mail.ui.avatar.SenderAvatar(app.dot.mail.data.model.EmailAddress("?"), size = m.avatar)
                     }
                 }
             }
@@ -845,6 +871,10 @@ fun ThreadRow(
                 }
                 if (thread.hasAttachments) {
                     Icon(Icons.Outlined.Attachment, null, Modifier.size(15.dp), tint = c.textTertiary)
+                    Spacer(Modifier.width(6.dp))
+                }
+                if (thread.encryptionHint != app.dot.mail.engine.EncryptionHint.NONE) {
+                    Icon(Icons.Outlined.Lock, encryptionLabel, Modifier.size(15.dp), tint = c.textTertiary)
                     Spacer(Modifier.width(6.dp))
                 }
                 if (thread.snoozedUntil != null) {
@@ -1096,16 +1126,7 @@ private fun QuietRefreshIndicator(
     }
 }
 
-/** The banner text for a sync error, in the user's language when the kind of failure is known. */
+/** The banner text for a sync error, in the user's language when the cause is known. */
 @Composable
-private fun syncErrorText(err: app.dot.mail.data.model.SyncState.Error?): String = when (err?.errorKind) {
-    null -> err?.message ?: stringResource(R.string.inbox_sync_problem)
-    app.dot.mail.engine.ConnectionFailure.DNS -> stringResource(R.string.sync_error_dns)
-    app.dot.mail.engine.ConnectionFailure.TIMEOUT -> stringResource(R.string.sync_error_timeout)
-    app.dot.mail.engine.ConnectionFailure.TLS -> stringResource(R.string.sync_error_tls)
-    app.dot.mail.engine.ConnectionFailure.AUTH -> stringResource(R.string.sync_error_auth)
-    app.dot.mail.engine.ConnectionFailure.SERVER_CLOSED -> stringResource(R.string.sync_error_server_closed)
-    app.dot.mail.engine.ConnectionFailure.THROTTLED -> stringResource(R.string.sync_error_throttled)
-    app.dot.mail.engine.ConnectionFailure.NETWORK -> stringResource(R.string.sync_error_network)
-    app.dot.mail.engine.ConnectionFailure.OTHER -> stringResource(R.string.sync_error_other)
-}
+private fun syncErrorText(err: app.dot.mail.data.model.SyncState.Error?): String =
+    err?.let { app.dot.mail.ui.common.ErrorText.syncError(it) } ?: stringResource(R.string.inbox_sync_problem)

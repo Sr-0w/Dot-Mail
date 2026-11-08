@@ -203,6 +203,10 @@
         <item quantity="one">Conversation archivée</item>
         <item quantity="other">%1$d conversations archivées</item>
     </plurals>
+    <plurals name="inbox_draft_trashed_toast">
+        <item quantity="one">Brouillon déplacé dans la corbeille</item>
+        <item quantity="other">%1$d brouillons déplacés dans la corbeille</item>
+    </plurals>
     <plurals name="inbox_trashed_toast">
         <item quantity="one">Conversation déplacée dans la corbeille</item>
         <item quantity="other">%1$d conversations déplacées dans la corbeille</item>
@@ -353,10 +357,10 @@
     <!-- Inbox: sign-in banner & misc -->
     <string name="inbox_banner_open_settings">Ouvrir les réglages</string>
     <string name="inbox_banner_sign_in_again">Se reconnecter</string>
-    <string name="inbox_failing_prefix_single">%1$s : </string>
-    <plurals name="inbox_failing_prefix_many">
-        <item quantity="one">%1$d compte : </item>
-        <item quantity="other">%1$d comptes : </item>
+    <string name="inbox_failing_line_single">%1$s : %2$s</string>
+    <plurals name="inbox_failing_line_many">
+        <item quantity="one">%1$d compte : %2$s</item>
+        <item quantity="other">%1$d comptes : %2$s</item>
     </plurals>
     <string name="inbox_snoozed_until">Jusqu’à %1$s</string>
     <string name="inbox_error_load_generic">Impossible de charger les e-mails</string>
@@ -507,7 +511,7 @@
     <string name="settings_sender_pictures_intro">Les initiales sont utilisées sauf si vous activez une source. Chaque source ci-dessous, hormis les contacts, interroge un autre serveur, qui apprend que vous avez reçu un e-mail de cet expéditeur.</string>
     <string name="settings_contact_photos">Photos des contacts</string>
     <string name="settings_contact_photos_denied">L’accès aux contacts a été refusé. Autorisez-le dans les réglages du système pour l’utiliser.</string>
-    <string name="settings_contact_photos_sub">Photos de votre carnet d’adresses. Reste sur cet appareil.</string>
+    <string name="settings_contact_photos_sub">Photos de votre carnet d’adresses, et suggestions du carnet quand vous saisissez un destinataire. Reste sur cet appareil.</string>
     <string name="settings_gravatar">Gravatar</string>
     <string name="settings_gravatar_sub">Envoie une empreinte de l’adresse de l’expéditeur à gravatar.com.</string>
     <string name="settings_brand_logos">Logos de marque</string>
@@ -1005,11 +1009,14 @@
     <string name="pgp_install_encrypted">Ce message est chiffré. Installez OpenKeychain pour le lire.</string>
     <string name="pgp_install_signed">Ce message est signé. Installez OpenKeychain pour le vérifier.</string>
     <string name="pgp_get_openkeychain">Obtenir OpenKeychain</string>
-    <string name="inbox_undo">Annuler</string>
-    <string name="inbox_undo_partial">Certains messages n’ont pas pu être remis en place ; ils le seront à la prochaine synchronisation.</string>
+    <string name="pgp_unsupported_encryption">Chiffrement non pris en charge</string>
+    <string name="pgp_unsupported_encryption_body">Ce message utilise un format chiffré que Dot Mail ne sait pas encore lire. Son contenu reste masqué.</string>
+    <string name="pgp_list_encrypted">Message chiffré</string>
+        <string name="inbox_undo">Annuler</string>
+        <string name="inbox_undo_partial">Certains messages n’ont pas pu être remis en place ; ils le seront à la prochaine synchronisation.</string>
 
     <!-- OLED theme -->
-    <string name="settings_theme_oled">OLED</string>
+        <string name="settings_theme_oled">OLED</string>
     <!-- OpenPGP compose -->
     <string name="account_section_pgp">OpenPGP</string>
     <string name="account_pgp_sign">Signer les nouveaux messages</string>
@@ -1053,4 +1060,40 @@
     <string name="outbox_reschedule">Reprogrammer</string>
     <string name="outbox_reschedule_title">Envoyer à</string>
     <string name="outbox_edit_unavailable">Il est déjà en cours d’envoi et ne peut plus être modifié.</string>
+    <string name="aliases_title">Alias</string>
+    <string name="aliases_subtitle">Gérer les alias SimpleLogin ou addy.io</string>
+    <string name="aliases_api_key">Clé API</string>
+    <string name="aliases_create">Créer un alias aléatoire</string>
+    <string name="aliases_limit_note">Seule la première page d’alias de ce fournisseur est affichée.</string>
+    <string name="aliases_remove_title">Supprimer la clé API ?</string>
+    <string name="aliases_remove_body">La clé API enregistrée et les alias chargés pour ce fournisseur seront supprimés de cet appareil.</string>
+    <string name="aliases_test">Tester la connexion</string>
+    <string name="aliases_remove_key">Supprimer la clé</string>
+    <string name="aliases_copy">Copier</string>
+    <string name="aliases_error">Impossible de joindre le fournisseur d’alias. Vérifiez la clé et réessayez.</string>
+    <string name="compose_use_alias">Utiliser un alias…</string>
+    <string name="compose_aliases_empty">Aucun alias n’est disponible auprès de vos fournisseurs connectés.</string>
+    <string name="aliases_reply_to_guidance">Le domaine de cet alias ne correspond pas à vos identités. Adresse copiée ; utilisez-la comme indication pour Répondre à.</string>
+
+    <!-- Typed error texts -->
+    <string name="sync_problem_folder">un dossier est indisponible sur le serveur</string>
+    <string name="sync_problem_parse">la réponse du serveur n’a pas pu être lue</string>
+    <string name="sync_problem_database">la base de messages locale n’a pas pu être mise à jour</string>
+    <string name="sync_problem_unexpected">le serveur a renvoyé des données inattendues</string>
+    <string name="sync_problem_headers">certains en-têtes de messages n’ont pas pu être lus — nouvel essai</string>
+    <string name="inbox_refresh_failed_reason">Actualisation impossible : %1$s</string>
+    <string name="action_error_message_moving">Ce message est en cours de déplacement. Réessayez dans un instant.</string>
+    <string name="action_error_message_folder_gone">Le dossier de ce message n’est plus disponible.</string>
+    <string name="action_error_destination_other_account">Choisissez une destination dans le même compte.</string>
+    <string name="action_error_move_syncing">Ce déplacement est encore en cours de synchronisation. Réessayez dans un instant.</string>
+    <string name="action_error_move_sending">Ce déplacement est en cours d’envoi au serveur. Réessayez dans un instant.</string>
+    <string name="action_error_source_required">Choisissez la boîte source avant de déplacer cette conversation.</string>
+    <string name="action_error_no_role_folder">Ce compte n’a pas de dossier « %1$s ».</string>
+    <string name="action_error_message_syncing">Ce message est encore en cours de synchronisation. Réessayez dans un instant.</string>
+    <string name="action_error_destination_gone">Le dossier de destination n’est plus disponible.</string>
+    <string name="action_error_local_draft_move">Ouvrez ou supprimez un brouillon local au lieu de le déplacer.</string>
+    <string name="action_error_mixed_accounts">Choisissez des conversations et une destination dans le même compte.</string>
+    <string name="action_error_draft_account_change">Commencez un nouveau brouillon pour utiliser un autre compte.</string>
+    <string name="thread_action_next_conversation">Conversation suivante</string>
+    <string name="thread_action_previous_conversation">Conversation précédente</string>
 </resources>

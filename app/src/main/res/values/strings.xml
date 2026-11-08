@@ -203,6 +203,10 @@
         <item quantity="one">Conversation archived</item>
         <item quantity="other">%1$d conversations archived</item>
     </plurals>
+    <plurals name="inbox_draft_trashed_toast">
+        <item quantity="one">Draft moved to trash</item>
+        <item quantity="other">%1$d drafts moved to trash</item>
+    </plurals>
     <plurals name="inbox_trashed_toast">
         <item quantity="one">Conversation moved to trash</item>
         <item quantity="other">%1$d conversations moved to trash</item>
@@ -353,10 +357,10 @@
     <!-- Inbox: sign-in banner & misc -->
     <string name="inbox_banner_open_settings">Open settings</string>
     <string name="inbox_banner_sign_in_again">Sign in again</string>
-    <string name="inbox_failing_prefix_single">%1$s: </string>
-    <plurals name="inbox_failing_prefix_many">
-        <item quantity="one">%1$d account: </item>
-        <item quantity="other">%1$d accounts: </item>
+    <string name="inbox_failing_line_single">%1$s: %2$s</string>
+    <plurals name="inbox_failing_line_many">
+        <item quantity="one">%1$d account: %2$s</item>
+        <item quantity="other">%1$d accounts: %2$s</item>
     </plurals>
     <string name="inbox_snoozed_until">Until %1$s</string>
     <string name="inbox_error_load_generic">Couldn\'t load mail</string>
@@ -507,7 +511,7 @@
     <string name="settings_sender_pictures_intro">Initials are used unless you turn a source on. Every source below except contacts asks another server, which learns that you received mail from that sender.</string>
     <string name="settings_contact_photos">Contact photos</string>
     <string name="settings_contact_photos_denied">Contacts permission was denied. Allow it in system settings to use this.</string>
-    <string name="settings_contact_photos_sub">Photos from your address book. Stays on this device.</string>
+    <string name="settings_contact_photos_sub">Photos from your address book, and address-book matches when you type a recipient. Stays on this device.</string>
     <string name="settings_gravatar">Gravatar</string>
     <string name="settings_gravatar_sub">Sends a hash of the sender\'s address to gravatar.com.</string>
     <string name="settings_brand_logos">Brand logos</string>
@@ -1005,11 +1009,14 @@
     <string name="pgp_install_encrypted">This message is encrypted. Install OpenKeychain to read it.</string>
     <string name="pgp_install_signed">This message is signed. Install OpenKeychain to check it.</string>
     <string name="pgp_get_openkeychain">Get OpenKeychain</string>
-    <string name="inbox_undo">Undo</string>
-    <string name="inbox_undo_partial">Some messages couldn’t be put back; they will be after the next sync.</string>
+    <string name="pgp_unsupported_encryption">Unsupported encryption</string>
+    <string name="pgp_unsupported_encryption_body">This message uses an encrypted format Dot Mail cannot read yet. Its contents remain hidden.</string>
+    <string name="pgp_list_encrypted">Encrypted message</string>
+        <string name="inbox_undo">Undo</string>
+        <string name="inbox_undo_partial">Some messages couldn’t be put back; they will be after the next sync.</string>
 
     <!-- OLED theme -->
-    <string name="settings_theme_oled">OLED</string>
+        <string name="settings_theme_oled">OLED</string>
     <!-- OpenPGP compose -->
     <string name="account_section_pgp">OpenPGP</string>
     <string name="account_pgp_sign">Sign new messages</string>
@@ -1053,4 +1060,40 @@
     <string name="outbox_reschedule">Reschedule</string>
     <string name="outbox_reschedule_title">Send at</string>
     <string name="outbox_edit_unavailable">It is already being sent and can\'t be edited.</string>
+    <string name="aliases_title">Aliases</string>
+    <string name="aliases_subtitle">Manage SimpleLogin or addy.io aliases</string>
+    <string name="aliases_api_key">API key</string>
+    <string name="aliases_create">Create random alias</string>
+    <string name="aliases_limit_note">Showing only the first page of aliases from this provider.</string>
+    <string name="aliases_remove_title">Remove API key?</string>
+    <string name="aliases_remove_body">The saved API key and aliases loaded for this provider will be removed from this device.</string>
+    <string name="aliases_test">Test connection</string>
+    <string name="aliases_remove_key">Remove key</string>
+    <string name="aliases_copy">Copy</string>
+    <string name="aliases_error">Could not reach the alias provider. Check the key and try again.</string>
+    <string name="compose_use_alias">Use an alias…</string>
+    <string name="compose_aliases_empty">No aliases are available for your connected providers.</string>
+    <string name="aliases_reply_to_guidance">This alias domain is not one of your identities. The address was copied; use it as Reply-To guidance.</string>
+
+    <!-- Typed error texts -->
+    <string name="sync_problem_folder">a folder is unavailable on the server</string>
+    <string name="sync_problem_parse">the server’s response couldn’t be read</string>
+    <string name="sync_problem_database">the local mail database couldn’t be updated</string>
+    <string name="sync_problem_unexpected">the server returned unexpected data</string>
+    <string name="sync_problem_headers">some message headers couldn’t be read — retrying</string>
+    <string name="inbox_refresh_failed_reason">Couldn’t refresh: %1$s</string>
+    <string name="action_error_message_moving">This message is moving. Try again shortly.</string>
+    <string name="action_error_message_folder_gone">This message’s folder is no longer available.</string>
+    <string name="action_error_destination_other_account">Choose a destination in the same account.</string>
+    <string name="action_error_move_syncing">This move is still being synchronized. Try again shortly.</string>
+    <string name="action_error_move_sending">This move is being sent to the server. Try again shortly.</string>
+    <string name="action_error_source_required">Choose the source mailbox before moving this conversation.</string>
+    <string name="action_error_no_role_folder">This account has no %1$s folder.</string>
+    <string name="action_error_message_syncing">This message is still being synchronized. Try again shortly.</string>
+    <string name="action_error_destination_gone">The destination folder is no longer available.</string>
+    <string name="action_error_local_draft_move">Open or discard a local draft instead of moving it.</string>
+    <string name="action_error_mixed_accounts">Choose conversations and a destination in the same account.</string>
+    <string name="action_error_draft_account_change">Start a new draft to use another account.</string>
+    <string name="thread_action_next_conversation">Next conversation</string>
+    <string name="thread_action_previous_conversation">Previous conversation</string>
 </resources>

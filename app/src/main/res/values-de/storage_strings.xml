@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="storage_title">Speicher und Offline</string>
+    <string name="storage_explanation">Eine Richtlinie wählen und mit Anwenden aktivieren. Servernachrichten werden nie gelöscht. Entwürfe, Postausgang, ausstehende Änderungen und gespeicherte Nachrichten bleiben geschützt und können das Limit überschreiten. Unbegrenzt bleibt durch freien Gerätespeicher begrenzt.</string>
+    <string name="storage_used">Gesamter lokaler Mailspeicher</string>
+    <string name="storage_database">Gemeinsame Datenbank und Suchindex</string>
+    <string name="storage_local_work">Postausgang und Entwurfsanhänge</string>
+    <string name="storage_orphans">Temporärer und nicht referenzierter Mailcache</string>
+    <string name="storage_available">Freier Gerätespeicher</string>
+    <string name="storage_approximate">Einige geschützte Größen sind geschätzt.</string>
+    <string name="storage_refresh_usage">Speicherbelegung aktualisieren</string>
+    <string name="storage_global_limit">Gesamtes Speicherlimit</string>
+    <string name="storage_unlimited">Unbegrenzt</string>
+    <string name="storage_account">Konto</string>
+    <string name="storage_payloads">Heruntergeladene Inhalte und Anhänge</string>
+    <string name="storage_protected">Geschützte Cachedateien</string>
+    <string name="storage_progress">Offline-Download</string>
+    <string name="storage_messages">Nachrichten im Cache</string>
+    <string name="storage_counts">%1$d / %2$d</string>
+    <string name="storage_count_unknown">%1$d im Cache · Gesamtzahl noch unbekannt</string>
+    <string name="storage_bodies">Heruntergeladene Inhalte</string>
+    <string name="storage_attachments">Heruntergeladene Anhänge</string>
+    <string name="storage_pause">Pausieren</string>
+    <string name="storage_resume">Fortsetzen</string>
+    <string name="storage_retry">Download erneut versuchen</string>
+    <string name="storage_clear">Heruntergeladene Mails entfernen</string>
+    <string name="storage_clear_sub">Downloads pausieren und freigebbare Inhalte und Anhänge entfernen.</string>
+    <string name="storage_clear_confirm">Heruntergeladene Mails dieses Kontos entfernen? Downloads werden pausiert. Kopfzeilen, geschützte Entwürfe, Postausgang, gespeicherte Nachrichten und ausstehende Änderungen bleiben erhalten. Auf dem Server wird nichts gelöscht.</string>
+    <string name="storage_cancel">Abbrechen</string>
+    <string name="storage_freed">%1$s freigegeben</string>
+    <string name="storage_retention">Lokal behalten</string>
+    <string name="storage_latest">Neueste Nachrichten</string>
+    <string name="storage_days">Letzte Tage</string>
+    <string name="storage_all">Alle Servernachrichten</string>
+    <string name="storage_full_offline">Unbegrenztes Offlineprofil wählen</string>
+    <string name="storage_full_offline_sub">Alle Nachrichteninhalte, Anhänge optional. Zum Start Anwenden wählen. Das Gesamtlimit und freier Gerätespeicher gelten weiterhin.</string>
+    <string name="storage_latest_count">Anzahl der Nachrichten</string>
+    <string name="storage_days_count">Anzahl der Tage</string>
+    <string name="storage_account_limit">Cachelimit des Kontos (MiB)</string>
+    <string name="storage_zero_unlimited">0 = unbegrenzt. 1024 MiB = 1 GiB. Geschützte Dateien bleiben erhalten.</string>
+    <string name="storage_prefetch_bodies">Inhalte automatisch herunterladen</string>
+    <string name="storage_prefetch_attachments">Anhänge automatisch herunterladen</string>
+    <string name="storage_wifi">Offline-Downloads nur über WLAN</string>
+    <string name="storage_charging">Nur beim Laden</string>
+    <string name="storage_invalid">Gültige Nachrichtenanzahl (1–1.000.000), Tage (1–36.500) und ein nicht negatives ganzzahliges MiB-Limit eingeben.</string>
+    <string name="storage_apply">Richtlinie anwenden</string>
+    <string name="storage_idle">Nicht gestartet</string>
+    <string name="storage_queued">Wartet auf den Start</string>
+    <string name="storage_downloading">Wird heruntergeladen</string>
+    <string name="storage_paused">Pausiert</string>
+    <string name="storage_wait_network">Wartet auf ein erlaubtes Netzwerk</string>
+    <string name="storage_wait_charging">Wartet auf Ladevorgang</string>
+    <string name="storage_limit_reached">Speicherlimit erreicht</string>
+    <string name="storage_device_full">Nicht genug Gerätespeicher</string>
+    <string name="storage_complete">Download abgeschlossen</string>
+    <string name="storage_partial">Einige Nachrichten sind nicht offline verfügbar</string>
+    <string name="storage_error">Speichervorgang fehlgeschlagen. Erneut versuchen.</string>
+    <string name="storage_keywords">offline herunterladen spiegeln Speicher Platz Cache Limit Quote Aufbewahrung Inhalt Anhänge Laden WLAN</string>
+    <plurals name="storage_skipped">
+        <item quantity="one">%1$d Nachricht konnte nicht geladen werden. Mit Erneut versuchen wiederholen.</item>
+        <item quantity="other">%1$d Nachrichten konnten nicht geladen werden. Mit Erneut versuchen wiederholen.</item>
+    </plurals>
+</resources>

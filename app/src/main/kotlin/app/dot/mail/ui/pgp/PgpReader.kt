@@ -8,6 +8,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,6 +23,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material3.Icon
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,12 +39,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.dot.design.Dot
 import app.dot.design.DotShapes
 import app.dot.design.DotSpacing
 import app.dot.design.components.ButtonStyle
 import app.dot.design.components.DotButton
+import app.dot.design.components.dotSurfaceEnter
 import app.dot.mail.R
 import app.dot.mail.data.model.MessageBody
 import app.dot.mail.data.model.PgpContent
@@ -113,62 +120,100 @@ private suspend fun process(context: Context, pgp: PgpContent, body: MessageBody
     }
     PgpContent.InlineEncrypted, PgpContent.InlineSigned ->
         OpenKeychain.decryptVerify(context, { body.plainText.orEmpty().toByteArray().inputStream() }, resume = resume)
+    PgpContent.Unsupported -> OpenKeychain.Outcome.Failed("Unsupported encryption")
 }
 
-/** The quiet status line above an OpenPGP message: what it is, what was checked, and the one action that makes sense. */
+/** Separate encryption and signature status rows; a signature is never implied by the encryption row. */
 @Composable
 fun PgpBar(body: MessageBody, state: PgpReaderState, modifier: Modifier = Modifier) {
     val pgp = body.pgp ?: return
     val context = LocalContext.current
     val c = Dot.colors
     val installed = remember { OpenKeychain.installed(context) }
-    val encrypted = pgp is PgpContent.Encrypted || pgp is PgpContent.InlineEncrypted
     val sig = state.signature
     val status = state.status
-
-    val (icon: ImageVector, text: String, tint) = when {
-        !installed -> Triple(if (encrypted) Icons.Outlined.Lock else Icons.Outlined.GppMaybe,
-            stringResource(if (encrypted) R.string.pgp_install_encrypted else R.string.pgp_install_signed), c.textSecondary)
-        status is PgpReaderState.Status.Working -> Triple(Icons.Outlined.Lock,
-            stringResource(if (encrypted) R.string.pgp_decrypting else R.string.pgp_verifying), c.textSecondary)
-        status is PgpReaderState.Status.Failed -> Triple(Icons.Outlined.GppBad,
-            stringResource(R.string.pgp_failed, status.message ?: "—"), c.danger)
-        sig != null -> signatureLine(sig, decrypted = encrypted && state.decrypted != null)
-        encrypted && state.decrypted != null -> Triple(Icons.Outlined.LockOpen, stringResource(R.string.pgp_decrypted), c.textSecondary)
-        encrypted -> Triple(Icons.Outlined.Lock, stringResource(R.string.pgp_encrypted), c.textSecondary)
-        else -> Triple(Icons.Outlined.GppMaybe, stringResource(R.string.pgp_signed_unchecked), c.textSecondary)
+    var showUnsupportedInfo by remember(pgp) { mutableStateOf(false) }
+    val kinds = pgpIndicatorKinds(pgp, sig)
+    val encryptionPresent = PgpIndicatorKind.ENCRYPTION in kinds
+    val operation = when (status) {
+        is PgpReaderState.Status.Working -> PgpOperationState.WORKING
+        is PgpReaderState.Status.Failed -> PgpOperationState.FAILED
+        else -> PgpOperationState.IDLE
     }
-    Row(
-        modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.xs)
-            .clip(DotShapes.medium).background(c.surface).padding(horizontal = DotSpacing.m, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(icon, null, Modifier.size(18.dp), tint = tint)
-        Spacer(Modifier.width(DotSpacing.s))
-        Text(text, style = Dot.type.caption, color = c.textSecondary, modifier = Modifier.weight(1f))
-        when {
-            !installed -> DotButton(stringResource(R.string.pgp_get_openkeychain), {
-                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(OpenKeychain.FDROID_URL))) }
-            }, style = ButtonStyle.Ghost, compact = true)
-            encrypted && state.decrypted == null && status !is PgpReaderState.Status.Working ->
-                DotButton(stringResource(R.string.pgp_decrypt), { state.run(null) }, compact = true)
-            status is PgpReaderState.Status.Failed && !encrypted ->
-                DotButton(stringResource(R.string.pgp_retry), { state.run(null) }, style = ButtonStyle.Ghost, compact = true)
+    val signatureState = pgpSignatureIndicatorState(encryptionPresent, sig != null, operation)
+    Column(modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.xs)) {
+        kinds.filter { it != PgpIndicatorKind.SIGNATURE || signatureState != null }.forEach { kind ->
+            val row = when (kind) {
+                PgpIndicatorKind.ENCRYPTION -> {
+                    val (icon, text, tint) = when {
+                        !installed -> Triple(Icons.Outlined.Lock, stringResource(R.string.pgp_install_encrypted), c.textSecondary)
+                        status is PgpReaderState.Status.Working -> Triple(Icons.Outlined.Lock, stringResource(R.string.pgp_decrypting), c.textSecondary)
+                        status is PgpReaderState.Status.Failed -> Triple(Icons.Outlined.GppBad, stringResource(R.string.pgp_failed, status.message ?: "—"), c.danger)
+                        state.decrypted != null -> Triple(Icons.Outlined.LockOpen, stringResource(R.string.pgp_decrypted), c.textSecondary)
+                        else -> Triple(Icons.Outlined.Lock, stringResource(R.string.pgp_encrypted), c.textSecondary)
+                    }
+                    Triple(icon, text, tint)
+                }
+                PgpIndicatorKind.SIGNATURE -> when {
+                    signatureState == SignatureIndicatorState.VERDICT -> signatureLine(requireNotNull(sig))
+                    !installed -> Triple(Icons.Outlined.GppMaybe, stringResource(R.string.pgp_install_signed), c.textSecondary)
+                    signatureState == SignatureIndicatorState.VERIFYING -> Triple(Icons.Outlined.GppMaybe, stringResource(R.string.pgp_verifying), c.textSecondary)
+                    signatureState == SignatureIndicatorState.FAILED -> Triple(Icons.Outlined.GppBad, stringResource(R.string.pgp_failed, status.let { (it as PgpReaderState.Status.Failed).message ?: "—" }), c.danger)
+                    else -> Triple(Icons.Outlined.GppMaybe, stringResource(R.string.pgp_signed_unchecked), c.textSecondary)
+                }
+                PgpIndicatorKind.UNSUPPORTED_ENCRYPTION -> Triple(Icons.Outlined.Lock, stringResource(R.string.pgp_unsupported_encryption), c.textSecondary)
+            }
+            val unsupported = kind == PgpIndicatorKind.UNSUPPORTED_ENCRYPTION
+            val encrypted = kind == PgpIndicatorKind.ENCRYPTION
+            val onlyIndicator = kinds.size == 1
+            Row(
+                Modifier.fillMaxWidth().padding(bottom = DotSpacing.xs)
+                    .clip(DotShapes.medium)
+                    .then(if (unsupported) Modifier.clickable { showUnsupportedInfo = true }.semantics { role = Role.Button } else Modifier)
+                    .background(c.surface).padding(horizontal = DotSpacing.m, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(row.first, null, Modifier.size(18.dp), tint = row.third)
+                Spacer(Modifier.width(DotSpacing.s))
+                Text(row.second, style = Dot.type.caption, color = c.textSecondary, modifier = Modifier.weight(1f))
+                when {
+                    !installed && onlyIndicator && kind != PgpIndicatorKind.UNSUPPORTED_ENCRYPTION ->
+                        DotButton(stringResource(R.string.pgp_get_openkeychain), {
+                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(OpenKeychain.FDROID_URL))) }
+                        }, style = ButtonStyle.Ghost, compact = true)
+                    encrypted && installed && state.decrypted == null && status !is PgpReaderState.Status.Working && status !is PgpReaderState.Status.Failed ->
+                        DotButton(stringResource(R.string.pgp_decrypt), { state.run(null) }, compact = true)
+                    encrypted && status is PgpReaderState.Status.Failed ->
+                        DotButton(stringResource(R.string.pgp_retry), { state.run(null) }, style = ButtonStyle.Ghost, compact = true)
+                    kind == PgpIndicatorKind.SIGNATURE && !encrypted && status is PgpReaderState.Status.Failed ->
+                        DotButton(stringResource(R.string.pgp_retry), { state.run(null) }, style = ButtonStyle.Ghost, compact = true)
+                }
+            }
         }
+    }
+    if (showUnsupportedInfo) {
+        AlertDialog(
+            onDismissRequest = { showUnsupportedInfo = false },
+            modifier = Modifier.dotSurfaceEnter(),
+            containerColor = c.surface,
+            shape = DotShapes.large,
+            title = { Text(stringResource(R.string.pgp_unsupported_encryption), style = Dot.type.title, color = c.textPrimary) },
+            text = { Text(stringResource(R.string.pgp_unsupported_encryption_body), style = Dot.type.callout, color = c.textSecondary) },
+            confirmButton = { DotButton(stringResource(R.string.compose_close), { showUnsupportedInfo = false }, style = ButtonStyle.Ghost, compact = true) },
+        )
     }
 }
 
 @Composable
-private fun signatureLine(sig: OpenKeychain.Signature, decrypted: Boolean): Triple<ImageVector, String, androidx.compose.ui.graphics.Color> {
+private fun signatureLine(sig: OpenKeychain.Signature): Triple<ImageVector, String, androidx.compose.ui.graphics.Color> {
     val c = Dot.colors
     val who = sig.signer ?: stringResource(R.string.pgp_unknown_signer)
-    val prefix = if (decrypted) stringResource(R.string.pgp_decrypted_prefix) else ""
     return when (sig.verdict) {
-        OpenKeychain.Verdict.VALID_CONFIRMED -> Triple(Icons.Outlined.VerifiedUser, prefix + stringResource(R.string.pgp_sig_valid, who), c.accent)
-        OpenKeychain.Verdict.VALID_UNCONFIRMED -> Triple(Icons.Outlined.GppMaybe, prefix + stringResource(R.string.pgp_sig_unconfirmed, who), c.textSecondary)
-        OpenKeychain.Verdict.KEY_MISSING -> Triple(Icons.Outlined.GppMaybe, prefix + stringResource(R.string.pgp_sig_key_missing), c.textSecondary)
-        OpenKeychain.Verdict.KEY_EXPIRED_OR_REVOKED -> Triple(Icons.Outlined.GppBad, prefix + stringResource(R.string.pgp_sig_expired, who), c.danger)
-        OpenKeychain.Verdict.INVALID -> Triple(Icons.Outlined.GppBad, prefix + stringResource(R.string.pgp_sig_invalid), c.danger)
+        OpenKeychain.Verdict.VALID_CONFIRMED -> Triple(Icons.Outlined.VerifiedUser, stringResource(R.string.pgp_sig_valid, who), c.accent)
+        OpenKeychain.Verdict.VALID_UNCONFIRMED -> Triple(Icons.Outlined.GppMaybe, stringResource(R.string.pgp_sig_unconfirmed, who), c.textSecondary)
+        OpenKeychain.Verdict.KEY_MISSING -> Triple(Icons.Outlined.GppMaybe, stringResource(R.string.pgp_sig_key_missing), c.textSecondary)
+        OpenKeychain.Verdict.KEY_EXPIRED_OR_REVOKED -> Triple(Icons.Outlined.GppBad, stringResource(R.string.pgp_sig_expired, who), c.danger)
+        OpenKeychain.Verdict.INVALID -> Triple(Icons.Outlined.GppBad, stringResource(R.string.pgp_sig_invalid), c.danger)
         OpenKeychain.Verdict.UNSIGNED -> Triple(Icons.Outlined.LockOpen, stringResource(R.string.pgp_decrypted), c.textSecondary)
     }
 }

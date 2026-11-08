@@ -96,8 +96,10 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
   - [ ] Real-account verification (see FR-01); Google restricted-scope verification for a public release
 - **FR-04 · P1 · Harden IMAP sync and message operations** — threading collisions, cross-folder archive/move, large-body
   storage, IDLE reconnect loops, global sync-lock contention, plus network-failure tests.
-  - Evidence: scoped moves PR #16, shared sessions PR #34, file-backed bodies / IDLE / threading work per
-    `docs/reports/codex-*.md`. No single consolidated verification of all five points; keep open until a review confirms each.
+  - Forward closeout prepared: conservative threading, message-scoped SmartFolder actions, batched aggregation and
+    bounded metadata/preview queries; regression and network tests in `docs/reports/codex-imap-hardening-closeout.md`.
+    Awaiting forward PR review/merge. Lead-approved retroactive split/repair follows as a separate idempotent pass
+    (oldest message retains the original thread ID; snooze/mute copied to split groups).
 - **FR-05 · P1 · Real-device regressions: slow refresh, inconsistent HTML fit, connection errors**
   - [x] Refresh 18 s → ~3 s (Inbox ~1.6 s), logins 30 → 4 (PR #34), measured on device
   - [x] Connection errors classified and explained in EN/FR/DE with Retry (PR #34 + `de22513`)
@@ -112,7 +114,8 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
   - [x] Engine: per-account retention, payload caching, disk budgets, LRU eviction that never deletes server mail,
     resumable full-offline download, Wi-Fi/charging constraints, pause/resume, usage breakdown (PR #55, Room v9;
     `docs/reports/codex-storage-offline.md`)
-  - [ ] Settings UI for policies, usage breakdown, offline progress, pause/resume (API exists, UI "remains for Claude")
+  - [ ] Settings UI for policies, usage breakdown, offline progress, pause/resume (Sol implementation under review;
+    EN/FR/DE, direct Settings search entry and Robolectric coverage; `docs/reports/codex-storage-settings-ui.md`)
   - [ ] Real-device checks (storage pressure, WorkManager constraints, large first download)
 - **FR-12 · P2 · Native Android Contacts integration** — partly done: system contact picker needs no permission; contact
   photos are an opt-in avatar source; "From contacts" filter uses Sent/outbox correspondents or the permission-gated

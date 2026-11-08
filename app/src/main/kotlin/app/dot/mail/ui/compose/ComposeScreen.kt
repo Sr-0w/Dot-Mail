@@ -77,6 +77,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -136,6 +137,14 @@ import app.dot.mail.LocalMailGraph
 import app.dot.mail.LocalSettings
 import app.dot.mail.R
 import app.dot.mail.data.model.EmailAddress
+import app.dot.mail.data.model.Identity
+import app.dot.mail.data.aliases.AndroidAliasRepository
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.widget.Toast
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import app.dot.mail.ui.ComposeRoute
 import app.dot.mail.ui.avatar.SenderAvatar
 import app.dot.mail.ui.common.Format
@@ -147,8 +156,6 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.temporal.TemporalAdjusters
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 private val QuoteIndent = 16.sp
 private val QuoteParagraphStyle = ParagraphStyle(textIndent = TextIndent(firstLine = QuoteIndent, restLine = QuoteIndent))
@@ -170,6 +177,7 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
             strings = { id, args -> appContext.getString(id, *args) },
             pgp = app.dot.mail.ui.pgp.OpenKeychainService(appContext),
             pgpDefaults = { id -> app.dot.mail.data.AccountSettingsStore.get(appContext).current(id).let { it.pgpSignDefault to it.pgpEncryptDefault } },
+            aliasRepository = AndroidAliasRepository(appContext),
         )
     }
     // OpenKeychain's own screens (passphrase, key choice) during an encrypted/signed send.
@@ -179,6 +187,7 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
     }
     LaunchedEffect(pgpPrompt) { pgpPrompt?.let { pgpLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(it.intentSender).build()) } }
     val state by vm.state.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
     val closed by vm.closed.collectAsStateWithLifecycle()
     val c = Dot.colors
     var menu by remember { mutableStateOf(false) }
@@ -194,6 +203,19 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
     val ccFocus = remember { FocusRequester() }
     var focusCcOnReveal by remember { mutableStateOf(false) }
     val reduceMotion = rememberReducedMotion()
+
+    LaunchedEffect(vm, context) {
+        vm.aliasOutcomes.collect { outcome ->
+            when (outcome) {
+                is AliasOutcome.Selected -> Unit
+                is AliasOutcome.CopiedNeedsReplyTo -> {
+                    (context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as ClipboardManager)
+                        .setPrimaryClip(ClipData.newPlainText("email alias", outcome.email))
+                    Toast.makeText(context, R.string.aliases_reply_to_guidance, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
 
     val richTextState = rememberRichTextState()
     var templatesOpen by remember { mutableStateOf(false) }
@@ -291,10 +313,11 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
         ) },
     ) { headerPadding ->
         if(draft!=null) {
-        Column(Modifier.fillMaxSize().backdropSource(edgeState).verticalScroll(bodyScroll)) { Spacer(Modifier.height(headerPadding.calculateTopPadding()))
+        Column(Modifier.fillMaxSize()) {
+        Column(Modifier.weight(1f).fillMaxWidth().backdropSource(edgeState).verticalScroll(bodyScroll)) { Spacer(Modifier.height(headerPadding.calculateTopPadding()))
 
             // From
-            if (state.senders.size > 1) {
+            if (state.senders.isNotEmpty()) {
                 Box {
                     FieldRow(stringResource(R.string.compose_from), onClick = { senderMenu = true }) {
                         Text(state.sender?.email.orEmpty(), style = Dot.type.callout, color = c.textPrimary, modifier = Modifier.weight(1f))
@@ -304,6 +327,7 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                         state.senders.forEach { s ->
                             DotMenuItem("${s.name} <${s.email}>", null) { senderMenu = false; vm.setSender(s) }
                         }
+                        DotMenuItem(stringResource(R.string.compose_use_alias), null) { senderMenu = false; vm.loadAliases() }
                     }
                 }
                 Hairline()
@@ -430,6 +454,57 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                 )
             }
 
+        }
+        state.aliasChoices?.let { choices ->
+            AlertDialog(
+                onDismissRequest = vm::dismissAliasPicker,
+                modifier = Modifier.dotSurfaceEnter(),
+                containerColor = c.surface,
+                shape = DotShapes.large,
+                title = { Text(stringResource(R.string.compose_use_alias), style = Dot.type.title, color = c.textPrimary) },
+                text = {
+                    Column {
+                        if (state.aliasLoading) {
+                            Row(Modifier.fillMaxWidth().padding(vertical = DotSpacing.m), horizontalArrangement = Arrangement.Center) {
+                                androidx.compose.material3.CircularProgressIndicator(color = c.textTertiary, strokeWidth = 1.5.dp)
+                            }
+                        }
+                        if (state.aliasProviderErrors.isNotEmpty()) {
+                            Text(stringResource(R.string.aliases_error), style = Dot.type.callout, color = c.danger, modifier = Modifier.padding(vertical = DotSpacing.s))
+                        }
+                        if (!state.aliasLoading && choices.isEmpty() && state.aliasProviderErrors.isEmpty()) {
+                            Text(stringResource(R.string.compose_aliases_empty), style = Dot.type.callout, color = c.textSecondary)
+                        }
+                        choices.forEach { alias ->
+                            app.dot.design.components.ListRow(
+                                title = alias.email,
+                                onClick = if (state.aliasUsing == null) ({ vm.useAlias(alias) }) else null,
+                                trailing = if (state.aliasUsing == alias.email) ({
+                                    androidx.compose.material3.CircularProgressIndicator(Modifier.size(18.dp), color = c.textTertiary, strokeWidth = 1.5.dp)
+                                }) else null,
+                            )
+                        }
+                        if (state.aliasUseError) {
+                            Text(stringResource(R.string.aliases_error), style = Dot.type.callout, color = c.danger, modifier = Modifier.padding(vertical = DotSpacing.s))
+                        }
+                    }
+                },
+                confirmButton = { DotButton(stringResource(R.string.compose_close), onClick = vm::dismissAliasPicker, style = ButtonStyle.Ghost, compact = true) },
+            )
+        }
+        if (state.savedOnce) {
+            Text(
+                stringResource(R.string.compose_draft_saved), style = Dot.type.caption, color = c.textTertiary,
+                modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s),
+            )
+        }
+        if (state.isRichText && bodyFocused) {
+            Hairline()
+            FormattingToolbar(
+                richTextState = richTextState,
+                onLinkClick = { showLinkDialog = true },
+            )
+        }
         }
         }
     }

@@ -84,7 +84,7 @@ class InboxViewModel(
         viewModelScope.launch {
             runCatching { graph.mail.undo(token) }
                 .onSuccess { failed -> if (failed > 0) _events.send(str(R.string.inbox_undo_partial)) }
-                .onFailure { _events.send(it.message ?: str(R.string.inbox_error_action_failed)) }
+                .onFailure { _events.send(app.dot.mail.ui.common.ErrorText.of(resources, it, R.string.inbox_error_action_failed)) }
         }
     }
 
@@ -169,12 +169,12 @@ class InboxViewModel(
             runCatching { graph.mail.applyUndoable(action, ids.toList(), source) }
                 .onSuccess { token ->
                     _selection.value = emptySet()
-                    val text = confirmation(action, count)
+                    val text = confirmation(action, count, inDrafts = header.value.role == FolderRole.DRAFTS)
                     // Archive/trash/spam can be undone from the snackbar (a swipe is easy to trigger by accident).
                     if (text != null && token != null && (token.moves.isNotEmpty() || token.drafts.isNotEmpty())) _undoEvents.send(text to token)
                     else text?.let { _events.send(it) }
                 }
-                .onFailure { _events.send(it.message ?: str(R.string.inbox_error_action_failed)) }
+                .onFailure { _events.send(app.dot.mail.ui.common.ErrorText.of(resources, it, R.string.inbox_error_action_failed)) }
         }
     }
 
@@ -186,7 +186,7 @@ class InboxViewModel(
                     _selection.value = emptySet()
                     _events.send(plural(R.plurals.inbox_snoozed_toast, ids.size))
                 }
-                .onFailure { _events.send(it.message ?: str(R.string.inbox_error_snooze_failed)) }
+                .onFailure { _events.send(app.dot.mail.ui.common.ErrorText.of(resources, it, R.string.inbox_error_snooze_failed)) }
         }
     }
 
@@ -198,7 +198,7 @@ class InboxViewModel(
                     _selection.value = emptySet()
                     _events.send(str(if (muted) R.string.inbox_muted_toast else R.string.inbox_unmuted_toast))
                 }
-                .onFailure { _events.send(it.message ?: str(R.string.inbox_error_mute_failed)) }
+                .onFailure { _events.send(app.dot.mail.ui.common.ErrorText.of(resources, it, R.string.inbox_error_mute_failed)) }
         }
     }
 
@@ -207,7 +207,7 @@ class InboxViewModel(
         viewModelScope.launch {
             runCatching { graph.mail.unsnooze(ids.toList()) }
                 .onSuccess { _selection.value = emptySet(); _events.send(plural(R.plurals.inbox_unsnoozed_toast, ids.size)) }
-                .onFailure { _events.send(it.message ?: str(R.string.inbox_error_unsnooze_failed)) }
+                .onFailure { _events.send(app.dot.mail.ui.common.ErrorText.of(resources, it, R.string.inbox_error_unsnooze_failed)) }
         }
     }
 
@@ -221,7 +221,7 @@ class InboxViewModel(
                     _selection.value = emptySet()
                     _events.send(plural(R.plurals.inbox_moved_toast, ids.size))
                 }
-                .onFailure { _events.send(it.message ?: str(R.string.inbox_error_move_failed)) }
+                .onFailure { _events.send(app.dot.mail.ui.common.ErrorText.of(resources, it, R.string.inbox_error_move_failed)) }
         }
     }
 
@@ -234,7 +234,7 @@ class InboxViewModel(
             val sync = launch {
                 // Bounded: nothing may stay "syncing" forever if a server hangs.
                 runCatching { kotlinx.coroutines.withTimeout(60_000) { graph.mail.refresh(_mailbox.value) } }
-                    .onFailure { _events.send(if (it is kotlinx.coroutines.TimeoutCancellationException) str(R.string.inbox_sync_still_running) else it.message ?: str(R.string.inbox_error_refresh_failed)) }
+                    .onFailure { _events.send(if (it is kotlinx.coroutines.TimeoutCancellationException) str(R.string.inbox_sync_still_running) else app.dot.mail.ui.common.ErrorText.of(resources, it, R.string.inbox_error_refresh_failed)) }
                 _syncing.value = false
             }
             // The pull spinner is only the "got it" confirmation: it leaves after a short beat (never over the list
@@ -246,9 +246,10 @@ class InboxViewModel(
         }
     }
 
-    private fun confirmation(action: MessageAction, n: Int): String? = when (action) {
+    /** [inDrafts]: the rows are drafts, which are not "conversations" (a draft being trashed says so). */
+    internal fun confirmation(action: MessageAction, n: Int, inDrafts: Boolean = false): String? = when (action) {
         MessageAction.ARCHIVE -> plural(R.plurals.inbox_archived_toast, n)
-        MessageAction.TRASH -> plural(R.plurals.inbox_trashed_toast, n)
+        MessageAction.TRASH -> plural(if (inDrafts) R.plurals.inbox_draft_trashed_toast else R.plurals.inbox_trashed_toast, n)
         MessageAction.SPAM -> plural(R.plurals.inbox_spam_toast, n)
         MessageAction.NOT_SPAM -> plural(R.plurals.inbox_not_spam_toast, n)
         MessageAction.DELETE_FOREVER -> plural(R.plurals.inbox_deleted_toast, n)

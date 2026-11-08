@@ -211,7 +211,7 @@ internal class RealMailGraph(
         val drafts = if (draftView) dao.folders(t.accountId).filter { it.role == "DRAFTS" }.map { it.id }.toSet() else emptySet()
         val latest = (if (draftView) messages.filter { it.folderId in drafts } else messages).lastOrNull()
         val handle = if (draftView) latest?.let { -it.id } else null
-        return ThreadSummary(t.id, t.accountId, t.subject, Codec.addresses(t.participants), t.snippet, t.lastAt, t.count, t.unread, t.starred, t.attachments, draftId = handle, recipients = latest?.let { Codec.addressField(it.header, "to") }.orEmpty(), category=latest?.let(::messageCategory))
+        return ThreadSummary(t.id, t.accountId, t.subject, Codec.addresses(t.participants), t.snippet, t.lastAt, t.count, t.unread, t.starred, t.attachments, draftId = handle, recipients = latest?.let { Codec.addressField(it.header, "to") }.orEmpty(), category=latest?.let(::messageCategory), encryptionHint=latest?.let { Codec.encryptionHint(it.header) } ?: app.dot.mail.engine.EncryptionHint.NONE)
     }
     private fun paging(where: String, args: List<Any>, draftView: Boolean = false, draftAccount: Long? = null, extra: Sql? = null, orderBy: String = ThreadQuery.orderBy(InboxSort.DATE)): Flow<PagingData<ThreadSummary>> = Pager(PagingConfig(pageSize = 40)) {
         if (extra == null) mailboxSource(where, args, draftView, draftAccount, orderBy) else mailboxSource("($where) AND (${extra.text})", args + extra.args, draftView, draftAccount, orderBy)
@@ -275,17 +275,19 @@ internal class RealMailGraph(
         if (old != null) {
             // Pending optimistic changes win until replay completes.
             val pending = dao.operations(folder.accountId).any { it.messageLocalId == old.id || (it.folderId == folder.id && it.uid == header.uid && it.validity == folder.validity) }
-            dao.updateMessage(old.copy(uid = header.uid, header=Codec.header(header), messageIdKey=header.messageId, unread = if (pending) old.unread else !header.flags.seen, starred = if (pending) old.starred else header.flags.starred))
-            if(old.header!=Codec.header(header)) indexSenders(old.id,header)
+            val encoded=Codec.header(header)
+            val updated=old.copy(uid=header.uid,header=encoded,messageIdKey=header.messageId,unread=if(pending) old.unread else !header.flags.seen,starred=if(pending) old.starred else header.flags.starred)
+            if(updated!=old) dao.updateMessage(updated)
+            if(old.header!=encoded) indexSenders(old.id,header)
             if(rebuild) rebuildThread(old.threadId); return old.threadId to false
         }
         val keys = Threading.keys(header)
         val exact = keys.mapNotNull { dao.threadKey(folder.accountId, it) }.distinct()
-        val fallback = if (exact.isEmpty() && Threading.mayFallback(header)) Threading.fallbackKey(header)?.let { dao.threadKey(folder.accountId, it) }?.takeIf { id -> dao.threadRow(id)?.let { kotlin.math.abs(header.sentAt - it.lastAt) <= 30L * 24 * 60 * 60 * 1000 } == true } else null
-        val threadId = exact.firstOrNull() ?: fallback ?: dao.insertThread(ThreadRow(accountId = folder.accountId, subject = header.subject))
+        val fallback = if (exact.isEmpty() && Threading.mayFallback(header)) Threading.fallbackKey(header)?.let { dao.threadKey(folder.accountId, it) }?.takeIf { id -> !dao.threadHasIdentifiedMessages(id) && dao.threadRow(id)?.let { kotlin.math.abs(header.sentAt - it.lastAt) <= 30L * 24 * 60 * 60 * 1000 } == true } else null
+        val threadId = exact.firstOrNull() ?: fallback ?: dao.insertThread(ThreadRow(accountId = folder.accountId, subject = header.subject, lastAt=header.sentAt))
         exact.filter { it != threadId }.forEach { other -> dao.mergeMessages(other, threadId); dao.mergeKeys(other, threadId); dao.deleteThread(other) }
         keys.forEach { dao.insertKey(ThreadKeyRow(folder.accountId, it, threadId)) }
-        if (header.gmailThreadId == null) Threading.fallbackKey(header)?.let { key ->
+        if (Threading.mayFallback(header)) Threading.fallbackKey(header)?.let { key ->
             val previous = dao.threadKey(folder.accountId, key)?.let { dao.threadRow(it) }
             if (previous == null || previous.lastAt <= header.sentAt) dao.putKey(ThreadKeyRow(folder.accountId, key, threadId))
         }
@@ -302,12 +304,12 @@ internal class RealMailGraph(
         dao.updateThread(row.copy(subject = latest?.subject ?: row.subject, participants = Codec.addresses(distinct.flatMap { Codec.addressField(it.header, "from") }.distinctBy { it.email }), snippet = latest?.snippet.orEmpty(), lastAt = latest?.sentAt ?: 0, count = distinct.size, unread = distinct.count { it.unread }, starred = distinct.any { it.starred }, attachments = distinct.any { it.hasAttachments }))
     }
     internal suspend fun moveMessage(message: MessageRow, target: FolderRow) {
-        if (message.accountId != target.accountId) throw MailActionException(MailActionFailure.ACCOUNT_MISMATCH, "Choose a destination in the same account")
+        if (message.accountId != target.accountId) throw MailActionException(MailActionFailure.ACCOUNT_MISMATCH, "Choose a destination in the same account", ActionErrorKind.DESTINATION_OTHER_ACCOUNT)
         if (message.folderId == target.id) return
         val source = dao.folder(message.folderId) ?: return
         if (message.uid < 0) {
-            val op = pendingMove(message) ?: throw MailActionException(MailActionFailure.OPERATION_PENDING, "This move is still being synchronized. Try again shortly.")
-            if (op.error == "IN_FLIGHT") throw MailActionException(MailActionFailure.OPERATION_PENDING, "This move is being sent to the server. Try again shortly.")
+            val op = pendingMove(message) ?: throw MailActionException(MailActionFailure.OPERATION_PENDING, "This move is still being synchronized. Try again shortly.", ActionErrorKind.MOVE_SYNCING)
+            if (op.error == "IN_FLIGHT") throw MailActionException(MailActionFailure.OPERATION_PENDING, "This move is being sent to the server. Try again shortly.", ActionErrorKind.MOVE_SENDING)
             if (op.folderId == target.id) {
                 dao.deleteOperation(op.id)
                 if (op.desiredSeen != null || op.desiredStarred != null) dao.insertOperation(op.copy(id = 0, action = "FLAGS", target = null))
@@ -364,11 +366,20 @@ internal class RealMailGraph(
         val rows = threadOrMessageRows(id)
         if (mailbox == null) {
             if (moving && rows.map { it.folderId }.distinct().size > 1)
-                throw MailActionException(MailActionFailure.SOURCE_REQUIRED, "Choose the source mailbox before moving this conversation")
+                throw MailActionException(MailActionFailure.SOURCE_REQUIRED, "Choose the source mailbox before moving this conversation", ActionErrorKind.SOURCE_REQUIRED)
             return rows
         }
         return when (mailbox) {
-            is Mailbox.Smart -> rows
+            is Mailbox.Smart -> {
+                val smart=smartFolders.get(mailbox.id) ?: return emptyList()
+                val thread=rows.firstOrNull()?.threadId ?: return emptyList()
+                val where=ThreadQuery.smartMessages(smart)
+                val matching=dao.matchingMessageIds(SimpleSQLiteQuery(
+                    "SELECT m.id FROM messages m JOIN folders f ON f.id=m.folderId WHERE m.threadId=? AND (${where.text})",
+                    (listOf<Any>(thread)+where.args).toTypedArray(),
+                )).toHashSet()
+                rows.filter { it.id in matching }
+            }
             is Mailbox.InFolder -> rows.filter { it.folderId == mailbox.folderId }
             is Mailbox.Unified -> if(mailbox.role.category()!=null) rows.filter { isInCategory(it,dao.folder(it.folderId)?.role,mailbox.role.category()!!) } else rows.filter { dao.folder(it.folderId)?.role == mailbox.role.name }
         }
@@ -397,14 +408,14 @@ internal class RealMailGraph(
                     if (role != null) {
                         val folders = dao.folders(message.accountId)
                         val target = folders.firstOrNull { it.role == role.name } ?: if (role == FolderRole.ARCHIVE) folders.firstOrNull { it.role == "ALL_MAIL" } else null
-                        if (target == null) throw MailActionException(MailActionFailure.FOLDER_UNAVAILABLE, "This account has no ${role.name.lowercase().replace('_',' ')} folder")
+                        if (target == null) throw MailActionException(MailActionFailure.FOLDER_UNAVAILABLE, "This account has no ${role.name.lowercase().replace('_',' ')} folder", ActionErrorKind.NO_ROLE_FOLDER, role.name)
                         moveMessage(message, target)
                     } else if (action == MessageAction.DELETE_FOREVER) {
                         val move = if (message.uid < 0) pendingMove(message) else null
-                        if (move?.error == "IN_FLIGHT") throw MailActionException(MailActionFailure.OPERATION_PENDING, "This move is being sent to the server. Try again shortly.")
+                        if (move?.error == "IN_FLIGHT") throw MailActionException(MailActionFailure.OPERATION_PENDING, "This move is being sent to the server. Try again shortly.", ActionErrorKind.MOVE_SENDING)
                         if (move != null) dao.updateOperation(move.copy(action = action.name, target = null))
                         else if (message.uid > 0) dao.folder(message.folderId)?.let { dao.insertOperation(OperationRow(accountId = message.accountId, folderId = it.id, validity = it.validity, uid = message.uid, action = action.name, messageLocalId = message.id)) }
-                        else throw MailActionException(MailActionFailure.OPERATION_PENDING, "This message is still being synchronized")
+                        else throw MailActionException(MailActionFailure.OPERATION_PENDING, "This message is still being synchronized", ActionErrorKind.MESSAGE_SYNCING)
                         dao.deleteMessage(message.id)
                     }
                 }
@@ -433,11 +444,11 @@ internal class RealMailGraph(
     override suspend fun move(threadIds: Collection<Long>, targetFolderId: Long, sourceMailbox: Mailbox) = moveScoped(threadIds, targetFolderId, sourceMailbox)
 
     private suspend fun moveScoped(threadIds: Collection<Long>, targetFolderId: Long, sourceMailbox: Mailbox?) = withContext(Dispatchers.IO) {
-        val target = dao.folder(targetFolderId) ?: throw MailActionException(MailActionFailure.FOLDER_UNAVAILABLE, "Destination folder is no longer available")
+        val target = dao.folder(targetFolderId) ?: throw MailActionException(MailActionFailure.FOLDER_UNAVAILABLE, "Destination folder is no longer available", ActionErrorKind.DESTINATION_GONE)
         database.withTransaction {
-            if (threadIds.any { it < 0 }) throw MailActionException(MailActionFailure.OPERATION_PENDING, "Open or discard a local draft instead of moving it")
+            if (threadIds.any { it < 0 }) throw MailActionException(MailActionFailure.OPERATION_PENDING, "Open or discard a local draft instead of moving it", ActionErrorKind.LOCAL_DRAFT_MOVE)
             val messages = threadIds.distinct().flatMap { actionRows(it, sourceMailbox, true) }
-            if (messages.any { it.accountId != target.accountId }) throw MailActionException(MailActionFailure.ACCOUNT_MISMATCH, "Choose conversations and a destination in the same account")
+            if (messages.any { it.accountId != target.accountId }) throw MailActionException(MailActionFailure.ACCOUNT_MISMATCH, "Choose conversations and a destination in the same account", ActionErrorKind.MIXED_ACCOUNTS)
             messages.forEach { moveMessage(it, target) }
             messages.map { it.threadId }.distinct().forEach { rebuildThread(it) }
         }; requestSync()
@@ -447,7 +458,7 @@ internal class RealMailGraph(
 
     private suspend fun refreshAttempt(mailbox:Mailbox,accounts:Set<Long>?) {
         val ids=accounts ?: when(mailbox) {
-            is Mailbox.InFolder -> dao.folder(mailbox.folderId)?.accountId?.let { setOf(it) } ?: throw MailSyncException("Folder is no longer available")
+            is Mailbox.InFolder -> dao.folder(mailbox.folderId)?.accountId?.let { setOf(it) } ?: throw MailSyncException("Folder is no longer available", SyncProblem.FOLDER_UNAVAILABLE)
             is Mailbox.Unified, is Mailbox.Smart -> dao.accounts().map { it.id }.toSet()
         }
         val ready=CompletableDeferred<Unit>()
@@ -459,27 +470,30 @@ internal class RealMailGraph(
                 val ok=syncAll(ids,primaryMailbox=mailbox) { account,folder,success,reason ->
                     val matches=when(mailbox) { is Mailbox.Smart -> false; is Mailbox.InFolder -> dao.folder(mailbox.folderId)?.path==folder.path; is Mailbox.Unified -> mailbox.role.name==folder.role.name }
                     if(early && matches) progressLock.withLock {
-                        if(!success) ready.completeExceptionally(MailSyncException(reason?.let { SyncDiagnostics.state(it,false).message } ?: "Some message headers could not be synchronized"))
+                        if(!success) ready.completeExceptionally((reason?.let { SyncDiagnostics.state(it,false) }.let { st -> MailSyncException(st?.message ?: "Some message headers could not be synchronized", st?.problem ?: SyncProblem.HEADERS_UNREADABLE, st?.errorKind) }))
                         remaining.remove(account)
                         if(remaining.isEmpty()) ready.complete(Unit)
                     }
                 }
                 if(ok) ready.complete(Unit)
-                else ready.completeExceptionally(MailSyncException(dao.accounts().firstOrNull { it.id in ids && it.syncError!=null }?.syncError?.let { SyncDiagnostics.state(it,false).message } ?: "Could not sync mail. Please retry."))
+                else ready.completeExceptionally((dao.accounts().firstOrNull { it.id in ids && it.syncError!=null }?.syncError?.let { SyncDiagnostics.state(it,false) }.let { st -> MailSyncException(st?.message ?: "Could not sync mail. Please retry.", st?.problem ?: SyncProblem.OTHER, st?.errorKind) }))
             } catch(e:CancellationException) { ready.cancel(e); throw e }
-            catch(e:Exception) { ready.completeExceptionally(MailSyncException(SyncDiagnostics.reason(e))) }
+            catch(e:Exception) { ready.completeExceptionally(MailSyncException(SyncDiagnostics.reason(e), SyncDiagnostics.problem(e), app.dot.mail.engine.ConnectionFailure.classify(e))) }
         }
         try { withTimeout(60_000) { ready.await() } }
-        catch(_:TimeoutCancellationException) { throw MailSyncException("Sync timed out. Please retry.") }
+        catch(_:TimeoutCancellationException) { throw MailSyncException("Sync timed out. Please retry.", SyncProblem.TIMEOUT) }
     }
     override suspend fun suggestContacts(prefix: String, limit: Int): List<EmailAddress> = withContext(Dispatchers.IO) {
-        dao.contacts(prefix.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%", limit.coerceIn(1, 50)).map { EmailAddress(it.email, it.name) }
+        val cap = limit.coerceIn(1, 50)
+        val history = dao.contacts(prefix.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%", cap).map { EmailAddress(it.email, it.name) }
+        // Address-book matches only fill what mail history left over, and only when the permission was already granted.
+        if (history.size >= cap) history else mergeSuggestions(history, addressBook.suggest(prefix, cap), cap)
     }
     private val draftLock = Mutex()
     override suspend fun saveDraft(draft: Draft): Long = withContext(Dispatchers.IO) { draftLock.withLock {
         requireNotNull(dao.account(draft.accountId))
         val previous = if (draft.localId != 0L) dao.draft(draft.localId) else null
-        if (draft.localId != 0L && previous?.accountId != draft.accountId) throw MailActionException(MailActionFailure.ACCOUNT_MISMATCH, "Save a new draft when changing accounts")
+        if (draft.localId != 0L && previous?.accountId != draft.accountId) throw MailActionException(MailActionFailure.ACCOUNT_MISMATCH, "Save a new draft when changing accounts", ActionErrorKind.DRAFT_ACCOUNT_CHANGE)
         val (cached, sources) = cacheAttachments(draft)
         val json = org.json.JSONObject(Codec.draft(cached)).put("attachmentSources", sources).toString()
         val id = database.withTransaction {
