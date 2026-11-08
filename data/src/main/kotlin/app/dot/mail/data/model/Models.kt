@@ -145,6 +145,11 @@ data class Draft(
     val references: List<String> = emptyList(),
     /** Epoch ms; null = send now (after undo window). */
     val scheduledAt: Long? = null,
+    /**
+     * Editor HTML for a formatted message, or null for plain text. When set, [bodyText] must hold its
+     * text/plain rendering (EmailHtml.toPlainText); the message is sent as multipart/alternative.
+     */
+    val bodyHtml: String? = null,
 )
 
 // ---------- Account setup ----------
@@ -202,3 +207,22 @@ class OAuthException(message: String) : Exception(message)
 enum class MailActionFailure { FOLDER_UNAVAILABLE, ACCOUNT_MISMATCH, OPERATION_PENDING }
 class MailActionException(val reason: MailActionFailure, message: String) : Exception(message)
 class MailSyncException(message: String) : Exception(message)
+
+/** Why a folder command was refused before anything was sent to the server. */
+enum class FolderFailure {
+    /** INBOX, Sent, Drafts, Trash, Spam, Archive... cannot be renamed, moved or deleted. */
+    PROTECTED_FOLDER,
+    /** Empty, too long, or contains the hierarchy separator or IMAP wildcards. */
+    INVALID_NAME,
+    ALREADY_EXISTS,
+    NOT_FOUND,
+    /** Deleting a folder that still holds messages without saying where they go. */
+    NOT_EMPTY,
+    /** Parent/target from another account, or the folder itself or one of its subfolders. */
+    INVALID_TARGET,
+    /** Delete a folder's subfolders (or move them away) first. */
+    HAS_SUBFOLDERS,
+    /** A previous change to this folder has not reached the server yet. */
+    PENDING,
+}
+class FolderException(val reason: FolderFailure, message: String) : Exception(message)

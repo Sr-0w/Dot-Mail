@@ -32,4 +32,10 @@ data class DiscoveredConfig(
     /** True when password sign-in is not accepted at all and OAuth2 is mandatory. */
     val oauthRequired: Boolean,
     val source: Source,
+    /**
+     * True when either [imap] or [smtp] uses unencrypted [SocketType.PLAIN] because no
+     * TLS/STARTTLS endpoint existed in any discovery source. The UI must require explicit
+     * user confirmation before verifying or saving credentials with an insecure config.
+     */
+    val insecure: Boolean = imap.socket == SocketType.PLAIN || smtp.socket == SocketType.PLAIN,
 )

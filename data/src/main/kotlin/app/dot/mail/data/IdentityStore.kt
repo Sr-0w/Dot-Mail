@@ -57,8 +57,8 @@ class IdentityStore private constructor(context: Context) {
             identity.id >= FIRST_ID && list.any { it.id == identity.id } -> identity.id
             else -> prefs.getLong("next_id", FIRST_ID).also { prefs.edit { putLong("next_id", it + 1) } }
         }
-        list.removeAll { it.id == id }
-        list.add(clean.copy(id = id))
+        val at = list.indexOfFirst { it.id == id }
+        if (at >= 0) list[at] = clean.copy(id = id) else list.add(clean.copy(id = id)) // updates keep their position
         write(identity.accountId, list)
         return id
     }
@@ -119,6 +119,9 @@ class IdentityStore private constructor(context: Context) {
 
         /** For tests: a store on a private context, bypassing the singleton. */
         internal fun forTest(context: Context) = IdentityStore(context)
+
+        /** For tests: drop the process-wide instance (Robolectric recreates the Application per test). */
+        internal fun resetForTest() { instance = null }
     }
 }
 

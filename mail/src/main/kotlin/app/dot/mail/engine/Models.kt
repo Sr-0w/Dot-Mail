@@ -7,7 +7,7 @@ data class Endpoint(val host: String, val port: Int, val username: String, val s
 data class Credentials(val secret: String, val oauth2: Boolean = false)
 data class Address(val email: String, val name: String? = null)
 enum class Role { INBOX, SENT, DRAFTS, ARCHIVE, TRASH, SPAM, ALL_MAIL, STARRED, CUSTOM }
-data class RemoteFolder(val path: String, val name: String, val role: Role, val unread: Int, val total: Int, val specialUse: Boolean = false)
+data class RemoteFolder(val path: String, val name: String, val role: Role, val unread: Int, val total: Int, val specialUse: Boolean = false, val separator: Char = '/')
 data class SyncCursor(val uidValidity: Long = 0, val uidNext: Long = 1, val highestModSeq: Long = -1)
 enum class MoveOutcome { MOVED, COPIED_AND_MARKED_DELETED }
 data class RemoteFlags(val uid: Long, val seen: Boolean, val starred: Boolean, val deleted: Boolean)

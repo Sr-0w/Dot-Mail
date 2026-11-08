@@ -49,7 +49,6 @@ import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.SwipeLeft
 import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material.icons.outlined.SwipeRight
-import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -58,6 +57,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.activity.compose.BackHandler
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -112,6 +116,11 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
     var about by remember { mutableStateOf(false) }
     var licences by remember { mutableStateOf(false) }
     var cacheVersion by remember { mutableIntStateOf(0) }
+    // Sub-pages: 0 = none. identityPage: -1 = account page, 0 = new identity, else editing that identity.
+    var accountPage by rememberSaveable { mutableLongStateOf(0L) }
+    var identityPage by rememberSaveable { mutableLongStateOf(-1L) }
+    val pageAccount = accounts.firstOrNull { it.id == accountPage }
+    BackHandler(enabled = accountPage != 0L) { if (identityPage >= 0) identityPage = -1 else accountPage = 0 }
     val c = Dot.colors
     val canLock = remember {
         BiometricManager.from(context).canAuthenticate(
@@ -132,7 +141,11 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
     // Permission revoked in system settings while the toggle was on: show it off.
     LaunchedEffect(Unit) { contactsGranted = hasContacts() }
 
-    Column(Modifier.fillMaxSize().background(c.background)) {
+    if (pageAccount != null && identityPage >= 0) {
+        IdentityEditorPage(pageAccount, identityPage, onBack = { identityPage = -1 })
+    } else if (pageAccount != null) {
+        AccountPage(pageAccount, onBack = { accountPage = 0 }, onEditIdentity = { identityPage = it }, onRemove = { removing = pageAccount })
+    } else Column(Modifier.fillMaxSize().background(c.background)) {
         DotTopBar(title = "Settings", elevated = scroll.value > 0, navigation = { BackButton(onBack) })
         Column(Modifier.verticalScroll(scroll)) {
             // ---- Accounts
@@ -143,8 +156,8 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
                     title = a.displayName,
                     subtitle = if (err != null) "${a.email}\n${err.message}" else a.email,
                     subtitleColor = if (err != null) c.danger else c.textSecondary,
-                    onClick = { removing = a },
-                    trailing = { Text("Remove", style = Dot.type.label, color = c.textSecondary) },
+                    onClick = { accountPage = a.id; identityPage = -1 },
+                    trailing = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = c.textTertiary) },
                 )
             }
             ListRow("Add account", icon = Icons.Outlined.Add, onClick = onAddAccount)
@@ -334,6 +347,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
                 DotButton("Remove", style = ButtonStyle.Danger, compact = true, onClick = {
                     removing = null
                     scope.launch {
+                        accountPage = 0
                         graph.accounts.removeAccount(a.id)
                         if (graph.accounts.accounts.first().isEmpty()) onAllAccountsRemoved()
                     }

@@ -38,7 +38,7 @@ class HttpsConfigFetcher internal constructor(
         } catch (e: Exception) {
             return null
         }
-        if (uri.scheme?.lowercase() != "https") return null
+        if (uri.scheme?.lowercase() != "https" || uri.host.isNullOrBlank()) return null
 
         var connection: HttpURLConnection? = null
         try {
@@ -65,7 +65,7 @@ class HttpsConfigFetcher internal constructor(
                         } catch (e: Exception) {
                             return null
                         }
-                        if (uri.scheme?.lowercase() != "https") return null
+                        if (uri.scheme?.lowercase() != "https" || uri.host.isNullOrBlank()) return null
                         continue
                     }
                     HttpURLConnection.HTTP_OK -> return readBounded(conn)

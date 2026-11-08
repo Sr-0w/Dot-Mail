@@ -52,9 +52,58 @@ class MailClient(val timeoutMs: Int = 30_000) {
     }
     suspend fun folders(endpoint: Endpoint, credentials: Credentials): List<RemoteFolder> = store(endpoint, credentials) { store ->
         uniqueRoles(store.defaultFolder.list("*").filter { it.type and Folder.HOLDS_MESSAGES != 0 }.map { f ->
-            RemoteFolder(f.fullName, f.name, role(f.fullName, (f as IMAPFolder).attributes.toList()), f.unreadMessageCount.coerceAtLeast(0), f.messageCount.coerceAtLeast(0), f.attributes.any { it.lowercase() in setOf("\\sent", "\\drafts", "\\archive", "\\trash", "\\junk", "\\all", "\\flagged", "\\inbox") })
+            RemoteFolder(f.fullName, f.name, role(f.fullName, (f as IMAPFolder).attributes.toList()), f.unreadMessageCount.coerceAtLeast(0), f.messageCount.coerceAtLeast(0), f.attributes.any { it.lowercase() in setOf("\\sent", "\\drafts", "\\archive", "\\trash", "\\junk", "\\all", "\\flagged", "\\inbox") }, f.separator.takeIf { it != 0.toChar() } ?: '/')
         })
     }
+
+    /**
+     * CREATE (+ SUBSCRIBE) a folder called [name] under [parent] (null = top level). The full path is built with the
+     * server's own hierarchy separator, which differs between servers ("/" or "."). Returns the created path.
+     */
+    suspend fun createFolder(endpoint: Endpoint, credentials: Credentials, parent: String?, name: String): String = store(endpoint, credentials) { s ->
+        val f = child(s, parent, name)
+        if (f.exists()) throw FolderOpException(FolderOpException.Kind.EXISTS, "A folder named \"$name\" already exists")
+        if (!f.create(Folder.HOLDS_MESSAGES)) throw FolderOpException(FolderOpException.Kind.REJECTED, "The server refused to create the folder")
+        runCatching { f.isSubscribed = true }
+        f.fullName
+    }
+
+    /**
+     * RENAME [from] to [newName] under [newParent] (null = top level); a different parent moves the folder. The server
+     * renames children too. Keeps the subscription. Returns the new path.
+     */
+    suspend fun renameFolder(endpoint: Endpoint, credentials: Credentials, from: String, newParent: String?, newName: String): String = store(endpoint, credentials) { s ->
+        val src = s.getFolder(from)
+        if (!src.exists()) throw FolderOpException(FolderOpException.Kind.NOT_FOUND, "The folder no longer exists on the server")
+        val dst = child(s, newParent, newName)
+        if (dst.exists()) throw FolderOpException(FolderOpException.Kind.EXISTS, "A folder named \"$newName\" already exists")
+        runCatching { src.isSubscribed = false }
+        if (!src.renameTo(dst)) {
+            runCatching { src.isSubscribed = true }
+            throw FolderOpException(FolderOpException.Kind.REJECTED, "The server refused to rename the folder")
+        }
+        runCatching { s.getFolder(dst.fullName).isSubscribed = true }
+        dst.fullName
+    }
+
+    private fun child(s: IMAPStore, parent: String?, name: String): Folder =
+        if (parent == null) s.defaultFolder.getFolder(name) else s.getFolder(parent).getFolder(name)
+
+    /** UIDVALIDITY of a folder (a cheap STATUS): a renamed folder keeps it, which is how a rename elsewhere is told from delete + create. */
+    suspend fun folderValidity(endpoint: Endpoint, credentials: Credentials, path: String): Long = store(endpoint, credentials) { s ->
+        runCatching { (s.getFolder(path) as IMAPFolder).uidValidity }.getOrDefault(0L)
+    }
+
+    /** UNSUBSCRIBE + DELETE. Refuses a folder that still holds messages: deleting it would destroy them. Missing = already done. */
+    suspend fun deleteFolder(endpoint: Endpoint, credentials: Credentials, path: String) = store(endpoint, credentials) { s ->
+        val f = s.getFolder(path)
+        if (!f.exists()) return@store
+        val count = runCatching { f.messageCount }.getOrDefault(0) // \Noselect parents cannot be counted: they hold none
+        if (count > 0) throw FolderOpException(FolderOpException.Kind.NOT_EMPTY, "The folder still contains $count messages on the server")
+        runCatching { f.isSubscribed = false }
+        if (!f.delete(false)) throw FolderOpException(FolderOpException.Kind.REJECTED, "The server refused to delete the folder")
+    }
+
     suspend fun sync(endpoint: Endpoint, credentials: Credentials, path: String, cursor: SyncCursor = SyncCursor(), now: Long = System.currentTimeMillis(), limit: Int = 500): HeaderSync = store(endpoint, credentials) { store ->
         require(limit in 1..5000)
         folder(store, path) { f ->
@@ -230,3 +279,8 @@ class MailClient(val timeoutMs: Int = 30_000) {
 
 /** Connection/authentication failed before any SMTP envelope or DATA was submitted; retry is safe. */
 class SubmissionNotStartedException(cause: Throwable) : Exception("SMTP submission did not start", cause)
+
+/** A folder command was refused by the server. [kind] lets callers explain it; replaying a command may treat some kinds as success. */
+class FolderOpException(val kind: Kind, message: String) : Exception(message) {
+    enum class Kind { EXISTS, NOT_FOUND, NOT_EMPTY, REJECTED }
+}

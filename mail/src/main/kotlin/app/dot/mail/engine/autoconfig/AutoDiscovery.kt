@@ -82,18 +82,28 @@ class AutoDiscovery(
 
         BuiltInProviders.lookup(domain)?.let { return@withContext it.toConfig(local, full) }
 
+        var insecureFallback: DiscoveredConfig? = null
+
         for (url in listOf(
             "https://autoconfig.$domain/mail/config-v1.1.xml",
             "https://$domain/.well-known/autoconfig/mail/config-v1.1.xml",
         )) {
-            fetchConfig(url, full, local, domain, Source.PROVIDER_AUTOCONFIG)?.let { return@withContext it }
+            val cfg = fetchConfig(url, full, local, domain, Source.PROVIDER_AUTOCONFIG) ?: continue
+            if (!cfg.insecure) return@withContext cfg
+            if (insecureFallback == null) insecureFallback = cfg
         }
-        discoverViaMx(domain, local, full)?.let { return@withContext it }
+        discoverViaMx(domain, local, full)?.let { cfg ->
+            if (!cfg.insecure) return@withContext cfg
+            if (insecureFallback == null) insecureFallback = cfg
+        }
 
         fetchConfig("https://autoconfig.thunderbird.net/v1.1/$domain", full, local, domain, Source.ISPDB)
-            ?.let { return@withContext it }
+            ?.let { cfg ->
+                if (!cfg.insecure) return@withContext cfg
+                if (insecureFallback == null) insecureFallback = cfg
+            }
 
-        return@withContext guess(full, domain)
+        return@withContext insecureFallback ?: guess(full, domain)
     }
 
     private fun discoverViaMx(domain: String, local: String, email: String): DiscoveredConfig? {
@@ -106,11 +116,14 @@ class AutoDiscovery(
         for (host in hosts) {
             BuiltInProviders.lookupByMx(host)?.let { return it.toConfig(local, email, Source.MX) }
         }
+        var insecureMxFallback: DiscoveredConfig? = null
         for (base in hosts.map(::registrableDomain).distinct().filter { it != domain }.take(3)) {
-            fetchConfig("https://autoconfig.thunderbird.net/v1.1/$base", email, local, domain, Source.MX)
-                ?.let { return it }
+            val cfg = fetchConfig("https://autoconfig.thunderbird.net/v1.1/$base", email, local, domain, Source.MX)
+                ?: continue
+            if (!cfg.insecure) return cfg
+            if (insecureMxFallback == null) insecureMxFallback = cfg
         }
-        return null
+        return insecureMxFallback
     }
 
     private fun BuiltInProviders.Entry.toConfig(local: String, email: String, source: Source = Source.BUILT_IN): DiscoveredConfig {
@@ -143,9 +156,10 @@ class AutoDiscovery(
             imap = servers.imap,
             smtp = servers.smtp,
             providerName = servers.providerName,
-            hint = null,
+            hint = if (servers.insecure) INSECURE_PLAIN_HINT else null,
             oauthRequired = false,
             source = source,
+            insecure = servers.insecure,
         )
     }
 
@@ -156,7 +170,13 @@ class AutoDiscovery(
         hint = null,
         oauthRequired = false,
         source = Source.GUESS,
+        insecure = false,
     )
+
+    companion object {
+        const val INSECURE_PLAIN_HINT =
+            "This provider advertised unencrypted settings (no TLS). Confirm in manual setup before signing in."
+    }
 }
 
 private val SECOND_LEVEL = setOf("co", "com", "org", "net", "gov", "edu", "ac", "ne", "or", "go")

@@ -79,6 +79,24 @@ interface MailRepository {
 
     suspend fun move(threadIds: Collection<Long>, targetFolderId: Long)
 
+    // ---- Folder management. Local change is immediate; the server command is queued and replayed on sync. ----
+    // All throw FolderException(reason) for refusals. If the server later refuses (name taken meanwhile, folder
+    // gone), the server wins: the local change is rolled back and the account shows a sync error saying why.
+
+    /** Creates a folder called [name] under [parentFolderId] (null = top level). Returns its id. */
+    suspend fun createFolder(accountId: Long, parentFolderId: Long?, name: String): Long = throw UnsupportedOperationException()
+
+    suspend fun renameFolder(folderId: Long, newName: String) { throw UnsupportedOperationException() }
+
+    /** Moves a folder (with its subfolders) under [newParentFolderId] (null = top level). */
+    suspend fun moveFolder(folderId: Long, newParentFolderId: Long?) { throw UnsupportedOperationException() }
+
+    /**
+     * Deletes a custom folder without subfolders. Non-empty folders need [moveContentsTo] (e.g. the Trash): the messages
+     * are moved there first, and the folder is deleted on the server only once they have all left it.
+     */
+    suspend fun deleteFolder(folderId: Long, moveContentsTo: Long? = null) { throw UnsupportedOperationException() }
+
     /** Pull-to-refresh: syncs the given mailbox now. */
     suspend fun refresh(mailbox: Mailbox)
 

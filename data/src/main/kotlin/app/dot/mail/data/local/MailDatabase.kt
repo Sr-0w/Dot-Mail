@@ -47,6 +47,9 @@ interface MailDao {
     @Query("SELECT * FROM folders WHERE accountId=:account") suspend fun folders(account: Long): List<FolderRow>
     @Query("SELECT * FROM folders WHERE id=:id") suspend fun folder(id: Long): FolderRow?
     @Insert suspend fun insertFolder(row: FolderRow): Long
+    @Query("DELETE FROM folders WHERE id=:id") suspend fun deleteFolderRow(id: Long)
+    /** Local ids of folders whose deletion is queued: hidden from the UI meanwhile. */
+    @Query("SELECT uid FROM operations WHERE action='FOLDER_DELETE'") fun observeDeletingFolderIds(): Flow<List<Long>>
     @Update suspend fun updateFolder(row: FolderRow)
     @RawQuery(observedEntities = [ThreadRow::class, MessageRow::class, FolderRow::class, DraftRow::class, BodyTextRow::class, SearchMatchRow::class]) fun page(query: SupportSQLiteQuery): PagingSource<Int, ThreadRow>
     @Query("SELECT $MESSAGE_META FROM messages WHERE threadId=:id ORDER BY sentAt,id") fun observeThread(id: Long): Flow<List<MessageRow>>
@@ -81,6 +84,9 @@ interface MailDao {
     @Query("SELECT threadId FROM thread_keys WHERE accountId=:account AND `key`=:key") suspend fun threadKey(account: Long, key: String): Long?
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putKey(row: ThreadKeyRow)
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertKey(row: ThreadKeyRow)
+    @Query("SELECT localUri FROM attachments WHERE localUri IS NOT NULL") suspend fun attachmentUris(): List<String>
+    @Query("SELECT bodyPath FROM messages WHERE bodyPath IS NOT NULL") suspend fun bodyPaths(): List<String>
+    @Query("SELECT * FROM drafts ORDER BY id LIMIT :limit OFFSET :offset") suspend fun draftBatch(offset: Int,limit: Int): List<DraftRow>
     @Query("SELECT * FROM attachments WHERE messageId=:id") suspend fun attachments(id: Long): List<AttachmentRow>
     @Query("SELECT * FROM attachments WHERE messageId IN (:ids)") suspend fun attachmentsFor(ids: List<Long>): List<AttachmentRow>
     @Query("SELECT * FROM attachments WHERE id=:id") suspend fun attachment(id: Long): AttachmentRow?
@@ -92,6 +98,7 @@ interface MailDao {
     @Query("SELECT * FROM drafts WHERE sourceMessageId=:id LIMIT 1") suspend fun draftForMessage(id: Long): DraftRow?
     @Query("DELETE FROM drafts WHERE id=:id") suspend fun deleteDraft(id: Long)
     @Query("SELECT * FROM outbox WHERE state IN ('PENDING','SUBMITTING','APPEND','APPENDING','UNCERTAIN') ORDER BY dueAt,id") fun observeOutbox(): Flow<List<OutboxRow>>
+    @Query("SELECT * FROM outbox WHERE state IN ('PENDING','SUBMITTING','APPEND','APPENDING','UNCERTAIN')") suspend fun activeOutbox(): List<OutboxRow>
     @Query("SELECT * FROM outbox WHERE state='APPENDING'") suspend fun appendingOutbox(): List<OutboxRow>
     @Insert suspend fun insertOutbox(row: OutboxRow): Long
     @Query("SELECT * FROM outbox WHERE id=:id") suspend fun outbox(id: Long): OutboxRow?

@@ -1,0 +1,20 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Google Inc//Google Calendar 70.9051//EN
+METHOD:REQUEST
+BEGIN:VEVENT
+DTSTAMP:20260528T120000Z
+SEQUENCE:0
+UID:abc123def456@google.com
+DTSTART;TZID=America/New_York:20260115T090000
+DTEND;TZID=America/New_York:20260115T093000
+RRULE:FREQ=WEEKLY;COUNT=4
+SUMMARY:Weekly sync
+DESCRIPTION:Recurring sync meeting
+LOCATION:Meet: https://meet.google.com/abc-defg-hij
+URL:https://calendar.google.com/calendar/event?eid=abc
+ORGANIZER:mailto:carol@gmail.com
+ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:alice@example.com
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR

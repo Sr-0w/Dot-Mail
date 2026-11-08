@@ -22,12 +22,18 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null): Boole
         var stage = "Connect"
         var folderLabel: String? = null
         var headerWarning: String? = null
+        var folderWarning: String? = null
         var redactions: Set<String> = setOf(account.email)
         try {
             val config = Codec.config(account.config); val creds = credentials(account)
             redactions = setOf(account.email, creds.secret)
             var deferredExpunge = false
+            stage = "Folder commands"
+            runFolderOps(account, config, creds).let { if (!it.success) success = false; folderWarning = it.warning }
+            stage = "Connect"
             val remoteFolders = client.folders(config.imap.endpoint(), creds)
+            stage = "Folder list"
+            reconcileFolders(account, config, creds, remoteFolders)
             for (remote in remoteFolders.sortedBy { when(it.role) { Role.INBOX -> 0; Role.SENT -> 1; Role.DRAFTS -> 2; else -> 3 } }) {
                 folderLabel = remote.role.name
                 stage = "Folder header sync"
@@ -114,7 +120,9 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null): Boole
                 }
                 notifications.distinctBy { it.first }.forEach { (id, subject) -> MailNotifications.newMail(context, account, id, subject) }
             }
-            dao.syncError(account.id, if (headerWarning != null) headerWarning else if (deferredExpunge) "Move copied messages and marked the originals deleted; server lacks targeted expunge" else if (dao.operations(account.id).any { it.error != null }) "Some server changes are pending or require review" else null)
+            stage = "Folder delete"
+            finishFolderDeletes(account, config, creds).let { if (!it.success) success = false; if (folderWarning == null) folderWarning = it.warning }
+            dao.syncError(account.id, if (folderWarning != null) folderWarning else if (headerWarning != null) headerWarning else if (deferredExpunge) "Move copied messages and marked the originals deleted; server lacks targeted expunge" else if (dao.operations(account.id).any { it.error != null }) "Some server changes are pending or require review" else null)
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             SyncDiagnostics.warn("$stage account=${account.id} folderRole=${folderLabel ?: "NONE"}", e, redactions)
@@ -124,6 +132,7 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null): Boole
         }
         finally { syncing.value = syncing.value - account.id }
     }
+    try { cacheCleanup.run() } catch(e: Exception) { SyncDiagnostics.warn("Private cache cleanup",e) }
     success
 }
 
@@ -151,7 +160,12 @@ internal suspend fun RealMailGraph.deliverOutbox(id: Long): Boolean = outboxLock
             OutgoingAttachment(name,mime,source=source)
         }
         val saved = row.mimePath?.let { File(it) }?.takeIf { it.isFile }
-        val mime = saved?.let { StoredMimeMessage(it) } ?: Mime.build(OutgoingMail(Address(account.email, account.name), draft.to.map { Address(it.email, it.name) }, draft.cc.map { Address(it.email, it.name) }, draft.bcc.map { Address(it.email, it.name) }, draft.subject, draft.bodyText, attachments = attachments, inReplyTo = draft.inReplyTo, references = draft.references, messageId = "<dotmail-$id-${java.util.UUID.randomUUID()}@${account.email.substringAfter('@')}>", date = java.time.Instant.now()))
+        val identity = identityStore.resolve(account.id, account.name, account.email).let { all -> all.firstOrNull { it.id == draft.identityId } ?: all.first { it.isDefault } }
+        val mime = saved?.let { StoredMimeMessage(it) } ?: Mime.build(OutgoingMail(Address(identity.email, identity.name.ifBlank { account.name }), draft.to.map { Address(it.email, it.name) }, draft.cc.map { Address(it.email, it.name) }, draft.bcc.map { Address(it.email, it.name) }, draft.subject,
+            // Formatted drafts: text/plain alternative + email-safe HTML (inline styles, sanitised) as multipart/alternative.
+            draft.bodyHtml?.let { draft.bodyText.ifBlank { app.dot.mail.engine.text.EmailHtml.toPlainText(it) } } ?: draft.bodyText,
+            html = draft.bodyHtml?.let { app.dot.mail.engine.text.EmailHtml.compose(it) },
+            attachments = attachments, inReplyTo = draft.inReplyTo, references = draft.references, replyTo = listOfNotNull(identity.replyTo?.let { Address(it) }), messageId = "<dotmail-$id-${java.util.UUID.randomUUID()}@${account.email.substringAfter('@')}>", date = java.time.Instant.now()))
         val file = File(context.filesDir, "outbox/${account.id}/$id.eml").also { it.parentFile!!.mkdirs() }
         if (saved==null) {
             val temporary=File(file.parentFile,"${file.name}.tmp")
@@ -161,7 +175,7 @@ internal suspend fun RealMailGraph.deliverOutbox(id: Long): Boolean = outboxLock
         dao.outboxPath(id, file.absolutePath)
         if (dao.transitionOutbox(id, "PENDING", "SUBMITTING") != 1) return@withLock true
         try {
-            client.send(config.smtp.endpoint(), creds, mime)
+            client.send(config.smtp.endpoint(), creds, mime, envelopeFrom = account.email)
         } catch (e: SubmissionNotStartedException) {
             SyncDiagnostics.warn("Outbox SMTP connect id=$id", e, setOf(creds.secret, account.email))
             if (e.cause is jakarta.mail.AuthenticationFailedException) dao.syncError(account.id, "Sign in again to reconnect this account", true)

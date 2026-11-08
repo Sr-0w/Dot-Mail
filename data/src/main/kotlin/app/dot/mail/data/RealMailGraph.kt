@@ -45,6 +45,8 @@ internal class RealMailGraph(
     tokenEndpoint: TokenEndpoint = HttpsTokenEndpoint(),
 ) : AccountRepository, MailRepository, ComposeRepository {
     internal val dao = database.mail()
+    internal val identityStore = IdentityStore.get(context)
+    internal val cacheCleanup = PrivateCacheCleanup(context,dao)
     internal val bodyStore = BodyStore(context, dao)
     internal val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     internal val syncLock = Mutex()
@@ -53,8 +55,8 @@ internal class RealMailGraph(
     private val bodyLocks = java.util.concurrent.ConcurrentHashMap<Long, Mutex>()
     private val oauth = OAuthManager(context, database, vault, oauthClients, tokenEndpoint)
     internal val syncing = MutableStateFlow<Set<Long>>(emptySet())
-    override val accounts: Flow<List<Account>> = combine(dao.observeAccounts(), syncing) { rows, active -> rows.map { row ->
-        Account(row.id, row.name, row.email, row.color, listOf(Identity(row.id, row.id, row.name, row.email, isDefault = true)),
+    override val accounts: Flow<List<Account>> = combine(dao.observeAccounts(), syncing, identityStore.version) { rows, active, _ -> rows.map { row ->
+        Account(row.id, row.name, row.email, row.color, identityStore.resolve(row.id, row.name, row.email),
             if (row.id in active) SyncState.Syncing else row.syncError?.let { SyncState.Error(it, isAuthError = row.authError) } ?: SyncState.Idle)
     } }
     override val outbox: Flow<List<OutboxItem>> = dao.observeOutbox().map { rows -> rows.map { row ->
@@ -104,8 +106,15 @@ internal class RealMailGraph(
         val id = dao.insertAccount(AccountRow(email = config.email, name = config.displayName, color = dao.accounts().size % 6, config = Codec.config(config), secret = vault.encrypt(config.email, password)))
         requestSync(); id
     }
-    override suspend fun removeAccount(accountId: Long) = withContext(Dispatchers.IO) { syncLock.withLock { dao.deleteAccount(accountId); File(context.filesDir, "attachments/$accountId").deleteRecursively(); File(context.filesDir, "outbox/$accountId").deleteRecursively(); Unit } }
-    override fun folders(accountId: Long): Flow<List<app.dot.mail.data.model.Folder>> = dao.observeFolders(accountId).map { rows -> rows.map { app.dot.mail.data.model.Folder(it.id, it.accountId, it.path, it.name, FolderRole.valueOf(it.role), it.unread, it.total) } }
+    override fun identities(accountId: Long): Flow<List<Identity>> = accounts.map { list -> list.firstOrNull { it.id == accountId }?.identities.orEmpty() }
+    override suspend fun saveIdentity(identity: Identity): Long = withContext(Dispatchers.IO) {
+        val account = requireNotNull(dao.account(identity.accountId)) { "Unknown account" }
+        identityStore.save(identity, account.email)
+    }
+    override suspend fun deleteIdentity(accountId: Long, identityId: Long) = withContext(Dispatchers.IO) { identityStore.delete(accountId, identityId) }
+    override suspend fun setDefaultIdentity(accountId: Long, identityId: Long) = withContext(Dispatchers.IO) { identityStore.setDefault(accountId, identityId) }
+    override suspend fun removeAccount(accountId: Long) = withContext(Dispatchers.IO) { syncLock.withLock { dao.deleteAccount(accountId); identityStore.forget(accountId); AccountSettingsStore.get(context).forget(accountId); File(context.filesDir, "attachments/$accountId").deleteRecursively(); File(context.filesDir, "outbox/$accountId").deleteRecursively(); Unit } }
+    override fun folders(accountId: Long): Flow<List<app.dot.mail.data.model.Folder>> = combine(dao.observeFolders(accountId), dao.observeDeletingFolderIds()) { rows, deleting -> rows.filter { it.id !in deleting } }.map { rows -> rows.map { app.dot.mail.data.model.Folder(it.id, it.accountId, it.path, it.name, FolderRole.valueOf(it.role), it.unread, it.total) } }
     internal suspend fun summary(t: ThreadRow, draftView: Boolean = false): ThreadSummary {
         if (t.id < 0) {
             val row = dao.draft(-t.id)
@@ -154,20 +163,28 @@ internal class RealMailGraph(
                 field != null -> { args += like(term.value); "$field LIKE ? ESCAPE '!'" }
                 term.field == "has" -> "m.hasAttachments=1"
                 term.field == "is" -> if (term.value.equals("unread", true)) "m.unread=1" else "m.starred=1"
-                else -> { repeat(4) { args += like(term.value) }; "(m.senderSearch LIKE ? ESCAPE '!' OR m.subject LIKE ? ESCAPE '!' OR m.snippet LIKE ? ESCAPE '!' OR m.text LIKE ? ESCAPE '!')" }
+                else -> { repeat(6) { args += like(term.value) }; "(m.senderSearch LIKE ? ESCAPE '!' OR m.subject LIKE ? ESCAPE '!' OR m.snippet LIKE ? ESCAPE '!' OR m.text LIKE ? ESCAPE '!' OR m.html LIKE ? ESCAPE '!' OR EXISTS(SELECT 1 FROM body_text b WHERE b.messageId=m.id AND b.text LIKE ? ESCAPE '!'))" }
             }
             predicates += "EXISTS(SELECT 1 FROM messages m WHERE m.threadId=t.id AND ($condition))"
         }
-        val where = predicates.joinToString(" AND ").ifBlank { "1=1" }
+        val local = predicates.joinToString(" AND ").ifBlank { "1=1" }
+        val where = "($local) OR EXISTS(SELECT 1 FROM messages m JOIN search_matches s ON s.messageId=m.id WHERE m.threadId=t.id AND s.queryHash=?)"
+        args += searchHash(query,accountId)
         return dao.page(SimpleSQLiteQuery("SELECT t.* FROM threads t WHERE t.count>0 AND ($where) ORDER BY t.lastAt DESC,t.id DESC", args.toTypedArray()))
     }
+    private fun searchHash(query: String, accountId: Long?) = java.security.MessageDigest.getInstance("SHA-256").digest("${accountId ?: "*"}:$query".toByteArray()).joinToString("") { "%02x".format(it) }
     private suspend fun serverSearch(query: String, accountId: Long?) = searchLock.withLock {
         if (query.isBlank()) return@withLock
+        val hash = searchHash(query,accountId)
+        dao.clearSearchMatches(hash)
         dao.accounts().filter { accountId == null || it.id == accountId }.forEach { account ->
             val config = Codec.config(account.config); val creds = credentials(account)
             dao.folders(account.id).forEach { folder ->
                 val headers = client.search(config.imap.endpoint(), creds, folder.path, query)
-                database.withTransaction { headers.forEach { upsertHeader(folder, it) } }
+                database.withTransaction { headers.forEach { header ->
+                    upsertHeader(folder, header)
+                    dao.byUid(folder.id,header.uid)?.let { dao.putSearchMatch(SearchMatchRow(hash,it.id)) }
+                } }
             }
         }
     }
@@ -241,7 +258,7 @@ internal class RealMailGraph(
         val latest = distinct.lastOrNull()
         dao.updateThread(row.copy(subject = latest?.subject ?: row.subject, participants = Codec.addresses(distinct.flatMap { Codec.addressField(it.header, "from") }.distinctBy { it.email }), snippet = latest?.snippet.orEmpty(), lastAt = latest?.sentAt ?: 0, count = distinct.size, unread = distinct.count { it.unread }, starred = distinct.any { it.starred }, attachments = distinct.any { it.hasAttachments }))
     }
-    private suspend fun moveMessage(message: MessageRow, target: FolderRow) {
+    internal suspend fun moveMessage(message: MessageRow, target: FolderRow) {
         if (message.accountId != target.accountId) throw MailActionException(MailActionFailure.ACCOUNT_MISMATCH, "Choose a destination in the same account")
         if (message.folderId == target.id) return
         val source = dao.folder(message.folderId) ?: return
@@ -299,6 +316,10 @@ internal class RealMailGraph(
             }
         }; requestSync()
     }
+    override suspend fun createFolder(accountId: Long, parentFolderId: Long?, name: String): Long = createFolderLocal(accountId, parentFolderId, name)
+    override suspend fun renameFolder(folderId: Long, newName: String) = relocateFolderLocal(folderId, keepParent = true, newParentId = null, newName = newName)
+    override suspend fun moveFolder(folderId: Long, newParentFolderId: Long?) = relocateFolderLocal(folderId, keepParent = false, newParentId = newParentFolderId, newName = null)
+    override suspend fun deleteFolder(folderId: Long, moveContentsTo: Long?) = deleteFolderLocal(folderId, moveContentsTo)
     override suspend fun move(threadIds: Collection<Long>, targetFolderId: Long) = withContext(Dispatchers.IO) {
         val target = dao.folder(targetFolderId) ?: throw MailActionException(MailActionFailure.FOLDER_UNAVAILABLE, "Destination folder is no longer available")
         database.withTransaction {
@@ -339,7 +360,7 @@ internal class RealMailGraph(
             dao.draftForMessage(messageId)?.let { return@withTransaction Codec.draft(it.json).copy(localId = it.id) }
             val message = dao.message(messageId) ?: return@withTransaction null
             if (dao.folder(message.folderId)?.role != "DRAFTS") return@withTransaction null
-            val d = Draft(accountId = message.accountId, identityId = message.accountId, to = Codec.addressField(message.header, "to"), cc = Codec.addressField(message.header, "cc"), bcc = Codec.addressField(message.header, "bcc"), subject = message.subject, bodyText = bodyStore.read(message)?.plainText.orEmpty(), attachmentUris = dao.attachments(messageId).filter { !it.inline }.mapNotNull { it.localUri }, references = Codec.strings(Codec.field(message.header, "refs") ?: "[]"))
+            val d = Draft(accountId = message.accountId, identityId = message.accountId, to = Codec.addressField(message.header, "to"), cc = Codec.addressField(message.header, "cc"), bcc = Codec.addressField(message.header, "bcc"), subject = message.subject, bodyText = bodyStore.read(message)?.let { b -> b.plainText ?: b.html?.let { app.dot.mail.engine.text.EmailHtml.toPlainText(it) } }.orEmpty(), bodyHtml = bodyStore.read(message)?.html, attachmentUris = dao.attachments(messageId).filter { !it.inline }.mapNotNull { it.localUri }, references = Codec.strings(Codec.field(message.header, "refs") ?: "[]"))
             val id = dao.putDraft(DraftRow(accountId = message.accountId, json = Codec.draft(d), updatedAt = System.currentTimeMillis(), sourceMessageId = messageId))
             d.copy(localId = id)
         } }
@@ -360,9 +381,13 @@ internal class RealMailGraph(
         val m = requireNotNull(dao.message(messageId)); val account = requireNotNull(dao.account(m.accountId))
         val from = Codec.addressField(m.header, "replyTo").ifEmpty { Codec.addressField(m.header, "from") }
         val to = if (mode == ReplyMode.FORWARD) emptyList() else from
-        val cc = if (mode == ReplyMode.REPLY_ALL) (Codec.addressField(m.header, "to") + Codec.addressField(m.header, "cc")).filter { a -> a.email != account.email && to.none { it.email == a.email } }.distinctBy { it.email } else emptyList()
+        val identities = identityStore.resolve(account.id, account.name, account.email)
+        val own = ReplyIdentity.ownAddresses(identities)
+        val originalTo = Codec.addressField(m.header, "to"); val originalCc = Codec.addressField(m.header, "cc")
+        val identity = ReplyIdentity.pick(identities, originalTo.map { it.email }, originalCc.map { it.email })
+        val cc = if (mode == ReplyMode.REPLY_ALL) (originalTo + originalCc).filter { a -> a.email.lowercase() !in own && to.none { it.email.equals(a.email, true) } }.distinctBy { it.email.lowercase() } else emptyList()
         val messageHeader = Codec.field(m.header, "messageId")
-        Draft(accountId = account.id, identityId = account.id, to = to, cc = cc, subject = (if (mode == ReplyMode.FORWARD) "Fwd: " else "Re: ") + Threading.baseSubject(m.subject), bodyText = "\n\n" + bodyStore.read(m)?.let { it.plainText ?: org.jsoup.Jsoup.parse(it.html.orEmpty()).text() }.orEmpty().lineSequence().joinToString("\n") { "> $it" },
+        Draft(accountId = account.id, identityId = identity?.id ?: account.id, to = to, cc = cc, subject = (if (mode == ReplyMode.FORWARD) "Fwd: " else "Re: ") + Threading.baseSubject(m.subject), bodyText = "\n\n" + bodyStore.read(m)?.let { it.plainText ?: org.jsoup.Jsoup.parse(it.html.orEmpty()).text() }.orEmpty().lineSequence().joinToString("\n") { "> $it" },
             attachmentUris = if (mode == ReplyMode.FORWARD) dao.attachments(m.id).filter { !it.inline }.mapNotNull { it.localUri } else emptyList(), inReplyTo = if (mode == ReplyMode.FORWARD) null else messageHeader, references = if (mode == ReplyMode.FORWARD) emptyList() else (Codec.strings(Codec.field(m.header, "refs") ?: "[]") + listOfNotNull(messageHeader)).distinct())
     }
     override suspend fun send(draft: Draft, undoWindowMs: Long): Long = withContext(Dispatchers.IO) {
@@ -373,11 +398,14 @@ internal class RealMailGraph(
         val id = database.withTransaction { val id = dao.insertOutbox(OutboxRow(accountId = draft.accountId, draft = Codec.draft(frozen), dueAt = due)); if (draft.localId != 0L) removeDraftAndSource(draft.localId); id }
         if (scheduling) WorkScheduling.outbox(context, id, due); id
     }
-    override suspend fun cancelSend(outboxId: Long): Boolean = database.withTransaction {
-        val row = dao.outbox(outboxId) ?: return@withTransaction false
-        if (dao.transitionOutbox(outboxId, "PENDING", "CANCELLED") != 1) return@withTransaction false
-        val draft = Codec.draft(row.draft)
-        dao.putDraft(DraftRow(draft.localId, row.accountId, row.draft, System.currentTimeMillis())); true
+    override suspend fun cancelSend(outboxId: Long): Boolean = withContext(Dispatchers.IO) {
+        val cancelled=database.withTransaction {
+            val row=dao.outbox(outboxId) ?: return@withTransaction null
+            if(dao.transitionOutbox(outboxId,"PENDING","CANCELLED")!=1) return@withTransaction null
+            val draft=Codec.draft(row.draft)
+            dao.putDraft(DraftRow(draft.localId,row.accountId,row.draft,System.currentTimeMillis())); row
+        } ?: return@withContext false
+        cancelled.mimePath?.let { File(it).delete() }; dao.clearOutboxMime(outboxId); true
     }
     override suspend fun retrySend(outboxId: Long, confirmPossibleDuplicate: Boolean): Boolean = withContext(Dispatchers.IO) {
         if (!outboxLock.tryLock()) return@withContext false

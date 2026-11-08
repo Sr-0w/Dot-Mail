@@ -16,6 +16,7 @@ internal data class ParsedServers(
     val imap: DiscoveredServer,
     val smtp: DiscoveredServer,
     val providerName: String?,
+    val insecure: Boolean = imap.socket == SocketType.PLAIN || smtp.socket == SocketType.PLAIN,
 )
 
 /**
@@ -72,9 +73,13 @@ internal object AutoconfigXml {
     }
 
     /**
-     * Picks the best candidate <[tag]> element: highest (type score + socket rank),
-     * first one wins ties. Untyped/unknown-type blocks score 1 so they are only
-     * used when nothing better exists.
+     * Picks the best candidate <[tag]> element:
+     *  1. Encrypted sockets ([SocketType.SSL], [SocketType.STARTTLS]) always outrank
+     *     [SocketType.PLAIN] regardless of server type, so `socketType=plain` is rejected
+     *     whenever any TLS/STARTTLS server exists in the document.
+     *  2. Within the same security tier, preferred server types win (`imap` > `pop3`/untyped).
+     *  3. Within the same server type, `SSL` > `STARTTLS` > `PLAIN`.
+     *  4. First candidate in document order wins ties.
      */
     private fun pick(root: Element, tag: String, typeScores: Map<String, Int>): Element? {
         val nodes = root.getElementsByTagName(tag)
@@ -86,7 +91,9 @@ internal object AutoconfigXml {
             val typeScore = typeScores[type] ?: if (type.isEmpty()) 1 else 0
             if (typeScore <= 0) continue
             if (el.childText("hostname").orEmpty().isBlank()) continue
-            val score = typeScore + socketRank[parseSocket(el.childText("socketType"))]!!
+            val socket = parseServerSocket(el)
+            val tlsBonus = if (socket != SocketType.PLAIN) 100 else 0
+            val score = tlsBonus + typeScore * 10 + socketRank.getValue(socket)
             if (score > bestScore) {
                 bestScore = score
                 best = el
@@ -104,13 +111,20 @@ internal object AutoconfigXml {
     ): DiscoveredServer? {
         val host = el.childText("hostname")?.let { substitute(it, email, localPart, domain) } ?: return null
         if (host.isBlank()) return null
-        val socket = parseSocket(el.childText("socketType"))
+        val socket = parseServerSocket(el)
         val port = el.childText("port")?.toIntOrNull()
             ?: defaultPort(socket)
         if (port !in 1..65535) return null
         val username = el.childText("username")?.takeIf { it.isNotBlank() }
             ?: email
         return DiscoveredServer(host, port, socket, substitute(username, email, localPart, domain))
+    }
+
+    private fun parseServerSocket(el: Element): SocketType {
+        if (el.childText("requireTls")?.equals("false", ignoreCase = true) == true) {
+            return SocketType.PLAIN
+        }
+        return parseSocket(el.childText("socketType"))
     }
 
     private fun parseSocket(value: String?): SocketType = when {
