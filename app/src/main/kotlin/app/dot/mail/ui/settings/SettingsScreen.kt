@@ -252,7 +252,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
 
             // ---- Appearance
             SectionLabel(stringResource(R.string.settings_section_appearance), Modifier.anchor(SettingsSection.APPEARANCE))
-            SegmentedSetting(stringResource(R.string.settings_theme), listOf(ThemeMode.SYSTEM to stringResource(R.string.settings_theme_system), ThemeMode.LIGHT to stringResource(R.string.settings_theme_light), ThemeMode.DARK to stringResource(R.string.settings_theme_dark)), prefs.theme) { m ->
+            SegmentedSetting(stringResource(R.string.settings_theme), listOf(ThemeMode.SYSTEM to stringResource(R.string.settings_theme_system), ThemeMode.LIGHT to stringResource(R.string.settings_theme_light), ThemeMode.DARK to stringResource(R.string.settings_theme_dark), ThemeMode.OLED to stringResource(R.string.settings_theme_oled)), prefs.theme) { m ->
                 settings.update { it.copy(theme = m) }
             }
             ToggleRow(stringResource(R.string.settings_group_conversations), stringResource(R.string.settings_group_conversations_sub), Icons.Outlined.Forum, prefs.conversationView) { v ->

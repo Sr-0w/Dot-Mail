@@ -14,7 +14,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
 
-enum class ThemeMode { SYSTEM, LIGHT, DARK }
+/** [OLED] is Dark with a true-black background. */
+enum class ThemeMode { SYSTEM, LIGHT, DARK, OLED }
 
 private val LocalDotColors = staticCompositionLocalOf { DarkColors }
 private val LocalDotTypography = staticCompositionLocalOf { DotTypography() }
@@ -29,12 +30,12 @@ object Dot {
 
 @Composable
 fun DotTheme(mode: ThemeMode = ThemeMode.SYSTEM, content: @Composable () -> Unit) {
-    val dark = when (mode) {
-        ThemeMode.SYSTEM -> isSystemInDarkTheme()
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK -> true
+    val colors = when (mode) {
+        ThemeMode.SYSTEM -> if (isSystemInDarkTheme()) DarkColors else LightColors
+        ThemeMode.LIGHT -> LightColors
+        ThemeMode.DARK -> DarkColors
+        ThemeMode.OLED -> OledColors
     }
-    val colors = if (dark) DarkColors else LightColors
     val type = DotTypography()
     CompositionLocalProvider(
         LocalDotColors provides colors,

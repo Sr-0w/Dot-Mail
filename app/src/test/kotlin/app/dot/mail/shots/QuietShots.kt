@@ -34,12 +34,12 @@ class QuietShots {
     @get:Rule val compose = androidx.compose.ui.test.junit4.createAndroidComposeRule<androidx.activity.ComponentActivity>()
     private val out = File("build/shots").apply { mkdirs() }
 
-    private fun shoot(name: String, dark: Boolean, content: @Composable () -> Unit) {
+    private fun shoot(name: String, dark: Boolean, mode: ThemeMode? = null, content: @Composable () -> Unit) {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val settings = AppSettings(context)
         compose.setContent {
             CompositionLocalProvider(LocalSettings provides settings, LocalMailGraph provides DemoMailGraph()) {
-                DotTheme(if (dark) ThemeMode.DARK else ThemeMode.LIGHT) { content() }
+                DotTheme(mode ?: if (dark) ThemeMode.DARK else ThemeMode.LIGHT) { content() }
             }
         }
         compose.waitForIdle()
@@ -47,7 +47,7 @@ class QuietShots {
         val w = view.width.coerceAtLeast(1); val h = view.height.coerceAtLeast(1)
         val bmp = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
         view.draw(android.graphics.Canvas(bmp))
-        File(out, "$name-${if (dark) "dark" else "light"}.png").outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        File(out, "$name-${if (mode == ThemeMode.OLED) "oled" else if (dark) "dark" else "light"}.png").outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
     }
 
     @Test fun categoriesLight() = shoot("categories", false) { CategoriesPage(onBack = {}) }
@@ -100,11 +100,10 @@ class QuietShots {
             demoResults.forEach { app.dot.mail.ui.search.SearchResultRow(it, onClick = {}) }
         }
     }
-    @Test fun searchLight() = shoot("search", false, searchScreen())
-    @Test fun searchDark() = shoot("search", true, searchScreen())
+    @Test fun searchLight() = shoot("search", false, null, searchScreen())
+    @Test fun searchDark() = shoot("search", true, null, searchScreen())
 
     // ---- audit leftovers: composer, account setup, attachments, outbox, snooze, dialogs ----
-    private fun both(name: String, content: @Composable () -> Unit) { shoot(name, false, content) }
 
     @Test fun composeLight() = shoot("compose", false) { app.dot.mail.ui.compose.ComposeScreen(route = app.dot.mail.ui.ComposeRoute(), onClose = {}) }
     @Test fun composeDark() = shoot("compose", true) { app.dot.mail.ui.compose.ComposeScreen(route = app.dot.mail.ui.ComposeRoute(), onClose = {}) }
@@ -116,4 +115,14 @@ class QuietShots {
     @Test fun outboxDark() = shoot("outbox", true) { app.dot.mail.ui.outbox.OutboxScreen(onBack = {}) }
     @Test fun snoozeLight() = shoot("snooze", false) { app.dot.mail.ui.snooze.SnoozeSheet(onDismiss = {}, onPick = {}) }
     @Test fun snoozeDark() = shoot("snooze", true) { app.dot.mail.ui.snooze.SnoozeSheet(onDismiss = {}, onPick = {}) }
+
+    @Test fun categoriesOled() = shoot("categories", true, ThemeMode.OLED) { CategoriesPage(onBack = {}) }
+    @Test fun smartEditorOled() = shoot("smart-folder-editor", true, ThemeMode.OLED) {
+        app.dot.mail.ui.settings.SmartFolderEditor(
+            app.dot.mail.data.model.SmartFolder("a", "Invoices to pay", subject = "invoice", unreadOnly = true), isNew = false, onBack = {},
+            store = app.dot.mail.data.SmartFolderStore.get(ApplicationProvider.getApplicationContext<Context>()),
+        )
+    }
+    @Test fun searchOled() = shoot("search", true, ThemeMode.OLED, searchScreen())
+    @Test fun composeOled() = shoot("compose", true, ThemeMode.OLED) { app.dot.mail.ui.compose.ComposeScreen(route = app.dot.mail.ui.ComposeRoute(), onClose = {}) }
 }
