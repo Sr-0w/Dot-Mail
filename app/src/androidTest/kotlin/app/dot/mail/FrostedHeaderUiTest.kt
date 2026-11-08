@@ -48,6 +48,42 @@ class FrostedHeaderUiTest {
             compose.waitUntil(WAIT_MS) { compose.onAllNodesWithContentDescription("Compose").fetchSemanticsNodes().isNotEmpty() }
         }
     }
+    @Test fun filtersCollapseAndReturnWhileScrollingWithoutHeaderResizeJumps() {
+        compose.waitForText(HIKE)
+        compose.runOnIdle {
+            @Suppress("UNCHECKED_CAST")
+            val field=app.dot.mail.demo.DemoMailGraph::class.java.getDeclaredField("messages").apply { isAccessible=true }
+            val messages=field.get(demo.graph) as kotlinx.coroutines.flow.MutableStateFlow<List<app.dot.mail.data.model.Message>>
+            val base=messages.value.first()
+            messages.value=messages.value+List(60) { i -> base.copy(id=10000L+i,threadId=10000L+i,subject="Scrolling fixture $i",sentAt=System.currentTimeMillis()-i*60000L) }
+        }
+        compose.mainClock.advanceTimeBy(600); compose.waitForIdle()
+        compose.onNodeWithContentDescription("Sort").assertIsDisplayed()
+        val times=java.util.Collections.synchronizedList(mutableListOf<Long>())
+        val handlerThread=android.os.HandlerThread("DotMailFrameMetrics").apply { start() }
+        val listener=android.view.Window.OnFrameMetricsAvailableListener { _,frame,_ ->
+            val duration=frame.getMetric(android.view.FrameMetrics.TOTAL_DURATION)
+            if(duration>0 && times.size<2000) times+=duration
+        }
+        compose.runOnIdle { compose.activity.window.addOnFrameMetricsAvailableListener(listener,Handler(handlerThread.looper)) }
+        try {
+            repeat(4) {
+                compose.onRoot().performTouchInput { swipeUp(durationMillis=600) }
+                compose.mainClock.advanceTimeBy(350); compose.waitForIdle()
+                compose.onNodeWithContentDescription("Sort").assertDoesNotExist()
+                if(it==0) capture("scrolled-inbox")
+                compose.onRoot().performTouchInput { swipeDown(durationMillis=600) }
+                compose.mainClock.advanceTimeBy(350); compose.waitForIdle()
+                compose.onNodeWithContentDescription("Sort").assertIsDisplayed()
+            }
+        } finally {
+            compose.runOnIdle { compose.activity.window.removeOnFrameMetricsAvailableListener(listener) }
+            handlerThread.quitSafely()
+        }
+        val frames=synchronized(times) { times.sorted() }
+        if(frames.isNotEmpty()) println("HEADER_FRAMES count=${frames.size} p50_ms=${frames[frames.size/2]/1000000.0} p95_ms=${frames[(frames.size*95/100).coerceAtMost(frames.lastIndex)]/1000000.0} over_16ms=${frames.count { it>16666667 }}")
+    }
+
     private fun capture(name:String) {
         captureDemoFrame(compose.activity,name)
         File(compose.activity.cacheDir,"dotmail-ui-tests/$name-tree.txt").writeText(compose.onRoot().printToString())
