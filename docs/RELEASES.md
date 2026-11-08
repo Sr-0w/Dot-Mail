@@ -98,3 +98,13 @@ for a readable tree; any diff outside the signature block is real non-determinis
    release pipeline (or track an upstream AGP reproducible-zip option).
 5. Keep `vcsInfo` off and `dependenciesInfo` `includeInApk/includeInBundle = false` (both already the case).
 
+
+## Reproducibility status
+
+`scripts/reprotest.sh <tag>` clones the tag twice on the build host into different paths, builds
+`:app:assembleRelease` with no daemon and no build cache under different time zones and umasks, and compares
+every APK entry (signature files excluded), then does the same against the published APK.
+
+| Tag | Two clean builds | Published APK | Notes |
+|---|---|---|---|
+| v0.1.0-alpha.1 | **identical** | differs in `classes.dex` and the baseline profile | alpha.1 was built incrementally in a long-lived build directory instead of a clean checkout. `scripts/release.sh` now tags first and builds from a fresh clone of the tag with the same flags as `reprotest.sh`, so from alpha.2 on the published file is expected to match a rebuild. |
