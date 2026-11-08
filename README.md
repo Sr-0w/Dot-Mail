@@ -104,10 +104,12 @@ Here is exactly where it stands — see [docs/FEATURES.md](docs/FEATURES.md) for
 | Works today | Not yet |
 |---|---|
 | IMAP/SMTP with password or app password | OAuth sign-in (needed for Outlook/Hotmail; optional for Gmail) |
-| Unified inbox, threads, search, folders | Rich-text (formatted) composing — plain text for now |
-| Offline cache, queued actions, background sync, IDLE while open | Push while the app is closed (sync every 15 min instead) |
-| Undo / scheduled send, drafts, attachments | Multiple sender aliases per account |
-| Notifications with actions, app lock | OpenPGP / S/MIME |
+| Unified inbox, threads, search, folder management | Push while the app is closed (sync every 15 min instead) |
+| Offline cache, queued actions, background sync, IDLE while open | Calendar invitation UI (the .ics parser is done) |
+| Rich-text or plain-text composing, aliases with signatures | OpenPGP / S/MIME |
+| Undo / scheduled send, drafts, attachments | Translations (French and German first) |
+| Remote images per message, sender or domain — remembered | |
+| Notifications with actions, app lock, home-screen widget | |
 
 ## Build it
 

@@ -132,7 +132,7 @@ fun DotButton(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (loading) {
-            CircularProgressIndicator(Modifier.size(16.dp), color = fgFinal, strokeWidth = 1.5.dp)
+            DotSpinner(size = 16.dp, color = fgFinal)
             Spacer(Modifier.width(DotSpacing.s))
         } else if (icon != null) {
             Icon(icon, null, Modifier.size(18.dp), tint = fgFinal)
@@ -193,7 +193,7 @@ fun DotPrimaryButton(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (loading) {
-            CircularProgressIndicator(Modifier.size(16.dp), color = fgFinal, strokeWidth = 1.5.dp)
+            DotSpinner(size = 16.dp, color = fgFinal)
             Spacer(Modifier.width(DotSpacing.s))
         } else if (icon != null) {
             Icon(icon, null, Modifier.size(18.dp), tint = fgFinal)
@@ -250,7 +250,7 @@ fun DotPrimaryButton(
         contentAlignment = Alignment.Center,
     ) {
         if (loading) {
-            CircularProgressIndicator(Modifier.size(16.dp), color = fgFinal, strokeWidth = 1.5.dp)
+            DotSpinner(size = 16.dp, color = fgFinal)
         } else {
             Icon(icon, contentDescription, Modifier.size(19.dp), tint = fgFinal)
         }
