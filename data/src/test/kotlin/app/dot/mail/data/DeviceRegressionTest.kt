@@ -58,6 +58,69 @@ class DeviceRegressionTest {
         assertEquals(MailActionFailure.ACCOUNT_MISMATCH,(mismatch as MailActionException).reason)
         assertEquals(inbox,db.mail().threadMessages(thread).single().folderId)
     }
+    @Test fun folderScopedMoveLeavesSentAndOtherCopiesUntouched() = runBlocking {
+        val account = graph.addAccount(config, "password")
+        val (inbox, thread) = fixture(account)
+        val sent = db.mail().insertFolder(FolderRow(accountId=account,path="Sent",name="Sent",role="SENT"))
+        val all = db.mail().insertFolder(FolderRow(accountId=account,path="All",name="All",role="ALL_MAIL"))
+        val archive = db.mail().insertFolder(FolderRow(accountId=account,path="Archive",name="Archive",role="ARCHIVE"))
+        val original = db.mail().threadMessages(thread).single()
+        db.mail().insertMessage(original.copy(id=0,folderId=sent,uid=50))
+        db.mail().insertMessage(original.copy(id=0,folderId=all,uid=60))
+        graph.move(listOf(thread),archive,Mailbox.InFolder(inbox))
+        val rows = db.mail().threadMessages(thread)
+        assertEquals(setOf(sent,all,archive),rows.map { it.folderId }.toSet())
+        assertEquals(50L,rows.single { it.folderId==sent }.uid)
+        assertEquals(60L,rows.single { it.folderId==all }.uid)
+        assertEquals(inbox,db.mail().operations(account).single().folderId)
+        // An obsolete UI selection must not retarget the already moved row.
+        graph.apply(MessageAction.TRASH,listOf(thread),Mailbox.InFolder(inbox))
+        assertEquals(1,db.mail().operations(account).size)
+    }
+    @Test fun trashAndSpamMoveOnlyCurrentFolderMessages() = runBlocking {
+        for (action in listOf(MessageAction.TRASH,MessageAction.SPAM)) {
+            val account = graph.addAccount(config.copy(email="${action.name}@example.org"),"password")
+            val (inbox,thread) = fixture(account)
+            val sent = db.mail().insertFolder(FolderRow(accountId=account,path="Sent",name="Sent",role="SENT"))
+            val role = if (action==MessageAction.TRASH) "TRASH" else "SPAM"
+            val target = db.mail().insertFolder(FolderRow(accountId=account,path=role,name=role,role=role))
+            db.mail().insertMessage(db.mail().threadMessages(thread).single().copy(id=0,folderId=sent,uid=55))
+            graph.apply(action,listOf(thread),Mailbox.InFolder(inbox))
+            assertEquals(setOf(sent,target),db.mail().threadMessages(thread).map { it.folderId }.toSet())
+            assertEquals(inbox,db.mail().operations(account).single().folderId)
+            assertEquals(55L,db.mail().threadMessages(thread).single { it.folderId==sent }.uid)
+        }
+    }
+    @Test fun unifiedArchiveScopesEachAccountToItsRoleFolder() = runBlocking {
+        val accounts = listOf(graph.addAccount(config,"password"),graph.addAccount(config.copy(email="b@example.org"),"password"))
+        val threads = accounts.map { account ->
+            val (_,thread) = fixture(account)
+            val sent = db.mail().insertFolder(FolderRow(accountId=account,path="Sent",name="Sent",role="SENT"))
+            db.mail().insertFolder(FolderRow(accountId=account,path="Archive",name="Archive",role="ARCHIVE"))
+            db.mail().insertMessage(db.mail().threadMessages(thread).single().copy(id=0,folderId=sent,uid=88))
+            thread
+        }
+        graph.apply(MessageAction.ARCHIVE,threads,Mailbox.Unified(FolderRole.INBOX))
+        accounts.forEach { account ->
+            assertEquals("INBOX",db.mail().folder(db.mail().operations(account).single().folderId)!!.role)
+            assertEquals(88L,db.mail().threadMessages(threads[accounts.indexOf(account)]).single { it.folderId==db.mail().folders(account).single { f -> f.role=="SENT" }.id }.uid)
+        }
+    }
+    @Test fun ambiguousLegacyMoveFailsAndVirtualMessageScopeIsRespected() = runBlocking {
+        val account = graph.addAccount(config,"password"); val (inbox,thread)=fixture(account)
+        val sent = db.mail().insertFolder(FolderRow(accountId=account,path="Sent",name="Sent",role="SENT"))
+        val trash = db.mail().insertFolder(FolderRow(accountId=account,path="Trash",name="Trash",role="TRASH"))
+        val source = db.mail().threadMessages(thread).single()
+        val sentId = db.mail().insertMessage(source.copy(id=0,folderId=sent,uid=99))
+        val failure = runCatching { graph.move(listOf(thread),trash) }.exceptionOrNull()
+        assertEquals(MailActionFailure.SOURCE_REQUIRED,(failure as MailActionException).reason)
+        assertTrue(db.mail().operations(account).isEmpty())
+        graph.apply(MessageAction.TRASH,listOf(ConversationIds.ofMessage(sentId)),Mailbox.InFolder(inbox))
+        assertTrue(db.mail().operations(account).isEmpty())
+        graph.move(listOf(ConversationIds.ofMessage(source.id)),trash,Mailbox.InFolder(inbox))
+        assertEquals(inbox,db.mail().operations(account).single().folderId)
+        assertEquals(sent,db.mail().message(sentId)!!.folderId)
+    }
     @Test fun localDraftsArePagedNewestFirstAndOpenByExactHandle() = runBlocking {
         val account = graph.addAccount(config,"password")
         val folder = db.mail().insertFolder(FolderRow(accountId=account,path="Drafts",name="Drafts",role="DRAFTS"))

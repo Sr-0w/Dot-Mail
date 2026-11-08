@@ -185,6 +185,8 @@ The `:data` and `:mail` modules have a clean, readable structure and thoughtful 
 ---
 
 ### P0-6 · Optimistic move (`uid = -message.id`) & multi-folder thread bugs: moving a thread moves `Sent` replies, creates duplicate messages on Gmail, and permanently bricks threads if `uid < 0` is orphaned
+
+**Current-folder movement subfinding: confirmed/fixed (2026-11-08).** Repository overloads now take `sourceMailbox: Mailbox`; folder scope selects exact folder rows and unified scope selects matching role folders in each account. Inbox actions pass the captured mailbox. Sent/All Mail copies remain untouched unless they are the explicit source. Legacy movement refuses ambiguous multi-folder threads (`SOURCE_REQUIRED`); legacy Archive retains Inbox scope. Single-message virtual ids are intersected with the source as well. Regression coverage: `DeviceRegressionTest`. This update addresses movement selection; it does not claim to resolve every Gmail reconciliation/UID orphan scenario described below.
 - **Where:**
   - `data/src/main/kotlin/app/dot/mail/data/RealMailGraph.kt:135-138,158-197`
   - `data/src/main/kotlin/app/dot/mail/data/Sync.kt:35-66`
