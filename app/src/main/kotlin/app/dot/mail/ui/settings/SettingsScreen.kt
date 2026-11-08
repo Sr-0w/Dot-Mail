@@ -136,6 +136,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
     var accountPage by rememberSaveable { mutableLongStateOf(0L) }
     var identityPage by rememberSaveable { mutableLongStateOf(-1L) }
     var remoteImagesPage by rememberSaveable { mutableStateOf(false) }
+    var aliasesPage by rememberSaveable { mutableStateOf(false) }
     var categoriesPage by rememberSaveable { mutableStateOf(false) }
     var smartPage by rememberSaveable { mutableStateOf(false) }
     var storagePage by rememberSaveable { mutableStateOf(false) }
@@ -164,7 +165,9 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             SettingsTarget.RemoteImages -> remoteImagesPage = true
         }
     }
-    BackHandler(enabled = accountPage != 0L || remoteImagesPage || categoriesPage || smartPage || storagePage) { if (storagePage) storagePage = false else if (smartPage) smartPage = false else if (categoriesPage) categoriesPage = false else if (remoteImagesPage) remoteImagesPage = false else if (identityPage >= 0) identityPage = -1 else accountPage = 0 }
+    BackHandler(enabled = accountPage != 0L || remoteImagesPage || categoriesPage || smartPage || storagePage || aliasesPage) {
+        if (storagePage) storagePage = false else if (aliasesPage) aliasesPage = false else if (smartPage) smartPage = false else if (categoriesPage) categoriesPage = false else if (remoteImagesPage) remoteImagesPage = false else if (identityPage >= 0) identityPage = -1 else accountPage = 0
+    }
     val c = Dot.colors
     val canLock = remember {
         BiometricManager.from(context).canAuthenticate(
@@ -188,6 +191,8 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
 
     if (storagePage) {
         StoragePage(onBack = { storagePage = false })
+    } else if (aliasesPage) {
+        AliasesPage(onBack = { aliasesPage = false })
     } else if (smartPage) {
         SmartFoldersPage(onBack = { smartPage = false })
     } else if (categoriesPage) {
@@ -377,6 +382,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
                 icon = Icons.Outlined.FilterList, onClick = { smartPage = true },
                 trailing = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = Dot.colors.textTertiary) },
             )
+            ListRow(stringResource(R.string.aliases_title), subtitle = stringResource(R.string.aliases_subtitle), icon = Icons.Outlined.Email, onClick = { aliasesPage = true })
             ListRow(
                 stringResource(R.string.settings_categories), subtitle = stringResource(R.string.settings_categories_sub),
                 icon = Icons.Outlined.Email, onClick = { categoriesPage = true },

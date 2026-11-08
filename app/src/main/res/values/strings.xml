@@ -1009,11 +1009,11 @@
     <string name="pgp_install_encrypted">This message is encrypted. Install OpenKeychain to read it.</string>
     <string name="pgp_install_signed">This message is signed. Install OpenKeychain to check it.</string>
     <string name="pgp_get_openkeychain">Get OpenKeychain</string>
-    <string name="inbox_undo">Undo</string>
-    <string name="inbox_undo_partial">Some messages couldn’t be put back; they will be after the next sync.</string>
+        <string name="inbox_undo">Undo</string>
+        <string name="inbox_undo_partial">Some messages couldn’t be put back; they will be after the next sync.</string>
 
     <!-- OLED theme -->
-    <string name="settings_theme_oled">OLED</string>
+        <string name="settings_theme_oled">OLED</string>
     <!-- OpenPGP compose -->
     <string name="account_section_pgp">OpenPGP</string>
     <string name="account_pgp_sign">Sign new messages</string>
@@ -1057,4 +1057,12 @@
     <string name="outbox_reschedule">Reschedule</string>
     <string name="outbox_reschedule_title">Send at</string>
     <string name="outbox_edit_unavailable">It is already being sent and can\'t be edited.</string>
+    <string name="aliases_title">Aliases</string>
+    <string name="aliases_subtitle">Manage SimpleLogin or addy.io aliases</string>
+    <string name="aliases_back">Back</string>
+    <string name="aliases_api_key">API key</string>
+    <string name="aliases_connect">Connect and load</string>
+    <string name="aliases_create">Create random alias</string>
+    <string name="aliases_disable">Disable</string>
+    <string name="aliases_enable">Enable</string>
 </resources>
