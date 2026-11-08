@@ -3,7 +3,7 @@ package app.dot.mail.ui.settings
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.dot.mail.data.aliases.AliasRepository
+import app.dot.mail.data.aliases.AndroidAliasRepository
 import app.dot.mail.data.aliases.AliasService
 import app.dot.mail.data.aliases.EmailAlias
 import kotlinx.coroutines.CancellationException
@@ -27,7 +27,7 @@ internal data class AliasesUiState(
 )
 
 internal class AliasesViewModel(context: Context) : ViewModel() {
-    private val repository = AliasRepository(context.applicationContext)
+    private val repository = AndroidAliasRepository(context.applicationContext)
     private val mutableState = MutableStateFlow(AliasesUiState())
     val state: StateFlow<AliasesUiState> = mutableState.asStateFlow()
 

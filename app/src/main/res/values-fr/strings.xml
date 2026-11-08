@@ -1069,5 +1069,6 @@
     <string name="aliases_copy">Copier</string>
     <string name="aliases_error">Impossible de joindre le fournisseur d’alias. Vérifiez la clé et réessayez.</string>
     <string name="compose_use_alias">Utiliser un alias…</string>
+    <string name="compose_aliases_empty">Aucun alias n’est disponible auprès de vos fournisseurs connectés.</string>
     <string name="aliases_reply_to_guidance">Le domaine de cet alias ne correspond pas à vos identités. Adresse copiée ; utilisez-la comme indication pour Répondre à.</string>
 </resources>

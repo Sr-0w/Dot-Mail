@@ -5,6 +5,9 @@ import androidx.lifecycle.viewModelScope
 import app.dot.mail.R
 import app.dot.mail.data.MailGraph
 import app.dot.mail.data.ReplyMode
+import app.dot.mail.data.aliases.AliasRepository
+import app.dot.mail.data.aliases.AliasService
+import app.dot.mail.data.aliases.EmailAlias
 import app.dot.mail.data.model.Draft
 import app.dot.mail.data.model.EmailAddress
 import app.dot.mail.data.model.Identity
@@ -13,9 +16,11 @@ import app.dot.mail.engine.text.QuoteSplitter
 import app.dot.mail.ui.ComposeRoute
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -45,6 +50,18 @@ data class Sender(
 }
 
 enum class RecipientField { TO, CC, BCC }
+
+sealed interface AliasOutcome {
+    data class Selected(val email: String) : AliasOutcome
+    data class CopiedNeedsReplyTo(val email: String) : AliasOutcome
+}
+
+internal fun existingIdentity(identities: List<Identity>, email: String): Identity? =
+    identities.firstOrNull { it.email.equals(email, ignoreCase = true) }
+
+private fun Identity.toSender() = Sender(
+    accountId, id, name, email, signature, signatureHtml, isDefault, signatureLogo, signatureOnNew, signatureOnReply,
+)
 
 data class ComposeState(
     val loaded: Boolean = false,
@@ -80,6 +97,12 @@ data class ComposeState(
     val pgpMissing: List<String> = emptyList(),
     val pgpOwnKeyMissing: Boolean = false,
     val pgpChecking: Boolean = false,
+    /** null means the alias picker is closed; an empty list is a visible loading/empty picker. */
+    val aliasChoices: List<EmailAlias>? = null,
+    val aliasLoading: Boolean = false,
+    val aliasProviderErrors: Set<AliasService> = emptySet(),
+    val aliasUsing: String? = null,
+    val aliasUseError: Boolean = false,
 ) {
     /** The sender whose signature is currently attached to this message, or null when none. */
     val signatureSender: Sender? get() = if (!signatureEnabled) null else
@@ -122,6 +145,7 @@ class ComposeViewModel(
     private val pgp: app.dot.mail.ui.pgp.PgpService? = null,
     /** (sign, encrypt) defaults of an account's settings for new messages. */
     private val pgpDefaults: (Long) -> Pair<Boolean, Boolean> = { false to false },
+    private val aliasRepository: AliasRepository? = null,
 ) : ViewModel() {
     private fun str(resId: Int, fallback: String, vararg args: Any): String =
         strings?.invoke(resId, args) ?: fallback
@@ -130,6 +154,9 @@ class ComposeViewModel(
 
     private val _closed = MutableStateFlow(false)
     val closed: StateFlow<Boolean> = _closed.asStateFlow()
+
+    private val aliasOutcomeChannel = Channel<AliasOutcome>(Channel.BUFFERED)
+    val aliasOutcomes = aliasOutcomeChannel.receiveAsFlow()
 
     private var suggestJob: Job? = null
     /** save / send / discard never overlap (autosave vs. send was a duplicate-draft risk). */
@@ -381,6 +408,64 @@ class ComposeViewModel(
         _state.update { s ->
             val enabled = if (signatureTouched) s.signatureEnabled else signatureDefault(sender, s.isReplyContext)
             refreshBodies(s.copy(signatureEnabled = enabled, signatureSourceKey = s.signatureSourceKey?.takeIf { it != sender.key }))
+        }
+    }
+
+    /** Fetches aliases for every provider with a saved key, retaining provider-specific failures for the picker. */
+    fun loadAliases() {
+        _state.update { it.copy(aliasChoices = emptyList(), aliasLoading = true, aliasProviderErrors = emptySet(), aliasUseError = false) }
+        viewModelScope.launch {
+            val choices = mutableListOf<EmailAlias>()
+            val errors = mutableSetOf<AliasService>()
+            for (service in AliasService.entries) {
+                try {
+                    val repository = aliasRepository ?: error("Alias repository unavailable")
+                    val key = repository.savedKey(service)
+                    if (!key.isNullOrBlank()) choices += repository.list(service, key)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    errors += service
+                }
+            }
+            _state.update { it.copy(aliasChoices = choices.distinctBy { alias -> alias.id to alias.email }, aliasLoading = false, aliasProviderErrors = errors) }
+        }
+    }
+
+    fun dismissAliasPicker() {
+        _state.update { it.copy(aliasChoices = null, aliasProviderErrors = emptySet(), aliasUseError = false, aliasUsing = null) }
+    }
+
+    /** Selects an alias as From when its domain is already owned by this account, otherwise requests a Reply-To hint. */
+    fun useAlias(alias: EmailAlias) {
+        _state.update { it.copy(aliasUsing = alias.email, aliasUseError = false) }
+        viewModelScope.launch {
+            try {
+                val currentSender = _state.value.sender ?: error("No sender selected")
+                val account = graph.accounts.accounts.first().firstOrNull { it.id == currentSender.accountId }
+                    ?: error("Account is no longer available")
+                val domain = alias.email.substringAfterLast('@', "").lowercase()
+                if (domain.isBlank() || account.identities.none { it.email.substringAfterLast('@', "").equals(domain, true) }) {
+                    _state.update { it.copy(aliasChoices = null, aliasUsing = null) }
+                    aliasOutcomeChannel.send(AliasOutcome.CopiedNeedsReplyTo(alias.email))
+                    return@launch
+                }
+
+                val identity = existingIdentity(account.identities, alias.email) ?: run {
+                    val newIdentity = Identity(0, account.id, alias.email.substringBefore('@'), alias.email)
+                    newIdentity.copy(id = graph.accounts.saveIdentity(newIdentity))
+                }
+                val sender = identity.toSender()
+                _state.update { current ->
+                    current.copy(senders = (current.senders + sender).distinctBy { it.accountId to it.identityId }, aliasChoices = null, aliasUsing = null)
+                }
+                setSender(sender)
+                aliasOutcomeChannel.send(AliasOutcome.Selected(alias.email))
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                _state.update { it.copy(aliasUsing = null, aliasUseError = true) }
+            }
         }
     }
 

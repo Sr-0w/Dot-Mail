@@ -1069,5 +1069,6 @@
     <string name="aliases_copy">Copy</string>
     <string name="aliases_error">Could not reach the alias provider. Check the key and try again.</string>
     <string name="compose_use_alias">Use an alias…</string>
+    <string name="compose_aliases_empty">No aliases are available for your connected providers.</string>
     <string name="aliases_reply_to_guidance">This alias domain is not one of your identities. The address was copied; use it as Reply-To guidance.</string>
 </resources>
