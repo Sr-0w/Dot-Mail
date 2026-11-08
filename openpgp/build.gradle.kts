@@ -6,8 +6,8 @@ plugins {
 }
 android {
     namespace = "org.openintents.openpgp"
-    compileSdk = 35
-    buildToolsVersion = "35.0.0"
+    compileSdk = 37
+    buildToolsVersion = "36.0.0"
     defaultConfig { minSdk = 26 }
     buildFeatures { aidl = true }
     compileOptions {

@@ -15,6 +15,7 @@ class DotMailApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        app.dot.design.components.enablePlatformBackdrop() // Android 17+: native window blur for header and glass
         settings = AppSettings(this)
         // Demo mode (debug builds only) shows sample mail with no network at all: used for
         // screenshots, UI tests and trying the app without an account.

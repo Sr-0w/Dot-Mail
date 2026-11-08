@@ -1,7 +1,6 @@
 // Local store (Room), repositories, sync (WorkManager), credentials (Keystore).
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.ksp)
 }
 fun oauthProperty(name: String) = providers.gradleProperty(name).orElse("").get().let {
@@ -17,8 +16,8 @@ fun googleOAuth(type: com.android.build.api.dsl.LibraryBuildType, clientId: Stri
 }
 android {
     namespace = "app.dot.mail.data"
-    compileSdk = 35
-    buildToolsVersion = "35.0.0"
+    compileSdk = 37
+    buildToolsVersion = "36.0.0"
     buildFeatures { buildConfig = true }
     defaultConfig {
         minSdk = 26
@@ -39,7 +38,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
     testOptions { unitTests.isIncludeAndroidResources = true }
     packaging { resources.excludes += setOf("META-INF/LICENSE.md", "META-INF/NOTICE.md", "META-INF/*.SF") }
 }
@@ -71,3 +69,5 @@ dependencies {
 
 // Exported schemas are JVM-test resources for real upgrade validation.
 android.sourceSets.getByName("test").resources.srcDir("$projectDir/schemas")
+
+kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }

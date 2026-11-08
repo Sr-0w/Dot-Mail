@@ -9,9 +9,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 
 internal data class HeaderGlass(val backdrop:Backdrop?)
-private val FADE=64.dp
-/** The fade starts this far inside the header (behind its lowest controls), so at rest the list's first row only meets its faint tail. */
-private val FADE_OVERLAP=24.dp
+/** Short ease-out below the header: everything under the header itself is fully frosted. */
+private val FADE=40.dp
+/** Extra top inset for the list, so at rest its first row sits past most of the fade. */
+private val LIST_INSET=24.dp
 internal val LocalHeaderGlass=staticCompositionLocalOf<HeaderGlass?> { null }
 
 /**
@@ -34,12 +35,12 @@ fun FrostedHeaderLayout(
     var headerHeight by remember(density,width) { mutableStateOf(initial) }
     var expandedHeight by remember(density,width) { mutableStateOf(initial) }
     Box(modifier.fillMaxSize()) {
-        content(PaddingValues(top=(if(reserveExpandedHeight) expandedHeight else headerHeight)+FADE_OVERLAP))
+        content(PaddingValues(top=(if(reserveExpandedHeight) expandedHeight else headerHeight)+LIST_INSET))
         // The overlay keeps the expanded size (a stable blur texture: no reallocation, no flicker); only its mask follows
         // the header actually on screen, so collapsing filters shrink the strong band smoothly instead of leaving it stale.
-        val total=expandedHeight+FADE-FADE_OVERLAP
+        val total=expandedHeight+FADE
         val visible by androidx.compose.animation.core.animateDpAsState(headerHeight,androidx.compose.animation.core.tween(if(app.dot.design.rememberReducedMotion()) 0 else 220),label="headerBlur")
-        TopEdgeFade(backdrop,1f,Modifier.align(Alignment.TopCenter),height=total,solidUntil=((visible-FADE_OVERLAP)/total).coerceIn(0f,1f),fadeLength=FADE/total)
+        TopEdgeFade(backdrop,1f,Modifier.align(Alignment.TopCenter),height=total,solidUntil=(visible/total).coerceIn(0f,1f),fadeLength=FADE/total)
         CompositionLocalProvider(LocalHeaderGlass provides HeaderGlass(null)) {
             Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().onSizeChanged { size ->
                 with(density) { size.height.toDp() }.let {
