@@ -1004,4 +1004,7 @@
     <string name="pgp_get_openkeychain">OpenKeychain holen</string>
     <string name="inbox_undo">Rückgängig</string>
     <string name="inbox_undo_partial">Einige Nachrichten konnten nicht zurückgelegt werden; das geschieht bei der nächsten Synchronisierung.</string>
+
+    <!-- OLED theme -->
+    <string name="settings_theme_oled">OLED</string>
 </resources>

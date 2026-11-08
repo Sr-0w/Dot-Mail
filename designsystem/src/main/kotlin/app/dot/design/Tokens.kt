@@ -75,6 +75,21 @@ val DarkColors = DotColors(
     scrim = Color(0x99000000),
 )
 
+/**
+ * Pure-black theme for OLED panels: the app background is exactly #000000 (pixels off), and only the surfaces that must
+ * read as separate (cards, inputs, sheets, raised chips, hairlines) are lifted a few steps so they stay distinguishable.
+ * Text and accent keep the Dark theme's AA contrast, which only improves on true black.
+ */
+val OledColors = DarkColors.copy(
+    background = Color(0xFF000000),
+    surface = Color(0xFF111113),
+    surfaceRaised = Color(0xFF1B1B1E),
+    border = Color(0xFF242428),
+    borderStrong = Color(0xFF3A3A40),
+    onInverse = Color(0xFF000000),
+    scrim = Color(0xB3000000),
+)
+
 val LightColors = DotColors(
     isDark = false,
     background = Color(0xFFFFFFFF),

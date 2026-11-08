@@ -21,6 +21,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.dot.design.DotTheme
 import app.dot.design.ThemeMode
+import androidx.compose.ui.graphics.toArgb
 import app.dot.mail.ui.DotMailRoot
 import app.dot.mail.ui.LockScreen
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,6 +53,9 @@ class MainActivity : FragmentActivity() {
         )
         super.onCreate(savedInstanceState)
         val app = dotApp
+        // The window's own background shows before the first Compose frame and between screens: paint the chosen
+        // theme's colour now so a true-black theme never flashes grey (and Dark/Light never flash the wrong tone).
+        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(windowBackgroundFor(app.settings.ui.value.theme, resources.configuration)))
         locked.value = savedInstanceState?.getBoolean(STATE_LOCKED) ?: app.settings.ui.value.appLock
         if (savedInstanceState == null) requests.value = parse(intent)
         setContent {
@@ -197,14 +201,30 @@ object MailtoParser {
     }
 }
 
+/** The theme background as an Android colour, before Compose exists (used for the window background at startup). */
+internal fun windowBackgroundFor(mode: ThemeMode, config: android.content.res.Configuration): Int {
+    val systemDark = (config.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+    val colors = when (mode) {
+        ThemeMode.SYSTEM -> if (systemDark) app.dot.design.DarkColors else app.dot.design.LightColors
+        ThemeMode.LIGHT -> app.dot.design.LightColors
+        ThemeMode.DARK -> app.dot.design.DarkColors
+        ThemeMode.OLED -> app.dot.design.OledColors
+    }
+    return colors.background.toArgb()
+}
+
 @androidx.compose.runtime.Composable
 private fun SyncSystemBars(mode: ThemeMode) {
     // enableEdgeToEdge(auto) follows the system theme; when the user forces a theme, fix icon contrast.
     val activity = androidx.activity.compose.LocalActivity.current ?: return
     val dark = app.dot.design.Dot.colors.isDark
-    LaunchedEffect(dark, mode) {
+    val background = app.dot.design.Dot.colors.background
+    LaunchedEffect(dark, mode, background) {
         val controller = androidx.core.view.WindowCompat.getInsetsController(activity.window, activity.window.decorView)
         controller.isAppearanceLightStatusBars = !dark
         controller.isAppearanceLightNavigationBars = !dark
+        // No grey contrast scrim behind a transparent navigation bar (it would break true black).
+        if (android.os.Build.VERSION.SDK_INT >= 29) activity.window.isNavigationBarContrastEnforced = false
+        activity.window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(background.toArgb()))
     }
 }
