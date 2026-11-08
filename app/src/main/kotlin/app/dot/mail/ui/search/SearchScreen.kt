@@ -45,6 +45,8 @@ import app.dot.design.DotSpacing
 import app.dot.design.components.BackButton
 import app.dot.design.components.EmptyState
 import app.dot.design.components.SearchField
+import androidx.compose.ui.res.stringResource
+import app.dot.mail.R
 import app.dot.mail.LocalMailGraph
 import app.dot.mail.data.MailGraph
 import app.dot.mail.data.model.ThreadSummary
@@ -94,7 +96,7 @@ fun SearchScreen(onBack: () -> Unit, onOpenThread: (Long) -> Unit) {
                 value = query,
                 onValueChange = { vm.query.value = it },
                 modifier = Modifier.weight(1f),
-                placeholder = "Search all accounts",
+                placeholder = stringResource(R.string.search_placeholder),
                 focusRequester = focus,
                 onSearch = { keyboard?.hide() },
             )
@@ -107,9 +109,9 @@ fun SearchScreen(onBack: () -> Unit, onOpenThread: (Long) -> Unit) {
                     CircularProgressIndicator(Modifier.size(22.dp), color = c.textTertiary, strokeWidth = 1.5.dp)
                 }
             results.itemCount == 0 && results.loadState.refresh is LoadState.Error ->
-                EmptyState(Icons.Outlined.WifiOff, "Search failed", (results.loadState.refresh as LoadState.Error).error.message ?: "Check your connection and try again.")
+                EmptyState(Icons.Outlined.WifiOff, stringResource(R.string.search_error_title), (results.loadState.refresh as LoadState.Error).error.message ?: stringResource(R.string.search_error_body))
             results.itemCount == 0 && results.loadState.refresh is LoadState.NotLoading ->
-                EmptyState(Icons.Outlined.SearchOff, "No results", "Nothing matches “$q” in downloaded mail or on your servers.")
+                EmptyState(Icons.Outlined.SearchOff, stringResource(R.string.search_no_results_title), stringResource(R.string.search_no_results_body, q))
             else -> LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
                 items(results.itemCount, key = results.itemKey { it.threadId }) { i ->
                     val t = results[i] ?: return@items
@@ -124,14 +126,14 @@ fun SearchScreen(onBack: () -> Unit, onOpenThread: (Long) -> Unit) {
 private fun SearchHints() {
     val c = Dot.colors
     Column(Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.xl)) {
-        Text("Search by sender, subject or words in the message.", style = Dot.type.callout, color = c.textSecondary)
+        Text(stringResource(R.string.search_hints_intro), style = Dot.type.callout, color = c.textSecondary)
         Spacer(Modifier.height(DotSpacing.l))
         listOf(
-            "from:anna" to "Mail from a sender",
-            "to:team@example.com" to "Mail sent to an address",
-            "subject:invoice" to "Words in the subject",
-            "has:attachment" to "Only with attachments",
-            "is:unread  is:starred" to "By state",
+            "from:anna" to stringResource(R.string.search_hint_from),
+            "to:team@example.com" to stringResource(R.string.search_hint_to),
+            "subject:invoice" to stringResource(R.string.search_hint_subject),
+            "has:attachment" to stringResource(R.string.search_hint_attachment),
+            "is:unread  is:starred" to stringResource(R.string.search_hint_state),
         ).forEach { (op, desc) ->
             Row(Modifier.padding(vertical = 6.dp)) {
                 Text(op, style = Dot.type.label, color = c.textPrimary, modifier = Modifier.weight(1f))

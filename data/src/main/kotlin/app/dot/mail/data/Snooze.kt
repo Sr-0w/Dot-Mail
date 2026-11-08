@@ -72,7 +72,7 @@ internal suspend fun RealMailGraph.resurfaceDue(now: Long = System.currentTimeMi
         dao.resurfaceSnooze(z.id, now)
         val account = dao.account(z.accountId) ?: continue
         val subject = (z.messageId?.let { dao.message(it) } ?: dao.threadMessages(z.threadId).lastOrNull())?.subject.orEmpty()
-        MailNotifications.newMail(context, account, z.messageId?.let(ConversationIds::ofMessage) ?: z.threadId, subject.ifBlank { "Snoozed message" })
+        MailNotifications.newMail(context, account, z.messageId?.let(ConversationIds::ofMessage) ?: z.threadId, subject.ifBlank { context.getString(R.string.notif_snoozed_message) })
     }
     dao.pruneSnoozes(now - RESURFACE_KEEP_MS)
     due.size

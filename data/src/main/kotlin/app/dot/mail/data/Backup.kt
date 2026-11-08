@@ -8,6 +8,7 @@ import app.dot.mail.data.backup.BackupIdentity
 import app.dot.mail.data.backup.BackupServer
 import app.dot.mail.data.model.AccountConfig
 import app.dot.mail.data.model.AuthType
+import app.dot.mail.data.model.BackupItem
 import app.dot.mail.data.model.BackupPreview
 import app.dot.mail.data.model.Identity
 import app.dot.mail.data.model.Security
@@ -54,7 +55,9 @@ internal suspend fun RealMailGraph.previewAccountsBackup(json: String): BackupPr
     val existing = dao.accounts().associateBy { it.email.lowercase() }
     val lines = mutableListOf<String>()
     val needSignIn = mutableListOf<String>()
+    val items = mutableListOf<BackupItem>()
     decoded.backup.accounts.forEach { a ->
+        items += BackupItem(a.email, a.imap.host, added = existing[a.email.lowercase()] == null, oauth = a.authType == "OAUTH2")
         if (existing[a.email.lowercase()] != null) {
             lines += "${a.email}: update identities (${a.identities.size}), signatures and preferences. Servers and password stay as they are."
         } else {
@@ -63,7 +66,7 @@ internal suspend fun RealMailGraph.previewAccountsBackup(json: String): BackupPr
         }
     }
     decoded.warnings.forEach { lines += "Skipped: $it" }
-    BackupPreview(lines, needSignIn)
+    BackupPreview(lines, needSignIn, items = items, warnings = decoded.warnings)
 }
 
 internal suspend fun RealMailGraph.applyAccountsBackup(json: String): BackupPreview = withContext(Dispatchers.IO) {
@@ -71,6 +74,7 @@ internal suspend fun RealMailGraph.applyAccountsBackup(json: String): BackupPrev
     if (decoded == null) return@withContext BackupPreview(emptyList(), error = error)
     val lines = mutableListOf<String>()
     val needSignIn = mutableListOf<String>()
+    val items = mutableListOf<BackupItem>()
     val settingsStore = AccountSettingsStore.get(context)
     val rules = NotificationRules.get(context)
     for (a in decoded.backup.accounts) {
@@ -88,7 +92,8 @@ internal suspend fun RealMailGraph.applyAccountsBackup(json: String): BackupPrev
             row = dao.account(id)
             needSignIn += a.email
             lines += "Added ${a.email}; sign in to start syncing."
-        } else lines += "Updated ${a.email}."
+            items += BackupItem(a.email, a.imap.host, added = true, oauth = a.authType == "OAUTH2")
+        } else { lines += "Updated ${a.email}."; items += BackupItem(a.email, a.imap.host, added = false, oauth = a.authType == "OAUTH2") }
         val account = requireNotNull(row)
         settingsStore.update(account.id) { it.copy(syncIntervalMinutes = a.settings.syncIntervalMinutes, syncWindowDays = a.settings.syncWindowDays, notificationsEnabled = a.settings.notificationsEnabled) }
         val current = identityStore.resolve(account.id, account.name, account.email)
@@ -109,5 +114,5 @@ internal suspend fun RealMailGraph.applyAccountsBackup(json: String): BackupPrev
     settingsStore.updateSync { decoded.backup.sync }
     if (decoded.backup.notificationActions.size == 2) rules.setActions(decoded.backup.notificationActions[0], decoded.backup.notificationActions[1])
     decoded.warnings.forEach { lines += "Skipped: $it" }
-    BackupPreview(lines, needSignIn)
+    BackupPreview(lines, needSignIn, items = items, warnings = decoded.warnings)
 }

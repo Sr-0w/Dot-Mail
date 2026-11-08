@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Notifications -->
+    <string name="notif_new_message">Neue Nachricht</string>
+    <string name="notif_mark_read">Als gelesen markieren</string>
+    <string name="notif_archive">Archivieren</string>
+
+    <!-- Notifications (more) -->
+    <string name="notif_delete">Löschen</string>
+    <string name="notif_reply">Antworten</string>
+    <string name="notif_snoozed_message">Zurückgestellte Nachricht</string>
+</resources>

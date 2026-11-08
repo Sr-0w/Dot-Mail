@@ -41,6 +41,9 @@ import app.dot.design.components.Hairline
 import app.dot.design.components.ListRow
 import app.dot.design.components.SectionLabel
 import app.dot.design.components.dotSurfaceEnter
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import app.dot.mail.R
 import app.dot.mail.LocalSettings
 import app.dot.mail.data.model.Account
 
@@ -59,40 +62,40 @@ internal fun RemoteImagesPage(accounts: List<Account>, onBack: () -> Unit) {
     val scroll = rememberScrollState()
 
     Column(Modifier.fillMaxSize().background(c.background)) {
-        DotTopBar(title = "Remote images", elevated = scroll.value > 0, navigation = { BackButton(onBack) })
+        DotTopBar(title = stringResource(R.string.remote_images_title), elevated = scroll.value > 0, navigation = { BackButton(onBack) })
         Column(Modifier.verticalScroll(scroll).navigationBarsPadding()) {
             Text(
-                "Remote images are blocked by default. Senders can use them to see when, where and on what device you open a message.",
+                stringResource(R.string.remote_images_intro),
                 style = Dot.type.callout, color = c.textSecondary,
                 modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s),
             )
             ToggleRow(
-                "Always load remote images", "Everyone can then see that you read their mail. Prefer allowing individual senders below.",
+                stringResource(R.string.remote_images_always), stringResource(R.string.remote_images_always_sub),
                 Icons.Outlined.Image, prefs.loadRemoteImages,
             ) { v -> settings.update { it.copy(loadRemoteImages = v) } }
             Hairline(Modifier.padding(vertical = DotSpacing.s))
 
-            SectionLabel("Always load for")
+            SectionLabel(stringResource(R.string.remote_images_section_rules))
             if (rules.isEmpty()) {
-                Text("No senders or domains yet. Open a message and choose “Always for …” from its image banner.",
+                Text(stringResource(R.string.remote_images_no_rules),
                     style = Dot.type.caption, color = c.textSecondary, modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.xs))
             }
             rules.forEach { rule ->
-                val scope = if (rule.accountId == 0L) "All accounts" else accounts.firstOrNull { it.id == rule.accountId }?.email ?: "Removed account"
+                val scope = if (rule.accountId == 0L) stringResource(R.string.remote_images_all_accounts) else accounts.firstOrNull { it.id == rule.accountId }?.email ?: stringResource(R.string.remote_images_removed_account)
                 val title = if (rule.isDomain) "@${rule.value}" else rule.value
                 ListRow(
-                    title = title, subtitle = if (rule.isDomain) "Domain and its subdomains · $scope" else "Sender · $scope",
-                    trailing = { DotIconButton(Icons.Outlined.Close, "Remove rule for $title", onClick = { policy.removeRule(rule) }, tint = c.textSecondary) },
+                    title = title, subtitle = stringResource(if (rule.isDomain) R.string.remote_images_rule_domain else R.string.remote_images_rule_sender, scope),
+                    trailing = { DotIconButton(Icons.Outlined.Close, stringResource(R.string.remote_images_remove_rule, title), onClick = { policy.removeRule(rule) }, tint = c.textSecondary) },
                 )
             }
-            ListRow("Add sender or domain", icon = Icons.Outlined.Add, onClick = { adding = true })
-            if (rules.isNotEmpty()) ListRow("Reset all rules", icon = Icons.Outlined.DeleteSweep, titleColor = c.danger, onClick = { confirmReset = true })
+            ListRow(stringResource(R.string.remote_images_add), icon = Icons.Outlined.Add, onClick = { adding = true })
+            if (rules.isNotEmpty()) ListRow(stringResource(R.string.remote_images_reset), icon = Icons.Outlined.DeleteSweep, titleColor = c.danger, onClick = { confirmReset = true })
             Hairline(Modifier.padding(vertical = DotSpacing.s))
 
-            SectionLabel("Remembered messages")
+            SectionLabel(stringResource(R.string.remote_images_section_remembered))
             ListRow(
-                "Forget remembered messages", icon = Icons.Outlined.DeleteSweep,
-                subtitle = if (approvals.isEmpty()) "No message has been approved yet." else "${approvals.size} messages are set to show their images.",
+                stringResource(R.string.remote_images_forget), icon = Icons.Outlined.DeleteSweep,
+                subtitle = if (approvals.isEmpty()) stringResource(R.string.remote_images_forget_none) else pluralStringResource(R.plurals.remote_images_forget_count, approvals.size, approvals.size),
                 titleColor = if (approvals.isEmpty()) c.textTertiary else c.textPrimary,
                 onClick = if (approvals.isEmpty()) null else ({ policy.forgetAllMessages() }),
             )
@@ -105,10 +108,10 @@ internal fun RemoteImagesPage(accounts: List<Account>, onBack: () -> Unit) {
             onDismissRequest = { confirmReset = false },
             modifier = Modifier.dotSurfaceEnter(),
             containerColor = c.surface, shape = DotShapes.large,
-            title = { Text("Reset all rules?", style = Dot.type.title, color = c.textPrimary) },
-            text = { Text("Images will be blocked again for every sender and domain on the list.", style = Dot.type.callout, color = c.textSecondary) },
-            confirmButton = { DotButton("Reset", style = ButtonStyle.Danger, compact = true, onClick = { confirmReset = false; policy.resetRules() }) },
-            dismissButton = { DotButton("Cancel", { confirmReset = false }, style = ButtonStyle.Ghost, compact = true) },
+            title = { Text(stringResource(R.string.remote_images_reset_title), style = Dot.type.title, color = c.textPrimary) },
+            text = { Text(stringResource(R.string.remote_images_reset_body), style = Dot.type.callout, color = c.textSecondary) },
+            confirmButton = { DotButton(stringResource(R.string.remote_images_reset_confirm), style = ButtonStyle.Danger, compact = true, onClick = { confirmReset = false; policy.resetRules() }) },
+            dismissButton = { DotButton(stringResource(R.string.remote_images_cancel), { confirmReset = false }, style = ButtonStyle.Ghost, compact = true) },
         )
     }
     if (adding) AddRuleDialog(accounts, onDismiss = { adding = false }) { isDomain, value, account -> policy.addRule(isDomain, value, account) }
@@ -120,20 +123,22 @@ private fun AddRuleDialog(accounts: List<Account>, onDismiss: () -> Unit, onAdd:
     var text by remember { mutableStateOf("") }
     var account by remember { mutableStateOf(0L) }
     var error by remember { mutableStateOf<String?>(null) }
+    val domainError = stringResource(R.string.remote_images_error_domain)
+    val addressError = stringResource(R.string.remote_images_error_address)
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.dotSurfaceEnter(),
         containerColor = c.surface, shape = DotShapes.large,
-        title = { Text("Add sender or domain", style = Dot.type.title, color = c.textPrimary) },
+        title = { Text(stringResource(R.string.remote_images_add_title), style = Dot.type.title, color = c.textPrimary) },
         text = {
             Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(DotSpacing.m)) {
                 DotTextField(
-                    text, { text = it; error = null }, label = "Address or @domain", placeholder = "news@example.org or @example.org",
+                    text, { text = it; error = null }, label = stringResource(R.string.remote_images_add_label), placeholder = stringResource(R.string.remote_images_add_placeholder),
                     keyboardType = KeyboardType.Email, isError = error != null, supporting = error,
                 )
                 if (accounts.size > 1) {
                     Column(Modifier.selectableGroup()) {
-                        listOf(0L to "All accounts").plus(accounts.map { it.id to it.email }).forEach { (id, label) ->
+                        listOf(0L to stringResource(R.string.remote_images_all_accounts)).plus(accounts.map { it.id to it.email }).forEach { (id, label) ->
                             ListRow(
                                 label, titleColor = if (account == id) c.textPrimary else c.textSecondary,
                                 modifier = Modifier.selectable(selected = account == id, role = Role.RadioButton, onClick = { account = id }),
@@ -145,12 +150,12 @@ private fun AddRuleDialog(accounts: List<Account>, onDismiss: () -> Unit, onAdd:
             }
         },
         confirmButton = {
-            DotButton("Add", enabled = text.isNotBlank(), compact = true, onClick = {
+            DotButton(stringResource(R.string.remote_images_add_confirm), enabled = text.isNotBlank(), compact = true, onClick = {
                 val t = text.trim()
                 val domain = t.startsWith("@") || '@' !in t
-                if (onAdd(domain, t, account)) onDismiss() else error = if (domain) "Enter a domain like example.org." else "Enter a full address."
+                if (onAdd(domain, t, account)) onDismiss() else error = if (domain) domainError else addressError
             })
         },
-        dismissButton = { DotButton("Cancel", onDismiss, style = ButtonStyle.Ghost, compact = true) },
+        dismissButton = { DotButton(stringResource(R.string.remote_images_cancel), onDismiss, style = ButtonStyle.Ghost, compact = true) },
     )
 }

@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.res.stringResource
+import app.dot.mail.R
 import app.dot.design.Dot
 import app.dot.design.DotSpacing
 import app.dot.design.components.DotMenu
@@ -80,14 +82,15 @@ internal fun <T> SegmentedSetting(title: String, options: List<Pair<T, String>>,
 internal fun PercentSlider(title: String, value: Int, range: IntRange, step: Int, onChange: (Int) -> Unit) {
     val c = Dot.colors
     val steps = (range.last - range.first) / step - 1
+    val percentState = stringResource(R.string.settings_percent_state, value)
     Column(Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s)) {
-        Text("$title · $value%", style = Dot.type.bodyStrong, color = c.textPrimary)
+        Text(stringResource(R.string.settings_reading_size_value, title, value), style = Dot.type.bodyStrong, color = c.textPrimary)
         Slider(
             value = value.toFloat(),
             onValueChange = { onChange((it / step).toInt() * step) },
             valueRange = range.first.toFloat()..range.last.toFloat(),
             steps = steps,
-            modifier = Modifier.semantics { stateDescription = "$value percent" },
+            modifier = Modifier.semantics { stateDescription = percentState },
             colors = SliderDefaults.colors(
                 thumbColor = c.inverse, activeTrackColor = c.inverse, inactiveTrackColor = c.surfaceRaised,
                 activeTickColor = c.onInverse, inactiveTickColor = c.borderStrong,
@@ -95,7 +98,7 @@ internal fun PercentSlider(title: String, value: Int, range: IntRange, step: Int
         )
         val base = Dot.type.body
         Text(
-            "The quick brown fox jumps over the lazy dog.",
+            stringResource(R.string.settings_reading_size_preview),
             style = base.copy(fontSize = base.fontSize * (value / 100f), lineHeight = base.lineHeight * (value / 100f)),
             color = c.textSecondary,
         )

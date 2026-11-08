@@ -32,6 +32,7 @@ import androidx.glance.text.TextAlign
 import app.dot.design.DarkColors
 import app.dot.design.LightColors
 import app.dot.mail.MainActivity
+import app.dot.mail.R
 import app.dot.mail.dotApp
 
 /**
@@ -47,7 +48,7 @@ class DotMailWidget : GlanceAppWidget() {
         // With app lock / hidden Recents the widget (visible on the lock screen) shows only the count.
         val ui = app.settings.ui.value
         val privateMode = ui.appLock || ui.secureScreen
-        val data = runCatching { WidgetRepository.load(app.graph, includeThreads = !privateMode) }
+        val data = runCatching { WidgetRepository.load(app.graph, includeThreads = !privateMode, unknownSender = context.getString(R.string.widget_unknown_sender), noSubject = context.getString(R.string.widget_no_subject)) }
             .getOrDefault(WidgetData(0, emptyList()))
         provideContent { WidgetContent(context, data, privateMode) }
     }
@@ -83,14 +84,14 @@ private fun WidgetContent(context: Context, data: WidgetData, privateMode: Boole
     ) {
         Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Vertical.Bottom) {
             Column(GlanceModifier.defaultWeight()) {
-                Text("INBOX", style = TextStyle(color = tertiary, fontSize = 11.sp, fontWeight = FontWeight.Medium))
+                Text(context.getString(R.string.widget_inbox_header), style = TextStyle(color = tertiary, fontSize = 11.sp, fontWeight = FontWeight.Medium))
                 Text(
                     if (data.unread > 0) data.unread.toString() else "0",
                     style = TextStyle(color = primary, fontSize = 30.sp, fontWeight = FontWeight.Bold),
                 )
             }
             Text(
-                if (data.unread == 0) "All caught up" else if (data.unread == 1) "unread" else "unread",
+                if (data.unread == 0) context.getString(R.string.widget_all_caught_up) else context.resources.getQuantityString(R.plurals.widget_unread_label, data.unread),
                 style = TextStyle(color = secondary, fontSize = 13.sp, textAlign = TextAlign.End),
             )
         }
@@ -104,7 +105,7 @@ private fun WidgetContent(context: Context, data: WidgetData, privateMode: Boole
             }
         } else if (privateMode && data.unread > 0 && rows > 0) {
             Spacer(GlanceModifier.height(8.dp))
-            Text("Open Dot Mail to read", style = TextStyle(color = tertiary, fontSize = 12.sp))
+            Text(context.getString(R.string.widget_open_to_read), style = TextStyle(color = tertiary, fontSize = 12.sp))
         }
     }
 }

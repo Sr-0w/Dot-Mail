@@ -90,14 +90,17 @@ private fun atTime(zone: ZoneId, date: LocalDate, hour: Int): ZonedDateTime =
  * "Tomorrow 08:00", "Sat 08:00" (within a week), "12 Dec 08:00" (beyond).
  * [use24h] picks 24-hour ("14:30") or 12-hour ("2:30 PM") time; locale
  * preference detection is out of scope. Day/month names follow [locale];
- * "Today"/"Tomorrow" stay English for now.
+ * [todayLabel] / [tomorrowLabel] are supplied by the caller so the app can translate them.
  */
-fun describe(at: ZonedDateTime, now: ZonedDateTime, locale: Locale, use24h: Boolean = true): String {
+fun describe(
+    at: ZonedDateTime, now: ZonedDateTime, locale: Locale, use24h: Boolean = true,
+    todayLabel: String = "Today", tomorrowLabel: String = "Tomorrow",
+): String {
     val days = ChronoUnit.DAYS.between(now.toLocalDate(), at.toLocalDate())
     val time = DateTimeFormatter.ofPattern(if (use24h) "HH:mm" else "h:mm a", locale).format(at.toLocalTime())
     val day = when {
-        days == 0L -> "Today"
-        days == 1L -> "Tomorrow"
+        days == 0L -> todayLabel
+        days == 1L -> tomorrowLabel
         days in 2L..7L -> DateTimeFormatter.ofPattern("EEE", locale).format(at)
         else -> DateTimeFormatter.ofPattern("d MMM", locale).format(at)
     }

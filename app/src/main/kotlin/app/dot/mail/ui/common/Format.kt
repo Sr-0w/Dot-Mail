@@ -12,7 +12,11 @@ import androidx.compose.material.icons.outlined.Report
 import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.AllInbox
+import androidx.annotation.StringRes
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
+import app.dot.mail.R
 import app.dot.mail.data.model.FolderRole
 import java.time.Instant
 import java.time.ZoneId
@@ -39,7 +43,7 @@ object Format {
         val day = then.toLocalDate()
         return when {
             day == today -> then.format(time.withLocale(locale))
-            day == today.minusDays(1) -> "Yesterday"
+            day == today.minusDays(1) -> relativeDay(locale, yesterday = true)
             ChronoUnit.DAYS.between(day, today) in 2..6 -> then.format(DateTimeFormatter.ofPattern("EEE", locale))
             day.year == today.year -> then.format(DateTimeFormatter.ofPattern(bestPattern(locale, "d MMM"), locale))
             else -> then.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT).withLocale(locale))
@@ -50,7 +54,7 @@ object Format {
     fun messageDate(epochMs: Long, now: Long = System.currentTimeMillis(), zone: ZoneId = ZoneId.systemDefault(), locale: Locale = Locale.getDefault()): String {
         val then = Instant.ofEpochMilli(epochMs).atZone(zone)
         val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
-        return if (then.toLocalDate() == today) "Today, " + then.format(time.withLocale(locale))
+        return if (then.toLocalDate() == today) relativeDay(locale, yesterday = false) + ", " + then.format(time.withLocale(locale))
         else then.format(fullDate.withLocale(locale))
     }
 
@@ -60,19 +64,36 @@ object Format {
         else -> "%.1f MB".format(bytes / (1024.0 * 1024.0))
     }
 
-    fun roleName(role: FolderRole): String = when (role) {
-        FolderRole.INBOX -> "Inbox"
-        FolderRole.SENT -> "Sent"
-        FolderRole.DRAFTS -> "Drafts"
-        FolderRole.ARCHIVE -> "Archive"
-        FolderRole.TRASH -> "Trash"
-        FolderRole.SPAM -> "Spam"
-        FolderRole.ALL_MAIL -> "All mail"
-        FolderRole.STARRED -> "Starred"
-        FolderRole.CUSTOM -> "Folder"
-        FolderRole.SNOOZED -> "Snoozed"
-        FolderRole.NEWSLETTERS -> "Newsletters"
+    /** "Yesterday" / "Today" in the user's language, from ICU (no string table to maintain). English if ICU is unavailable (JVM tests). */
+    private fun relativeDay(locale: Locale, yesterday: Boolean): String = runCatching {
+        val f = android.icu.text.RelativeDateTimeFormatter.getInstance(android.icu.util.ULocale.forLocale(locale), null,
+            android.icu.text.RelativeDateTimeFormatter.Style.LONG, android.icu.text.DisplayContext.CAPITALIZATION_FOR_BEGINNING_OF_SENTENCE)
+        f.format(
+            if (yesterday) android.icu.text.RelativeDateTimeFormatter.Direction.LAST else android.icu.text.RelativeDateTimeFormatter.Direction.THIS,
+            android.icu.text.RelativeDateTimeFormatter.AbsoluteUnit.DAY,
+        )
+    }.getOrNull()?.takeIf { it.isNotBlank() } ?: if (yesterday) "Yesterday" else "Today"
+
+    @StringRes fun roleNameRes(role: FolderRole): Int = when (role) {
+        FolderRole.INBOX -> R.string.inbox_role_inbox
+        FolderRole.SENT -> R.string.inbox_role_sent
+        FolderRole.DRAFTS -> R.string.inbox_role_drafts
+        FolderRole.ARCHIVE -> R.string.inbox_role_archive
+        FolderRole.TRASH -> R.string.inbox_role_trash
+        FolderRole.SPAM -> R.string.inbox_role_spam
+        FolderRole.ALL_MAIL -> R.string.inbox_role_all_mail
+        FolderRole.STARRED -> R.string.inbox_role_starred
+        FolderRole.CUSTOM -> R.string.inbox_role_custom
+        FolderRole.SNOOZED -> R.string.inbox_role_snoozed
+        FolderRole.NEWSLETTERS -> R.string.inbox_role_newsletters
     }
+
+    /** Name of a system folder role in the current language. */
+    @Composable fun roleName(role: FolderRole): String = stringResource(roleNameRes(role))
+    fun roleName(resources: android.content.res.Resources, role: FolderRole): String = resources.getString(roleNameRes(role))
+
+    /** What a folder is called in lists: custom folders by path, system folders by their translated role name. */
+    @Composable fun folderTitle(role: FolderRole, path: String): String = if (role == FolderRole.CUSTOM) path else roleName(role)
 
     fun roleIcon(role: FolderRole): ImageVector = when (role) {
         FolderRole.INBOX -> Icons.Outlined.Inbox

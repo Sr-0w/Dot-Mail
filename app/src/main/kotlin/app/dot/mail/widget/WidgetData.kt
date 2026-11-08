@@ -37,12 +37,12 @@ internal object WidgetRepository {
     }
 
     /** One-shot read through the MailGraph contract (Room-backed, so offline). Never touches the main thread. */
-    suspend fun load(graph: MailGraph, includeThreads: Boolean): WidgetData = withContext(Dispatchers.IO) {
+    suspend fun load(graph: MailGraph, includeThreads: Boolean, unknownSender: String = "(unknown sender)", noSubject: String = "(no subject)"): WidgetData = withContext(Dispatchers.IO) {
         val unread = unreadCount(graph).first()
         if (!includeThreads || unread == 0) return@withContext WidgetData(unread, emptyList())
         val threads = latestUnread(graph).take(MAX_THREADS).map {
             val from = it.participants.lastOrNull()
-            WidgetThread(it.threadId, from?.displayName ?: "(unknown sender)", it.subject.ifBlank { "(no subject)" })
+            WidgetThread(it.threadId, from?.displayName ?: unknownSender, it.subject.ifBlank { noSubject })
         }
         WidgetData(unread, threads)
     }

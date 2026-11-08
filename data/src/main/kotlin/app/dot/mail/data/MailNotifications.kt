@@ -30,17 +30,17 @@ internal object MailNotifications {
         val open = PendingIntent.getActivity(context, 0, launcher, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         fun action(value: String): PendingIntent = PendingIntent.getBroadcast(context, 0, Intent(context, NotificationActionReceiver::class.java).setAction(value).setData(android.net.Uri.parse("dotmail://thread/$threadId/$value")).putExtra("threadId", threadId).putExtra("folderId", folderId), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val builder = NotificationCompat.Builder(context, channel)
-            .setSmallIcon(android.R.drawable.ic_dialog_email).setContentTitle(account.name.ifBlank { account.email }).setContentText(subject.ifBlank { "New message" })
+            .setSmallIcon(android.R.drawable.ic_dialog_email).setContentTitle(account.name.ifBlank { account.email }).setContentText(subject.ifBlank { context.getString(R.string.notif_new_message) })
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE).setAutoCancel(true).setContentIntent(open)
         NotificationRules.get(context).actions.value.forEach { a ->
             when (a) {
-                NotificationAction.MARK_READ -> builder.addAction(android.R.drawable.ic_menu_view, "Mark read", action("MARK_READ"))
-                NotificationAction.ARCHIVE -> builder.addAction(android.R.drawable.ic_menu_save, "Archive", action("ARCHIVE"))
-                NotificationAction.DELETE -> builder.addAction(android.R.drawable.ic_menu_delete, "Delete", action("TRASH"))
+                NotificationAction.MARK_READ -> builder.addAction(android.R.drawable.ic_menu_view, context.getString(R.string.notif_mark_read), action("MARK_READ"))
+                NotificationAction.ARCHIVE -> builder.addAction(android.R.drawable.ic_menu_save, context.getString(R.string.notif_archive), action("ARCHIVE"))
+                NotificationAction.DELETE -> builder.addAction(android.R.drawable.ic_menu_delete, context.getString(R.string.notif_delete), action("TRASH"))
                 NotificationAction.REPLY -> {
                     // Opens the app straight into a reply (MainActivity understands dotmail.reply).
                     val reply = Intent(launcher).putExtra("dotmail.reply", true).setData(android.net.Uri.parse("dotmail://thread/$threadId/reply"))
-                    builder.addAction(android.R.drawable.ic_menu_revert, "Reply", PendingIntent.getActivity(context, 1, reply, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+                    builder.addAction(android.R.drawable.ic_menu_revert, context.getString(R.string.notif_reply), PendingIntent.getActivity(context, 1, reply, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
                 }
             }
         }

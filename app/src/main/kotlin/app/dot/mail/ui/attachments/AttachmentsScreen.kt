@@ -73,6 +73,8 @@ import app.dot.design.components.DotSnackbar
 import app.dot.design.components.DotTopBar
 import app.dot.design.components.EmptyState
 import app.dot.design.components.SearchField
+import androidx.compose.ui.res.stringResource
+import app.dot.mail.R
 import app.dot.mail.LocalMailGraph
 import app.dot.mail.data.MailGraph
 import app.dot.mail.data.model.AttachmentItem
@@ -103,7 +105,7 @@ internal sealed interface AttachmentEvent {
 }
 
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
-class AttachmentsViewModel(private val graph: MailGraph) : ViewModel() {
+class AttachmentsViewModel(private val graph: MailGraph, private val resources: android.content.res.Resources) : ViewModel() {
     val query = MutableStateFlow("")
     val kind = MutableStateFlow<AttachmentKind?>(null)
     val items: Flow<PagingData<AttachmentItem>> =
@@ -117,10 +119,10 @@ class AttachmentsViewModel(private val graph: MailGraph) : ViewModel() {
     /** Opens (or shares) the file, downloading it first if it isn't on the device yet — only because the user asked. */
     fun launch(item: AttachmentItem, share: Boolean) {
         viewModelScope.launch {
-            if (!item.isDownloaded) _events.send(AttachmentEvent.Message("Downloading ${item.attachment.fileName}…"))
+            if (!item.isDownloaded) _events.send(AttachmentEvent.Message(resources.getString(R.string.attachments_downloading, item.attachment.fileName)))
             runCatching { graph.mail.openAttachment(item.attachment) }
                 .onSuccess { _events.send(AttachmentEvent.Open(it, item.attachment.mimeType, item.attachment.fileName, share)) }
-                .onFailure { _events.send(AttachmentEvent.Message("Couldn't open ${item.attachment.fileName}")) }
+                .onFailure { _events.send(AttachmentEvent.Message(resources.getString(R.string.thread_error_open_attachment, item.attachment.fileName))) }
         }
     }
 }
@@ -129,7 +131,8 @@ class AttachmentsViewModel(private val graph: MailGraph) : ViewModel() {
 @Composable
 fun AttachmentsScreen(onBack: () -> Unit) {
     val graph = LocalMailGraph.current
-    val vm: AttachmentsViewModel = viewModel { AttachmentsViewModel(graph) }
+    val appResources = LocalContext.current.applicationContext.resources
+    val vm: AttachmentsViewModel = viewModel { AttachmentsViewModel(graph, appResources) }
     val query by vm.query.collectAsStateWithLifecycle()
     val kind by vm.kind.collectAsStateWithLifecycle()
     val items = vm.items.collectAsLazyPagingItems()
@@ -158,7 +161,7 @@ fun AttachmentsScreen(onBack: () -> Unit) {
                     val intent = if (e.share) Intent(Intent.ACTION_SEND).setType(e.mime).putExtra(Intent.EXTRA_STREAM, uri)
                     else Intent(Intent.ACTION_VIEW).setDataAndType(uri, e.mime)
                     try { context.startActivity(Intent.createChooser(intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), e.name)) }
-                    catch (_: ActivityNotFoundException) { snackbar.showSnackbar("No app can open ${e.name}") }
+                    catch (_: ActivityNotFoundException) { snackbar.showSnackbar(context.getString(R.string.thread_no_app_to_open, e.name)) }
                 }
             }
         }
@@ -166,24 +169,24 @@ fun AttachmentsScreen(onBack: () -> Unit) {
 
     Box(Modifier.fillMaxSize().background(c.background)) {
         Column(Modifier.fillMaxSize()) {
-            DotTopBar(title = "Attachments", subtitle = "All accounts", elevated = listState.canScrollBackward, navigation = { BackButton(onBack) })
+            DotTopBar(title = stringResource(R.string.attachments_title), subtitle = stringResource(R.string.inbox_all_accounts), elevated = listState.canScrollBackward, navigation = { BackButton(onBack) })
             SearchField(
                 value = query, onValueChange = { vm.query.value = it },
-                placeholder = "Search file name or sender",
+                placeholder = stringResource(R.string.attachments_search_placeholder),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter),
             )
             LazyRow(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = DotSpacing.gutter, vertical = DotSpacing.s),
                 horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(DotSpacing.s),
             ) {
-                item { FilterChip("All", kind == null) { vm.kind.value = null } }
-                items(AttachmentKind.entries.toList()) { k -> FilterChip(label(k), kind == k) { vm.kind.value = if (kind == k) null else k } }
+                item { FilterChip(stringResource(R.string.attachments_filter_all), kind == null) { vm.kind.value = null } }
+                items(AttachmentKind.entries.toList()) { k -> FilterChip(stringResource(label(k)), kind == k) { vm.kind.value = if (kind == k) null else k } }
             }
             if (items.itemCount == 0 && items.loadState.refresh is androidx.paging.LoadState.NotLoading) {
                 EmptyState(
                     Icons.Outlined.AttachFile,
-                    if (query.isBlank() && kind == null) "No attachments yet" else "No matching attachments",
-                    if (query.isBlank() && kind == null) "Files sent to you appear here, across all accounts." else "Try another type or search.",
+                    stringResource(if (query.isBlank() && kind == null) R.string.attachments_empty_title else R.string.attachments_no_match_title),
+                    stringResource(if (query.isBlank() && kind == null) R.string.attachments_empty_body else R.string.attachments_no_match_body),
                 )
             } else {
                 LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp)) {
@@ -203,10 +206,10 @@ fun AttachmentsScreen(onBack: () -> Unit) {
 }
 
 private fun label(k: AttachmentKind) = when (k) {
-    AttachmentKind.IMAGES -> "Images"
-    AttachmentKind.PDFS -> "PDFs"
-    AttachmentKind.DOCUMENTS -> "Documents"
-    AttachmentKind.OTHER -> "Other"
+    AttachmentKind.IMAGES -> R.string.attachments_kind_images
+    AttachmentKind.PDFS -> R.string.attachments_kind_pdfs
+    AttachmentKind.DOCUMENTS -> R.string.attachments_kind_documents
+    AttachmentKind.OTHER -> R.string.attachments_kind_other
 }
 
 @Composable
@@ -244,7 +247,7 @@ private fun AttachmentRow(item: AttachmentItem, onOpen: () -> Unit, onShare: () 
     val date = remember(item.sentAt) { DateTimeFormatter.ofPattern("d MMM", Locale.getDefault()).format(Instant.ofEpochMilli(item.sentAt).atZone(ZoneId.systemDefault())) }
     Row(
         Modifier.fillMaxWidth()
-            .combinedClickable(onClickLabel = if (item.isDownloaded) "Open" else "Download and open", onClick = onOpen, onLongClickLabel = "Share", onLongClick = onShare)
+            .combinedClickable(onClickLabel = stringResource(if (item.isDownloaded) R.string.thread_open else R.string.attachments_download_and_open), onClick = onOpen, onLongClickLabel = stringResource(R.string.thread_share), onLongClick = onShare)
             .defaultMinSize(minHeight = 64.dp)
             .padding(horizontal = DotSpacing.gutter, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -275,7 +278,7 @@ private fun Thumbnail(item: AttachmentItem) {
     val context = LocalContext.current
     val bitmap by produceState<Bitmap?>(null, a.localUri) {
         val uri = a.localUri
-        value = if (kind != AttachmentKind.IMAGES || uri == null) null else Thumbs.cache.get(uri) ?: withContext(Dispatchers.IO) {
+        val loaded = if (kind != AttachmentKind.IMAGES || uri == null) null else Thumbs.cache.get(uri) ?: withContext(Dispatchers.IO) {
             runCatching {
                 val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                 context.contentResolver.openInputStream(Uri.parse(uri))?.use { BitmapFactory.decodeStream(it, null, bounds) }
@@ -284,6 +287,7 @@ private fun Thumbnail(item: AttachmentItem) {
                 context.contentResolver.openInputStream(Uri.parse(uri))?.use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample }) }
             }.getOrNull()?.also { Thumbs.cache.put(uri, it) }
         }
+        value = loaded
     }
     Box(Modifier.size(48.dp).clip(DotShapes.small).background(c.surface), contentAlignment = Alignment.Center) {
         val b = bitmap

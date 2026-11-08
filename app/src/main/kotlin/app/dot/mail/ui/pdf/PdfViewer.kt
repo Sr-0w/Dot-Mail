@@ -45,6 +45,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.res.stringResource
+import app.dot.mail.R
 import app.dot.design.Dot
 import app.dot.design.DotShapes
 import app.dot.design.DotSpacing
@@ -74,10 +76,10 @@ fun PdfViewerDialog(
         Column(Modifier.fillMaxSize().background(c.background)) {
             DotTopBar(
                 title = name,
-                navigation = { DotIconButton(Icons.Outlined.Close, "Close", onClick = onDismiss) },
+                navigation = { DotIconButton(Icons.Outlined.Close, stringResource(R.string.compose_close), onClick = onDismiss) },
                 actions = {
-                    DotIconButton(Icons.Outlined.Share, "Share", onClick = onShare)
-                    DotIconButton(Icons.Outlined.OpenInNew, "Open with…", onClick = onOpenExternally)
+                    DotIconButton(Icons.Outlined.Share, stringResource(R.string.thread_share), onClick = onShare)
+                    DotIconButton(Icons.Outlined.OpenInNew, stringResource(R.string.pdf_open_with), onClick = onOpenExternally)
                 },
             )
             PdfPages(uri, onFailed = onOpenExternally, modifier = Modifier.weight(1f))
@@ -108,7 +110,7 @@ private fun PdfPages(uri: String, onFailed: () -> Unit, modifier: Modifier = Mod
         loaded == null -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) { DotSpinner(size = 22.dp, color = c.textTertiary) }
         loaded.isFailure -> Box(modifier.fillMaxSize().padding(DotSpacing.xl), contentAlignment = Alignment.Center) {
             Text(
-                "This PDF can't be previewed here (it may be protected or damaged). Use “Open with…”.",
+                stringResource(R.string.pdf_unavailable),
                 style = Dot.type.callout, color = c.textSecondary,
             )
         }
@@ -167,7 +169,7 @@ private fun PdfPage(pdf: PdfDocument, index: Int, widthPx: Int) {
         }
     } else {
         Image(
-            img.asImageBitmap(), contentDescription = "Page ${index + 1}",
+            img.asImageBitmap(), contentDescription = stringResource(R.string.pdf_page, index + 1),
             modifier = Modifier.fillMaxWidth().aspectRatio(img.width.toFloat() / img.height),
         )
     }
