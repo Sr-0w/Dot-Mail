@@ -92,6 +92,7 @@ internal class RealMailGraph(
     }
     override suspend fun verify(config: AccountConfig, password: String): VerifyResult = withContext(Dispatchers.IO) {
         try { client.verify(config.imap.endpoint(), config.smtp.endpoint(), Credentials(password, config.authType == AuthType.OAUTH2)); VerifyResult.Ok }
+        catch (e: CancellationException) { throw e }
         catch (e: Exception) { verificationFailure(e) }
     }
 
@@ -109,6 +110,31 @@ internal class RealMailGraph(
     override suspend fun deleteIdentity(accountId: Long, identityId: Long) = withContext(Dispatchers.IO) { identityStore.delete(accountId, identityId) }
     override suspend fun setDefaultIdentity(accountId: Long, identityId: Long) = withContext(Dispatchers.IO) { identityStore.setDefault(accountId, identityId) }
     override suspend fun renameAccount(accountId: Long, displayName: String) = withContext(Dispatchers.IO) { dao.accountName(accountId, displayName.trim().ifEmpty { return@withContext }) }
+    override suspend fun updatePassword(accountId: Long, password: String): VerifyResult = withContext(Dispatchers.IO) {
+        val snapshot = dao.account(accountId) ?: return@withContext VerifyResult.ConnectionFailed("Account no longer exists")
+        val config = Codec.config(snapshot.config)
+        if (config.authType == AuthType.OAUTH2) return@withContext VerifyResult.AuthFailed("Use browser sign-in to reconnect this account")
+        if (password.isBlank()) return@withContext VerifyResult.AuthFailed("Enter your password or app password")
+        val verified = verify(config, password)
+        if (verified != VerifyResult.Ok) return@withContext verified
+        val result = syncLock.withLock {
+            val current = dao.account(accountId)
+            if (current == null || current.config != snapshot.config || current.secret != snapshot.secret)
+                return@withLock VerifyResult.ConnectionFailed("Account changed during sign-in. Try again.")
+            try {
+                val encrypted = vault.encrypt(current.email, password)
+                if (dao.accountSecret(accountId, encrypted) == 1) VerifyResult.Ok
+                else VerifyResult.ConnectionFailed("Account no longer exists")
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                SyncDiagnostics.warn("Save account password account=$accountId", e, setOf(current.email,password))
+                VerifyResult.ConnectionFailed("Could not securely save the password. Try again.")
+            }
+        }
+        if (result == VerifyResult.Ok) requestSync()
+        result
+    }
+
     override suspend fun removeAccount(accountId: Long) = withContext(Dispatchers.IO) { syncLock.withLock { dao.deleteAccount(accountId); identityStore.forget(accountId); AccountSettingsStore.get(context).forget(accountId); File(context.filesDir, "attachments/$accountId").deleteRecursively(); File(context.filesDir, "outbox/$accountId").deleteRecursively(); Unit } }
     override fun folders(accountId: Long): Flow<List<app.dot.mail.data.model.Folder>> = combine(dao.observeFolders(accountId), dao.observeDeletingFolderIds()) { rows, deleting -> rows.filter { it.id !in deleting } }.map { rows -> rows.map { app.dot.mail.data.model.Folder(it.id, it.accountId, it.path, it.name, FolderRole.valueOf(it.role), it.unread, it.total) } }
     internal suspend fun summary(t: ThreadRow, draftView: Boolean = false): ThreadSummary {
