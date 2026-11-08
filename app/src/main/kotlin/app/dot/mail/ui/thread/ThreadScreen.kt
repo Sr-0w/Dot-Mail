@@ -559,6 +559,7 @@ private fun MessageCard(
                 )
             }
             val files = message.attachments.filter { !it.isInline || it.contentId == null }
+            CalendarInvites(message)
             if (files.isNotEmpty()) AttachmentStrip(files, onAttachment)
         }
         Spacer(Modifier.height(DotSpacing.m))
@@ -719,6 +720,46 @@ private fun linkify(text: String, color: androidx.compose.ui.graphics.Color, onL
         last = m.range.first + raw.length
     }
     append(text, last, text.length)
+}
+
+/**
+ * Calendar invitations carried as text/calendar parts (or .ics files): parsed locally and shown as a card with
+ * "Add to calendar" (system Calendar insert intent, no permission). Replying to the organiser (iTIP REPLY) needs
+ * data-layer support and is not offered yet.
+ */
+@Composable
+private fun CalendarInvites(message: Message) {
+    val parts = remember(message.attachments) {
+        message.attachments.filter { it.mimeType.startsWith("text/calendar", true) || it.fileName.endsWith(".ics", true) }
+    }
+    if (parts.isEmpty()) return
+    val graph = LocalMailGraph.current
+    val context = LocalContext.current
+    val invites by androidx.compose.runtime.produceState(emptyList<app.dot.mail.engine.calendar.Ics.CalendarInvite>(), parts) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            parts.flatMap { a ->
+                runCatching {
+                    val uri = Uri.parse(graph.mail.openAttachment(a))
+                    val text = context.contentResolver.openInputStream(uri)?.use { it.readBytes().take(512 * 1024).toByteArray().decodeToString() }.orEmpty()
+                    app.dot.mail.engine.calendar.Ics.parse(text)
+                }.getOrDefault(emptyList())
+            }.distinctBy { it.uid to it.sequence }
+        }
+    }
+    val use24h = remember { android.text.format.DateFormat.is24HourFormat(context) }
+    invites.forEach { invite ->
+        app.dot.mail.ui.calendar.InviteCard(
+            invite = invite,
+            myEmail = null,
+            onRespond = {},
+            onAddToCalendar = {
+                try { context.startActivity(app.dot.mail.ui.calendar.insertEventIntent(invite)) }
+                catch (_: ActivityNotFoundException) { }
+            },
+            use24h = use24h,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s),
+        )
+    }
 }
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
