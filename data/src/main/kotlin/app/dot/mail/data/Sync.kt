@@ -69,6 +69,11 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null, schedu
                     result.failures.forEach { SyncDiagnostics.warn("Header UID=${it.uid} account=${account.id} folderRole=${remote.role}", it.error, redactions) }
                     headerWarning = "Folder ${remote.role}: some message headers could not be read; retrying"
                 }
+                val missing=dao.folderMessages(folder.id).filter { it.uid>0 && Codec.field(it.header,"category")==null && result.headers.none { h -> h.uid==it.uid } }.take(200)
+                if(missing.isNotEmpty() && !result.reset) {
+                    try { result=result.copy(headers=result.headers+client.headers(config.imap.endpoint(),creds,folder.path,missing.map { it.uid }.toLongArray(),result.cursor.uidValidity)) }
+                    catch(e: CancellationException) { throw e } catch(e: Exception) { SyncDiagnostics.warn("Classification metadata account=${account.id} folderRole=${remote.role}",e,redactions) }
+                }
                 var replayed = false
                 for (queued in dao.operations(account.id).filter { it.folderId == folder.id }) {
                     var op = dao.operation(queued.id) ?: continue

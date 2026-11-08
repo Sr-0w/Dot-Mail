@@ -462,6 +462,7 @@ private fun EmptyFor(role: FolderRole?) {
         FolderRole.SENT -> "Nothing sent yet" to "Messages you send appear here."
         FolderRole.SPAM -> "No spam" to "Suspicious mail lands here."
         FolderRole.TRASH -> "Trash is empty" to "Deleted conversations stay here for a while."
+        FolderRole.NEWSLETTERS -> "No newsletters" to "Mailing lists and newsletters appear here."
         FolderRole.SNOOZED -> "Nothing snoozed" to "Snoozed conversations wait here until their time."
         else -> "Nothing here" to "This folder is empty."
     }
