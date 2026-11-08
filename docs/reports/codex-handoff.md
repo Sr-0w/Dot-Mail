@@ -20,3 +20,7 @@ Next steps for Claude: wire the Settings toggle/explanation after merging the fi
 ## Follow-up: refresh performance/recovery
 
 See codex-refresh-performance.md. Read-only Infomaniak warm full refresh improved from 17.1–18.3s to 3.02–3.05s (four logins), or 1.19–1.25s with a warmed IDLE pool (zero logins). Inbox commit is 1.59–1.61s. syncAll was 60,636 DEX units and is now 412; phases split into small methods. Added Error.errorKind/canRetry and MailRepository.retrySync(accountId), retained sanitized diagnostics, and tested late tail errors. No phone access. Claude will wire banners and measure the phone. Next queued task from Claude: emoji/CJK/combining-mark snippet corruption, surrogate-safe truncation, and healing stored snippets. Do that as a separate PR after this refresh PR.
+
+## Follow-up: Unicode snippets
+
+See codex-unicode-snippets.md. The live account's damaged prefix was already in text/plain; HTML retains the emoji after a long style prefix. Added capped HTML fallback for suspect plain, grapheme-safe clipping, incremental byte-prefix decoding, and revisioned background healing of old previews from cached bodies or bounded server PEEKs. No schema bump. Next queues from Claude: full-content search (also reuse the platform PdfText.extract helper from app), on-device storage/offline policy, then evidence report closing older IMAP-hardening subpoints. Read exact FEATURE_REQUESTS wording before each task. Phone remains Claude-only.

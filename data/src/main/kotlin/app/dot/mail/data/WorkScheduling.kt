@@ -21,6 +21,11 @@ internal object WorkScheduling {
             OneTimeWorkRequestBuilder<SnoozeWorker>().setInitialDelay((dueAt - System.currentTimeMillis()).coerceAtLeast(0), TimeUnit.MILLISECONDS).build())
     }
     fun cancelSnooze(context: Context, id: Long) { WorkManager.getInstance(context).cancelUniqueWork("dotmail.snooze.$id") }
+    fun snippetRepair(context:Context,accountId:Long) {
+        WorkManager.getInstance(context).enqueueUniqueWork("dotmail.snippets.$accountId",ExistingWorkPolicy.KEEP,
+            OneTimeWorkRequestBuilder<SnippetRepairWorker>().setInputData(workDataOf("accountId" to accountId)).setConstraints(network)
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL,10,TimeUnit.SECONDS).build())
+    }
     fun drafts(context: Context, accountId: Long) {
         WorkManager.getInstance(context).enqueueUniqueWork("dotmail.drafts.$accountId",ExistingWorkPolicy.REPLACE,
             OneTimeWorkRequestBuilder<DraftMirrorWorker>().setInputData(workDataOf("accountId" to accountId))

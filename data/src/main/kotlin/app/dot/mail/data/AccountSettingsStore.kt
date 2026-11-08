@@ -76,6 +76,9 @@ class AccountSettingsStore private constructor(context: Context) {
         }
     }
 
+    internal fun snippetRevision(accountId:Long):Int=prefs.getInt("$accountId.snippetRevision",0)
+    internal fun markSnippetRevision(accountId:Long,revision:Int) = prefs.edit { putInt("$accountId.snippetRevision",revision) }
+
     // ---- bookkeeping for the sync engine (not user settings) ----
     fun lastSynced(accountId: Long): Long = prefs.getLong("$accountId.lastSync", 0L)
     fun markSynced(accountId: Long, at: Long = System.currentTimeMillis()) = prefs.edit { putLong("$accountId.lastSync", at) }

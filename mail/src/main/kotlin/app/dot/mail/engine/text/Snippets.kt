@@ -1,5 +1,7 @@
 package app.dot.mail.engine.text
 
+import java.text.BreakIterator
+import java.util.Locale
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
@@ -30,6 +32,17 @@ object Snippets {
         "h5", "h6", "hr", "li", "main", "nav", "ol", "p", "pre", "section", "table",
         "tbody", "td", "tfoot", "th", "thead", "tr", "ul",
     )
+
+    /** Plain alternatives can already contain ASCII substitutions while HTML retains the actual Unicode text. */
+    internal fun needsHtmlFallback(plain:String):Boolean = plain.trimStart().startsWith("??") || plain.contains('\uFFFD')
+
+    fun fromBody(text:String?,html:String?,max:Int=160):String {
+        val plain=fromPlainText(text.orEmpty(),max)
+        if(plain.isNotBlank() && !needsHtmlFallback(plain)) return plain
+        val rich=html?.let { fromHtml(it,max) }.orEmpty()
+        if(plain.isBlank()) return rich
+        return if(rich.isNotBlank() && !needsHtmlFallback(rich) && rich.any { it.code>127 && it!='…' }) rich else plain
+    }
 
     /** Snippet from a plain-text body; the quoted tail of a reply is dropped. */
     fun fromPlainText(text: String, max: Int = 160): String {
@@ -95,7 +108,10 @@ object Snippets {
     private fun clip(text: String, max: Int): String {
         val collapsed = text.replace('\u00A0', ' ').replace(WHITESPACE, " ").trim()
         if (collapsed.length <= max) return collapsed
-        return collapsed.substring(0, max - 1).trimEnd() + ELLIPSIS
+        val boundaries=BreakIterator.getCharacterInstance(Locale.ROOT).apply { setText(collapsed) }
+        // Preserve grapheme clusters while retaining the existing UTF-16 maximum-length contract.
+        val end=boundaries.preceding(max).coerceAtLeast(0)
+        return collapsed.substring(0,end).trimEnd() + ELLIPSIS
     }
 
     private val WHITESPACE = Regex("\\s+")

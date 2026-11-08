@@ -47,4 +47,27 @@ class SnippetFetcherTest {
             assertTrue(preview.startsWith("Bonjour été 日本語")); assertFalse(preview.contains("<p>"))
         } finally { server.stop() }
     }
+    @Test fun damagedPlainFallsBackToUnicodeHtmlAndUtf8PrefixesStayWellFormed() = runBlocking {
+        val server=GreenMail(arrayOf(ServerSetup(0,"127.0.0.1","imap"),ServerSetup(0,"127.0.0.1","smtp")))
+        server.start(); server.setUser("a@example.org","a","password")
+        try {
+            val client=MailClient(); val credentials=Credentials("password")
+            val imap=Endpoint("127.0.0.1",server.imap.port,"a",TransportSecurity.NONE)
+            val smtp=Endpoint("127.0.0.1",server.smtp.port,"a",TransportSecurity.NONE)
+            val expected="🔥 Smartphones 日本語 e\u0301"
+            client.send(smtp,credentials,Mime.build(OutgoingMail(Address("a@example.org"),listOf(Address("a@example.org")),subject="Unicode",text="?? Smartphones",html="<html><head><style>"+"/* layout */".repeat(2000)+"</style></head><body><p>$expected</p></body></html>")))
+            val initial=client.sync(imap,credentials,"INBOX")
+            val preview=client.snippets(imap,credentials,"INBOX",longArrayOf(initial.headers.single().uid),initial.cursor.uidValidity).values.single()
+            assertEquals(expected,preview)
+            val raw="From: a@example.org\r\nTo: a@example.org\r\nSubject: Prefix\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n"+"x".repeat(126)+"🔥 日本語 e\u0301"
+            val message=jakarta.mail.internet.MimeMessage(jakarta.mail.Session.getInstance(java.util.Properties()),raw.toByteArray(Charsets.UTF_8).inputStream())
+            client.append(imap,credentials,"INBOX",message)
+            val second=client.sync(imap,credentials,"INBOX")
+            val partial=client.snippets(imap,credentials,"INBOX",longArrayOf(second.headers.last().uid),second.cursor.uidValidity,maxBytes=128).values.single()
+            assertEquals("x".repeat(126),partial)
+            assertFalse(partial.contains('\uFFFD'))
+            assertTrue(client.sync(imap,credentials,"INBOX").flags.none { it.seen && it.uid==initial.headers.single().uid })
+        } finally { server.stop() }
+    }
+
 }
