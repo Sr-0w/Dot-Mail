@@ -44,7 +44,12 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.paging.compose)
+    implementation(libs.paging.runtime) // AsyncPagingDataDiffer: the widget materialises one page of PagingData
     implementation(libs.biometric)
+    implementation(libs.glance.appwidget)
+    implementation(libs.androidsvg) // Apache-2.0; renders BIMI brand logos (SVG Tiny PS) to a bitmap
+    implementation(libs.work.runtime.ktx)
+    implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.webkit)
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
@@ -54,5 +59,6 @@ dependencies {
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(libs.truth)
     androidTestImplementation(libs.espresso.core)
 }

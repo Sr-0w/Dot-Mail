@@ -49,5 +49,17 @@
             </intent-filter>
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>
+
+        <!-- Home-screen widget (Jetpack Glance): unread count + latest unread threads. -->
+        <receiver
+            android:name=".widget.DotMailWidgetReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/dotmail_widget_info" />
+        </receiver>
     </application>
 </manifest>

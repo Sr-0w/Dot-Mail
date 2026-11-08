@@ -19,6 +19,7 @@ class DotMailApp : Application() {
         // Demo mode (debug builds only) shows sample mail with no network at all: used for
         // screenshots, UI tests and trying the app without an account.
         graph = if (BuildConfig.DEBUG && settings.demoMode) DemoMailGraph() else createMailGraph(this)
+        app.dot.mail.widget.DotWidgets.install(this)
     }
 }
 

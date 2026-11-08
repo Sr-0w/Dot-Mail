@@ -88,19 +88,27 @@ val LightColors = DotColors(
     scrim = Color(0x66000000),
 )
 
+/** One avatar hue: solid fill + initials colour, for the dark and the light theme. */
+internal class AvatarTone(val darkFill: Color, val darkText: Color, val lightFill: Color, val lightText: Color)
+
 /**
- * Muted tints for avatars/account markers. Desaturated so a list of senders never looks like confetti.
- * Each pair is (dark-theme tint, light-theme tint).
+ * Twelve hues spread around the wheel, deliberately mid-saturation: deep tinted fills with pale initials
+ * on dark, pale tinted fills with deep initials on light. Initials contrast is >= 5:1 in every cell
+ * (computed with the WCAG formula), and no fill is bright enough to compete with content.
  */
-internal val AvatarTints = listOf(
-    Color(0xFF8E9AAF) to Color(0xFF5F6B82),
-    Color(0xFFA3927E) to Color(0xFF7D6A55),
-    Color(0xFF8AA396) to Color(0xFF55776A),
-    Color(0xFFA08AA6) to Color(0xFF75607C),
-    Color(0xFF9AA27F) to Color(0xFF6B7351),
-    Color(0xFF7FA0A8) to Color(0xFF50737B),
-    Color(0xFFA88A8A) to Color(0xFF7E5B5B),
-    Color(0xFF8C8FB0) to Color(0xFF5E6187),
+internal val AvatarTones = listOf(
+    AvatarTone(Color(0xFF5F322B), Color(0xFFEAADA4), Color(0xFFF8DCD8), Color(0xFF70261A)), // red
+    AvatarTone(Color(0xFF5F432B), Color(0xFFEAC5A4), Color(0xFFF8E7D8), Color(0xFF70421A)), // orange
+    AvatarTone(Color(0xFF5F512B), Color(0xFFEAD7A4), Color(0xFFF8F0D8), Color(0xFF70591A)), // amber
+    AvatarTone(Color(0xFF555F2B), Color(0xFFDCEAA4), Color(0xFFF2F8D8), Color(0xFF5E701A)), // lime
+    AvatarTone(Color(0xFF2B5F33), Color(0xFFA4EAB0), Color(0xFFD8F8DD), Color(0xFF1A7028)), // green
+    AvatarTone(Color(0xFF2B5F4E), Color(0xFFA4EAD2), Color(0xFFD8F8ED), Color(0xFF1A7053)), // teal
+    AvatarTone(Color(0xFF2B5B5F), Color(0xFFA4E4EA), Color(0xFFD8F5F8), Color(0xFF1A6870)), // cyan
+    AvatarTone(Color(0xFF2B475F), Color(0xFFA4C9EA), Color(0xFFD8E9F8), Color(0xFF1A4870)), // blue
+    AvatarTone(Color(0xFF2B325F), Color(0xFFA4ADEA), Color(0xFFD8DCF8), Color(0xFF1A2670)), // indigo
+    AvatarTone(Color(0xFF3E2B5F), Color(0xFFBEA4EA), Color(0xFFE4D8F8), Color(0xFF391A70)), // violet
+    AvatarTone(Color(0xFF582B5F), Color(0xFFE0A4EA), Color(0xFFF4D8F8), Color(0xFF641A70)), // magenta
+    AvatarTone(Color(0xFF5F2B43), Color(0xFFEAA4C5), Color(0xFFF8D8E7), Color(0xFF701A42)), // rose
 )
 
 val Inter = FontFamily(

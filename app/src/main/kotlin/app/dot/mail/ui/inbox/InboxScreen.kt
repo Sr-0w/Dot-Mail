@@ -85,6 +85,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -102,6 +103,8 @@ import app.dot.design.DotShapes
 import app.dot.design.DotSpacing
 import app.dot.design.components.Avatar
 import app.dot.design.components.DotIconButton
+import app.dot.design.components.DotMenu
+import app.dot.design.components.DotMenuItem
 import app.dot.design.components.DotSnackbar
 import app.dot.design.components.DotTopBar
 import app.dot.design.components.EmptyState
@@ -428,7 +431,7 @@ fun ThreadRow(
             if (unread) UnreadDot(size = 7.dp)
         }
         if (!compact) {
-            Box(Modifier.clip(CircleShape).combinedClickable(onClick = onLongClick)) {
+            Box(Modifier.clip(CircleShape).combinedClickable(onClickLabel = if (selected) "Deselect" else "Select", onClick = onLongClick).clearAndSetSemantics { }) {
                 AnimatedContent(selected || selectionMode, label = "avatar") { sel ->
                     if (sel) SelectCircle(selected)
                     else {
@@ -444,19 +447,25 @@ fun ThreadRow(
         }
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    sender,
-                    style = Dot.type.headline.copy(fontWeight = if (unread) FontWeight.SemiBold else FontWeight.Normal),
-                    color = c.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                if (thread.messageCount > 1) {
-                    Spacer(Modifier.width(6.dp))
-                    Text(thread.messageCount.toString(), style = Dot.type.caption, color = c.textTertiary)
+                // Sender + count share the free width; attachment glyph and date stay pinned right.
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        sender,
+                        style = Dot.type.headline.copy(fontWeight = if (unread) FontWeight.SemiBold else FontWeight.Normal),
+                        color = c.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (thread.messageCount > 1) {
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            thread.messageCount.toString(), style = Dot.type.caption, color = c.textTertiary,
+                            modifier = Modifier.semantics { contentDescription = "${thread.messageCount} messages" },
+                        )
+                    }
                 }
-                Spacer(Modifier.weight(1f).width(DotSpacing.s))
+                Spacer(Modifier.width(DotSpacing.s))
                 if (thread.hasAttachments) {
                     Icon(Icons.Outlined.Attachment, null, Modifier.size(15.dp), tint = c.textTertiary)
                     Spacer(Modifier.width(6.dp))
@@ -479,7 +488,7 @@ fun ThreadRow(
                 )
                 if (thread.isStarred) {
                     Spacer(Modifier.width(DotSpacing.s))
-                    Icon(Icons.Outlined.Star, "Starred", Modifier.size(16.dp), tint = c.star)
+                    Icon(Icons.Outlined.Star, null, Modifier.size(16.dp), tint = c.star)
                 }
             }
             if (!compact && thread.snippet.isNotBlank()) {
@@ -532,36 +541,14 @@ private fun SelectionBar(
             Box {
                 DotIconButton(Icons.Outlined.MoreVert, "More actions", onClick = { menu = true })
                 DotMenu(menu, onDismiss = { menu = false }) {
-                    MenuItem("Mark as unread", Icons.Outlined.MarkEmailUnread) { menu = false; onAction(MessageAction.MARK_UNREAD) }
-                    MenuItem("Star", Icons.Outlined.StarOutline) { menu = false; onAction(MessageAction.STAR) }
-                    MenuItem("Move to…", Icons.Outlined.DriveFileMove) { menu = false; onMove() }
-                    if (role == FolderRole.SPAM) MenuItem("Not spam", Icons.Outlined.Inbox) { menu = false; onAction(MessageAction.NOT_SPAM) }
-                    else MenuItem("Report spam", Icons.Outlined.Report) { menu = false; onAction(MessageAction.SPAM) }
+                    DotMenuItem("Mark as unread", Icons.Outlined.MarkEmailUnread) { menu = false; onAction(MessageAction.MARK_UNREAD) }
+                    DotMenuItem("Star", Icons.Outlined.StarOutline) { menu = false; onAction(MessageAction.STAR) }
+                    DotMenuItem("Move to…", Icons.Outlined.DriveFileMove) { menu = false; onMove() }
+                    if (role == FolderRole.SPAM) DotMenuItem("Not spam", Icons.Outlined.Inbox) { menu = false; onAction(MessageAction.NOT_SPAM) }
+                    else DotMenuItem("Report spam", Icons.Outlined.Report) { menu = false; onAction(MessageAction.SPAM) }
                 }
             }
         },
-    )
-}
-
-@Composable
-fun DotMenu(expanded: Boolean, onDismiss: () -> Unit, content: @Composable () -> Unit) {
-    DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = onDismiss,
-        containerColor = Dot.colors.surface,
-        shape = DotShapes.medium,
-        tonalElevation = 0.dp,
-        shadowElevation = 8.dp,
-        border = androidx.compose.foundation.BorderStroke(DotSpacing.hairline * 2, Dot.colors.border),
-    ) { content() }
-}
-
-@Composable
-fun MenuItem(text: String, icon: ImageVector?, color: Color = Dot.colors.textPrimary, onClick: () -> Unit) {
-    DropdownMenuItem(
-        text = { Text(text, style = Dot.type.callout, color = color) },
-        leadingIcon = icon?.let { { Icon(it, null, Modifier.size(20.dp), tint = Dot.colors.textSecondary) } },
-        onClick = onClick,
     )
 }
 

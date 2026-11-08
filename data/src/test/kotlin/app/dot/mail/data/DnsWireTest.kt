@@ -53,4 +53,25 @@ class DnsWireTest {
         loop[snyders.size - 22] = 0xC0.toByte(); loop[snyders.size - 21] = (snyders.size - 22).toByte()
         DnsWire.parseMx(loop) // must terminate
     }
+
+    // default._bimi TXT records captured from a public resolver (2026-11-08).
+    private val cnnBimi = hex("4321818000010001000000000764656661756c74055f62696d6903636e6e03636f6d0000100001c00c0010000100000598009291763d42494d49313b206c3d68747470733a2f2f616d706c6966792e76616c696d61696c2e636f6d2f62696d692f74696d652d7761726e65722f5234457a6635784b3561632d434e4e2e7376673b20613d68747470733a2f2f616d706c6966792e76616c696d61696c2e636f6d2f62696d692f74696d652d7761726e65722f5234457a6635784b3561632d434e4e2e70656d")
+    private val noBimi = hex("4321818000010000000100000764656661756c74055f62696d6907736e79646572730378797a0000100001c01a0006000100000e100045066e73616e79310a696e666f6d616e69616b03636f6d000a686f73746d61737465720a696e666f6d616e69616b0263680078c3ff5100002a3000000e1000093e6800000e10")
+
+    @Test fun `parses a BIMI TXT record`() {
+        val txt = DnsWire.parseTxt(cnnBimi).single()
+        assertThat(txt).startsWith("v=BIMI1; l=https://amplify.valimail.com/bimi/")
+        assertThat(txt).contains("a=https://")
+    }
+
+    @Test fun `TXT with several character-strings is concatenated`() {
+        // header(1 answer) + question "a.b" TXT IN + answer: ptr, TXT, IN, ttl, rdlen=9, "abc" "defg"
+        val msg = hex("000081800001000100000000" + "01610162" + "00" + "00100001" + "c00c" + "00100001" + "00000000" + "0009" + "03616263" + "0464656667")
+        assertThat(DnsWire.parseTxt(msg)).containsExactly("abcdefg")
+    }
+
+    @Test fun `no TXT record gives nothing and truncation never throws`() {
+        assertThat(DnsWire.parseTxt(noBimi)).isEmpty()
+        for (n in 0 until cnnBimi.size) DnsWire.parseTxt(cnnBimi.copyOf(n))
+    }
 }

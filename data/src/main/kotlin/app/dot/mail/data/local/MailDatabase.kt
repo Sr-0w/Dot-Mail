@@ -17,12 +17,12 @@ data class ThreadKeyRow(val accountId: Long, val key: String, val threadId: Long
 data class MessageRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val accountId: Long, val folderId: Long, val threadId: Long, val uid: Long, val header: String, val subject: String, val sentAt: Long, val unread: Boolean, val starred: Boolean, val hasAttachments: Boolean, val snippet: String = "", val text: String? = null, val html: String? = null, val bodyLoaded: Boolean = false, val remoteImages: Boolean = false, val senderSearch: String = "", val recipientSearch: String = "", @ColumnInfo(defaultValue = "0") val snippetFetched: Boolean = false)
 @Entity(tableName = "attachments", foreignKeys = [ForeignKey(entity = MessageRow::class, parentColumns = ["id"], childColumns = ["messageId"], onDelete = ForeignKey.CASCADE)], indices = [Index("messageId")])
 data class AttachmentRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val messageId: Long, val partId: String, val name: String, val mime: String, val size: Long, val cid: String?, val inline: Boolean, val localUri: String?)
-@Entity(tableName = "drafts", foreignKeys = [ForeignKey(entity = AccountRow::class, parentColumns = ["id"], childColumns = ["accountId"], onDelete = ForeignKey.CASCADE)], indices = [Index("accountId")])
-data class DraftRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val accountId: Long, val json: String)
+@Entity(tableName = "drafts", foreignKeys = [ForeignKey(entity = AccountRow::class, parentColumns = ["id"], childColumns = ["accountId"], onDelete = ForeignKey.CASCADE)], indices = [Index("accountId"), Index(value = ["sourceMessageId"], unique = true)])
+data class DraftRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val accountId: Long, val json: String, @ColumnInfo(defaultValue = "0") val updatedAt: Long = 0, val sourceMessageId: Long? = null)
 @Entity(tableName = "outbox", foreignKeys = [ForeignKey(entity = AccountRow::class, parentColumns = ["id"], childColumns = ["accountId"], onDelete = ForeignKey.CASCADE)], indices = [Index("accountId")])
 data class OutboxRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val accountId: Long, val draft: String, val dueAt: Long, val state: String = "PENDING", val mimePath: String? = null, val error: String? = null)
 @Entity(tableName = "operations", foreignKeys = [ForeignKey(entity = AccountRow::class, parentColumns = ["id"], childColumns = ["accountId"], onDelete = ForeignKey.CASCADE)], indices = [Index("accountId")])
-data class OperationRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val accountId: Long, val folderId: Long, val validity: Long, val uid: Long, val action: String, val target: String? = null, val attempts: Int = 0, val error: String? = null)
+data class OperationRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val accountId: Long, val folderId: Long, val validity: Long, val uid: Long, val action: String, val target: String? = null, val attempts: Int = 0, val error: String? = null, val messageLocalId: Long? = null, val desiredSeen: Boolean? = null, val desiredStarred: Boolean? = null)
 @Entity(tableName = "contacts", primaryKeys = ["accountId", "email"], foreignKeys = [ForeignKey(entity = AccountRow::class, parentColumns = ["id"], childColumns = ["accountId"], onDelete = ForeignKey.CASCADE)])
 data class ContactRow(val accountId: Long, val email: String, val name: String?, val lastSeen: Long)
 
@@ -41,7 +41,7 @@ interface MailDao {
     @Query("SELECT * FROM folders WHERE id=:id") suspend fun folder(id: Long): FolderRow?
     @Insert suspend fun insertFolder(row: FolderRow): Long
     @Update suspend fun updateFolder(row: FolderRow)
-    @RawQuery(observedEntities = [ThreadRow::class, MessageRow::class, FolderRow::class]) fun page(query: SupportSQLiteQuery): PagingSource<Int, ThreadRow>
+    @RawQuery(observedEntities = [ThreadRow::class, MessageRow::class, FolderRow::class, DraftRow::class]) fun page(query: SupportSQLiteQuery): PagingSource<Int, ThreadRow>
     @Query("SELECT * FROM messages WHERE threadId=:id ORDER BY sentAt,id") fun observeThread(id: Long): Flow<List<MessageRow>>
     @Query("SELECT * FROM messages WHERE threadId=:id ORDER BY sentAt,id") suspend fun threadMessages(id: Long): List<MessageRow>
     @Query("SELECT * FROM messages WHERE folderId=:id") suspend fun folderMessages(id: Long): List<MessageRow>
@@ -63,6 +63,7 @@ interface MailDao {
     @Query("DELETE FROM attachments WHERE messageId=:id") suspend fun clearAttachments(id: Long)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putDraft(row: DraftRow): Long
     @Query("SELECT * FROM drafts WHERE id=:id") suspend fun draft(id: Long): DraftRow?
+    @Query("SELECT * FROM drafts WHERE sourceMessageId=:id LIMIT 1") suspend fun draftForMessage(id: Long): DraftRow?
     @Query("DELETE FROM drafts WHERE id=:id") suspend fun deleteDraft(id: Long)
     @Query("SELECT * FROM outbox WHERE state IN ('PENDING','SUBMITTING','APPEND','APPENDING','UNCERTAIN') ORDER BY dueAt,id") fun observeOutbox(): Flow<List<OutboxRow>>
     @Query("SELECT * FROM outbox WHERE state='APPENDING'") suspend fun appendingOutbox(): List<OutboxRow>
@@ -81,7 +82,7 @@ interface MailDao {
     @Query("SELECT email, name, MAX(lastSeen) AS lastSeen, accountId FROM contacts WHERE email LIKE :prefix ESCAPE '!' OR name LIKE :prefix ESCAPE '!' GROUP BY email ORDER BY lastSeen DESC LIMIT :limit") suspend fun contacts(prefix: String, limit: Int): List<ContactRow>
 }
 
-@Database(entities = [AccountRow::class, FolderRow::class, ThreadRow::class, ThreadKeyRow::class, MessageRow::class, AttachmentRow::class, DraftRow::class, OutboxRow::class, OperationRow::class, ContactRow::class], version = 3, exportSchema = true)
+@Database(entities = [AccountRow::class, FolderRow::class, ThreadRow::class, ThreadKeyRow::class, MessageRow::class, AttachmentRow::class, DraftRow::class, OutboxRow::class, OperationRow::class, ContactRow::class], version = 4, exportSchema = true)
 abstract class MailDatabase : RoomDatabase() { abstract fun mail(): MailDao }
 
 internal val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
@@ -93,5 +94,16 @@ internal val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
 internal val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
     override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE accounts ADD COLUMN authError INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
+internal val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE drafts ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE drafts ADD COLUMN sourceMessageId INTEGER")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_drafts_sourceMessageId ON drafts(sourceMessageId)")
+        db.execSQL("ALTER TABLE operations ADD COLUMN messageLocalId INTEGER")
+        db.execSQL("ALTER TABLE operations ADD COLUMN desiredSeen INTEGER")
+        db.execSQL("ALTER TABLE operations ADD COLUMN desiredStarred INTEGER")
     }
 }

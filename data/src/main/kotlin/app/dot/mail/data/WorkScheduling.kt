@@ -27,12 +27,13 @@ internal object WorkScheduling {
 class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result = try {
         if (GraphRegistry.get(applicationContext).syncAll()) Result.success() else Result.retry()
-    } catch (e: CancellationException) { throw e } catch (e: Exception) { Result.retry() }
+    } catch (e: CancellationException) { throw e } catch (e: Exception) { SyncDiagnostics.warn("Sync worker", e); Result.retry() }
 }
 class OutboxWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result = try {
         if (GraphRegistry.get(applicationContext).deliverOutbox(inputData.getLong("id", -1))) Result.success() else Result.retry()
     } catch (e: CancellationException) { throw e } catch (e: Exception) {
+        SyncDiagnostics.warn("Outbox worker id=${inputData.getLong("id", -1)}", e)
         val graph = GraphRegistry.get(applicationContext)
         val id = inputData.getLong("id", -1)
         graph.dao.outbox(id)?.takeIf { it.state == "PENDING" }?.let {

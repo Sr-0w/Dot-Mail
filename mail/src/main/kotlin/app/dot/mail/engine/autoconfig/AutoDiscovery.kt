@@ -165,7 +165,7 @@ private val SECOND_LEVEL = setOf("co", "com", "org", "net", "gov", "edu", "ac", 
  * Approximate registrable domain ("eTLD+1") without a public-suffix list: last two labels, or
  * last three for the common `co.uk` / `com.au` shape. Good enough to address ISPDB.
  */
-internal fun registrableDomain(host: String): String {
+fun registrableDomain(host: String): String {
     val labels = host.trim().trimEnd('.').lowercase().split('.').filter { it.isNotEmpty() }
     if (labels.size <= 2) return labels.joinToString(".")
     val n = if (labels.last().length == 2 && labels[labels.size - 2] in SECOND_LEVEL) 3 else 2

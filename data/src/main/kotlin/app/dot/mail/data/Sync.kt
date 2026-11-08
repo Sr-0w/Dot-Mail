@@ -15,15 +15,19 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
-internal suspend fun RealMailGraph.syncAll(): Boolean = syncLock.withLock {
+internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null): Boolean = syncLock.withLock {
     var success = true
-    dao.accounts().forEach { account ->
+    dao.accounts().filter { accountIds == null || it.id in accountIds }.forEach { account ->
         syncing.value = syncing.value + account.id
+        var stage = "Connect"
+        var folderLabel: String? = null
         try {
             val config = Codec.config(account.config); val creds = credentials(account)
             var deferredExpunge = false
             val remoteFolders = client.folders(config.imap.endpoint(), creds)
-            for (remote in remoteFolders) {
+            for (remote in remoteFolders.sortedBy { when(it.role) { Role.INBOX -> 0; Role.SENT -> 1; Role.DRAFTS -> 2; else -> 3 } }) {
+                folderLabel = remote.role.name
+                stage = "Folder header sync"
                 var folder = dao.folders(account.id).firstOrNull { it.path == remote.path }
                 if (folder == null) {
                     val id = dao.insertFolder(FolderRow(accountId = account.id, path = remote.path, name = remote.name, role = remote.role.name))
@@ -33,12 +37,27 @@ internal suspend fun RealMailGraph.syncAll(): Boolean = syncLock.withLock {
                 var result = client.sync(config.imap.endpoint(), creds, folder.path, initialCursor)
                 var replayed = false
                 for (op in dao.operations(account.id).filter { it.folderId == folder.id }) {
+                    if (op.action == "DEFERRED_FLAGS") {
+                        val row = op.messageLocalId?.let { dao.message(it) }
+                        if (row == null) { dao.deleteOperation(op.id); continue }
+                        if (row.uid < 1) continue
+                        if (row.folderId != folder.id) { dao.folder(row.folderId)?.let { dao.updateOperation(op.copy(folderId = row.folderId, validity = it.validity, uid = row.uid)) }; success = false; continue }
+                        if (dao.folder(row.folderId)?.validity != result.cursor.uidValidity) { dao.updateOperation(op.copy(error = "UIDVALIDITY changed; operation requires review")); continue }
+                        try {
+                            client.setFlags(config.imap.endpoint(), creds, folder.path, longArrayOf(row.uid), seen = op.desiredSeen, starred = op.desiredStarred)
+                            dao.deleteOperation(op.id); replayed = true
+                        } catch (e: CancellationException) { throw e } catch (e: Exception) { SyncDiagnostics.warn("Deferred flags account=${account.id} folderRole=${remote.role}", e); success = false }
+                        continue
+                    }
                     if (op.validity != result.cursor.uidValidity) {
                         dao.updateOperation(op.copy(error = "UIDVALIDITY changed; operation requires review", attempts = op.attempts + 1)); continue
                     }
                     try {
                         when (op.action) {
-                            "MOVE" -> { if (client.move(config.imap.endpoint(), creds, folder.path, longArrayOf(op.uid), requireNotNull(op.target)) == MoveOutcome.COPIED_AND_MARKED_DELETED) deferredExpunge = true }
+                            "MOVE" -> {
+                                if (op.desiredSeen != null || op.desiredStarred != null) client.setFlags(config.imap.endpoint(), creds, folder.path, longArrayOf(op.uid), seen = op.desiredSeen, starred = op.desiredStarred)
+                                if (client.move(config.imap.endpoint(), creds, folder.path, longArrayOf(op.uid), requireNotNull(op.target)) == MoveOutcome.COPIED_AND_MARKED_DELETED) deferredExpunge = true }
+                            "FLAGS" -> client.setFlags(config.imap.endpoint(), creds, folder.path, longArrayOf(op.uid), seen = op.desiredSeen, starred = op.desiredStarred)
                             MessageAction.MARK_READ.name -> client.setFlags(config.imap.endpoint(), creds, folder.path, longArrayOf(op.uid), seen = true)
                             MessageAction.MARK_UNREAD.name -> client.setFlags(config.imap.endpoint(), creds, folder.path, longArrayOf(op.uid), seen = false)
                             MessageAction.STAR.name -> client.setFlags(config.imap.endpoint(), creds, folder.path, longArrayOf(op.uid), starred = true)
@@ -46,7 +65,10 @@ internal suspend fun RealMailGraph.syncAll(): Boolean = syncLock.withLock {
                             MessageAction.DELETE_FOREVER.name -> client.setFlags(config.imap.endpoint(), creds, folder.path, longArrayOf(op.uid), delete = true)
                         }
                         dao.deleteOperation(op.id); replayed = true
-                    } catch (e: Exception) { dao.updateOperation(op.copy(attempts = op.attempts + 1, error = "Server operation failed")); success = false; break }
+                    } catch (e: CancellationException) { throw e } catch (e: Exception) {
+                        SyncDiagnostics.warn("Operation ${op.action} account=${account.id} folderRole=${remote.role}", e)
+                        dao.updateOperation(op.copy(attempts = op.attempts + 1, error = SyncDiagnostics.reason(e))); success = false; break
+                    }
                 }
                 if (replayed) result = client.sync(config.imap.endpoint(), creds, folder.path, initialCursor)
                 val notifications = mutableListOf<Pair<Long, String>>()
@@ -54,13 +76,15 @@ internal suspend fun RealMailGraph.syncAll(): Boolean = syncLock.withLock {
                     val old = dao.folderMessages(folder.id)
                     if (result.reset) old.filter { it.uid > 0 }.forEach { dao.deleteMessage(it.id) }
                     else old.filter { it.uid > 0 && it.uid !in result.existingUids }.forEach { dao.deleteMessage(it.id) }
-                    val pending = dao.operations(account.id).filter { it.folderId == folder.id && it.validity == result.cursor.uidValidity }.map { it.uid }.toSet()
+                    val operations = dao.operations(account.id)
+                    val pending = operations.filter { it.folderId == folder.id && it.validity == result.cursor.uidValidity }.map { it.uid }.toSet()
+                    val pendingLocalIds = operations.mapNotNull { it.messageLocalId }.toSet()
                     result.headers.filter { !it.flags.deleted && it.uid !in pending }.forEach { header ->
                         val (thread, fresh) = upsertHeader(folder.copy(validity = result.cursor.uidValidity), header)
                         if (fresh && !result.reset && !header.flags.seen && remote.role == Role.INBOX) notifications += thread to header.subject
                     }
                     result.flags.filter { it.uid !in pending }.forEach { flag -> dao.byUid(folder.id, flag.uid)?.let { row ->
-                        if (flag.deleted) dao.deleteMessage(row.id) else dao.updateMessage(row.copy(unread = !flag.seen, starred = flag.starred))
+                        if (row.id !in pendingLocalIds) { if (flag.deleted) dao.deleteMessage(row.id) else dao.updateMessage(row.copy(unread = !flag.seen, starred = flag.starred)) }
                     } }
                     (old.map { it.threadId } + dao.folderMessages(folder.id).map { it.threadId }).distinct().forEach { rebuildThread(it) }
                     dao.updateFolder(folder.copy(name = remote.name, role = remote.role.name, unread = remote.unread, total = remote.total, validity = result.cursor.uidValidity, nextUid = result.cursor.uidNext, modSeq = result.cursor.highestModSeq))
@@ -70,7 +94,7 @@ internal suspend fun RealMailGraph.syncAll(): Boolean = syncLock.withLock {
                 if (previewRows.isNotEmpty()) {
                     val snippets = try { client.snippets(config.imap.endpoint(), creds, folder.path, previewRows.map { it.uid }.toLongArray(), result.cursor.uidValidity) }
                     catch (e: CancellationException) { throw e }
-                    catch (_: Exception) { emptyMap() } // Header/flag sync remains authoritative even when previews fail.
+                    catch (e: Exception) { SyncDiagnostics.warn("Snippet prefetch account=${account.id} folderRole=${remote.role}", e); emptyMap() } // Header/flag sync remains authoritative even when previews fail.
                     database.withTransaction {
                         snippets.forEach { (uid, snippet) -> dao.byUid(folder.id, uid)?.let { dao.updateMessage(it.copy(snippet = snippet, snippetFetched = true)) } }
                         previewRows.map { it.threadId }.distinct().forEach { rebuildThread(it) }
@@ -79,7 +103,13 @@ internal suspend fun RealMailGraph.syncAll(): Boolean = syncLock.withLock {
                 notifications.distinctBy { it.first }.forEach { (id, subject) -> MailNotifications.newMail(context, account, id, subject) }
             }
             dao.syncError(account.id, if (deferredExpunge) "Move copied messages and marked the originals deleted; server lacks targeted expunge" else if (dao.operations(account.id).any { it.error != null }) "Some server changes are pending or require review" else null)
-        } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; success = false; dao.syncError(account.id, if (e is jakarta.mail.AuthenticationFailedException || e is app.dot.mail.data.oauth.ReauthenticationRequired) "Sign in again to reconnect this account" else "Could not synchronize account", e is jakarta.mail.AuthenticationFailedException || e is app.dot.mail.data.oauth.ReauthenticationRequired) }
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            SyncDiagnostics.warn("$stage account=${account.id} folderRole=${folderLabel ?: "NONE"}", e)
+            success = false
+            val reason = SyncDiagnostics.reason(e)
+            dao.syncError(account.id, folderLabel?.let { "Folder $it: $reason" } ?: reason, e is jakarta.mail.AuthenticationFailedException || e is app.dot.mail.data.oauth.ReauthenticationRequired)
+        }
         finally { syncing.value = syncing.value - account.id }
     }
     success
@@ -110,6 +140,7 @@ internal suspend fun RealMailGraph.deliverOutbox(id: Long): Boolean = syncLock.w
         try {
             client.send(config.smtp.endpoint(), creds, mime)
         } catch (e: SubmissionNotStartedException) {
+            SyncDiagnostics.warn("Outbox SMTP connect id=$id", e)
             if (e.cause is jakarta.mail.AuthenticationFailedException) dao.syncError(account.id, "Sign in again to reconnect this account", true)
             dao.transitionOutbox(id, "SUBMITTING", "PENDING", "Connection failed before submission; will retry")
             return@withLock false
@@ -117,6 +148,7 @@ internal suspend fun RealMailGraph.deliverOutbox(id: Long): Boolean = syncLock.w
             withContext(NonCancellable) { dao.transitionOutbox(id, "SUBMITTING", "UNCERTAIN", "Submission was interrupted. Check Sent before retrying.") }
             throw e
         } catch (e: Exception) {
+            SyncDiagnostics.warn("Outbox SMTP submission id=$id", e)
             // SMTP can lose its final reply after accepting DATA. Automatic retry could duplicate mail.
             dao.transitionOutbox(id, "SUBMITTING", "UNCERTAIN", "Delivery could not be confirmed. Check Sent before retrying.")
             dao.syncError(account.id, "A queued send could not be confirmed. Check Sent before retrying.")
@@ -135,6 +167,7 @@ internal suspend fun RealMailGraph.deliverOutbox(id: Long): Boolean = syncLock.w
             client.append(config.imap.endpoint(), creds, sent, mime)
             dao.transitionOutbox(id, "APPENDING", "SENT")
         } catch (e: Exception) {
+            SyncDiagnostics.warn("Outbox Sent copy id=$id", e)
             withContext(NonCancellable) { dao.transitionOutbox(id, "APPENDING", "APPEND", "Message sent; its Sent copy could not be saved. Retry will only save the copy.") }
             if (e is CancellationException) throw e
             return@withLock false

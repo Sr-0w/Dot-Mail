@@ -178,14 +178,14 @@ private fun UndoSendHost(onRestored: (Long) -> Unit, modifier: Modifier = Modifi
     val prefs by LocalSettings.current.ui.collectAsStateWithLifecycle()
     val seconds = prefs.undoSendSeconds
     val host = remember { SnackbarHostState() }
-    val pending by UndoSendBus.pending.collectAsStateWithLifecycle()
-    LaunchedEffect(pending) {
-        val p = pending ?: return@LaunchedEffect
+    LaunchedEffect(Unit) {
+        UndoSendBus.pending.collect { pendingSend ->
+        val p = pendingSend ?: return@collect
         UndoSendBus.pending.value = null
         val scheduled = p.scheduledAt != null
         if (!scheduled && seconds == 0) {
             host.showSnackbar("Sending…", duration = SnackbarDuration.Short)
-            return@LaunchedEffect
+            return@collect
         }
         val result = kotlinx.coroutines.withTimeoutOrNull(if (scheduled) 6_000L else seconds * 1_000L) {
             host.showSnackbar(if (scheduled) "Message scheduled" else "Sending…", actionLabel = "Undo", duration = SnackbarDuration.Indefinite)
@@ -194,6 +194,7 @@ private fun UndoSendHost(onRestored: (Long) -> Unit, modifier: Modifier = Modifi
         if (result == SnackbarResult.ActionPerformed) {
             if (graph.compose.cancelSend(p.outboxId)) onRestored(p.draftId)
             else host.showSnackbar("Too late — the message was already sent")
+        }
         }
     }
     SnackbarHost(host, modifier.navigationBarsPadding().padding(bottom = 8.dp)) { DotSnackbar(it) }

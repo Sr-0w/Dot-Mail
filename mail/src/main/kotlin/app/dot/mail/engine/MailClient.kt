@@ -48,9 +48,9 @@ class MailClient(val timeoutMs: Int = 30_000) {
         withContext(Dispatchers.IO) { session(smtp, credentials, true).getTransport("smtp").use { it.connect(smtp.host, smtp.port, smtp.username, credentials.secret) } }
     }
     suspend fun folders(endpoint: Endpoint, credentials: Credentials): List<RemoteFolder> = store(endpoint, credentials) { store ->
-        store.defaultFolder.list("*").filter { it.type and Folder.HOLDS_MESSAGES != 0 }.map { f ->
-            RemoteFolder(f.fullName, f.name, role(f.fullName, (f as IMAPFolder).attributes.toList()), f.unreadMessageCount.coerceAtLeast(0), f.messageCount.coerceAtLeast(0))
-        }
+        uniqueRoles(store.defaultFolder.list("*").filter { it.type and Folder.HOLDS_MESSAGES != 0 }.map { f ->
+            RemoteFolder(f.fullName, f.name, role(f.fullName, (f as IMAPFolder).attributes.toList()), f.unreadMessageCount.coerceAtLeast(0), f.messageCount.coerceAtLeast(0), f.attributes.any { it.lowercase() in setOf("\\sent", "\\drafts", "\\archive", "\\trash", "\\junk", "\\all", "\\flagged", "\\inbox") })
+        })
     }
     suspend fun sync(endpoint: Endpoint, credentials: Credentials, path: String, cursor: SyncCursor = SyncCursor(), now: Long = System.currentTimeMillis(), limit: Int = 500): HeaderSync = store(endpoint, credentials) { store ->
         require(limit in 1..5000)
@@ -101,6 +101,7 @@ class MailClient(val timeoutMs: Int = 30_000) {
         return (0 until source.count).any { hasAttachments(source.getBodyPart(it), depth + 1) }
     }
     suspend fun body(endpoint: Endpoint, credentials: Credentials, path: String, uid: Long, expectedValidity: Long? = null): ParsedBody = store(endpoint, credentials) { s -> folder(s, path) { f -> require(expectedValidity == null || expectedValidity == f.uidValidity) { "Folder UIDVALIDITY changed" }
+        require(uid > 0) { "A server message UID must be positive" }
         val message = requireNotNull(f.getMessageByUID(uid)) { "Message no longer exists" }
         val output = object : java.io.ByteArrayOutputStream() {
             override fun write(b: ByteArray, off: Int, len: Int) { require(count.toLong() + len <= 25 * 1024 * 1024) { "Message exceeds 25 MiB" }; super.write(b, off, len) }
@@ -169,6 +170,12 @@ class MailClient(val timeoutMs: Int = 30_000) {
         } } finally { closer.cancel(); withContext(NonCancellable + Dispatchers.IO) { runCatching { s.close() } } }
     }
     companion object {
+        internal fun uniqueRoles(folders: List<RemoteFolder>): List<RemoteFolder> {
+            val winners = folders.filter { it.role != Role.CUSTOM }.groupBy { it.role }.mapValues { (_, choices) ->
+                choices.sortedWith(compareByDescending<RemoteFolder> { it.specialUse }.thenByDescending { it.total }.thenBy { it.path }).first().path
+            }
+            return folders.map { if (it.role != Role.CUSTOM && winners[it.role] != it.path) it.copy(role = Role.CUSTOM) else it }
+        }
         fun role(path: String, attributes: List<String>): Role {
             val special = mapOf("\\Inbox" to Role.INBOX, "\\Sent" to Role.SENT, "\\Drafts" to Role.DRAFTS, "\\Archive" to Role.ARCHIVE, "\\Trash" to Role.TRASH, "\\Junk" to Role.SPAM, "\\All" to Role.ALL_MAIL, "\\Flagged" to Role.STARRED)
             special.entries.firstOrNull { (attr, _) -> attributes.any { it.equals(attr, true) } }?.let { return it.value }

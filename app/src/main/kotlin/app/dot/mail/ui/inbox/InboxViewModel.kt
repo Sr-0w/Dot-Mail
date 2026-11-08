@@ -141,9 +141,12 @@ class InboxViewModel(private val graph: MailGraph, private val saved: SavedState
         if (_refreshing.value) return
         viewModelScope.launch {
             _refreshing.value = true
+            val started = System.currentTimeMillis()
             // Bounded: the spinner must never get stuck if a sync hangs.
             runCatching { kotlinx.coroutines.withTimeout(60_000) { graph.mail.refresh(_mailbox.value) } }
                 .onFailure { _events.send(if (it is kotlinx.coroutines.TimeoutCancellationException) "Still syncing in the background" else it.message ?: "Couldn't refresh") }
+            // A true→false flip inside one frame never reaches PullToRefreshBox, leaving its indicator stuck.
+            kotlinx.coroutines.delay((600 - (System.currentTimeMillis() - started)).coerceAtLeast(0))
             _refreshing.value = false
         }
     }

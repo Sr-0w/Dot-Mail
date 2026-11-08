@@ -87,6 +87,8 @@ import app.dot.design.components.BackButton
 import app.dot.design.components.ButtonStyle
 import app.dot.design.components.DotButton
 import app.dot.design.components.DotIconButton
+import app.dot.design.components.DotMenu
+import app.dot.design.components.DotMenuItem
 import app.dot.design.components.DotSnackbar
 import app.dot.design.components.DotTopBar
 import app.dot.design.components.EmptyState
@@ -102,8 +104,6 @@ import app.dot.mail.data.model.MessageAction
 import app.dot.mail.engine.html.HtmlSanitizer
 import app.dot.mail.engine.text.QuoteSplitter
 import app.dot.mail.ui.common.Format
-import app.dot.mail.ui.inbox.DotMenu
-import app.dot.mail.ui.inbox.MenuItem
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -251,12 +251,12 @@ fun ThreadScreen(
                         DotIconButton(Icons.Outlined.MoreVert, "More", onClick = { menu = true })
                         DotMenu(menu, { menu = false }) {
                             val starred = list?.any { it.isStarred } == true
-                            MenuItem(if (starred) "Remove star" else "Star", if (starred) Icons.Outlined.StarOutline else Icons.Outlined.Star) {
+                            DotMenuItem(if (starred) "Remove star" else "Star", if (starred) Icons.Outlined.StarOutline else Icons.Outlined.Star) {
                                 menu = false; vm.act(if (starred) MessageAction.UNSTAR else MessageAction.STAR)
                             }
-                            MenuItem("Report spam", Icons.Outlined.Report) { menu = false; vm.act(MessageAction.SPAM) }
+                            DotMenuItem("Report spam", Icons.Outlined.Report) { menu = false; vm.act(MessageAction.SPAM) }
                             last?.unsubscribe?.let { target ->
-                                MenuItem("Unsubscribe", Icons.Outlined.Unsubscribe) {
+                                DotMenuItem("Unsubscribe", Icons.Outlined.Unsubscribe) {
                                     menu = false
                                     if (target.startsWith("mailto:", ignoreCase = true)) onComposeTo(target) else pendingLink = target
                                 }

@@ -69,6 +69,8 @@ data class ThreadSummary(
     val unreadCount: Int,
     val isStarred: Boolean,
     val hasAttachments: Boolean,
+    val draftId: Long? = null,
+    val recipients: List<EmailAddress> = emptyList(),
 ) {
     val isUnread: Boolean get() = unreadCount > 0
 }
@@ -189,3 +191,7 @@ data class OutboxItem(
 enum class OAuthProvider { GOOGLE, MICROSOFT }
 data class OAuthAvailability(val provider: OAuthProvider, val available: Boolean, val reason: String?)
 class OAuthException(message: String) : Exception(message)
+
+enum class MailActionFailure { FOLDER_UNAVAILABLE, ACCOUNT_MISMATCH, OPERATION_PENDING }
+class MailActionException(val reason: MailActionFailure, message: String) : Exception(message)
+class MailSyncException(message: String) : Exception(message)

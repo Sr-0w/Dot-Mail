@@ -51,7 +51,7 @@ object Snippets {
         body.select("[class~=preheader], [class~=pre-header], [class~=emailhide], [class~=email-hide], [class~=hide], [class~=hidden], [class~=invisible], [class~=no-display]").remove()
 
         val raw = buildString { walk(body, this) }
-        return clip(QuoteSplitter.split(raw).visible, max)
+        return clip(QuoteSplitter.split(raw.lineSequence().joinToString("\n") { it.trim() }).visible, max)
     }
 
     /**
@@ -65,8 +65,7 @@ object Snippets {
                     // Whitespace-only text nodes are markup indentation, not content —
                     // dropping them keeps quote markers ("> ") at column 0 in the
                     // extracted text.
-                    val t = node.text()
-                    if (t.isNotBlank()) sb.append(t)
+                    sb.append(node.wholeText)
                 }
                 is Element -> {
                     val tag = node.tagName().lowercase()
@@ -74,6 +73,7 @@ object Snippets {
                         sb.append('\n')
                         continue
                     }
+                    if (tag in BLOCK_TAGS && sb.isNotEmpty() && sb.last() != '\n') sb.append('\n')
                     walk(node, sb)
                     if (tag in BLOCK_TAGS) sb.append('\n')
                 }

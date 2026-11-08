@@ -12,7 +12,49 @@ import java.util.concurrent.atomic.AtomicReference
 /** Minimal DNS wire-format reader: just enough to extract MX records from a response. */
 internal object DnsWire {
     const val TYPE_MX = 15
+    const val TYPE_TXT = 16
     const val CLASS_IN = 1
+
+    /** TXT records of a DNS response; the character-strings of one record are concatenated. Never throws. */
+    fun parseTxt(msg: ByteArray): List<String> = try {
+        walkAnswers(msg) { type, m, rd, rdLen ->
+            if (type != TYPE_TXT) return@walkAnswers null
+            val sb = StringBuilder()
+            var p = rd
+            while (p < rd + rdLen) {
+                val len = m[p].toInt() and 0xFF
+                require(p + 1 + len <= rd + rdLen)
+                sb.append(String(m, p + 1, len, Charsets.UTF_8))
+                p += 1 + len
+            }
+            sb.toString()
+        }
+    } catch (e: IndexOutOfBoundsException) {
+        emptyList()
+    } catch (e: IllegalArgumentException) {
+        emptyList()
+    }
+
+    /** Calls [onRecord] for each answer; non-null results are collected. Empty for errors/NXDOMAIN. */
+    private fun walkAnswers(m: ByteArray, onRecord: (type: Int, msg: ByteArray, rdataStart: Int, rdLen: Int) -> String?): List<String> {
+        if (m.size < 12) return emptyList()
+        val flags = u16(m, 2)
+        if (flags and 0x8000 == 0 || flags and 0x000F != 0) return emptyList()
+        val qd = u16(m, 4)
+        val an = u16(m, 6)
+        var p = 12
+        repeat(qd) { p = skipName(m, p) + 4 }
+        val out = mutableListOf<String>()
+        repeat(an) {
+            p = skipName(m, p)
+            val type = u16(m, p)
+            val rdLen = u16(m, p + 8)
+            val rd = p + 10
+            onRecord(type, m, rd, rdLen)?.let(out::add)
+            p = rd + rdLen
+        }
+        return out
+    }
 
     /** MX exchange hosts of a DNS response, lowest preference first. Empty on error/truncation/NXDOMAIN. */
     fun parseMx(msg: ByteArray): List<String> = try {
@@ -117,5 +159,40 @@ class AndroidMxResolver(private val timeoutMs: Long = 4_000) : MxResolver {
             executor.shutdown()
         }
         return result.get()?.let(DnsWire::parseMx).orEmpty()
+    }
+}
+
+/** TXT lookups (used for BIMI brand-logo records). Blocking, API 29+, empty on any failure. */
+fun interface TxtResolver {
+    fun lookup(name: String): List<String>
+}
+
+class AndroidTxtResolver(private val timeoutMs: Long = 4_000) : TxtResolver {
+    override fun lookup(name: String): List<String> {
+        if (Build.VERSION.SDK_INT < 29) return emptyList()
+        return query(name)
+    }
+
+    @androidx.annotation.RequiresApi(29)
+    private fun query(name: String): List<String> {
+        val latch = CountDownLatch(1)
+        val result = AtomicReference<ByteArray?>(null)
+        val cancel = CancellationSignal()
+        val executor = Executors.newSingleThreadExecutor()
+        try {
+            DnsResolver.getInstance().rawQuery(
+                null, name, DnsWire.CLASS_IN, DnsWire.TYPE_TXT, DnsResolver.FLAG_EMPTY, executor, cancel,
+                object : DnsResolver.Callback<ByteArray> {
+                    override fun onAnswer(answer: ByteArray, rcode: Int) { result.set(answer); latch.countDown() }
+                    override fun onError(error: DnsResolver.DnsException) { latch.countDown() }
+                },
+            )
+            if (!latch.await(timeoutMs, TimeUnit.MILLISECONDS)) cancel.cancel()
+        } catch (e: Exception) {
+            return emptyList()
+        } finally {
+            executor.shutdown()
+        }
+        return result.get()?.let(DnsWire::parseTxt).orEmpty()
     }
 }

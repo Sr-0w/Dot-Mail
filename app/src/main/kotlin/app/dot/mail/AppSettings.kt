@@ -10,6 +10,12 @@ import kotlinx.coroutines.flow.asStateFlow
 enum class SwipeAction { ARCHIVE, TRASH, READ_TOGGLE, STAR_TOGGLE, NONE }
 enum class Density { COMFORTABLE, COMPACT }
 
+/** Where to go after archiving / deleting the open conversation. */
+enum class AfterAction { LIST, NEXT, PREVIOUS }
+
+/** When opening a conversation marks it as read. */
+enum class MarkRead { IMMEDIATELY, AFTER_2S, MANUALLY }
+
 /** App-wide UI preferences. Small and synchronous on purpose (SharedPreferences, read once). */
 data class UiPrefs(
     val theme: ThemeMode = ThemeMode.SYSTEM,
@@ -23,6 +29,37 @@ data class UiPrefs(
     val secureScreen: Boolean = false,
     val undoSendSeconds: Int = 5,
     val confirmLinks: Boolean = true,
+
+    // --- General
+    /** Account used for new messages; 0 = the first account. */
+    val defaultAccountId: Long = 0,
+    val confirmDelete: Boolean = false,
+    val afterAction: AfterAction = AfterAction.LIST,
+    val markRead: MarkRead = MarkRead.IMMEDIATELY,
+    /** Group messages into conversations (off: every message is its own row). */
+    val conversationView: Boolean = true,
+
+    // --- Appearance
+    /** Per-sender hues on avatars; off = one neutral grey. */
+    val avatarColors: Boolean = true,
+    /** Sender pictures, each an independent opt-in (see ui/avatar). */
+    val contactPhotos: Boolean = false,
+    val gravatar: Boolean = false,
+    val brandLogos: Boolean = false,
+    val websiteIcons: Boolean = false,
+    /** Reading text size in percent, 90..130. */
+    val readingTextPercent: Int = 100,
+
+    // --- Reading
+    val quotedExpanded: Boolean = false,
+
+    // --- Composing
+    val replyAllByDefault: Boolean = false,
+    val includeOriginal: Boolean = true,
+
+    // --- Privacy
+    /** Minutes in the background before the app locks again; 0 = as soon as it leaves the screen. */
+    val lockAfterMinutes: Int = 0,
 )
 
 class AppSettings(context: Context) {
@@ -47,6 +84,21 @@ class AppSettings(context: Context) {
             putBoolean("secure", next.secureScreen)
             putInt("undoSend", next.undoSendSeconds)
             putBoolean("confirmLinks", next.confirmLinks)
+            putLong("defaultAccountId", next.defaultAccountId)
+            putBoolean("confirmDelete", next.confirmDelete)
+            putString("afterAction", next.afterAction.name)
+            putString("markRead", next.markRead.name)
+            putBoolean("conversationView", next.conversationView)
+            putBoolean("avatarColors", next.avatarColors)
+            putBoolean("contactPhotos", next.contactPhotos)
+            putBoolean("gravatar", next.gravatar)
+            putBoolean("brandLogos", next.brandLogos)
+            putBoolean("websiteIcons", next.websiteIcons)
+            putInt("readingTextPercent", next.readingTextPercent)
+            putBoolean("quotedExpanded", next.quotedExpanded)
+            putBoolean("replyAllByDefault", next.replyAllByDefault)
+            putBoolean("includeOriginal", next.includeOriginal)
+            putInt("lockAfterMinutes", next.lockAfterMinutes)
         }
     }
 
@@ -62,6 +114,21 @@ class AppSettings(context: Context) {
             secureScreen = prefs.getBoolean("secure", d.secureScreen),
             undoSendSeconds = prefs.getInt("undoSend", d.undoSendSeconds),
             confirmLinks = prefs.getBoolean("confirmLinks", d.confirmLinks),
+            defaultAccountId = prefs.getLong("defaultAccountId", d.defaultAccountId),
+            confirmDelete = prefs.getBoolean("confirmDelete", d.confirmDelete),
+            afterAction = enumOr(prefs.getString("afterAction", null), d.afterAction),
+            markRead = enumOr(prefs.getString("markRead", null), d.markRead),
+            conversationView = prefs.getBoolean("conversationView", d.conversationView),
+            avatarColors = prefs.getBoolean("avatarColors", d.avatarColors),
+            contactPhotos = prefs.getBoolean("contactPhotos", d.contactPhotos),
+            gravatar = prefs.getBoolean("gravatar", d.gravatar),
+            brandLogos = prefs.getBoolean("brandLogos", d.brandLogos),
+            websiteIcons = prefs.getBoolean("websiteIcons", d.websiteIcons),
+            readingTextPercent = prefs.getInt("readingTextPercent", d.readingTextPercent).coerceIn(90, 130),
+            quotedExpanded = prefs.getBoolean("quotedExpanded", d.quotedExpanded),
+            replyAllByDefault = prefs.getBoolean("replyAllByDefault", d.replyAllByDefault),
+            includeOriginal = prefs.getBoolean("includeOriginal", d.includeOriginal),
+            lockAfterMinutes = prefs.getInt("lockAfterMinutes", d.lockAfterMinutes),
         )
     }
 

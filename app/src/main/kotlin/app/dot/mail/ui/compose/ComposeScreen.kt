@@ -71,6 +71,8 @@ import app.dot.design.DotShapes
 import app.dot.design.DotSpacing
 import app.dot.design.components.Avatar
 import app.dot.design.components.DotIconButton
+import app.dot.design.components.DotMenu
+import app.dot.design.components.DotMenuItem
 import app.dot.design.components.DotTopBar
 import app.dot.design.components.Hairline
 import app.dot.mail.LocalMailGraph
@@ -78,8 +80,6 @@ import app.dot.mail.LocalSettings
 import app.dot.mail.data.model.EmailAddress
 import app.dot.mail.ui.ComposeRoute
 import app.dot.mail.ui.common.Format
-import app.dot.mail.ui.inbox.DotMenu
-import app.dot.mail.ui.inbox.MenuItem
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
@@ -122,12 +122,12 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                 Box {
                     DotIconButton(Icons.Outlined.MoreVert, "More", onClick = { menu = true })
                     DotMenu(menu, { menu = false }) {
-                        MenuItem("Schedule send", Icons.Outlined.Schedule) { menu = false; scheduleMenu = true }
-                        MenuItem("Discard", Icons.Outlined.DeleteOutline, color = c.danger) { menu = false; vm.discard() }
+                        DotMenuItem("Schedule send", Icons.Outlined.Schedule) { menu = false; scheduleMenu = true }
+                        DotMenuItem("Discard", Icons.Outlined.DeleteOutline, color = c.danger) { menu = false; vm.discard() }
                     }
                     DotMenu(scheduleMenu, { scheduleMenu = false }) {
                         scheduleOptions().forEach { (label, at) ->
-                            MenuItem(label, null) { scheduleMenu = false; vm.send(scheduledAt = at) }
+                            DotMenuItem(label, null) { scheduleMenu = false; vm.send(scheduledAt = at) }
                         }
                     }
                 }
@@ -145,7 +145,7 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                     }
                     DotMenu(senderMenu, { senderMenu = false }) {
                         state.senders.forEach { s ->
-                            MenuItem("${s.name} <${s.email}>", null) { senderMenu = false; vm.setSender(s) }
+                            DotMenuItem("${s.name} <${s.email}>", null) { senderMenu = false; vm.setSender(s) }
                         }
                     }
                 }
@@ -271,9 +271,9 @@ private fun RecipientRow(
     Column {
         Row(
             Modifier.fillMaxWidth().padding(start = DotSpacing.gutter, end = DotSpacing.s, top = 6.dp, bottom = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
         ) {
-            Text(label, style = Dot.type.callout, color = c.textTertiary, modifier = Modifier.width(44.dp))
+            Text(label, style = Dot.type.callout, color = c.textTertiary, modifier = Modifier.width(44.dp).padding(top = 14.dp))
             FlowRow(
                 Modifier.weight(1f).padding(vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -395,7 +395,7 @@ private fun Plain(
     onIme: () -> Unit = {},
 ) {
     val c = Dot.colors
-    Box(modifier, contentAlignment = Alignment.CenterStart) {
+    Box(modifier, contentAlignment = if (singleLine) Alignment.CenterStart else Alignment.TopStart) {
         if (value.isEmpty() && placeholder != null) Text(placeholder, style = style, color = c.textTertiary)
         BasicTextField(
             value = value,

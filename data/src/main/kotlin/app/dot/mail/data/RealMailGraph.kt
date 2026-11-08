@@ -29,7 +29,7 @@ internal object GraphRegistry {
     @Volatile private var graph: RealMailGraph? = null
     fun get(context: Context): RealMailGraph = graph ?: synchronized(this) {
         graph ?: RealMailGraph(context.applicationContext,
-            Room.databaseBuilder(context.applicationContext, MailDatabase::class.java, "dotmail.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3).build(),
+            Room.databaseBuilder(context.applicationContext, MailDatabase::class.java, "dotmail.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build(),
             KeystoreCredentialVault()).also { graph = it; it.start() }
     }
 }
@@ -101,17 +101,39 @@ internal class RealMailGraph(
     }
     override suspend fun removeAccount(accountId: Long) = withContext(Dispatchers.IO) { syncLock.withLock { dao.deleteAccount(accountId); File(context.filesDir, "attachments/$accountId").deleteRecursively(); File(context.filesDir, "outbox/$accountId").deleteRecursively(); Unit } }
     override fun folders(accountId: Long): Flow<List<app.dot.mail.data.model.Folder>> = dao.observeFolders(accountId).map { rows -> rows.map { app.dot.mail.data.model.Folder(it.id, it.accountId, it.path, it.name, FolderRole.valueOf(it.role), it.unread, it.total) } }
-    private fun summary(t: ThreadRow) = ThreadSummary(t.id, t.accountId, t.subject, Codec.addresses(t.participants), t.snippet, t.lastAt, t.count, t.unread, t.starred, t.attachments)
-    private fun paging(where: String, args: List<Any>): Flow<PagingData<ThreadSummary>> = Pager(PagingConfig(pageSize = 40)) {
-        dao.page(SimpleSQLiteQuery("SELECT t.* FROM threads t WHERE t.count>0 AND ($where) ORDER BY t.lastAt DESC,t.id DESC", args.toTypedArray()))
-    }.flow.map { data -> data.map(::summary) }
-    override fun threads(mailbox: Mailbox): Flow<PagingData<ThreadSummary>> = when (mailbox) {
-        is Mailbox.InFolder -> paging("EXISTS(SELECT 1 FROM messages m WHERE m.threadId=t.id AND m.folderId=?)", listOf(mailbox.folderId))
-        is Mailbox.Unified -> paging("EXISTS(SELECT 1 FROM messages m JOIN folders f ON f.id=m.folderId WHERE m.threadId=t.id AND f.role=?)", listOf(mailbox.role.name))
+    internal suspend fun summary(t: ThreadRow, draftView: Boolean = false): ThreadSummary {
+        if (t.id < 0) {
+            val row = dao.draft(-t.id)
+            val d = row?.let { Codec.draft(it.json) }
+            return ThreadSummary(t.id, t.accountId, d?.subject.orEmpty(), d?.to.orEmpty(), d?.bodyText?.let { app.dot.mail.engine.text.Snippets.fromPlainText(it) }.orEmpty(), row?.updatedAt ?: t.lastAt, 1, 0, false, d?.attachmentUris?.isNotEmpty() == true, draftId = -t.id, recipients = d?.to.orEmpty())
+        }
+        val messages = dao.threadMessages(t.id)
+        val drafts = if (draftView) dao.folders(t.accountId).filter { it.role == "DRAFTS" }.map { it.id }.toSet() else emptySet()
+        val latest = (if (draftView) messages.filter { it.folderId in drafts } else messages).lastOrNull()
+        val handle = if (draftView) latest?.let { -it.id } else null
+        return ThreadSummary(t.id, t.accountId, t.subject, Codec.addresses(t.participants), t.snippet, t.lastAt, t.count, t.unread, t.starred, t.attachments, draftId = handle, recipients = latest?.let { Codec.addressField(it.header, "to") }.orEmpty())
+    }
+    private fun paging(where: String, args: List<Any>, draftView: Boolean = false, draftAccount: Long? = null): Flow<PagingData<ThreadSummary>> = Pager(PagingConfig(pageSize = 40)) {
+        mailboxSource(where, args, draftView, draftAccount)
+    }.flow.map { data -> data.map { summary(it, draftView) } }
+    internal fun mailboxSource(where: String, args: List<Any>, draftView: Boolean, draftAccount: Long?): PagingSource<Int, ThreadRow> {
+        val remote = "SELECT t.* FROM threads t WHERE t.count>0 AND ($where)" + if (draftView) " AND NOT EXISTS(SELECT 1 FROM drafts d JOIN messages m ON m.id=d.sourceMessageId WHERE m.threadId=t.id)" else ""
+        val local = if (draftView) " UNION ALL SELECT -id AS id,accountId,'' AS subject,'[]' AS participants,'' AS snippet,updatedAt AS lastAt,1 AS count,0 AS unread,0 AS starred,0 AS attachments FROM drafts" + if (draftAccount != null) " WHERE accountId=?" else "" else ""
+        val params = args + if (draftView && draftAccount != null) listOf(draftAccount) else emptyList()
+        return dao.page(SimpleSQLiteQuery("SELECT * FROM ($remote$local) ORDER BY lastAt DESC,id DESC", params.toTypedArray()))
+    }
+    override fun threads(mailbox: Mailbox): Flow<PagingData<ThreadSummary>> = flow {
+        when (mailbox) {
+            is Mailbox.InFolder -> {
+                val folder = dao.folder(mailbox.folderId)
+                emitAll(paging("EXISTS(SELECT 1 FROM messages m WHERE m.threadId=t.id AND m.folderId=?)", listOf(mailbox.folderId), folder?.role == "DRAFTS", folder?.accountId))
+            }
+            is Mailbox.Unified -> emitAll(paging("EXISTS(SELECT 1 FROM messages m JOIN folders f ON f.id=m.folderId WHERE m.threadId=t.id AND f.role=?)", listOf(mailbox.role.name), mailbox.role == FolderRole.DRAFTS))
+        }
     }
     override fun search(query: String, accountId: Long?): Flow<PagingData<ThreadSummary>> = flow {
         val job = scope.launch { runCatching { serverSearch(query, accountId) } }
-        try { emitAll(Pager(PagingConfig(pageSize = 40)) { searchSource(query, accountId) }.flow.map { it.map(::summary) }) }
+        try { emitAll(Pager(PagingConfig(pageSize = 40)) { searchSource(query, accountId) }.flow.map { it.map { row -> summary(row) } }) }
         finally { job.cancel() }
     }
     internal fun searchSource(query: String, accountId: Long?): PagingSource<Int, ThreadRow> {
@@ -155,8 +177,11 @@ internal class RealMailGraph(
     override suspend fun loadBody(messageId: Long) = withContext(Dispatchers.IO) { syncLock.withLock {
         val message = dao.message(messageId) ?: return@withLock
         if (message.bodyLoaded) return@withLock
-        val folder = requireNotNull(dao.folder(message.folderId)); val account = requireNotNull(dao.account(message.accountId)); val config = Codec.config(account.config)
-        val body = client.body(config.imap.endpoint(), credentials(account), folder.path, message.uid, folder.validity)
+        val pending = if (message.uid < 0) pendingMove(message) else null
+        if (message.uid < 0 && pending == null) throw MailActionException(MailActionFailure.OPERATION_PENDING, "This message is moving. Try opening it shortly.")
+        val folder = dao.folder(pending?.folderId ?: message.folderId) ?: throw MailActionException(MailActionFailure.FOLDER_UNAVAILABLE, "Message folder is no longer available")
+        val account = requireNotNull(dao.account(message.accountId)); val config = Codec.config(account.config)
+        val body = client.body(config.imap.endpoint(), credentials(account), folder.path, pending?.uid ?: message.uid, pending?.validity ?: folder.validity)
         val parts = body.attachments.map { part -> val file = attachmentFile(account.id, "${UUID.randomUUID()}/${safeFileName(part.name)}"); file.writeBytes(part.bytes); AttachmentRow(messageId = messageId, partId = part.partId, name = part.name, mime = part.mimeType, size = part.bytes.size.toLong(), cid = part.contentId, inline = part.inline, localUri = uri(file)) }
         database.withTransaction {
             dao.clearAttachments(messageId); parts.forEach { dao.insertAttachment(it) }
@@ -171,7 +196,8 @@ internal class RealMailGraph(
         val old = dao.byUid(folder.id, header.uid) ?: header.messageId?.let { mid -> dao.folderMessages(folder.id).firstOrNull { it.uid < 0 && Codec.field(it.header, "messageId") == mid } }
         if (old != null) {
             // Pending optimistic changes win until replay completes.
-            if (dao.operations(folder.accountId).none { it.folderId == folder.id && it.uid == header.uid && it.validity == folder.validity }) dao.updateMessage(old.copy(uid = header.uid, unread = !header.flags.seen, starred = header.flags.starred))
+            val pending = dao.operations(folder.accountId).any { it.messageLocalId == old.id || (it.folderId == folder.id && it.uid == header.uid && it.validity == folder.validity) }
+            dao.updateMessage(old.copy(uid = header.uid, unread = if (pending) old.unread else !header.flags.seen, starred = if (pending) old.starred else header.flags.starred))
             rebuildThread(old.threadId); return old.threadId to false
         }
         val keys = Threading.keys(header)
@@ -188,45 +214,117 @@ internal class RealMailGraph(
         val latest = distinct.lastOrNull()
         dao.updateThread(row.copy(subject = latest?.subject ?: row.subject, participants = Codec.addresses(distinct.flatMap { Codec.addressField(it.header, "from") }.distinctBy { it.email }), snippet = latest?.snippet.orEmpty(), lastAt = latest?.sentAt ?: 0, count = distinct.size, unread = distinct.count { it.unread }, starred = distinct.any { it.starred }, attachments = distinct.any { it.hasAttachments }))
     }
+    private suspend fun moveMessage(message: MessageRow, target: FolderRow) {
+        if (message.accountId != target.accountId) throw MailActionException(MailActionFailure.ACCOUNT_MISMATCH, "Choose a destination in the same account")
+        if (message.folderId == target.id) return
+        val source = dao.folder(message.folderId) ?: return
+        if (message.uid < 0) {
+            val op = pendingMove(message) ?: throw MailActionException(MailActionFailure.OPERATION_PENDING, "This move is still being synchronized. Try again shortly.")
+            if (op.folderId == target.id) {
+                dao.deleteOperation(op.id)
+                if (op.desiredSeen != null || op.desiredStarred != null) dao.insertOperation(op.copy(id = 0, action = "FLAGS", target = null))
+                dao.updateMessage(message.copy(folderId = target.id, uid = op.uid)); return
+            }
+            dao.updateOperation(op.copy(target = target.path))
+        } else dao.insertOperation(OperationRow(accountId = message.accountId, folderId = source.id, validity = source.validity, uid = message.uid, action = "MOVE", target = target.path, messageLocalId = message.id))
+        dao.updateMessage(message.copy(folderId = target.id, uid = -message.id))
+    }
+    private suspend fun pendingMove(message: MessageRow): OperationRow? {
+        val candidates = dao.operations(message.accountId).filter { it.action == "MOVE" && (it.messageLocalId == message.id || it.messageLocalId == null) }
+        return candidates.firstOrNull { it.messageLocalId == message.id } ?: candidates.filter { it.target == dao.folder(message.folderId)?.path }.singleOrNull()
+    }
     override suspend fun apply(action: MessageAction, threadIds: Collection<Long>) = withContext(Dispatchers.IO) { syncLock.withLock {
         database.withTransaction {
-            threadIds.distinct().forEach { thread ->
-                dao.threadMessages(thread).forEach { message ->
-                    require(message.uid > 0) { "Message move is awaiting server synchronization" }
-                    val folder = requireNotNull(dao.folder(message.folderId))
-                    val targetRole = when (action) { MessageAction.ARCHIVE -> FolderRole.ARCHIVE; MessageAction.TRASH -> FolderRole.TRASH; MessageAction.SPAM -> FolderRole.SPAM; MessageAction.NOT_SPAM -> FolderRole.INBOX; else -> null }
-                    val target = targetRole?.let { role -> dao.folders(message.accountId).firstOrNull { it.role == role.name } ?: if (role == FolderRole.ARCHIVE) dao.folders(message.accountId).firstOrNull { it.role == FolderRole.ALL_MAIL.name } else null }
-                    require(targetRole == null || target != null) { "No ${targetRole?.name} folder available" }
-                    dao.insertOperation(OperationRow(accountId = message.accountId, folderId = folder.id, validity = folder.validity, uid = message.uid, action = if (target != null) "MOVE" else action.name, target = target?.path))
-                    when (action) {
-                        MessageAction.MARK_READ -> dao.updateMessage(message.copy(unread = false)); MessageAction.MARK_UNREAD -> dao.updateMessage(message.copy(unread = true))
-                        MessageAction.STAR -> dao.updateMessage(message.copy(starred = true)); MessageAction.UNSTAR -> dao.updateMessage(message.copy(starred = false))
-                        else -> if (target != null) dao.updateMessage(message.copy(folderId = target.id, uid = -message.id)) else dao.deleteMessage(message.id)
+            for (thread in threadIds.distinct()) {
+                if (thread < 0) { if (action in setOf(MessageAction.TRASH, MessageAction.DELETE_FOREVER)) removeDraftAndSource(-thread); continue }
+                for (message in dao.threadMessages(thread)) {
+                    val seen = when(action) { MessageAction.MARK_READ -> true; MessageAction.MARK_UNREAD -> false; else -> null }
+                    val starred = when(action) { MessageAction.STAR -> true; MessageAction.UNSTAR -> false; else -> null }
+                    if (seen != null || starred != null) {
+                        if (message.uid < 0) {
+                            val move = pendingMove(message)
+                            val existing = move ?: dao.operations(message.accountId).firstOrNull { it.action == "DEFERRED_FLAGS" && it.messageLocalId == message.id }
+                            val op = existing ?: OperationRow(accountId = message.accountId, folderId = message.folderId, validity = 0, uid = 0, action = "DEFERRED_FLAGS", messageLocalId = message.id)
+                            val updated = op.copy(desiredSeen = seen ?: op.desiredSeen, desiredStarred = starred ?: op.desiredStarred)
+                            if (existing != null) dao.updateOperation(updated) else dao.insertOperation(updated)
+                        } else dao.folder(message.folderId)?.let { folder -> dao.insertOperation(OperationRow(accountId = message.accountId, folderId = folder.id, validity = folder.validity, uid = message.uid, action = action.name, messageLocalId = message.id)) }
+                        dao.updateMessage(message.copy(unread = seen?.not() ?: message.unread, starred = starred ?: message.starred))
+                        continue
                     }
-                }; rebuildThread(thread)
+                    val role = when(action) { MessageAction.ARCHIVE -> FolderRole.ARCHIVE; MessageAction.TRASH -> FolderRole.TRASH; MessageAction.SPAM -> FolderRole.SPAM; MessageAction.NOT_SPAM -> FolderRole.INBOX; else -> null }
+                    if (role != null) {
+                        val folders = dao.folders(message.accountId)
+                        val target = folders.firstOrNull { it.role == role.name } ?: if (role == FolderRole.ARCHIVE) folders.firstOrNull { it.role == "ALL_MAIL" } else null
+                        if (target == null) throw MailActionException(MailActionFailure.FOLDER_UNAVAILABLE, "This account has no ${role.name.lowercase().replace('_',' ')} folder")
+                        moveMessage(message, target)
+                    } else if (action == MessageAction.DELETE_FOREVER) {
+                        val move = if (message.uid < 0) pendingMove(message) else null
+                        if (move != null) dao.updateOperation(move.copy(action = action.name, target = null))
+                        else if (message.uid > 0) dao.folder(message.folderId)?.let { dao.insertOperation(OperationRow(accountId = message.accountId, folderId = it.id, validity = it.validity, uid = message.uid, action = action.name, messageLocalId = message.id)) }
+                        else throw MailActionException(MailActionFailure.OPERATION_PENDING, "This message is still being synchronized")
+                        dao.deleteMessage(message.id)
+                    }
+                }
+                rebuildThread(thread)
             }
         }; requestSync()
     } }
     override suspend fun move(threadIds: Collection<Long>, targetFolderId: Long) = withContext(Dispatchers.IO) { syncLock.withLock {
-        val target = requireNotNull(dao.folder(targetFolderId))
-        database.withTransaction { threadIds.distinct().forEach { thread -> dao.threadMessages(thread).forEach { message ->
-            require(message.accountId == target.accountId) { "Moving between accounts is unsupported" }
-            if (message.folderId != target.id) { val source = requireNotNull(dao.folder(message.folderId)); dao.insertOperation(OperationRow(accountId = message.accountId, folderId = source.id, validity = source.validity, uid = message.uid, action = "MOVE", target = target.path)); dao.updateMessage(message.copy(folderId = target.id, uid = -message.id)) }
-        }; rebuildThread(thread) } }; requestSync()
+        val target = dao.folder(targetFolderId) ?: throw MailActionException(MailActionFailure.FOLDER_UNAVAILABLE, "Destination folder is no longer available")
+        database.withTransaction {
+            if (threadIds.any { it < 0 }) throw MailActionException(MailActionFailure.OPERATION_PENDING, "Open or discard a local draft instead of moving it")
+            val messages = threadIds.distinct().flatMap { dao.threadMessages(it) }
+            if (messages.any { it.accountId != target.accountId }) throw MailActionException(MailActionFailure.ACCOUNT_MISMATCH, "Choose conversations and a destination in the same account")
+            messages.forEach { moveMessage(it, target) }
+            threadIds.distinct().forEach { rebuildThread(it) }
+        }; requestSync()
     } }
-    override suspend fun refresh(mailbox: Mailbox) { requestSync() }
+    override suspend fun refresh(mailbox: Mailbox) {
+        val ids = when(mailbox) { is Mailbox.InFolder -> dao.folder(mailbox.folderId)?.accountId?.let { setOf(it) } ?: throw MailSyncException("Folder is no longer available"); is Mailbox.Unified -> null }
+        try {
+            withTimeout(60_000) { if (!syncAll(ids)) throw MailSyncException("Could not sync mail. Check the account status and connection.") }
+        } catch (_: TimeoutCancellationException) {
+            withContext(NonCancellable) { dao.accounts().filter { ids == null || it.id in ids }.forEach { dao.syncError(it.id, "Sync timed out. Try again shortly.", it.authError) } }
+            throw MailSyncException("Sync timed out. Try again shortly.")
+        }
+    }
     override suspend fun suggestContacts(prefix: String, limit: Int): List<EmailAddress> = withContext(Dispatchers.IO) {
         dao.contacts(prefix.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%", limit.coerceIn(1, 50)).map { EmailAddress(it.email, it.name) }
     }
-    override suspend fun saveDraft(draft: Draft): Long = withContext(Dispatchers.IO) {
+    private val draftLock = Mutex()
+    override suspend fun saveDraft(draft: Draft): Long = withContext(Dispatchers.IO) { draftLock.withLock {
         requireNotNull(dao.account(draft.accountId))
-        if (draft.localId != 0L) require(dao.draft(draft.localId)?.accountId == draft.accountId)
+        val previous = if (draft.localId != 0L) dao.draft(draft.localId) else null
+        if (draft.localId != 0L && previous?.accountId != draft.accountId) throw MailActionException(MailActionFailure.ACCOUNT_MISMATCH, "Save a new draft when changing accounts")
         val (cached, sources) = cacheAttachments(draft)
         val json = org.json.JSONObject(Codec.draft(cached)).put("attachmentSources", sources).toString()
-        dao.putDraft(DraftRow(draft.localId, draft.accountId, json))
+        dao.putDraft(DraftRow(draft.localId, draft.accountId, json, System.currentTimeMillis(), previous?.sourceMessageId))
+    } }
+    override suspend fun loadDraft(localId: Long): Draft? {
+        if (localId >= 0) return dao.draft(localId)?.let { Codec.draft(it.json).copy(localId = it.id) }
+        val messageId = -localId
+        dao.draftForMessage(messageId)?.let { return Codec.draft(it.json).copy(localId = it.id) }
+        loadBody(messageId)
+        return draftLock.withLock { database.withTransaction {
+            dao.draftForMessage(messageId)?.let { return@withTransaction Codec.draft(it.json).copy(localId = it.id) }
+            val message = dao.message(messageId) ?: return@withTransaction null
+            if (dao.folder(message.folderId)?.role != "DRAFTS") return@withTransaction null
+            val d = Draft(accountId = message.accountId, identityId = message.accountId, to = Codec.addressField(message.header, "to"), cc = Codec.addressField(message.header, "cc"), bcc = Codec.addressField(message.header, "bcc"), subject = message.subject, bodyText = message.text.orEmpty(), attachmentUris = dao.attachments(messageId).filter { !it.inline }.mapNotNull { it.localUri }, references = Codec.strings(Codec.field(message.header, "refs") ?: "[]"))
+            val id = dao.putDraft(DraftRow(accountId = message.accountId, json = Codec.draft(d), updatedAt = System.currentTimeMillis(), sourceMessageId = messageId))
+            d.copy(localId = id)
+        } }
     }
-    override suspend fun loadDraft(localId: Long): Draft? = dao.draft(localId)?.let { Codec.draft(it.json).copy(localId = it.id) }
-    override suspend fun discardDraft(localId: Long) { dao.deleteDraft(localId) }
+    private suspend fun removeDraftAndSource(localId: Long) {
+        val source = dao.draft(localId)?.sourceMessageId?.let { dao.message(it) }
+        if (source != null && source.uid > 0) {
+            dao.folder(source.folderId)?.let { folder -> dao.insertOperation(OperationRow(accountId = source.accountId, folderId = folder.id, validity = folder.validity, uid = source.uid, action = MessageAction.DELETE_FOREVER.name, messageLocalId = source.id)) }
+            dao.deleteMessage(source.id); rebuildThread(source.threadId)
+        }
+        dao.deleteDraft(localId)
+    }
+    override suspend fun discardDraft(localId: Long) {
+        database.withTransaction { removeDraftAndSource(localId) }; requestSync()
+    }
     override suspend fun prepareReply(messageId: Long, mode: ReplyMode): Draft = withContext(Dispatchers.IO) {
         loadBody(messageId)
         val m = requireNotNull(dao.message(messageId)); val account = requireNotNull(dao.account(m.accountId))
@@ -242,14 +340,14 @@ internal class RealMailGraph(
         requireNotNull(dao.account(draft.accountId))
         val frozen = cacheAttachments(draft).first
         val due = maxOf(System.currentTimeMillis() + undoWindowMs.coerceIn(0, 60_000), draft.scheduledAt ?: 0)
-        val id = database.withTransaction { val id = dao.insertOutbox(OutboxRow(accountId = draft.accountId, draft = Codec.draft(frozen), dueAt = due)); if (draft.localId != 0L) dao.deleteDraft(draft.localId); id }
+        val id = database.withTransaction { val id = dao.insertOutbox(OutboxRow(accountId = draft.accountId, draft = Codec.draft(frozen), dueAt = due)); if (draft.localId != 0L) removeDraftAndSource(draft.localId); id }
         if (scheduling) WorkScheduling.outbox(context, id, due); id
     }
     override suspend fun cancelSend(outboxId: Long): Boolean = database.withTransaction {
         val row = dao.outbox(outboxId) ?: return@withTransaction false
         if (dao.transitionOutbox(outboxId, "PENDING", "CANCELLED") != 1) return@withTransaction false
         val draft = Codec.draft(row.draft)
-        dao.putDraft(DraftRow(draft.localId, row.accountId, row.draft)); true
+        dao.putDraft(DraftRow(draft.localId, row.accountId, row.draft, System.currentTimeMillis())); true
     }
     override suspend fun retrySend(outboxId: Long, confirmPossibleDuplicate: Boolean): Boolean = withContext(Dispatchers.IO) {
         if (!syncLock.tryLock()) return@withContext false

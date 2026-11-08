@@ -11,6 +11,32 @@ import java.util.UUID
 
 /** Explicitly opted-in test. Only test-generated self-mail is written/moved. Never enable protocol debug. */
 class LiveInfomaniakTest {
+    /** Reproduces first-vs-incremental sync without any mailbox writes. */
+    @Test fun incrementalReadOnly() = runBlocking {
+        val file = Path.of(System.getProperty("user.home"), ".config", "dotmail", "test-account.env")
+        assumeTrue(System.getenv("DOTMAIL_LIVE") == "1" && Files.isRegularFile(file))
+        val config = Files.readAllLines(file).filter { '=' in it && !it.trimStart().startsWith('#') }.associate { it.substringBefore('=').trim().removePrefix("export ") to it.substringAfter('=').trim().trim('\"', '\'') }
+        val email = requireNotNull(config["DOTMAIL_TEST_EMAIL"])
+        val endpoint = Endpoint("mail.infomaniak.com", 993, email, TransportSecurity.SSL_TLS)
+        val credentials = Credentials(requireNotNull(config["DOTMAIL_TEST_PASSWORD"]))
+        val client = MailClient()
+        var failed = false
+        for ((index, folder) in client.folders(endpoint, credentials).withIndex()) {
+            var phase = "initial"
+            try {
+                val first = client.sync(endpoint, credentials, folder.path, limit = 20)
+                phase = "incremental"
+                val next = client.sync(endpoint, credentials, folder.path, first.cursor, limit = 20)
+                assertFalse(next.reset)
+                println("LIVE READONLY folder=$index role=${folder.role} initial+incremental OK condstore=${first.cursor.highestModSeq >= 0}")
+            } catch (e: Exception) {
+                failed = true
+                val classes = generateSequence<Throwable>(e) { it.cause }.take(8).map { it.javaClass.simpleName }.joinToString(" -> ")
+                println("LIVE READONLY folder=$index role=${folder.role} phase=$phase failure=$classes")
+            }
+        }
+        assertFalse("One or more read-only sync attempts failed; see sanitized stage/class output", failed)
+    }
     @Test fun imapAndBothSmtpTransports() = runBlocking {
         val path = Path.of(System.getProperty("user.home"), ".config", "dotmail", "test-account.env")
         assumeTrue("Live interop requires DOTMAIL_LIVE=1 and an external credentials file", System.getenv("DOTMAIL_LIVE") == "1" && Files.isRegularFile(path))

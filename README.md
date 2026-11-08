@@ -28,9 +28,11 @@ between your phone and your provider.
 
 <div align="center">
 
-| Inbox | Conversation | Compose |
+| Inbox | Conversation | Mailboxes |
 |:---:|:---:|:---:|
-| <img src="docs/screenshots/inbox-dark.png" width="240" alt="Inbox, dark theme" /> | <img src="docs/screenshots/thread-dark.png" width="240" alt="Conversation view" /> | <img src="docs/screenshots/compose-dark.png" width="240" alt="Composer" /> |
+| <img src="docs/screenshots/inbox-dark.png" width="240" alt="Unified inbox, dark theme" /> | <img src="docs/screenshots/thread-dark.png" width="240" alt="Conversation view" /> | <img src="docs/screenshots/drawer-dark.png" width="240" alt="Sidebar with accounts and folders" /> |
+
+<sub>Screenshots from the built-in demo mode on a Galaxy S25 Ultra — sample data, not real mail.</sub>
 
 </div>
 

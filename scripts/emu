@@ -2,7 +2,8 @@
 # Drives the test device (the owner's phone over wireless adb by default; DEVICE=serial to override).
 #   scripts/emu install [apk]      install (default build-out/apk/debug/app-debug.apk) and launch
 #   scripts/emu shot out.png       screenshot to a local file
-#   scripts/emu adb <args...>      any adb command on the device
+#   scripts/emu input tap X Y | text T | keyevent K   guarded input (refused unless Dot Mail is in front)
+#   scripts/emu adb <args...>      any adb command on the device (not for input/screenshots)
 #   scripts/emu reconnect          re-discover the phone's wireless-debugging port (mDNS) and connect
 # It is a real personal phone: only touch app.dot.mail. Never clear other apps' data, never uninstall
 # anything else, never read other apps' content. Screenshots only while Dot Mail is in the foreground.
@@ -26,7 +27,13 @@ case "$cmd" in
     fg=$("$ADB" -s "$DEVICE" shell dumpsys activity activities | grep -m1 -E "topResumedActivity|mResumedActivity" || true)
     case "$fg" in *app.dot.mail*) ;; *) echo "refusing: Dot Mail is not in the foreground ($fg)"; exit 3 ;; esac
     "$ADB" -s "$DEVICE" exec-out screencap -p > "$out"; echo "$out" ;;
+  input)
+    # Guarded input: every tap/text/key is refused unless Dot Mail is in the foreground at that instant.
+    fg=$("$ADB" -s "$DEVICE" shell dumpsys activity activities | grep -m1 -E "topResumedActivity|mResumedActivity" || true)
+    case "$fg" in *app.dot.mail*) ;; *) echo "refusing input: Dot Mail is not in the foreground"; exit 3 ;; esac
+    "$ADB" -s "$DEVICE" shell input "$@" ;;
   adb)
+    # Raw adb: never use for `shell input` or screencap (use `input` / `shot`, which check the foreground).
     "$ADB" -s "$DEVICE" "$@" ;;
   *) echo "usage: scripts/emu install [apk]|shot out.png|adb args|reconnect"; exit 2 ;;
 esac

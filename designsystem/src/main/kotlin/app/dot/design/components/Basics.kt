@@ -42,7 +42,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import app.dot.design.AvatarTints
+import app.dot.design.AvatarTones
 import app.dot.design.Dot
 import app.dot.design.DotMotion
 import app.dot.design.DotShapes
@@ -156,22 +156,28 @@ fun DotIconButton(
     }
 }
 
-/** Initials avatar with a muted, stable tint derived from [seed] (usually the email address). */
+/** When false, avatars use one neutral grey instead of a per-sender hue (Settings → Appearance). */
+val LocalAvatarColors = androidx.compose.runtime.compositionLocalOf { true }
+
+/** Stable hue index for an address, shared by every avatar surface. */
+fun avatarHue(seed: String): Int = (seed.trim().lowercase().hashCode() and 0x7fffffff) % AvatarTones.size
+
+/** Initials avatar with a stable tinted hue derived from [seed] (usually the email address). */
 @Composable
 fun Avatar(name: String, seed: String, modifier: Modifier = Modifier, size: Dp = 40.dp) {
-    val dark = Dot.colors.isDark
-    val tint = AvatarTints[(seed.lowercase().hashCode() and 0x7fffffff) % AvatarTints.size].let { if (dark) it.first else it.second }
+    val c = Dot.colors
+    val tone = AvatarTones[avatarHue(seed)]
+    val colorful = LocalAvatarColors.current
+    val fill = if (!colorful) c.surfaceRaised else if (c.isDark) tone.darkFill else tone.lightFill
+    val text = if (!colorful) c.textSecondary else if (c.isDark) tone.darkText else tone.lightText
     Box(
-        modifier
-            .size(size)
-            .clip(CircleShape)
-            .background(tint.copy(alpha = if (dark) 0.22f else 0.14f)),
+        modifier.size(size).clip(CircleShape).background(fill),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             initials(name),
             style = if (size >= 40.dp) Dot.type.label else Dot.type.caption,
-            color = tint,
+            color = text,
             maxLines = 1,
         )
     }
