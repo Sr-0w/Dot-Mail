@@ -362,4 +362,102 @@
     <!-- Snooze additions -->
     <string name="snooze_today">Today</string>
     <string name="snooze_this_evening_label">This evening</string>
+
+    <!-- Thread -->
+    <string name="thread_error_download">Couldn\'t download this message. %1$s</string>
+    <string name="thread_unsub_done">Unsubscribed. You may still get mail already on its way.</string>
+    <string name="thread_unsub_failed">Couldn\'t reach the sender\'s unsubscribe service. Try again later.</string>
+    <string name="thread_error_open_attachment">Couldn\'t open %1$s</string>
+    <string name="thread_no_app_to_open">No app can open %1$s</string>
+    <string name="thread_more">More</string>
+    <string name="thread_mute_conversation">Mute conversation</string>
+    <string name="thread_unmute_conversation">Unmute conversation</string>
+    <string name="thread_star">Star</string>
+    <string name="thread_remove_star">Remove star</string>
+    <string name="thread_unsubscribe">Unsubscribe</string>
+    <string name="thread_unavailable_title">Conversation unavailable</string>
+    <string name="thread_unavailable_body">It may have been moved or deleted.</string>
+    <string name="thread_confirm_trash_title">Move to trash?</string>
+    <string name="thread_confirm_delete_title">Delete forever?</string>
+    <string name="thread_confirm_delete_body">This conversation will be permanently removed from the server.</string>
+    <string name="thread_unsub_title">Unsubscribe?</string>
+    <string name="thread_unsub_body">Dot Mail will send a one-click unsubscribe request to %1$s. Nothing else is shared — no cookies, no browser.</string>
+    <string name="thread_link_title">Open link?</string>
+    <string name="thread_link_homograph">This address mixes alphabets or uses look-alike letters — it may imitate another site.</string>
+    <string name="thread_link_not_encrypted">This link is not encrypted.</string>
+    <string name="thread_link_strip_tracking">Remove tracking parameters</string>
+    <string name="thread_link_open">Open</string>
+    <string name="thread_starred">Starred</string>
+    <string name="thread_to_recipients">to %1$s</string>
+    <string name="thread_undisclosed_recipients">undisclosed recipients</string>
+    <string name="thread_recipients_more">%1$s +%2$d</string>
+    <string name="thread_truncated">This message is very long — showing the beginning.</string>
+    <string name="thread_header_reply_to">Reply to</string>
+    <string name="thread_header_date">Date</string>
+    <plurals name="thread_remote_blocked">
+        <item quantity="one">1 remote image blocked to protect your privacy</item>
+        <item quantity="other">%1$d remote images blocked to protect your privacy</item>
+    </plurals>
+    <string name="thread_load_images">Load images</string>
+    <string name="thread_remote_more">More options for remote images</string>
+    <string name="thread_always_for">Always for %1$s</string>
+    <string name="thread_remote_confirm_title">Always load images from %1$s?</string>
+    <string name="thread_remote_confirm_body">Senders can see when and where you open their mail. Only do this for senders you trust. You can remove the rule in Settings → Privacy &amp; security → Remote images.</string>
+    <string name="thread_remote_confirm_action">Always load</string>
+    <string name="thread_images_loaded">Images loaded · %1$s</string>
+    <string name="thread_images_loaded_always_for">always for %1$s</string>
+    <string name="thread_images_loaded_this_message">this message</string>
+    <string name="thread_stop">Stop</string>
+    <string name="thread_stop_label">Stop loading images</string>
+    <string name="thread_error_reply_failed">Couldn\'t send your reply</string>
+    <string name="thread_reply_sending">Sending your reply to the organiser…</string>
+    <string name="thread_undo">Undo</string>
+    <string name="thread_reply_too_late">Too late — the reply was already sent</string>
+    <string name="thread_open">Open</string>
+    <string name="thread_share">Share</string>
+    <string name="thread_reply_to_all">Reply to all</string>
+    <string name="thread_reply_to_name">Reply to %1$s</string>
+
+    <!-- Attachments browser -->
+    <string name="attachments_title">Attachments</string>
+    <string name="attachments_search_placeholder">Search file name or sender</string>
+    <string name="attachments_filter_all">All</string>
+    <string name="attachments_kind_images">Images</string>
+    <string name="attachments_kind_pdfs">PDFs</string>
+    <string name="attachments_kind_documents">Documents</string>
+    <string name="attachments_kind_other">Other</string>
+    <string name="attachments_empty_title">No attachments yet</string>
+    <string name="attachments_empty_body">Files sent to you appear here, across all accounts.</string>
+    <string name="attachments_no_match_title">No matching attachments</string>
+    <string name="attachments_no_match_body">Try another type or search.</string>
+    <string name="attachments_downloading">Downloading %1$s…</string>
+    <string name="attachments_download_and_open">Download and open</string>
+
+    <!-- Calendar invites -->
+    <string name="calendar_event_fallback">Calendar event</string>
+    <string name="calendar_no_subject">(No subject)</string>
+    <string name="calendar_add_to_calendar">Add to calendar</string>
+    <string name="calendar_accept">Accept</string>
+    <string name="calendar_maybe">Maybe</string>
+    <string name="calendar_decline">Decline</string>
+    <string name="calendar_all_day">All day</string>
+    <string name="calendar_all_day_range">All day · %1$s – %2$s</string>
+
+    <!-- PDF viewer -->
+    <string name="pdf_open_with">Open with…</string>
+    <string name="pdf_unavailable">This PDF can\'t be previewed here (it may be protected or damaged). Use “Open with…”.</string>
+    <string name="pdf_page">Page %1$d</string>
+
+    <!-- Templates -->
+    <string name="templates_title">Templates</string>
+    <string name="templates_empty">No templates yet. Write a message, then save it here to reuse it. You can use {{first_name}}, {{name}}, {{my_name}} and {{date}}.</string>
+    <string name="templates_delete">Delete template</string>
+    <string name="templates_save_this">Save this message as a template</string>
+    <string name="templates_save_title">Save template</string>
+    <string name="templates_name">Name</string>
+    <string name="templates_save_note">The subject and body are saved; recipients are not.</string>
+
+    <!-- More thread/calendar -->
+    <string name="calendar_cancelled">Cancelled</string>
+    <string name="thread_downloading">Downloading</string>
 </resources>

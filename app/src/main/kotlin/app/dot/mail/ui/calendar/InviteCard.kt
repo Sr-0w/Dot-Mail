@@ -38,6 +38,8 @@ import app.dot.design.ThemeMode
 import app.dot.design.components.ButtonStyle
 import app.dot.design.components.DotButton
 import app.dot.design.components.DotPrimaryButton
+import androidx.compose.ui.res.stringResource
+import app.dot.mail.R
 import app.dot.mail.engine.calendar.Ics
 import java.time.LocalDate
 import java.time.LocalTime
@@ -71,6 +73,8 @@ fun InviteCard(
     use24h: Boolean = false,
 ) {
     val c = Dot.colors
+    // The range wording is translated; its two dates are formatted per call.
+    val rangeTemplate = stringResource(R.string.calendar_all_day_range, "\u0001", "\u0002")
     val cancelled = invite.method == Ics.Method.CANCEL
     val showResponse = invite.method == Ics.Method.REQUEST &&
         myEmail != null &&
@@ -90,7 +94,7 @@ fun InviteCard(
             Spacer(Modifier.width(DotSpacing.m))
             Column(Modifier.weight(1f)) {
                 Text(
-                    invite.summary.ifBlank { "(No subject)" },
+                    invite.summary.ifBlank { stringResource(R.string.calendar_no_subject) },
                     style = Dot.type.headline,
                     color = if (cancelled) c.textSecondary else c.textPrimary,
                     fontWeight = if (cancelled) FontWeight.Medium else FontWeight.SemiBold,
@@ -105,12 +109,12 @@ fun InviteCard(
                     ) {
                         Icon(Icons.Outlined.EventBusy, null, Modifier.size(14.dp), tint = c.danger)
                         Spacer(Modifier.width(DotSpacing.xs))
-                        Text("Cancelled", style = Dot.type.label, color = c.danger)
+                        Text(stringResource(R.string.calendar_cancelled), style = Dot.type.label, color = c.danger)
                     }
                 }
                 Spacer(Modifier.height(DotSpacing.xs))
                 Text(
-                    timeLine(invite.start, invite.end, use24h),
+                    timeLine(invite.start, invite.end, use24h, stringResource(R.string.calendar_all_day)) { a, b -> rangeTemplate.replace("\u0001", a).replace("\u0002", b) },
                     style = Dot.type.callout,
                     color = c.textSecondary,
                 )
@@ -127,7 +131,7 @@ fun InviteCard(
         if (!cancelled) {
             Spacer(Modifier.height(DotSpacing.m))
             DotButton(
-                "Add to calendar",
+                stringResource(R.string.calendar_add_to_calendar),
                 onAddToCalendar,
                 style = ButtonStyle.Secondary,
                 compact = true,
@@ -138,9 +142,9 @@ fun InviteCard(
         if (showResponse) {
             Spacer(Modifier.height(DotSpacing.s))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(DotSpacing.s)) {
-                ResponseButton("Accept", Ics.PartStat.ACCEPTED, myResponse, responding, onRespond, Modifier.weight(1f))
-                ResponseButton("Maybe", Ics.PartStat.TENTATIVE, myResponse, responding, onRespond, Modifier.weight(1f))
-                ResponseButton("Decline", Ics.PartStat.DECLINED, myResponse, responding, onRespond, Modifier.weight(1f))
+                ResponseButton(stringResource(R.string.calendar_accept), Ics.PartStat.ACCEPTED, myResponse, responding, onRespond, Modifier.weight(1f))
+                ResponseButton(stringResource(R.string.calendar_maybe), Ics.PartStat.TENTATIVE, myResponse, responding, onRespond, Modifier.weight(1f))
+                ResponseButton(stringResource(R.string.calendar_decline), Ics.PartStat.DECLINED, myResponse, responding, onRespond, Modifier.weight(1f))
             }
         }
     }
@@ -182,14 +186,14 @@ private fun MetaLine(icon: ImageVector, text: String) {
  * RFC-exclusive end adjusted), "09:00 – 09:30", and "09:00 – Jun 11, 10:30"
  * when the end falls on a later day.
  */
-private fun timeLine(start: Ics.EventTime, end: Ics.EventTime?, use24h: Boolean): String {
+private fun timeLine(start: Ics.EventTime, end: Ics.EventTime?, use24h: Boolean, allDayLabel: String, allDayRange: (String, String) -> String): String {
     val timeFmt = DateTimeFormatter.ofPattern(if (use24h) "HH:mm" else "h:mm a")
-    val dateFmt = DateTimeFormatter.ofPattern("MMM d")
+    val dateFmt = runCatching { DateTimeFormatter.ofPattern(android.text.format.DateFormat.getBestDateTimePattern(java.util.Locale.getDefault(), "MMMd")) }.getOrElse { DateTimeFormatter.ofPattern("MMM d") }
     return when {
         start.allDay -> {
             val last = end?.date?.minusDays(1) ?: start.date
-            if (last > start.date) "All day · ${start.date.format(dateFmt)} – ${last.format(dateFmt)}"
-            else "All day"
+            if (last > start.date) allDayRange(start.date.format(dateFmt), last.format(dateFmt))
+            else allDayLabel
         }
         else -> {
             val s = start.time?.format(timeFmt).orEmpty()
