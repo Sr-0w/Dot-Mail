@@ -73,7 +73,7 @@ mandatory account. Verified by listing **every** dependency from `gradle/libs.ve
 | jakarta.mail:jakarta.mail-api (2.1.3) | yes | dual: EPL-2.0 / GPL-2.0 w/ Classpath exception | free (EPL-2.0 branch) |
 | org.jsoup:jsoup (1.18.3) | yes | dual: ISC / MIT | free |
 | com.caverock:androidsvg-aar (1.4) | yes | MPL-2.0 | free (weak copyleft, source-available) |
-| com.mohamedrejeb.richeditor:richeditor-compose (1.0.0-rc13) | yes | GPL-3.0-or-later | free; matches the app's own licence |
+| com.mohamedrejeb.richeditor:richeditor-compose (1.0.0-rc13) | yes | Apache-2.0 | free |
 | junit (4.13.2) | no — test only | EPL-1.0 | free |
 | com.google.truth:truth (1.4.4) | no — test only | Apache-2.0 | free |
 | com.icegreen:greenmail (2.1.2) | no — test only | Apache-2.0 | free |

@@ -31,7 +31,7 @@ are testing**.
 | JDK | 17 | `compileOptions` + `kotlinOptions.jvmTarget` in each module's `build.gradle.kts` (the Gradle wrapper does **not** pin the JDK — use the same JDK on the same major version) |
 | compileSdk / targetSdk | 35 / 35 | `app/build.gradle.kts` |
 | minSdk | 26 | `app/build.gradle.kts` |
-| Build-Tools | not pinned in the repo — AGP 8.7.3 default is 34.0.0 for compilation; `scripts/release.sh` uses the **latest installed** build-tools for `zipalign`/`apksigner` | see "Recommended changes" |
+| Build-Tools | **35.0.0**, pinned (`buildToolsVersion` in app, data, designsystem; `scripts/release.sh` uses the same for `zipalign`/`apksigner`) | |
 | Dependencies | all pinned in `gradle/libs.versions.toml` (Compose BOM 2025.06.01, core-ktx 1.15.0, room 2.6.1, …) | `gradle/libs.versions.toml` |
 | Build flags | `org.gradle.workers.max=2`, `org.gradle.parallel=false`, `org.gradle.caching=true`, `-Xmx2g -Dfile.encoding=UTF-8` | `gradle.properties` |
 
@@ -89,9 +89,9 @@ for a readable tree; any diff outside the signature block is real non-determinis
 
 ### Recommended changes (NOT made by this doc — follow-up task)
 
-1. Pin `buildToolsVersion = "34.0.0"` (the AGP 8.7.3 default) in all four modules so aapt2/zipalign inputs
+1. ~~Pin build-tools~~ — done: 35.0.0 in the three Android modules (`:mail` is plain JVM) so aapt2/zipalign inputs
    are explicit.
-2. Make `scripts/release.sh` use a pinned build-tools directory instead of "latest installed".
+2. ~~Pin release.sh build-tools~~ — done (35.0.0).
 3. Add a `reprotest` script/task: build the tag twice on the same host and compare (catches host drift),
    then optionally cross-host (catches real non-determinism).
 4. If step 1 of the checklist above shows timestamp variance, add a zip normalisation post-step to the
