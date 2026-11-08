@@ -203,6 +203,10 @@
         <item quantity="one">Unterhaltung archiviert</item>
         <item quantity="other">%1$d Unterhaltungen archiviert</item>
     </plurals>
+    <plurals name="inbox_draft_trashed_toast">
+        <item quantity="one">Entwurf in den Papierkorb verschoben</item>
+        <item quantity="other">%1$d Entwürfe in den Papierkorb verschoben</item>
+    </plurals>
     <plurals name="inbox_trashed_toast">
         <item quantity="one">Unterhaltung in den Papierkorb verschoben</item>
         <item quantity="other">%1$d Unterhaltungen in den Papierkorb verschoben</item>
@@ -353,10 +357,10 @@
     <!-- Inbox: sign-in banner & misc -->
     <string name="inbox_banner_open_settings">Einstellungen öffnen</string>
     <string name="inbox_banner_sign_in_again">Erneut anmelden</string>
-    <string name="inbox_failing_prefix_single">%1$s: </string>
-    <plurals name="inbox_failing_prefix_many">
-        <item quantity="one">%1$d Konto: </item>
-        <item quantity="other">%1$d Konten: </item>
+    <string name="inbox_failing_line_single">%1$s: %2$s</string>
+    <plurals name="inbox_failing_line_many">
+        <item quantity="one">%1$d Konto: %2$s</item>
+        <item quantity="other">%1$d Konten: %2$s</item>
     </plurals>
     <string name="inbox_snoozed_until">Bis %1$s</string>
     <string name="inbox_error_load_generic">E-Mails konnten nicht geladen werden</string>
