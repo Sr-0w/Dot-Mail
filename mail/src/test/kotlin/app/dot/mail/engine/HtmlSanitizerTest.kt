@@ -55,12 +55,59 @@ class HtmlSanitizerTest {
     }
     private fun assertSafe(html: String) {
         val doc = Jsoup.parseBodyFragment(html)
-        assertTrue(doc.select("script,iframe,object,embed,form,input,button,meta,link,style,svg,math,video,audio,source,base,template").isEmpty())
+        assertTrue(doc.select("script,iframe,object,embed,form,input,button,meta,link,svg,math,video,audio,source,base,template").isEmpty())
+        doc.select("style").forEach { sheet ->
+            val css = sheet.data()
+            listOf("url(", "@import", "expression", "position", "\\", "@font-face", "behavior", "binding", "var(").forEach { bad ->
+                assertFalse("Stylesheet kept $bad: $css", css.contains(bad, true))
+            }
+        }
         doc.body().allElements.forEach { el ->
             el.attributes().forEach { attr -> assertFalse(attr.key.startsWith("on", true)) }
             assertFalse(el.hasAttr("srcset")); assertFalse(el.hasAttr("background"))
             if (el.hasAttr("href")) assertTrue(el.attr("href").startsWith("https:") || el.attr("href").startsWith("http:") || el.attr("href").startsWith("mailto:"))
             assertFalse(el.hasAttr("src"))
         }
+    }
+
+    @Test fun stylesheetsKeepResponsiveRulesButNothingThatFetchesOrPositions() {
+        val input = """
+            <html><head><style>
+            @import url(https://evil.invalid/a.css);
+            @font-face { font-family: X; src: url(https://evil.invalid/f.woff) }
+            /* comment */
+            .container { width: 600px; background-color: #ffffff }
+            .hero { background: url(https://evil.invalid/pixel.gif) }
+            .overlay { position: fixed; top: 0; color: red }
+            @media only screen and (max-width: 600px) { .container { width: 100% !important } .hide { display: none !important } }
+            @keyframes spin { from { color: red } to { color: blue } }
+            </style></head><body bgcolor="#f4f4f4"><table class="container" width="600"><tr><td bgcolor="#eeeeee">Hi</td></tr></table></body></html>
+        """.trimIndent()
+        val result = HtmlSanitizer.sanitize(input)
+        assertSafe(result.html)
+        val css = Jsoup.parse(result.html).select("style").joinToString("") { it.data() }
+        assertTrue(css, css.contains(".container{width:600px;background-color:#ffffff}"))
+        assertTrue(css, css.contains("@media only screen and (max-width: 600px){.container{width:100% !important}.hide{display:none !important}}"))
+        assertTrue(css, css.contains(".overlay{color:red}"))
+        assertFalse(css.contains("keyframes")); assertFalse(css.contains(".hero"))
+        assertTrue(result.responsive)
+        assertEquals(600, result.layoutWidth)
+        assertTrue(result.html.contains("class=\"container\""))
+        assertTrue(result.html.contains("bgcolor=\"#eeeeee\""))
+        assertTrue(result.html.contains("background-color:#f4f4f4"))
+    }
+    @Test fun stylesheetWithEscapesOrMarkupIsDroppedEntirely() {
+        assertEquals("", HtmlSanitizer.sanitizeStylesheet(".a{background:u\\72l(https://evil.invalid)}"))
+        assertEquals("", HtmlSanitizer.sanitizeStylesheet(".a{color:red}</style><script>evil()</script>"))
+        assertEquals("", HtmlSanitizer.sanitizeStylesheet(".a{color:red"))
+        assertEquals(".a{color:rgb(1, 2, 3)}", HtmlSanitizer.sanitizeStylesheet(".a { color: rgb(1, 2, 3) }"))
+        assertEquals("", HtmlSanitizer.sanitizeStylesheet("@media screen{@media print{.a{color:red}}}"))
+    }
+    @Test fun layoutWidthReflectsFixedDesignsOnly() {
+        assertEquals(0, HtmlSanitizer.sanitize("<table width='100%'><tr><td>fluid</td></tr></table>").layoutWidth)
+        assertEquals(640, HtmlSanitizer.sanitize("<div style='width:640px'>x</div>").layoutWidth)
+        assertEquals(700, HtmlSanitizer.sanitize("<table><tr><td style='min-width: 700px !important'>x</td></tr></table>").layoutWidth)
+        assertEquals(1280, HtmlSanitizer.sanitize("<img width='5000'>").layoutWidth)
+        assertFalse(HtmlSanitizer.sanitize("<table width='600'></table>").responsive)
     }
 }

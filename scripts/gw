@@ -9,7 +9,7 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 HOST=${BUILD_HOST:-srobin@192.168.0.232}
 # Each worktree builds in its own directory on the host (main tree → ~/dotmail, worktree "sonnet" → ~/dotmail-sonnet),
 # so agents on different branches never overwrite each other's sources; one build per worktree at a time.
-WT=$(basename "$ROOT" | tr -c 'A-Za-z0-9_-\n' '-')
+WT=$(basename "$ROOT" | tr -c 'A-Za-z0-9_\n-' '-')
 if [ "$WT" = "Dot-Mail" ]; then RDIR=dotmail; else RDIR="dotmail-$WT"; fi
 LIVE_OPT_IN=0
 if [ "${DOTMAIL_LIVE:-0}" = 1 ]; then LIVE_OPT_IN=1; fi

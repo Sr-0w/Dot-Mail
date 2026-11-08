@@ -1,25 +1,118 @@
 package app.dot.mail.engine
 
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
 import org.jsoup.safety.Cleaner
 import org.jsoup.safety.Safelist
 import java.util.Locale
 
 /** Defense in depth. The renderer must also disable JS and intercept ALL network requests. */
 object HtmlSanitizer {
-    data class Result(val html: String, val hasRemoteImages: Boolean, val blockedRemoteResources: Int)
-    private val tags = arrayOf("a", "abbr", "b", "blockquote", "br", "caption", "center", "code", "col", "colgroup", "dd", "del", "div", "dl", "dt", "em", "font", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "i", "img", "li", "ol", "p", "pre", "s", "small", "span", "strong", "sub", "sup", "table", "tbody", "td", "th", "thead", "tr", "u", "ul")
-    // Deliberately value-restrict CSS: no functions, escapes, comments, at-rules, custom properties or URLs.
-    private val properties = setOf("color", "background-color", "font-family", "font-size", "font-weight", "font-style", "text-align", "text-decoration", "line-height", "letter-spacing", "white-space", "vertical-align", "border", "border-color", "border-width", "border-style", "border-collapse", "border-spacing", "padding", "padding-top", "padding-bottom", "padding-left", "padding-right", "margin", "margin-top", "margin-bottom", "margin-left", "margin-right", "width", "height", "max-width", "min-width", "display")
+    /**
+     * @property layoutWidth widest fixed pixel width the email's layout asks for (tables, cells, images,
+     *   CSS `width`/`min-width`), or 0 when it has none. The reader uses it to scale fixed-width designs
+     *   to fit the screen instead of clipping them.
+     * @property responsive the email ships `@media (max-width…)` rules, i.e. it adapts to narrow screens
+     *   by itself and should be laid out at the device width.
+     */
+    data class Result(
+        val html: String,
+        val hasRemoteImages: Boolean,
+        val blockedRemoteResources: Int,
+        val layoutWidth: Int = 0,
+        val responsive: Boolean = false,
+    )
+
+    private val tags = arrayOf("a", "abbr", "b", "blockquote", "br", "caption", "center", "code", "col", "colgroup", "dd", "del", "div", "dl", "dt", "em", "font", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "i", "img", "li", "ol", "p", "pre", "s", "small", "span", "strong", "sub", "sup", "table", "tbody", "td", "tfoot", "th", "thead", "tr", "u", "ul")
+
+    // Deliberately value-restrict CSS: no functions (except plain rgb()/rgba() colours), escapes, comments,
+    // custom properties or URLs, and nothing that positions content outside the message flow.
+    private val properties = setOf(
+        "color", "background", "background-color", "font", "font-family", "font-size", "font-weight", "font-style", "font-variant",
+        "text-align", "text-decoration", "text-transform", "text-indent", "line-height", "letter-spacing", "word-spacing",
+        "white-space", "word-break", "word-wrap", "overflow-wrap", "vertical-align",
+        "border", "border-color", "border-width", "border-style", "border-collapse", "border-spacing", "border-radius",
+        "border-top", "border-right", "border-bottom", "border-left",
+        "padding", "padding-top", "padding-bottom", "padding-left", "padding-right",
+        "margin", "margin-top", "margin-bottom", "margin-left", "margin-right",
+        "width", "height", "max-width", "min-width", "max-height", "min-height",
+        "display", "float", "clear", "table-layout", "box-sizing", "direction", "list-style-type",
+    )
+    private val colourFunction = Regex("(?i)rgba?\\(\\s*[0-9.]+%?\\s*[, ]\\s*[0-9.]+%?\\s*[, ]\\s*[0-9.]+%?\\s*([,/]\\s*[0-9.]+%?\\s*)?\\)")
+    private val safeValue = Regex("[a-zA-Z0-9#.,%\\s'\"+/-]+")
+
+    /** One `property:value` declaration, or null when it isn't on the allow-list. */
+    private fun declaration(raw: String): String? {
+        val pair = raw.split(':', limit = 2)
+        if (pair.size != 2) return null
+        val key = pair[0].trim().lowercase(Locale.ROOT)
+        var value = pair[1].trim()
+        val important = value.endsWith("!important", ignoreCase = true)
+        if (important) value = value.dropLast("!important".length).trim()
+        if (key !in properties || value.isEmpty()) return null
+        if (!colourFunction.replace(value, "c").matches(safeValue)) return null
+        return "$key:$value" + if (important) " !important" else ""
+    }
+
+    private fun declarations(block: String): String = block.split(';').mapNotNull(::declaration).joinToString(";")
+
+    private val safeSelector = Regex("[a-zA-Z0-9\\s.#,_*>+~:=\\[\\]\"'()-]+")
+    private val safeMedia = Regex("(?i)@media[a-z0-9\\s(),:.-]*")
+
+    /**
+     * Rebuilds a stylesheet from scratch, keeping only plain style rules (allow-listed declarations) and
+     * `@media` blocks around them. Everything else — `@import`, `@font-face`, `@keyframes`, escapes, comments,
+     * markup-looking content — is dropped. Returns an empty string when nothing survives.
+     */
+    internal fun sanitizeStylesheet(css: String): String {
+        if ('\\' in css || '<' in css) return ""
+        val text = css.replace(Regex("(?s)/\\*.*?\\*/"), " ")
+        val out = StringBuilder()
+        fun rules(from: Int, to: Int, depth: Int) {
+            var i = from
+            while (i < to) {
+                val brace = text.indexOf('{', i).takeIf { it in i until to } ?: return
+                val semi = text.indexOf(';', i).takeIf { it in i until brace }
+                if (semi != null && text.substring(i, semi).trim().startsWith("@")) { i = semi + 1; continue } // @import/@charset…
+                val prelude = text.substring(i, brace).trim()
+                // Matching close brace for this block.
+                var level = 1
+                var j = brace + 1
+                while (j < to && level > 0) { if (text[j] == '{') level++ else if (text[j] == '}') level--; j++ }
+                if (level != 0) return
+                val inner = brace + 1 until j - 1
+                when {
+                    prelude.startsWith("@media", true) && depth == 0 && prelude.matches(safeMedia) -> {
+                        val mark = out.length
+                        out.append(prelude.replace(Regex("\\s+"), " ")).append('{')
+                        val before = out.length
+                        rules(inner.first, inner.last + 1, depth + 1)
+                        if (out.length == before) out.setLength(mark) else out.append('}')
+                    }
+                    prelude.startsWith("@") -> Unit
+                    prelude.matches(safeSelector) -> {
+                        val body = declarations(text.substring(inner.first, inner.last + 1))
+                        if (body.isNotEmpty()) out.append(prelude.replace(Regex("\\s+"), " ")).append('{').append(body).append('}')
+                    }
+                }
+                i = j
+            }
+        }
+        rules(0, text.length, 0)
+        return out.toString()
+    }
+
     fun sanitize(input: String, allowRemoteImages: Boolean = false, cidUris: Map<String, String> = emptyMap()): Result {
         val doc = Jsoup.parse(input)
         doc.outputSettings().prettyPrint(false)
         var remote = false
         var blocked = 0
+        val sheets = StringBuilder()
         for (el in doc.allElements) {
             if (el.hasAttr("srcset") || el.hasAttr("background")) { remote = true; blocked++ }
             val style = el.attr("style")
             if (Regex("(?i)url\\s*\\(|@import|\\\\").containsMatchIn(if (el.tagName() == "style") el.data() else style)) { remote = true; blocked++ }
+            if (el.tagName() == "style") sheets.append(sanitizeStylesheet(el.data()))
             if (el.tagName() == "img") {
                 val src = el.attr("src").trim()
                 if (src.startsWith("cid:", true)) {
@@ -32,29 +125,53 @@ object HtmlSanitizer {
                 }
             }
             el.removeAttr("srcset").removeAttr("background")
-            if (style.isNotEmpty()) {
-                val safe = style.split(';').mapNotNull { declaration ->
-                    val pair = declaration.split(':', limit = 2)
-                    if (pair.size != 2) return@mapNotNull null
-                    val key = pair[0].trim().lowercase(Locale.ROOT)
-                    val value = pair[1].trim()
-                    if (key in properties && value.matches(Regex("[a-zA-Z0-9#.,%\\s'\"+/-]+"))) "$key:$value" else null
-                }.joinToString(";")
-                el.attr("style", safe)
-            }
+            if (style.isNotEmpty()) el.attr("style", declarations(style))
         }
         val safe = Safelist().addTags(*tags)
-            .addAttributes(":all", "style", "title", "dir", "lang")
+            .addAttributes(":all", "style", "title", "dir", "lang", "class", "id", "align")
             .addAttributes("a", "href").addProtocols("a", "href", "https", "http", "mailto")
-            .addAttributes("img", "src", "alt", "width", "height").addProtocols("img", "src", "content")
-            .addAttributes("td", "colspan", "rowspan", "align", "valign", "width")
-            .addAttributes("th", "colspan", "rowspan", "align", "valign", "width")
-            .addAttributes("table", "width", "cellpadding", "cellspacing", "border")
+            .addAttributes("img", "src", "alt", "width", "height", "border").addProtocols("img", "src", "content")
+            .addAttributes("td", "colspan", "rowspan", "valign", "width", "height", "bgcolor")
+            .addAttributes("th", "colspan", "rowspan", "valign", "width", "height", "bgcolor")
+            .addAttributes("tr", "valign", "bgcolor")
+            .addAttributes("table", "width", "height", "cellpadding", "cellspacing", "border", "bgcolor")
+            .addAttributes("col", "width", "span").addAttributes("colgroup", "width", "span")
             .addAttributes("font", "color", "face", "size")
         if (allowRemoteImages) safe.addProtocols("img", "src", "https", "http")
         val cleaned = Cleaner(safe).clean(doc)
         cleaned.outputSettings().prettyPrint(false)
         cleaned.select("a").attr("rel", "noreferrer noopener")
-        return Result(cleaned.body().html(), remote, blocked)
+        // Only colour values survive in bgcolor; ids and classes can't collide with anything we inject.
+        cleaned.select("[bgcolor]").forEach { if (!it.attr("bgcolor").matches(Regex("#?[a-zA-Z0-9]{1,20}"))) it.removeAttr("bgcolor") }
+        val bodyColour = doc.body().attr("bgcolor").takeIf { it.matches(Regex("#?[a-zA-Z0-9]{1,20}")) }
+        val stylesheet = sheets.toString()
+        val body = cleaned.body().html()
+        val html = buildString {
+            if (stylesheet.isNotEmpty()) append("<style>").append(stylesheet).append("</style>")
+            if (bodyColour != null) append("<div style=\"background-color:").append(bodyColour).append("\">").append(body).append("</div>") else append(body)
+        }
+        return Result(
+            html = html,
+            hasRemoteImages = remote,
+            blockedRemoteResources = blocked,
+            layoutWidth = layoutWidth(cleaned),
+            responsive = Regex("(?i)@media[^{]*max-width").containsMatchIn(stylesheet),
+        )
     }
+
+    private val pxWidth = Regex("(?i)(?:^|;)\\s*(?:min-)?width\\s*:\\s*([0-9]{2,4})(?:\\.[0-9]+)?\\s*(?:px)?\\s*(?:!important)?\\s*(?:;|$)")
+
+    /** Widest fixed width in CSS pixels the layout requests (capped), 0 if it is fluid. */
+    private fun layoutWidth(doc: Document): Int {
+        var max = 0
+        for (el in doc.body().allElements) {
+            when (el.tagName()) {
+                "table", "td", "th", "img", "col", "colgroup" -> el.attr("width").trim().removeSuffix("px").toIntOrNull()?.let { max = maxOf(max, it) }
+            }
+            pxWidth.findAll(el.attr("style")).forEach { m -> m.groupValues[1].toIntOrNull()?.let { max = maxOf(max, it) } }
+        }
+        return max.coerceAtMost(MAX_LAYOUT_WIDTH)
+    }
+
+    private const val MAX_LAYOUT_WIDTH = 1280
 }

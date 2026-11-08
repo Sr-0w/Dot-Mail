@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
@@ -37,14 +38,23 @@ fun HtmlMessageView(
     /** Exact content:// URIs of this message's inline parts; nothing else local is ever served. */
     inlineUris: Set<String> = emptySet(),
     textZoom: Int = 100,
+    /** Widest fixed CSS-pixel width the design needs (0 = fluid), from the sanitiser. */
+    layoutWidth: Int = 0,
+    /** The email adapts to narrow screens itself, so it is laid out at the device width. */
+    responsive: Boolean = false,
 ) {
-    val document = remember(html, dark, textColor, linkColor) { wrap(html, dark, textColor, linkColor) }
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier) {
+    // WebView CSS pixels == dp. A fixed-width design wider than the space we have is laid out at its own
+    // width and the overview mode scales it down to fit — like Gmail / Samsung Email — instead of clipping.
+    val available = maxWidth.value.toInt().coerceAtLeast(1)
+    val viewportWidth = if (!responsive && layoutWidth > available) layoutWidth + 2 * BODY_MARGIN else 0
+    val document = remember(html, dark, textColor, linkColor, viewportWidth) { wrap(html, dark, textColor, linkColor, viewportWidth) }
     val currentOnLink by androidx.compose.runtime.rememberUpdatedState(onLink)
     val linkHandler: (String) -> Unit = remember { { url -> currentOnLink(url) } }
     // The WebView's theme (algorithmic darkening) is fixed at creation: recreate it when the theme flips.
     androidx.compose.runtime.key(dark) {
     AndroidView(
-        modifier = modifier,
+        modifier = Modifier.fillMaxWidth(),
         factory = { ctx ->
             val themed = ContextThemeWrapper(ctx, if (dark) android.R.style.Theme_Material else android.R.style.Theme_Material_Light)
             WebView(themed).apply {
@@ -97,7 +107,11 @@ fun HtmlMessageView(
         onRelease = { it.destroy() },
     )
     }
+    }
 }
+
+/** Breathing room (CSS px) kept around scaled-down fixed-width designs. */
+private const val BODY_MARGIN = 4
 
 private class SafeClient(
     val allowRemote: Boolean,
@@ -130,17 +144,18 @@ private class SafeClient(
 private fun css(color: Int) = String.format("#%06X", 0xFFFFFF and color)
 
 /** Base styles: our type, readable measure, nothing wider than the screen. */
-private fun wrap(body: String, dark: Boolean, textColor: Int, linkColor: Int): String = """
+private fun wrap(body: String, dark: Boolean, textColor: Int, linkColor: Int, viewportWidth: Int): String = """
 <!DOCTYPE html><html><head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+${if (viewportWidth > 0) "<meta name=\"viewport\" content=\"width=$viewportWidth\">" else "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"}
 ${if (dark) "" else "<meta name=\"color-scheme\" content=\"light\">"}
 <style>
 html,body{margin:0;padding:0;background:transparent;}
+${if (viewportWidth > 0) "body{padding:0 ${BODY_MARGIN}px;}" else ""}
 body{font-family:sans-serif;font-size:15px;line-height:1.55;${if (dark) "" else "color:${css(textColor)};"}word-wrap:break-word;overflow-wrap:anywhere;-webkit-text-size-adjust:100%;}
 ${if (dark) "" else "a{color:${css(linkColor)};}"}
 img{max-width:100%!important;height:auto!important;}
-table{max-width:100%;}
+${if (viewportWidth > 0) "" else "table{max-width:100%;}"}
 pre{white-space:pre-wrap;}
 blockquote{margin:8px 0;padding-left:12px;border-left:2px solid rgba(128,128,128,.35);color:inherit;opacity:.85;}
 </style></head><body>$body</body></html>

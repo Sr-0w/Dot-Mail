@@ -506,7 +506,13 @@ private fun MessageCard(
                     linkColor = c.accent.toArgb(),
                     onLink = onLink,
                     textZoom = (readingScale * 100).toInt(),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s),
+                    layoutWidth = clean.layoutWidth,
+                    responsive = clean.responsive,
+                    // Designed (table/newsletter) mail gets the full width like other clients; plain prose keeps our margins.
+                    modifier = Modifier.fillMaxWidth().padding(
+                        horizontal = if (clean.layoutWidth > 0 || clean.responsive) DotSpacing.s else DotSpacing.gutter,
+                        vertical = DotSpacing.s,
+                    ),
                 )
             } else {
                 PlainTextBody(body.plainText.orEmpty(), onLink, textScale = readingScale, quotedExpanded = quotedExpanded)
