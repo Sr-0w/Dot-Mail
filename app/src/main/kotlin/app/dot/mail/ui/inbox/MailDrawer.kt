@@ -1,7 +1,14 @@
 package app.dot.mail.ui.inbox
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.outlined.CreateNewFolder
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -65,6 +72,12 @@ fun MailDrawer(
     onOutbox: () -> Unit = {},
 ) {
     val c = Dot.colors
+    var folderDialog by remember { mutableStateOf<FolderDialog?>(null) }
+    FolderDialogs(
+        dialog = folderDialog, accountId = state.focusedAccountId, folders = state.folders,
+        onDismiss = { folderDialog = null }, onChange = { folderDialog = it },
+        onDeleted = { id -> if (current == Mailbox.InFolder(id)) onOpen(Mailbox.Unified(FolderRole.INBOX)) },
+    )
     ModalDrawerSheet(
         modifier = Modifier.widthIn(max = 320.dp).fillMaxHeight(),
         drawerContainerColor = c.background,
@@ -117,8 +130,8 @@ fun MailDrawer(
                         )
                     }
                     val custom = state.folders.filter { it.role == FolderRole.CUSTOM }.sortedBy { it.path.lowercase() }
-                    if (custom.isNotEmpty()) {
-                        item { SectionLabel("Folders", Modifier.padding(top = DotSpacing.m)) }
+                    item { SectionLabel("Folders", Modifier.padding(top = DotSpacing.m)) }
+                    run {
                         items(custom, key = { "c" + it.id }) { f ->
                             val depth = f.path.count { it == '/' || it == '.' }.coerceAtMost(3)
                             DrawerItem(
@@ -127,10 +140,12 @@ fun MailDrawer(
                                 count = f.unreadCount.takeIf { it > 0 },
                                 selected = current == Mailbox.InFolder(f.id),
                                 indent = depth * 14,
+                                onLongClick = { folderDialog = FolderDialog.Options(f) },
                                 onClick = { onOpen(Mailbox.InFolder(f.id)) },
                             )
                         }
                     }
+                    item { DrawerItem("New folder", Icons.Outlined.CreateNewFolder, null, selected = false, navigation = false, onClick = { folderDialog = FolderDialog.New }) }
                 }
                 item {
                     Spacer(Modifier.height(DotSpacing.l))
@@ -170,6 +185,7 @@ fun MailDrawer(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun DrawerItem(
     label: String,
@@ -179,6 +195,8 @@ private fun DrawerItem(
     indent: Int = 0,
     /** True for mailbox destinations (tab, selectable); false for plain actions like Settings. */
     navigation: Boolean = true,
+    /** Long-press menu (accessible as the "Folder options" custom action). */
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     val c = Dot.colors
@@ -188,7 +206,7 @@ private fun DrawerItem(
             .padding(horizontal = 10.dp, vertical = 1.dp)
             .clip(DotShapes.medium)
             .background(if (selected) c.surfaceRaised else Color.Transparent)
-            .clickable(role = if (navigation) Role.Tab else Role.Button, onClick = onClick)
+            .combinedClickable(role = if (navigation) Role.Tab else Role.Button, onLongClickLabel = "Folder options", onLongClick = onLongClick, onClick = onClick)
             .then(if (navigation) Modifier.semantics { this.selected = selected } else Modifier)
             .heightIn(min = 48.dp)
             .padding(start = (10 + indent).dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
