@@ -188,12 +188,15 @@ internal fun IdentityEditorPage(account: Account, identityId: Long, onBack: () -
     var logoSaved by remember { mutableStateOf(false) }
     var sigOnNew by remember { mutableStateOf(existing?.signatureOnNew ?: true) }
     var sigOnReply by remember { mutableStateOf(existing?.signatureOnReply ?: true) }
+    var baselineHtml by remember { mutableStateOf<String?>(null) }
+    var confirmDiscard by remember { mutableStateOf(false) }
     var htmlPicked by remember { mutableStateOf<((String) -> Unit)?>(null) }
     val logoFailed = stringResource(R.string.identity_signature_logo_failed)
     androidx.compose.runtime.LaunchedEffect(Unit) {
         val initial = existing?.signatureHtml
             ?: existing?.signature?.let { app.dot.mail.ui.compose.ComposeViewModel.signatureBodyHtml(app.dot.mail.ui.compose.Sender(0, null, "", "", signature = it)) }.orEmpty()
         sigState.loadSignature(initial)
+        baselineHtml = signatureHtmlOf(sigState)
     }
     androidx.compose.runtime.DisposableEffect(Unit) {
         onDispose { if (!logoSaved) createdLogos.forEach { app.dot.mail.data.SignatureLogos.delete(context, it) } }
@@ -226,12 +229,19 @@ internal fun IdentityEditorPage(account: Account, identityId: Long, onBack: () -
     val emailOk = isPrimary || IdentityStore.isValidAddress(email)
     val replyToOk = replyTo.isBlank() || IdentityStore.isValidAddress(replyTo)
     val scroll = rememberScrollState()
+    val dirty = baselineHtml?.let { base ->
+        name != (existing?.name ?: account.displayName) || email != existing?.email.orEmpty() || replyTo != existing?.replyTo.orEmpty() ||
+            logo != existing?.signatureLogo || sigOnNew != (existing?.signatureOnNew ?: true) || sigOnReply != (existing?.signatureOnReply ?: true) ||
+            makeDefault != (existing?.isDefault == true) || signatureHtmlOf(sigState) != base
+    } == true
+    val leave: () -> Unit = { if (dirty && !busy) confirmDiscard = true else onBack() }
+    androidx.activity.compose.BackHandler(enabled = dirty && !busy) { confirmDiscard = true }
 
     Column(Modifier.fillMaxSize().background(c.background).imePadding()) {
         DotTopBar(
             title = stringResource(if (existing == null) R.string.identity_new else R.string.identity_edit),
             elevated = scroll.value > 0,
-            navigation = { BackButton(onBack) },
+            navigation = { BackButton(leave) },
         )
         Column(Modifier.weight(1f).verticalScroll(scroll).padding(horizontal = DotSpacing.gutter), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(DotSpacing.l)) {
             DotTextField(name, { name = it }, label = stringResource(R.string.identity_name), placeholder = stringResource(R.string.identity_name_placeholder))
@@ -299,6 +309,19 @@ internal fun IdentityEditorPage(account: Account, identityId: Long, onBack: () -
                     }
                 }
             },
+        )
+    }
+
+    if (confirmDiscard) {
+        AlertDialog(
+            onDismissRequest = { confirmDiscard = false },
+            modifier = Modifier.dotSurfaceEnter(),
+            containerColor = c.surface,
+            shape = DotShapes.large,
+            title = { Text(stringResource(R.string.identity_discard_title), style = Dot.type.title, color = c.textPrimary) },
+            text = { Text(stringResource(R.string.identity_discard_body), style = Dot.type.callout, color = c.textSecondary) },
+            confirmButton = { DotButton(stringResource(R.string.identity_keep_editing), { confirmDiscard = false }, compact = true) },
+            dismissButton = { DotButton(stringResource(R.string.identity_discard), { confirmDiscard = false; onBack() }, style = ButtonStyle.Danger, compact = true) },
         )
     }
 

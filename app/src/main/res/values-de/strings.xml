@@ -819,4 +819,10 @@
         <item quantity="one">%d Tracker blockiert</item>
         <item quantity="other">%d Tracker blockiert</item>
     </plurals>
+
+    <!-- Unsaved changes -->
+    <string name="identity_discard_title">Änderungen verwerfen?</string>
+    <string name="identity_discard_body">Ihre Änderungen an dieser Identität wurden nicht gespeichert.</string>
+    <string name="identity_keep_editing">Weiter bearbeiten</string>
+    <string name="identity_discard">Verwerfen</string>
 </resources>

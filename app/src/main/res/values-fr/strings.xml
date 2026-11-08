@@ -819,4 +819,10 @@
         <item quantity="one">%d traceur bloqué</item>
         <item quantity="other">%d traceurs bloqués</item>
     </plurals>
+
+    <!-- Unsaved changes -->
+    <string name="identity_discard_title">Abandonner les modifications ?</string>
+    <string name="identity_discard_body">Vos modifications de cette identité n’ont pas été enregistrées.</string>
+    <string name="identity_keep_editing">Continuer à modifier</string>
+    <string name="identity_discard">Abandonner</string>
 </resources>
