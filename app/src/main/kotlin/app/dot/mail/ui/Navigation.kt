@@ -223,7 +223,7 @@ fun DotMailRoot(requests: StateFlow<ExternalRequest?>, onRequestConsumed: () -> 
                 val route = entry.toRoute<SearchRoute>()
                 SearchScreen(onBack = { nav.popBackStack() }, onOpenThread = { nav.navigate(ThreadRoute(it)) }, folderId = route.folderId, role = route.role)
             }
-            composable<OutboxRoute> { app.dot.mail.ui.outbox.OutboxScreen(onBack = { nav.popBackStack() }) }
+            composable<OutboxRoute> { app.dot.mail.ui.outbox.OutboxScreen(onBack = { nav.popBackStack() }, onEdit = { nav.openCompose(ComposeRoute(draftId = it)) }) }
             composable<AttachmentsRoute> { app.dot.mail.ui.attachments.AttachmentsScreen(onBack = { nav.popBackStack() }) }
             composable<SettingsRoute> {
                 SettingsScreen(

@@ -561,6 +561,15 @@ class ComposeViewModel(
     fun addAttachments(uris: List<String>) = edit { it.copy(attachmentUris = (it.attachmentUris + uris).distinct()) }
     fun removeAttachment(uri: String) = edit { it.copy(attachmentUris = it.attachmentUris - uri) }
 
+    /** Send at [at] (epoch ms). A time that is not at least a minute ahead is refused with a message instead of sending at once. */
+    fun scheduleSend(at: Long, now: Long = System.currentTimeMillis()) {
+        if (app.dot.mail.data.SendSchedule.validate(at, now) != app.dot.mail.data.SendSchedule.Validity.OK) {
+            _state.update { it.copy(error = str(R.string.schedule_error_past, "Pick a time at least a minute ahead")) }
+            return
+        }
+        send(scheduledAt = at)
+    }
+
     fun send(scheduledAt: Long? = null) {
         if (_state.value.sending || finished) return
         if (!commitPending()) return

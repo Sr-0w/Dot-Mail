@@ -52,16 +52,18 @@ import kotlinx.coroutines.launch
 
 /** Messages that haven't fully left yet: scheduled, sending, or needing the user's decision. */
 @Composable
-fun OutboxScreen(onBack: () -> Unit) {
+fun OutboxScreen(onBack: () -> Unit, onEdit: (Long) -> Unit = {}) {
     val graph = LocalMailGraph.current
     val items by graph.compose.outbox.collectAsStateWithLifecycle(emptyList())
     val scope = rememberCoroutineScope()
     var confirmDuplicate by remember { mutableStateOf<OutboxItem?>(null) }
+    var rescheduling by remember { mutableStateOf<OutboxItem?>(null) }
     val snackbar = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
     val reducedMotion = app.dot.design.rememberReducedMotion()
     val busyText = stringResource(R.string.outbox_busy_toast)
     fun busy(ok: Boolean) { if (!ok) scope.launch { snackbar.showSnackbar(busyText) } }
+    val editUnavailable = stringResource(R.string.outbox_edit_unavailable)
     val c = Dot.colors
     Box(Modifier.fillMaxSize().background(c.background)) {
     Column(Modifier.fillMaxSize()) {
@@ -90,9 +92,18 @@ fun OutboxScreen(onBack: () -> Unit) {
                         Spacer(Modifier.height(DotSpacing.xs))
                         Text(it, style = Dot.type.caption, color = c.textTertiary)
                     }
-                    if (item.canRetry || item.canDelete) {
+                    if (item.canRetry || item.canDelete || item.canEdit || item.canReschedule) {
                         Spacer(Modifier.height(DotSpacing.m))
-                        Row(horizontalArrangement = Arrangement.spacedBy(DotSpacing.s)) {
+                        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(DotSpacing.s)) {
+                            if (item.canEdit) {
+                                // Takes the message back out of the queue and reopens it in the composer (nothing is lost).
+                                DotButton(stringResource(R.string.outbox_edit), compact = true, style = ButtonStyle.Secondary, onClick = {
+                                    scope.launch { if (graph.compose.cancelSend(item.id)) onEdit(item.draftId) else snackbar.showSnackbar(editUnavailable) }
+                                })
+                            }
+                            if (item.canReschedule) {
+                                DotButton(stringResource(R.string.outbox_reschedule), compact = true, style = ButtonStyle.Secondary, onClick = { rescheduling = item })
+                            }
                             if (item.canRetry) {
                                 DotButton(stringResource(R.string.outbox_retry), compact = true, style = ButtonStyle.Secondary, onClick = {
                                     if (item.state == OutboxState.NEEDS_REVIEW) confirmDuplicate = item
@@ -110,6 +121,13 @@ fun OutboxScreen(onBack: () -> Unit) {
         }
     }
     SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 8.dp)) { DotSnackbar(it) }
+    }
+    rescheduling?.let { item ->
+        app.dot.mail.ui.schedule.ScheduleSheet(
+            title = stringResource(R.string.outbox_reschedule_title),
+            onDismiss = { rescheduling = null },
+            onPick = { at -> rescheduling = null; scope.launch { busy(graph.compose.rescheduleSend(item.id, at)) } },
+        )
     }
     confirmDuplicate?.let { item ->
         AlertDialog(
@@ -137,7 +155,7 @@ fun OutboxScreen(onBack: () -> Unit) {
 
 @Composable
 private fun stateLabel(item: OutboxItem): String = when (item.state) {
-    OutboxState.QUEUED -> if (item.sendAt > System.currentTimeMillis() + 60_000) stringResource(R.string.outbox_state_scheduled, Format.listDate(item.sendAt))
+    OutboxState.QUEUED -> if (app.dot.mail.data.SendSchedule.isScheduled(item.sendAt, System.currentTimeMillis())) stringResource(R.string.outbox_state_scheduled, app.dot.mail.ui.schedule.scheduleLabel(androidx.compose.ui.platform.LocalContext.current, item.sendAt))
         else stringResource(if (item.error != null) R.string.outbox_state_waiting_retry else R.string.outbox_state_queued)
     OutboxState.SENDING -> stringResource(R.string.outbox_state_sending)
     OutboxState.SAVING_SENT -> stringResource(R.string.outbox_state_saving_sent)

@@ -1045,4 +1045,12 @@
     <!-- Tracking-pixel toggle -->
     <string name="settings_block_pixels">Tracking-Pixel blockieren</string>
     <string name="settings_block_pixels_sub">Entfernt die winzigen Bilder, mit denen Absender erfahren, dass Sie eine Nachricht geöffnet haben – auch wenn Sie Bilder laden. Die Erkennung ist heuristisch und nicht lückenlos. Unabhängig vom Laden externer Bilder.</string>
+    <!-- Send later -->
+    <string name="schedule_pick_date_time">Datum und Uhrzeit wählen</string>
+    <string name="schedule_note">Wird zur gewählten Zeit gesendet, solange Ihr Telefon online ist. Android kann es einige Minuten später ausliefern.</string>
+    <string name="schedule_error_past">Wählen Sie eine Zeit, die mindestens eine Minute in der Zukunft liegt.</string>
+    <string name="outbox_edit">Bearbeiten</string>
+    <string name="outbox_reschedule">Neu planen</string>
+    <string name="outbox_reschedule_title">Senden um</string>
+    <string name="outbox_edit_unavailable">Es wird bereits gesendet und kann nicht mehr bearbeitet werden.</string>
 </resources>

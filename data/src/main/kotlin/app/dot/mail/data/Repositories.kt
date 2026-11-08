@@ -224,6 +224,12 @@ interface ComposeRepository {
      */
     suspend fun retrySend(outboxId: Long, confirmPossibleDuplicate: Boolean = false): Boolean
 
+    /**
+     * Moves a still-waiting queued message to [sendAt] (epoch ms, at least [SendSchedule.MIN_LEAD_MS] ahead). False when it is
+     * no longer waiting (delivery started or finished), the time is invalid, or the message cannot be moved.
+     */
+    suspend fun rescheduleSend(outboxId: Long, sendAt: Long): Boolean = false
+
     /** Removes only the local queued/review item; never recalls server mail. False during active delivery. */
     suspend fun deleteOutbox(outboxId: Long): Boolean
 

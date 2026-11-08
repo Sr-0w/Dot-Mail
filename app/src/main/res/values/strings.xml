@@ -1045,4 +1045,12 @@
     <!-- Tracking-pixel toggle -->
     <string name="settings_block_pixels">Block tracking pixels</string>
     <string name="settings_block_pixels_sub">Removes the tiny images senders use to learn that you opened a message, even when you load images. Detection is heuristic and cannot catch everything. Separate from loading remote images.</string>
+    <!-- Send later -->
+    <string name="schedule_pick_date_time">Pick date &amp; time</string>
+    <string name="schedule_note">Sent at the chosen time while your phone is online. Android can deliver it a few minutes late.</string>
+    <string name="schedule_error_past">Pick a time at least a minute ahead.</string>
+    <string name="outbox_edit">Edit</string>
+    <string name="outbox_reschedule">Reschedule</string>
+    <string name="outbox_reschedule_title">Send at</string>
+    <string name="outbox_edit_unavailable">It is already being sent and can\'t be edited.</string>
 </resources>

@@ -201,6 +201,7 @@ interface MailDao {
     @Query("SELECT * FROM outbox WHERE state='SUBMITTING'") suspend fun submittingOutbox(): List<OutboxRow>
     @Query("SELECT * FROM outbox WHERE state IN ('PENDING','APPEND') ORDER BY dueAt") suspend fun pendingOutbox(): List<OutboxRow>
     @Query("UPDATE outbox SET state=:next,error=:error WHERE id=:id AND state=:expected") suspend fun transitionOutbox(id: Long, expected: String, next: String, error: String? = null): Int
+    @Query("UPDATE outbox SET dueAt=:due WHERE id=:id AND state='PENDING'") suspend fun outboxDue(id: Long, due: Long): Int
     @Query("UPDATE outbox SET mimePath=:path WHERE id=:id AND state='PENDING'") suspend fun outboxPath(id: Long, path: String): Int
     @Query("UPDATE outbox SET mimePath=NULL WHERE id=:id AND state IN ('SENT','CANCELLED','DISCARDED')") suspend fun clearOutboxMime(id: Long)
     @Update suspend fun updateOutbox(row: OutboxRow)
