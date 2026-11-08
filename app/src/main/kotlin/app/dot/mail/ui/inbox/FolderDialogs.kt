@@ -12,6 +12,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -62,6 +64,7 @@ fun FolderDialogs(
 ) {
     if (dialog == null || accountId == null) return
     val graph = LocalMailGraph.current
+    val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
     val c = Dot.colors
     var error by remember(dialog) { mutableStateOf<String?>(null) }
@@ -86,9 +89,18 @@ fun FolderDialogs(
             title = { Text(dialog.folder.name, style = Dot.type.title, color = c.textPrimary) },
             text = {
                 Column {
-                    ListRow("Rename", icon = Icons.Outlined.Edit, onClick = { onChange(FolderDialog.Rename(dialog.folder)) })
-                    ListRow("Move into…", icon = Icons.Outlined.DriveFileMove, onClick = { onChange(FolderDialog.Move(dialog.folder)) })
-                    ListRow("Delete", icon = Icons.Outlined.DeleteOutline, titleColor = c.danger, onClick = { onChange(FolderDialog.Delete(dialog.folder)) })
+                    val rules = remember { app.dot.mail.data.NotificationRules.get(appContext) }
+                    val overrides by rules.folderOverrides.collectAsStateWithLifecycle()
+                    val notify = app.dot.mail.data.NotificationRules.effective(overrides, dialog.folder.id, dialog.folder.role.name)
+                    app.dot.mail.ui.settings.ToggleRow(
+                        "Notify for new mail", if (dialog.folder.role == FolderRole.INBOX) "On by default for the Inbox." else "Off by default for other folders.",
+                        Icons.Outlined.Notifications, notify,
+                    ) { on -> rules.setFolderNotify(dialog.folder.id, dialog.folder.role.name, on) }
+                    if (dialog.folder.role == FolderRole.CUSTOM) {
+                        ListRow("Rename", icon = Icons.Outlined.Edit, onClick = { onChange(FolderDialog.Rename(dialog.folder)) })
+                        ListRow("Move into…", icon = Icons.Outlined.DriveFileMove, onClick = { onChange(FolderDialog.Move(dialog.folder)) })
+                        ListRow("Delete", icon = Icons.Outlined.DeleteOutline, titleColor = c.danger, onClick = { onChange(FolderDialog.Delete(dialog.folder)) })
+                    }
                 }
             },
             confirmButton = { DotButton("Close", onDismiss, style = ButtonStyle.Ghost, compact = true) },

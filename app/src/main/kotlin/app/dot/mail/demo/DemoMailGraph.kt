@@ -214,6 +214,13 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
             )
         }
 
+        private val mutedState = MutableStateFlow<Set<Long>>(emptySet())
+        override suspend fun setMuted(threadIds: Collection<Long>, muted: Boolean) {
+            val real = threadIds.mapNotNull { id -> if (ConversationIds.isMessage(id)) messages.value.firstOrNull { it.id == ConversationIds.messageIdOf(id) }?.threadId else id.takeIf { it > 0 } }
+            mutedState.update { if (muted) it + real else it - real.toSet() }
+        }
+        override fun mutedThreads(): Flow<Set<Long>> = mutedState
+
         // ---- Snooze (in memory): wake-up times by thread id; hidden from lists until due, shown in the Snoozed list.
         private val snoozed = MutableStateFlow<Map<Long, Long>>(emptyMap())
 

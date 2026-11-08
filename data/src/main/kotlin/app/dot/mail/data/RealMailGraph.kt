@@ -368,6 +368,11 @@ internal class RealMailGraph(
             }
         }; requestSync()
     }
+    override suspend fun setMuted(threadIds: Collection<Long>, muted: Boolean) = withContext(Dispatchers.IO) {
+        val real = threadIds.mapNotNull { id -> if (ConversationIds.isMessage(id)) dao.message(ConversationIds.messageIdOf(id))?.threadId else id.takeIf { it > 0 } }
+        NotificationRules.get(context).setMuted(real, muted)
+    }
+    override fun mutedThreads(): Flow<Set<Long>> = NotificationRules.get(context).muted
     override suspend fun snooze(threadIds: Collection<Long>, untilMillis: Long) = snoozeLocal(threadIds, untilMillis)
     override suspend fun unsnooze(threadIds: Collection<Long>) = unsnoozeLocal(threadIds)
     override fun snoozedCount(): Flow<Int> = dao.observeSnoozedCount()

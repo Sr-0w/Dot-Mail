@@ -284,6 +284,14 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
                     )
                 },
             )
+            val rules = remember { app.dot.mail.data.NotificationRules.get(context.applicationContext) }
+            val buttons by rules.actions.collectAsStateWithLifecycle()
+            val actionOptions = listOf(
+                app.dot.mail.data.NotificationAction.MARK_READ to "Mark as read", app.dot.mail.data.NotificationAction.ARCHIVE to "Archive",
+                app.dot.mail.data.NotificationAction.DELETE to "Delete", app.dot.mail.data.NotificationAction.REPLY to "Reply",
+            )
+            ChoiceRow("First notification button", Icons.Outlined.Notifications, buttons[0], actionOptions) { rules.setActions(it, buttons[1]) }
+            ChoiceRow("Second notification button", Icons.Outlined.Notifications, buttons[1], actionOptions) { rules.setActions(buttons[0], it) }
             Divider()
 
             // ---- Privacy & security

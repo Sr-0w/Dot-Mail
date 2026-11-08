@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 internal object MailNotifications {
     fun newMail(context: Context, account: AccountRow, threadId: Long, subject: String) {
         if (!AccountSettingsStore.get(context).current(account.id).notificationsEnabled) return
+        if (NotificationRules.get(context).isMuted(threadId)) return // muted conversation: new mail stays unread but silent
         val manager = context.getSystemService(NotificationManager::class.java)
         val channel = "dotmail.account.${account.id}"
         manager.createNotificationChannel(NotificationChannel(channel, account.email, NotificationManager.IMPORTANCE_DEFAULT))
@@ -27,17 +28,28 @@ internal object MailNotifications {
         launcher.data = android.net.Uri.parse("dotmail://thread/$threadId")
         val open = PendingIntent.getActivity(context, 0, launcher, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         fun action(value: String): PendingIntent = PendingIntent.getBroadcast(context, 0, Intent(context, NotificationActionReceiver::class.java).setAction(value).setData(android.net.Uri.parse("dotmail://thread/$threadId/$value")).putExtra("threadId", threadId), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        manager.notify(threadId.toString(), 1, NotificationCompat.Builder(context, channel)
+        val builder = NotificationCompat.Builder(context, channel)
             .setSmallIcon(android.R.drawable.ic_dialog_email).setContentTitle(account.name.ifBlank { account.email }).setContentText(subject.ifBlank { "New message" })
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE).setAutoCancel(true).setContentIntent(open)
-            .addAction(android.R.drawable.ic_menu_view, "Mark read", action("MARK_READ"))
-            .addAction(android.R.drawable.ic_menu_save, "Archive", action("ARCHIVE")).build())
+        NotificationRules.get(context).actions.value.forEach { a ->
+            when (a) {
+                NotificationAction.MARK_READ -> builder.addAction(android.R.drawable.ic_menu_view, "Mark read", action("MARK_READ"))
+                NotificationAction.ARCHIVE -> builder.addAction(android.R.drawable.ic_menu_save, "Archive", action("ARCHIVE"))
+                NotificationAction.DELETE -> builder.addAction(android.R.drawable.ic_menu_delete, "Delete", action("TRASH"))
+                NotificationAction.REPLY -> {
+                    // Opens the app straight into a reply (MainActivity understands dotmail.reply).
+                    val reply = Intent(launcher).putExtra("dotmail.reply", true).setData(android.net.Uri.parse("dotmail://thread/$threadId/reply"))
+                    builder.addAction(android.R.drawable.ic_menu_revert, "Reply", PendingIntent.getActivity(context, 1, reply, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+                }
+            }
+        }
+        manager.notify(threadId.toString(), 1, builder.build())
     }
 }
 class NotificationActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val thread = intent.getLongExtra("threadId", -1)
-        val action = when (intent.action) { "MARK_READ" -> MessageAction.MARK_READ; "ARCHIVE" -> MessageAction.ARCHIVE; else -> return }
+        val action = when (intent.action) { "MARK_READ" -> MessageAction.MARK_READ; "ARCHIVE" -> MessageAction.ARCHIVE; "TRASH" -> MessageAction.TRASH; else -> return }
         if (thread <= 0) return
         val pending = goAsync()
         val graph = GraphRegistry.get(context)

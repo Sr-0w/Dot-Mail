@@ -57,6 +57,7 @@ import app.dot.mail.ui.search.SearchScreen
 import app.dot.mail.ui.settings.SettingsScreen
 import app.dot.mail.ui.thread.ThreadScreen
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
 
 @Serializable object WelcomeRoute
@@ -227,7 +228,12 @@ fun DotMailRoot(requests: StateFlow<ExternalRequest?>, onRequestConsumed: () -> 
             val request = pending ?: return@LaunchedEffect
             if (!ready) return@LaunchedEffect // handled once an account exists
             when (request) {
-                is ExternalRequest.OpenThread -> nav.navigate(ThreadRoute(request.threadId))
+                is ExternalRequest.OpenThread -> {
+                    // Reply button of a notification: compose a reply to the newest message; otherwise just open the conversation.
+                    val last = if (request.reply) runCatching { graph.mail.thread(request.threadId).first().lastOrNull() }.getOrNull() else null
+                    if (last != null) nav.openCompose(ComposeRoute(replyToMessageId = last.id, replyMode = app.dot.mail.data.ReplyMode.REPLY.name))
+                    else nav.navigate(ThreadRoute(request.threadId))
+                }
                 is ExternalRequest.Compose -> nav.openCompose(
                     ComposeRoute(
                         to = request.to, cc = request.cc, bcc = request.bcc,

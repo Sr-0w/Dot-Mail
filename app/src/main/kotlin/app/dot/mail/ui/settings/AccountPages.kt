@@ -72,6 +72,7 @@ internal fun AccountPage(account: Account, onBack: () -> Unit, onEditIdentity: (
                 Text(err.message, style = Dot.type.callout, color = c.danger, modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.m))
             }
             val context = LocalContext.current
+            val graph = LocalMailGraph.current
             val store = remember { AccountSettingsStore.get(context.applicationContext) }
             val cfg by store.settings(account.id).collectAsStateWithLifecycle()
             var renaming by remember { mutableStateOf(false) }
@@ -106,6 +107,23 @@ internal fun AccountPage(account: Account, onBack: () -> Unit, onEditIdentity: (
             SectionLabel("Notifications")
             ToggleRow("Notify about new mail", "For ${account.email}", Icons.Outlined.Notifications, cfg.notificationsEnabled) { v ->
                 store.update(account.id) { it.copy(notificationsEnabled = v) }
+            }
+            if (cfg.notificationsEnabled) {
+                val folders by remember(account.id) { graph.mail.folders(account.id) }.collectAsStateWithLifecycle(emptyList())
+                val rules = remember { app.dot.mail.data.NotificationRules.get(context.applicationContext) }
+                val overrides by rules.folderOverrides.collectAsStateWithLifecycle()
+                Text(
+                    "Choose which folders notify. The Inbox does by default; other folders stay quiet unless you switch them on.",
+                    style = Dot.type.caption, color = c.textSecondary, modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.xs),
+                )
+                folders.filter { it.role != app.dot.mail.data.model.FolderRole.ALL_MAIL && it.role != app.dot.mail.data.model.FolderRole.STARRED }
+                    .sortedWith(compareBy({ app.dot.mail.ui.common.Format.roleOrder.indexOf(it.role).let { i -> if (i < 0) 99 else i } }, { it.path.lowercase() }))
+                    .forEach { f ->
+                        ToggleRow(
+                            if (f.role == app.dot.mail.data.model.FolderRole.CUSTOM) f.path else app.dot.mail.ui.common.Format.roleName(f.role), null, null,
+                            app.dot.mail.data.NotificationRules.effective(overrides, f.id, f.role.name),
+                        ) { on -> rules.setFolderNotify(f.id, f.role.name, on) }
+                    }
             }
             ListRow(
                 "Sound and vibration", subtitle = "Opens this account's notification channel in system settings", icon = Icons.Outlined.NotificationsActive,

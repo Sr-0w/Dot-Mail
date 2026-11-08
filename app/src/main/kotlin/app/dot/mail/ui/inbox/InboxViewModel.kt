@@ -147,6 +147,18 @@ class InboxViewModel(
         }
     }
 
+    fun mute(ids: Collection<Long>, muted: Boolean) {
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            runCatching { graph.mail.setMuted(ids.toList(), muted) }
+                .onSuccess {
+                    _selection.value = emptySet()
+                    _events.send(if (muted) "Muted: new mail won't notify" else "Unmuted")
+                }
+                .onFailure { _events.send(it.message ?: "Couldn't change mute") }
+        }
+    }
+
     fun unsnooze(ids: Collection<Long> = _selection.value) {
         if (ids.isEmpty()) return
         viewModelScope.launch {

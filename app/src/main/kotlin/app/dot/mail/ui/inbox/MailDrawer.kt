@@ -137,6 +137,7 @@ fun MailDrawer(
                             count = f.unreadCount.takeIf { it > 0 && f.role in setOf(FolderRole.INBOX, FolderRole.SPAM, FolderRole.CUSTOM) },
                             selected = current == Mailbox.InFolder(f.id) ||
                                 (state.accounts.size == 1 && f.role == FolderRole.INBOX && current == Mailbox.Unified(FolderRole.INBOX)),
+                            onLongClick = { folderDialog = FolderDialog.Options(f) },
                             onClick = { onOpen(Mailbox.InFolder(f.id)) },
                         )
                     }
