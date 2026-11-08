@@ -58,6 +58,39 @@ class RepositoryTest {
         assertFalse(db.mail().byUid(folderId, 1)!!.unread)
         assertEquals("bob@example.org", graph.suggestContacts("bo").single().email)
     }
+    @Test fun passwordReplacementRequiresBothServersAndPreservesFailureState() = runBlocking {
+        val server = GreenMail(arrayOf(ServerSetup(0,"127.0.0.1","imap"),ServerSetup(0,"127.0.0.1","smtp")))
+        server.start()
+        try {
+            server.setUser("alice@example.org","alice","new-password")
+            val local = config.copy(imap=config.imap.copy(host="127.0.0.1",port=server.imap.port),smtp=config.smtp.copy(host="127.0.0.1",port=server.smtp.port))
+            val id = graph.addAccount(local,"old-password")
+            db.mail().syncError(id,"Login failed",true)
+            val original = db.mail().account(id)!!
+            assertTrue(graph.updatePassword(id,"wrong-password") is VerifyResult.AuthFailed)
+            assertEquals(original,db.mail().account(id))
+            // IMAP accepts the new password; SMTP still must verify before saving it.
+            val unavailable = graph.addAccount(local.copy(smtp=local.smtp.copy(port=1)),"old-password")
+            db.mail().syncError(unavailable,"Login failed",true)
+            val before = db.mail().account(unavailable)!!
+            assertTrue(graph.updatePassword(unavailable,"new-password") is VerifyResult.ConnectionFailed)
+            assertEquals(before,db.mail().account(unavailable))
+            assertEquals(VerifyResult.Ok,graph.updatePassword(id,"new-password"))
+            val saved = db.mail().account(id)!!
+            assertEquals("encrypted:new-password",saved.secret)
+            assertNull(saved.syncError); assertFalse(saved.authError)
+        } finally { server.stop() }
+    }
+    @Test fun passwordReplacementRejectsMissingAndOauthAccounts() = runBlocking {
+        assertTrue(graph.updatePassword(999,"password") is VerifyResult.ConnectionFailed)
+        val id=graph.addAccount(config,"old-password")
+        val before=db.mail().account(id)!!
+        assertTrue(graph.updatePassword(id,"") is VerifyResult.AuthFailed)
+        assertEquals(before,db.mail().account(id))
+        db.mail().accountAuthorization(id,before.secret,Codec.config(config.copy(authType=AuthType.OAUTH2)))
+        assertTrue(graph.updatePassword(id,"password") is VerifyResult.AuthFailed)
+        assertEquals(before.secret,db.mail().account(id)!!.secret)
+    }
     @Test fun greenMailSyncLoadsBodyOnlyOnDemand() = runBlocking {
         val server = GreenMail(arrayOf(ServerSetup(0, "127.0.0.1", "imap"), ServerSetup(0, "127.0.0.1", "smtp")))
         server.start()

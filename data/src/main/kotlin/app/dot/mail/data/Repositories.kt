@@ -44,6 +44,10 @@ interface AccountRepository {
     /** Stores the account (credentials encrypted with Android Keystore) and starts the first sync. Returns account id. */
     suspend fun addAccount(config: AccountConfig, password: String): Long
 
+    /** Verify IMAP and SMTP before replacing a password/app password. OAuth uses browser reauthorization. */
+    suspend fun updatePassword(accountId: Long, password: String): VerifyResult =
+        VerifyResult.ConnectionFailed("Password changes are not available")
+
     suspend fun removeAccount(accountId: Long)
 
     /** Changes the name shown for the account (and used as sender name of its primary identity). */
