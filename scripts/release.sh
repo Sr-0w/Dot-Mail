@@ -9,7 +9,7 @@ cd "$ROOT"
 scripts/gw :mail:test :data:testDebugUnitTest :app:testDebugUnitTest :app:assembleRelease
 ssh "$HOST" 'source ~/.bashrc; set -e; set -a; . ~/.config/dotmail/release-signing.env; set +a
   cd ~/dotmail/app/build/outputs/apk/release
-  in=$(ls *.apk | grep -v signed | head -1)
+  rm -f aligned.apk dotmail-signed.apk; in=$(ls app-release*.apk | head -1)
   BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
   $BT/zipalign -f -p 4 "$in" aligned.apk
   $BT/apksigner sign --ks "$DOTMAIL_KEYSTORE" --ks-pass env:DOTMAIL_KEYSTORE_PASSWORD --ks-key-alias "$DOTMAIL_KEY_ALIAS" --out dotmail-signed.apk aligned.apk
