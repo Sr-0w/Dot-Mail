@@ -60,7 +60,7 @@ object Mime {
             message.setContent(MimeMultipart("mixed").apply {
                 addBodyPart(body)
                 mail.attachments.forEach { attachment -> addBodyPart(MimeBodyPart().apply {
-                    dataHandler = DataHandler(ByteArrayDataSource(attachment.bytes, attachment.mimeType)).apply { setCommandMap(handlers) }
+                    dataHandler = DataHandler(attachment.source ?: ByteArrayDataSource(attachment.bytes, attachment.mimeType)).apply { setCommandMap(handlers) }
                     setHeader("Content-Transfer-Encoding", "base64")
                     fileName = MimeUtility.encodeText(attachment.name, "UTF-8", null)
                     disposition = if (attachment.contentId == null) Part.ATTACHMENT else Part.INLINE
@@ -72,6 +72,46 @@ object Mime {
         message.saveChanges()
         return message
     }
+    /** Streams decoded MIME parts into caller-owned private files, retaining no attachment arrays. */
+    fun cache(part: Part, directory: java.io.File, maxBytes: Long = 25L * 1024 * 1024): CachedBody {
+        directory.mkdirs()
+        val texts = mutableListOf<java.io.File>(); val htmls = mutableListOf<java.io.File>(); val attachments = mutableListOf<CachedPart>()
+        var remaining = maxBytes
+        fun save(p: Part, name: String): java.io.File = java.io.File(directory, name).also { file ->
+            p.inputStream.use { input -> file.outputStream().use { output ->
+                val buffer = ByteArray(8192)
+                while (true) { val count = input.read(buffer); if (count < 0) break; require(count <= remaining) { "Message exceeds download limit" }; remaining -= count; output.write(buffer,0,count) }
+            } }
+        }
+        fun visit(p: Part, id: String, depth: Int) {
+            require(depth < 40) { "MIME nesting limit exceeded" }
+            val type = safeType(p)
+            val disposition = runCatching { p.disposition }.getOrNull()
+            val name = runCatching { p.fileName }.getOrNull()
+            val cid = runCatching { p.getHeader("Content-ID")?.firstOrNull()?.trim()?.trim('<','>') }.getOrNull()
+            if (type.startsWith("multipart/")) {
+                val multipart = p.content as Multipart
+                for (i in 0 until multipart.count) visit(multipart.getBodyPart(i), "$id.$i", depth+1)
+            } else if (name != null || disposition.equals(Part.ATTACHMENT,true) || type !in setOf("text/plain","text/html") || cid != null) {
+                attachments += CachedPart(id, name?.let { runCatching { MimeUtility.decodeText(it) }.getOrDefault(it) } ?: "attachment", type, cid, disposition.equals(Part.INLINE,true) || (cid != null && !disposition.equals(Part.ATTACHMENT,true)), save(p,"part-$id"))
+            } else {
+                val raw = save(p,"text-$id")
+                val charset = runCatching { jakarta.mail.internet.ContentType(p.contentType).getParameter("charset")?.let { java.nio.charset.Charset.forName(it) } }.getOrNull() ?: Charsets.UTF_8
+                val utf = java.io.File(directory,"utf-$id")
+                raw.reader(charset).use { input -> utf.writer(Charsets.UTF_8).use { output -> input.copyTo(output) } }; raw.delete()
+                if (type=="text/html") htmls += utf else texts += utf
+            }
+        }
+        fun join(files: List<java.io.File>, name: String): java.io.File? {
+            if (files.isEmpty()) return null
+            val target=java.io.File(directory,name)
+            target.outputStream().use { out -> files.forEachIndexed { index,file -> if(index>0) out.write(10); file.inputStream().use { it.copyTo(out) }; file.delete() } }
+            return target
+        }
+        try { visit(part,"1",0); return CachedBody(join(texts,"plain.txt"),join(htmls,"body.html"),attachments) }
+        catch (e: Exception) { directory.deleteRecursively(); throw e }
+    }
+    private fun safeType(part: Part): String = runCatching { part.contentType.substringBefore(';').trim().lowercase() }.getOrDefault("application/octet-stream")
     fun parse(part: Part, maxBytes: Int = 25 * 1024 * 1024): ParsedBody {
         val texts = mutableListOf<String>(); val htmls = mutableListOf<String>(); val attachments = mutableListOf<MimeAttachment>()
         var remaining = maxBytes
@@ -91,15 +131,19 @@ object Mime {
         }
         fun visit(p: Part, id: String, depth: Int) {
             require(depth < 40) { "MIME nesting limit exceeded" }
-            if (p.isMimeType("multipart/*")) {
+            val type = safeType(p)
+            val disposition = runCatching { p.disposition }.getOrNull()
+            val name = runCatching { p.fileName }.getOrNull()
+            val cid = runCatching { p.getHeader("Content-ID")?.firstOrNull()?.trim()?.trim('<','>') }.getOrNull()
+            if (type.startsWith("multipart/")) {
                 val multi = p.content as Multipart
                 for (i in 0 until multi.count) visit(multi.getBodyPart(i), "$id.$i", depth + 1)
-            } else if (p.fileName != null || p.disposition.equals(Part.ATTACHMENT, true) || (!p.isMimeType("text/plain") && !p.isMimeType("text/html"))) {
-                attachments += MimeAttachment(id, p.fileName?.let { runCatching { MimeUtility.decodeText(it) }.getOrDefault(it) } ?: "attachment", p.contentType.substringBefore(';'), p.getHeader("Content-ID")?.firstOrNull()?.trim('<', '>'), p.disposition.equals(Part.INLINE, true), bytes(p))
+            } else if (name != null || disposition.equals(Part.ATTACHMENT, true) || type !in setOf("text/plain","text/html") || cid != null) {
+                attachments += MimeAttachment(id, name?.let { runCatching { MimeUtility.decodeText(it) }.getOrDefault(it) } ?: "attachment", type, cid, disposition.equals(Part.INLINE, true) || (cid != null && !disposition.equals(Part.ATTACHMENT, true)), bytes(p))
             } else {
                 val charset = runCatching { jakarta.mail.internet.ContentType(p.contentType).getParameter("charset")?.let { java.nio.charset.Charset.forName(it) } }.getOrNull() ?: Charsets.UTF_8
                 val value = bytes(p).toString(charset)
-                if (p.isMimeType("text/html")) htmls += value else texts += value
+                if (type == "text/html") htmls += value else texts += value
             }
         }
         visit(part, "1", 0)

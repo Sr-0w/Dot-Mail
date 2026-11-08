@@ -37,6 +37,9 @@ import androidx.compose.material.icons.automirrored.outlined.ReplyAll
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.DeleteForever
+import androidx.compose.material.icons.outlined.DriveFileMove
+import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.MarkEmailUnread
 import androidx.compose.material.icons.outlined.MoreHoriz
@@ -149,13 +152,24 @@ class ThreadViewModel(private val graph: MailGraph, private val threadId: Long) 
     }
 
     /** Latch which messages start expanded *before* marking read, or unread ones would collapse a frame later. */
-    fun onOpened(initial: List<Message>) {
+    fun onOpened(initial: List<Message>, mode: app.dot.mail.MarkRead = app.dot.mail.MarkRead.IMMEDIATELY) {
         if (markedRead) return
         markedRead = true
         _toggled.update { current ->
             initial.associate { m -> m.id to (m.isUnread || m == initial.lastOrNull() || initial.size == 1) } + current
         }
-        if (initial.any { it.isUnread }) viewModelScope.launch { runCatching { graph.mail.apply(MessageAction.MARK_READ, listOf(threadId)) } }
+        if (initial.any { it.isUnread } && mode != app.dot.mail.MarkRead.MANUALLY) viewModelScope.launch {
+            if (mode == app.dot.mail.MarkRead.AFTER_2S) kotlinx.coroutines.delay(2_000) // cancelled if the user leaves sooner
+            runCatching { graph.mail.apply(MessageAction.MARK_READ, listOf(threadId)) }
+        }
+    }
+
+    fun move(folderId: Long) {
+        viewModelScope.launch {
+            runCatching { graph.mail.move(listOf(threadId), folderId) }
+                .onSuccess { _events.send(ThreadEvent.Close) }
+                .onFailure { _events.send(ThreadEvent.Message(it.message ?: "Couldn't move")) }
+        }
     }
 
     fun allowRemote(messageId: Long) = _remoteAllowed.update { it + messageId }
@@ -191,12 +205,14 @@ sealed interface ThreadEvent {
     data class OpenUri(val uri: String, val mime: String, val name: String, val share: Boolean) : ThreadEvent
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun ThreadScreen(
     threadId: Long,
     onBack: () -> Unit,
     onReply: (messageId: Long, mode: ReplyMode) -> Unit,
     onComposeTo: (String) -> Unit,
+    onOpenAdjacent: (Long) -> Unit = {},
 ) {
     val graph = LocalMailGraph.current
     val vm: ThreadViewModel = viewModel(key = "thread-$threadId") { ThreadViewModel(graph, threadId) }
@@ -209,12 +225,22 @@ fun ThreadScreen(
     val listState = rememberLazyListState()
     var pendingLink by remember { mutableStateOf<String?>(null) }
     var menu by remember { mutableStateOf(false) }
+    var showMove by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    var confirmTrash by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         vm.events.collect { e ->
             when (e) {
-                ThreadEvent.Close -> onBack()
+                ThreadEvent.Close -> {
+                    val target = when (prefs.afterAction) {
+                        app.dot.mail.AfterAction.NEXT -> ThreadOrder.after(threadId)
+                        app.dot.mail.AfterAction.PREVIOUS -> ThreadOrder.before(threadId)
+                        app.dot.mail.AfterAction.LIST -> null
+                    }
+                    if (target != null) onOpenAdjacent(target) else onBack()
+                }
                 is ThreadEvent.Message -> snackbar.showSnackbar(e.text)
                 is ThreadEvent.OpenUri -> {
                     val uri = Uri.parse(e.uri)
@@ -232,7 +258,7 @@ fun ThreadScreen(
             }
         }
     }
-    LaunchedEffect(messages != null) { messages?.let { vm.onOpened(it) } }
+    LaunchedEffect(messages != null) { messages?.let { vm.onOpened(it, prefs.markRead) } }
 
     val list = messages
     val last = list?.lastOrNull()
@@ -245,7 +271,7 @@ fun ThreadScreen(
                 navigation = { BackButton(onBack) },
                 actions = {
                     DotIconButton(Icons.Outlined.Archive, "Archive", onClick = { vm.act(MessageAction.ARCHIVE) })
-                    DotIconButton(Icons.Outlined.Delete, "Delete", onClick = { vm.act(MessageAction.TRASH) })
+                    DotIconButton(Icons.Outlined.Delete, "Delete", onClick = { if (prefs.confirmDelete) confirmTrash = true else vm.act(MessageAction.TRASH) })
                     DotIconButton(Icons.Outlined.MarkEmailUnread, "Mark as unread", onClick = { vm.act(MessageAction.MARK_UNREAD) })
                     Box {
                         DotIconButton(Icons.Outlined.MoreVert, "More", onClick = { menu = true })
@@ -255,6 +281,9 @@ fun ThreadScreen(
                                 menu = false; vm.act(if (starred) MessageAction.UNSTAR else MessageAction.STAR)
                             }
                             DotMenuItem("Report spam", Icons.Outlined.Report) { menu = false; vm.act(MessageAction.SPAM) }
+                            DotMenuItem("Not spam", Icons.Outlined.Inbox) { menu = false; vm.act(MessageAction.NOT_SPAM) }
+                            DotMenuItem("Move to…", Icons.Outlined.DriveFileMove) { menu = false; showMove = true }
+                            DotMenuItem("Delete forever", Icons.Outlined.DeleteForever, color = c.danger) { menu = false; confirmDelete = true }
                             last?.unsubscribe?.let { target ->
                                 DotMenuItem("Unsubscribe", Icons.Outlined.Unsubscribe) {
                                     menu = false
@@ -304,16 +333,53 @@ fun ThreadScreen(
                             },
                             onAttachment = vm::openAttachment,
                             onSender = { onComposeTo(it.email) },
+                            readingScale = prefs.readingTextPercent / 100f,
+                            quotedExpanded = prefs.quotedExpanded,
                         )
                         Hairline(Modifier.padding(horizontal = DotSpacing.gutter))
                     }
                 }
             }
-            if (last != null) ReplyBar(last, onReply)
+            if (last != null) ReplyBar(last, onReply, replyAllByDefault = prefs.replyAllByDefault)
         }
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 72.dp)) { DotSnackbar(it) }
     }
 
+    if (showMove && list != null && list.isNotEmpty()) {
+        val folders by graph.mail.folders(list.first().accountId).collectAsStateWithLifecycle(emptyList())
+        androidx.compose.material3.ModalBottomSheet(
+            onDismissRequest = { showMove = false }, containerColor = c.surface, shape = DotShapes.sheet, dragHandle = null,
+        ) {
+            Text("Move to", style = Dot.type.title, color = c.textPrimary, modifier = Modifier.padding(DotSpacing.gutter))
+            folders.filter { it.id != list.first().folderId }
+                .sortedWith(compareBy({ Format.roleOrder.indexOf(it.role).let { i -> if (i < 0) 99 else i } }, { it.path }))
+                .forEach { f ->
+                    app.dot.design.components.ListRow(
+                        title = if (f.role == app.dot.mail.data.model.FolderRole.CUSTOM) f.path else Format.roleName(f.role),
+                        icon = Format.roleIcon(f.role),
+                        onClick = { showMove = false; vm.move(f.id) },
+                    )
+                }
+            Spacer(Modifier.navigationBarsPadding().height(DotSpacing.l))
+        }
+    }
+    if (confirmTrash) {
+        AlertDialog(
+            onDismissRequest = { confirmTrash = false }, containerColor = c.surface, shape = DotShapes.large,
+            title = { Text("Move to trash?", style = Dot.type.title, color = c.textPrimary) },
+            confirmButton = { DotButton("Delete", { confirmTrash = false; vm.act(MessageAction.TRASH) }, style = ButtonStyle.Danger, compact = true) },
+            dismissButton = { DotButton("Cancel", { confirmTrash = false }, style = ButtonStyle.Ghost, compact = true) },
+        )
+    }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false }, containerColor = c.surface, shape = DotShapes.large,
+            title = { Text("Delete forever?", style = Dot.type.title, color = c.textPrimary) },
+            text = { Text("This conversation will be permanently removed from the server.", style = Dot.type.callout, color = c.textSecondary) },
+            confirmButton = { DotButton("Delete", { confirmDelete = false; vm.act(MessageAction.DELETE_FOREVER) }, style = ButtonStyle.Danger, compact = true) },
+            dismissButton = { DotButton("Cancel", { confirmDelete = false }, style = ButtonStyle.Ghost, compact = true) },
+        )
+    }
     pendingLink?.let { url -> LinkDialog(url, onDismiss = { pendingLink = null }, onOpen = { pendingLink = null; openUrl(context, url) }) }
 }
 
@@ -364,6 +430,8 @@ private fun MessageCard(
     onLink: (String) -> Unit,
     onAttachment: (Attachment, Boolean) -> Unit,
     onSender: (EmailAddress) -> Unit,
+    readingScale: Float = 1f,
+    quotedExpanded: Boolean = false,
 ) {
     val c = Dot.colors
     var details by rememberSaveable(message.id) { mutableStateOf(false) }
@@ -373,7 +441,7 @@ private fun MessageCard(
                 .padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.m),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Avatar(message.from.displayName, message.from.email, size = 36.dp)
+            app.dot.mail.ui.avatar.SenderAvatar(message.from, size = 36.dp)
             Spacer(Modifier.width(DotSpacing.m))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -437,10 +505,11 @@ private fun MessageCard(
                     textColor = c.textPrimary.toArgb(),
                     linkColor = c.accent.toArgb(),
                     onLink = onLink,
+                    textZoom = (readingScale * 100).toInt(),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s),
                 )
             } else {
-                PlainTextBody(body.plainText.orEmpty(), onLink)
+                PlainTextBody(body.plainText.orEmpty(), onLink, textScale = readingScale, quotedExpanded = quotedExpanded)
             }
             val files = message.attachments.filter { !it.isInline || it.contentId == null }
             if (files.isNotEmpty()) AttachmentStrip(files, onAttachment)
@@ -508,12 +577,13 @@ private fun RemoteContentBanner(count: Int, onAllow: () -> Unit) {
 private val URL = Regex("""(https?://[^\s<>"')\]]+)|([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})""")
 
 @Composable
-private fun PlainTextBody(text: String, onLink: (String) -> Unit) {
+private fun PlainTextBody(text: String, onLink: (String) -> Unit, textScale: Float = 1f, quotedExpanded: Boolean = false) {
     val c = Dot.colors
     val split = remember(text) { QuoteSplitter.split(text) }
-    var showQuoted by rememberSaveable(text) { mutableStateOf(false) }
+    var showQuoted by rememberSaveable(text) { mutableStateOf(quotedExpanded) }
+    val bodyStyle = Dot.type.body.let { it.copy(fontSize = it.fontSize * textScale, lineHeight = it.lineHeight * textScale) }
     Column(Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s)) {
-        SelectionContainer { Text(linkify(split.visible.trimEnd(), c.accent, onLink), style = Dot.type.body, color = c.textPrimary) }
+        SelectionContainer { Text(linkify(split.visible.trimEnd(), c.accent, onLink), style = bodyStyle, color = c.textPrimary) }
         val quoted = split.quoted
         if (!quoted.isNullOrBlank()) {
             Box(
@@ -576,9 +646,10 @@ private fun AttachmentStrip(files: List<Attachment>, onOpen: (Attachment, Boolea
 
 /** Quiet reply affordance, like a chat composer: a soft field that opens the full composer. */
 @Composable
-private fun ReplyBar(last: Message, onReply: (Long, ReplyMode) -> Unit) {
+private fun ReplyBar(last: Message, onReply: (Long, ReplyMode) -> Unit, replyAllByDefault: Boolean = false) {
     val c = Dot.colors
     val multiple = (last.to + last.cc).size > 1
+    val primaryAll = multiple && replyAllByDefault
     Column(Modifier.background(c.background).navigationBarsPadding()) {
         Hairline()
         Row(
@@ -587,19 +658,27 @@ private fun ReplyBar(last: Message, onReply: (Long, ReplyMode) -> Unit) {
         ) {
             Row(
                 Modifier.weight(1f).clip(DotShapes.large).background(c.surface)
-                    .clickable { onReply(last.id, ReplyMode.REPLY) }
+                    .clickable { onReply(last.id, if (primaryAll) ReplyMode.REPLY_ALL else ReplyMode.REPLY) }
                     .padding(horizontal = DotSpacing.l, vertical = 13.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(Icons.AutoMirrored.Outlined.Reply, null, Modifier.size(18.dp), tint = c.textTertiary)
                 Spacer(Modifier.width(DotSpacing.s))
                 Text(
-                    "Reply to ${last.from.displayName.substringBefore(' ')}",
+                    if (primaryAll) "Reply to all" else "Reply to ${last.from.displayName.substringBefore(' ')}",
                     style = Dot.type.callout, color = c.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             }
-            if (multiple) DotIconButton(Icons.AutoMirrored.Outlined.ReplyAll, "Reply all", onClick = { onReply(last.id, ReplyMode.REPLY_ALL) })
+            if (multiple && primaryAll) DotIconButton(Icons.AutoMirrored.Outlined.Reply, "Reply", onClick = { onReply(last.id, ReplyMode.REPLY) })
+            else if (multiple) DotIconButton(Icons.AutoMirrored.Outlined.ReplyAll, "Reply all", onClick = { onReply(last.id, ReplyMode.REPLY_ALL) })
             DotIconButton(Icons.AutoMirrored.Outlined.Forward, "Forward", onClick = { onReply(last.id, ReplyMode.FORWARD) })
         }
     }
+}
+
+/** Order of the list the user came from, for "after archive: open next/previous". */
+object ThreadOrder {
+    @Volatile var ids: List<Long> = emptyList()
+    fun after(id: Long): Long? = ids.indexOf(id).takeIf { it >= 0 }?.let { ids.getOrNull(it + 1) }
+    fun before(id: Long): Long? = ids.indexOf(id).takeIf { it > 0 }?.let { ids.getOrNull(it - 1) }
 }

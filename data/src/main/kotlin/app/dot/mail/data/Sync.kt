@@ -21,8 +21,11 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null): Boole
         syncing.value = syncing.value + account.id
         var stage = "Connect"
         var folderLabel: String? = null
+        var headerWarning: String? = null
+        var redactions: Set<String> = setOf(account.email)
         try {
             val config = Codec.config(account.config); val creds = credentials(account)
+            redactions = setOf(account.email, creds.secret)
             var deferredExpunge = false
             val remoteFolders = client.folders(config.imap.endpoint(), creds)
             for (remote in remoteFolders.sortedBy { when(it.role) { Role.INBOX -> 0; Role.SENT -> 1; Role.DRAFTS -> 2; else -> 3 } }) {
@@ -35,8 +38,13 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null): Boole
                 }
                 val initialCursor = SyncCursor(folder.validity, folder.nextUid, folder.modSeq)
                 var result = client.sync(config.imap.endpoint(), creds, folder.path, initialCursor)
+                if (result.failures.isNotEmpty()) {
+                    result.failures.forEach { SyncDiagnostics.warn("Header UID=${it.uid} account=${account.id} folderRole=${remote.role}", it.error, redactions) }
+                    headerWarning = "Folder ${remote.role}: some message headers could not be read; retrying"
+                }
                 var replayed = false
-                for (op in dao.operations(account.id).filter { it.folderId == folder.id }) {
+                for (queued in dao.operations(account.id).filter { it.folderId == folder.id }) {
+                    var op = dao.operation(queued.id) ?: continue
                     if (op.action == "DEFERRED_FLAGS") {
                         val row = op.messageLocalId?.let { dao.message(it) }
                         if (row == null) { dao.deleteOperation(op.id); continue }
@@ -46,12 +54,16 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null): Boole
                         try {
                             client.setFlags(config.imap.endpoint(), creds, folder.path, longArrayOf(row.uid), seen = op.desiredSeen, starred = op.desiredStarred)
                             dao.deleteOperation(op.id); replayed = true
-                        } catch (e: CancellationException) { throw e } catch (e: Exception) { SyncDiagnostics.warn("Deferred flags account=${account.id} folderRole=${remote.role}", e); success = false }
+                        } catch (e: CancellationException) { throw e } catch (e: Exception) { SyncDiagnostics.warn("Deferred flags account=${account.id} folderRole=${remote.role}", e, redactions); success = false }
                         continue
                     }
                     if (op.validity != result.cursor.uidValidity) {
                         dao.updateOperation(op.copy(error = "UIDVALIDITY changed; operation requires review", attempts = op.attempts + 1)); continue
                     }
+                    val claimed = database.withTransaction {
+                        dao.operation(op.id)?.copy(error = "IN_FLIGHT")?.also { dao.updateOperation(it) }
+                    } ?: continue
+                    op = claimed
                     try {
                         when (op.action) {
                             "MOVE" -> {
@@ -66,7 +78,7 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null): Boole
                         }
                         dao.deleteOperation(op.id); replayed = true
                     } catch (e: CancellationException) { throw e } catch (e: Exception) {
-                        SyncDiagnostics.warn("Operation ${op.action} account=${account.id} folderRole=${remote.role}", e)
+                        SyncDiagnostics.warn("Operation ${op.action} account=${account.id} folderRole=${remote.role}", e, redactions)
                         dao.updateOperation(op.copy(attempts = op.attempts + 1, error = SyncDiagnostics.reason(e))); success = false; break
                     }
                 }
@@ -94,7 +106,7 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null): Boole
                 if (previewRows.isNotEmpty()) {
                     val snippets = try { client.snippets(config.imap.endpoint(), creds, folder.path, previewRows.map { it.uid }.toLongArray(), result.cursor.uidValidity) }
                     catch (e: CancellationException) { throw e }
-                    catch (e: Exception) { SyncDiagnostics.warn("Snippet prefetch account=${account.id} folderRole=${remote.role}", e); emptyMap() } // Header/flag sync remains authoritative even when previews fail.
+                    catch (e: Exception) { SyncDiagnostics.warn("Snippet prefetch account=${account.id} folderRole=${remote.role}", e, redactions); emptyMap() } // Header/flag sync remains authoritative even when previews fail.
                     database.withTransaction {
                         snippets.forEach { (uid, snippet) -> dao.byUid(folder.id, uid)?.let { dao.updateMessage(it.copy(snippet = snippet, snippetFetched = true)) } }
                         previewRows.map { it.threadId }.distinct().forEach { rebuildThread(it) }
@@ -102,10 +114,10 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null): Boole
                 }
                 notifications.distinctBy { it.first }.forEach { (id, subject) -> MailNotifications.newMail(context, account, id, subject) }
             }
-            dao.syncError(account.id, if (deferredExpunge) "Move copied messages and marked the originals deleted; server lacks targeted expunge" else if (dao.operations(account.id).any { it.error != null }) "Some server changes are pending or require review" else null)
+            dao.syncError(account.id, if (headerWarning != null) headerWarning else if (deferredExpunge) "Move copied messages and marked the originals deleted; server lacks targeted expunge" else if (dao.operations(account.id).any { it.error != null }) "Some server changes are pending or require review" else null)
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            SyncDiagnostics.warn("$stage account=${account.id} folderRole=${folderLabel ?: "NONE"}", e)
+            SyncDiagnostics.warn("$stage account=${account.id} folderRole=${folderLabel ?: "NONE"}", e, redactions)
             success = false
             val reason = SyncDiagnostics.reason(e)
             dao.syncError(account.id, folderLabel?.let { "Folder $it: $reason" } ?: reason, e is jakarta.mail.AuthenticationFailedException || e is app.dot.mail.data.oauth.ReauthenticationRequired)
@@ -115,7 +127,7 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null): Boole
     success
 }
 
-internal suspend fun RealMailGraph.deliverOutbox(id: Long): Boolean = syncLock.withLock {
+internal suspend fun RealMailGraph.deliverOutbox(id: Long): Boolean = outboxLock.withLock {
     var row = dao.outbox(id) ?: return@withLock true
     if (row.state !in listOf("PENDING", "APPEND")) return@withLock true
     if (row.dueAt > System.currentTimeMillis()) return@withLock false
@@ -128,19 +140,30 @@ internal suspend fun RealMailGraph.deliverOutbox(id: Long): Boolean = syncLock.w
             val uri = Uri.parse(source)
             val known = dao.attachmentUri(source)
             val metadata = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
-            val bytes = context.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
-            OutgoingAttachment(known?.name ?: metadata ?: "attachment", known?.mime ?: context.contentResolver.getType(uri) ?: "application/octet-stream", bytes)
+            val name=known?.name ?: metadata ?: "attachment"
+            val mime=known?.mime ?: context.contentResolver.getType(uri) ?: "application/octet-stream"
+            val source=object : jakarta.activation.DataSource {
+                override fun getInputStream(): java.io.InputStream = context.contentResolver.openInputStream(uri) ?: throw java.io.IOException("Cached attachment unavailable")
+                override fun getOutputStream(): java.io.OutputStream = throw java.io.IOException("Read only")
+                override fun getContentType() = mime
+                override fun getName() = name
+            }
+            OutgoingAttachment(name,mime,source=source)
         }
-        val mime = (row.mimePath?.let { File(it) }?.takeIf { it.isFile }?.inputStream()?.use { MimeMessage(Session.getInstance(Properties()), it) }) ?: Mime.build(OutgoingMail(Address(account.email, account.name), draft.to.map { Address(it.email, it.name) }, draft.cc.map { Address(it.email, it.name) }, draft.bcc.map { Address(it.email, it.name) }, draft.subject, draft.bodyText, attachments = attachments, inReplyTo = draft.inReplyTo, references = draft.references, messageId = "<dotmail-$id-${java.util.UUID.randomUUID()}@${account.email.substringAfter('@')}>", date = java.time.Instant.now()))
+        val saved = row.mimePath?.let { File(it) }?.takeIf { it.isFile }
+        val mime = saved?.let { StoredMimeMessage(it) } ?: Mime.build(OutgoingMail(Address(account.email, account.name), draft.to.map { Address(it.email, it.name) }, draft.cc.map { Address(it.email, it.name) }, draft.bcc.map { Address(it.email, it.name) }, draft.subject, draft.bodyText, attachments = attachments, inReplyTo = draft.inReplyTo, references = draft.references, messageId = "<dotmail-$id-${java.util.UUID.randomUUID()}@${account.email.substringAfter('@')}>", date = java.time.Instant.now()))
         val file = File(context.filesDir, "outbox/${account.id}/$id.eml").also { it.parentFile!!.mkdirs() }
-        file.outputStream().use { mime.writeTo(it) }
+        if (saved==null) {
+            val temporary=File(file.parentFile,"${file.name}.tmp")
+            try { temporary.outputStream().use { mime.writeTo(it) }; check(temporary.renameTo(file)) { "Could not persist queued MIME" } } finally { temporary.delete() }
+        }
         row = row.copy(mimePath = file.absolutePath)
         dao.outboxPath(id, file.absolutePath)
         if (dao.transitionOutbox(id, "PENDING", "SUBMITTING") != 1) return@withLock true
         try {
             client.send(config.smtp.endpoint(), creds, mime)
         } catch (e: SubmissionNotStartedException) {
-            SyncDiagnostics.warn("Outbox SMTP connect id=$id", e)
+            SyncDiagnostics.warn("Outbox SMTP connect id=$id", e, setOf(creds.secret, account.email))
             if (e.cause is jakarta.mail.AuthenticationFailedException) dao.syncError(account.id, "Sign in again to reconnect this account", true)
             dao.transitionOutbox(id, "SUBMITTING", "PENDING", "Connection failed before submission; will retry")
             return@withLock false
@@ -148,26 +171,30 @@ internal suspend fun RealMailGraph.deliverOutbox(id: Long): Boolean = syncLock.w
             withContext(NonCancellable) { dao.transitionOutbox(id, "SUBMITTING", "UNCERTAIN", "Submission was interrupted. Check Sent before retrying.") }
             throw e
         } catch (e: Exception) {
-            SyncDiagnostics.warn("Outbox SMTP submission id=$id", e)
+            SyncDiagnostics.warn("Outbox SMTP submission id=$id", e, setOf(creds.secret, account.email))
             // SMTP can lose its final reply after accepting DATA. Automatic retry could duplicate mail.
             dao.transitionOutbox(id, "SUBMITTING", "UNCERTAIN", "Delivery could not be confirmed. Check Sent before retrying.")
             dao.syncError(account.id, "A queued send could not be confirmed. Check Sent before retrying.")
             return@withLock true
         }
-        val autoSent = config.imap.host.equals("imap.gmail.com", true) || config.imap.host.equals("imap.googlemail.com", true)
+        (mime as? java.io.Closeable)?.close()
+        val autoSent = config.smtp.host.equals("smtp.gmail.com", true) || config.smtp.host.equals("smtp.googlemail.com", true)
         dao.transitionOutbox(id, "SUBMITTING", if (autoSent) "SENT" else "APPEND")
         row = requireNotNull(dao.outbox(id))
+        if(row.state=="SENT") { File(requireNotNull(row.mimePath)).delete(); dao.clearOutboxMime(id) }
     }
     if (row.state == "APPEND") {
         if (dao.transitionOutbox(id, "APPEND", "APPENDING") != 1) return@withLock true
         try {
             val sent = dao.folders(account.id).firstOrNull { it.role == Role.SENT.name }?.path ?: "Sent"
-            val mime = File(requireNotNull(row.mimePath)).inputStream().use { MimeMessage(Session.getInstance(Properties()), it) }
-            mime.removeHeader("Bcc")
-            client.append(config.imap.endpoint(), creds, sent, mime)
+            StoredMimeMessage(File(requireNotNull(row.mimePath))).use { mime ->
+                mime.removeHeader("Bcc")
+                client.append(config.imap.endpoint(), creds, sent, mime)
+            }
             dao.transitionOutbox(id, "APPENDING", "SENT")
+            File(requireNotNull(row.mimePath)).delete(); dao.clearOutboxMime(id)
         } catch (e: Exception) {
-            SyncDiagnostics.warn("Outbox Sent copy id=$id", e)
+            SyncDiagnostics.warn("Outbox Sent copy id=$id", e, setOf(creds.secret, account.email))
             withContext(NonCancellable) { dao.transitionOutbox(id, "APPENDING", "APPEND", "Message sent; its Sent copy could not be saved. Retry will only save the copy.") }
             if (e is CancellationException) throw e
             return@withLock false

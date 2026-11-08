@@ -77,6 +77,9 @@ class LiveInfomaniakTest {
                 phase = "SMTP $port $security send to self"
                 client.send(Endpoint("mail.infomaniak.com", port, email, security), credentials, mime)
                 println("LIVE SMTP $port $security: OK")
+                phase = "INBOX incremental header sync after delivery for SMTP $port"
+                val afterDelivery = client.sync(imap, credentials, inbox, initial.cursor, limit = 20)
+                println("LIVE INBOX incremental after self-mail $port: headers=${afterDelivery.headers.size}")
                 phase = "IMAP find generated message for SMTP $port"
                 var found: Header? = null
                 repeat(30) {

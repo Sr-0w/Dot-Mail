@@ -65,15 +65,22 @@ class MailClient(val timeoutMs: Int = 30_000) {
             val candidates = if (reset) {
                 f.search(ReceivedDateTerm(ComparisonTerm.GE, Date(now - 30L * 24 * 60 * 60 * 1000))).takeLast(limit).toTypedArray()
             } else if (next > cursor.uidNext) f.getMessagesByUID(max(1, cursor.uidNext), UIDFolder.LASTUID).filterNotNull().take(limit).toTypedArray() else emptyArray()
-            fetchHeaders(f, candidates, store.hasCapability("X-GM-EXT-1"))
+            val failures = mutableListOf<HeaderFailure>()
+            try { fetchHeaders(f, candidates, store.hasCapability("X-GM-EXT-1")) }
+            catch (e: MessagingException) { failures += HeaderFailure(0, e) }
             val flagsMessages = if (!reset && cursor.highestModSeq >= 0 && store.hasCapability("CONDSTORE")) {
                 f.getMessagesByUIDChangedSince(1, UIDFolder.LASTUID, cursor.highestModSeq)
             } else inventory
             f.fetch(flagsMessages, FetchProfile().apply { add(FetchProfile.Item.FLAGS); add(UIDFolder.FetchProfileItem.UID) })
-            val headers = candidates.map { header(f, it) }
+            val headers = candidates.mapNotNull { message ->
+                try { header(f, message) }
+                catch (e: Exception) { failures += HeaderFailure(f.getUID(message), e); null }
+            }
             // Do not advance past a partial page. HighestModSeq is only advanced after flag inventory succeeds.
-            val checkpoint = if (candidates.size == limit && !reset) (headers.maxOfOrNull { it.uid } ?: cursor.uidNext - 1) + 1 else next
-            HeaderSync(SyncCursor(validity, checkpoint, runCatching { f.highestModSeq }.getOrDefault(-1)), reset, headers, flagsMessages.map { flags(f, it) }, existing)
+            val pageEnd = if (candidates.size == limit && !reset) (headers.maxOfOrNull { it.uid } ?: cursor.uidNext - 1) + 1 else next
+            val checkpoint = minOf(pageEnd, failures.map { it.uid }.filter { it > 0 }.minOrNull() ?: pageEnd)
+            val flagResults = flagsMessages.mapNotNull { message -> try { flags(f, message) } catch (e: Exception) { failures += HeaderFailure(f.getUID(message), e); null } }
+            HeaderSync(SyncCursor(validity, checkpoint, if (failures.isEmpty()) runCatching { f.highestModSeq }.getOrDefault(-1) else -1), reset, headers, flagResults, existing, failures)
         }
     }
     private fun fetchHeaders(f: IMAPFolder, messages: Array<out Message>, gmail: Boolean) {
@@ -85,12 +92,26 @@ class MailClient(val timeoutMs: Int = 30_000) {
     }
     private fun flags(f: IMAPFolder, m: Message) = RemoteFlags(f.getUID(m), m.isSet(Flags.Flag.SEEN), m.isSet(Flags.Flag.FLAGGED), m.isSet(Flags.Flag.DELETED))
     private fun addresses(list: Array<out jakarta.mail.Address>?): List<Address> = list.orEmpty().filterIsInstance<InternetAddress>().map { Address(it.address, it.personal) }
-    private fun header(f: IMAPFolder, m: Message): Header = Header(
+    internal fun header(f: IMAPFolder, message: Message): Header = try { envelopeHeader(f, message) }
+    catch (failure: MessagingException) {
+        // Some servers/clients fail ENVELOPE parsing while RFC header fields are still available.
+        fun raw(name: String) = message.getHeader(name)?.firstOrNull()
+        val from = raw("From")
+        if (from.isNullOrBlank()) throw failure
+        fun list(name: String) = raw(name)?.let { runCatching { InternetAddress.parseHeader(it, false) }.getOrNull() }?.map { Address(it.address, it.personal) }.orEmpty()
+        Header(f.getUID(message), raw("Message-ID"), Threading.ids(raw("References")), Threading.ids(raw("In-Reply-To")).firstOrNull(),
+            list("From"), list("To"), list("Cc"), list("Bcc"), list("Reply-To").ifEmpty { list("From") },
+            raw("Subject")?.let { runCatching { jakarta.mail.internet.MimeUtility.decodeText(it) }.getOrDefault(it) }.orEmpty(),
+            raw("Date")?.let { runCatching { jakarta.mail.internet.MailDateFormat().parse(it).time }.getOrNull() } ?: 0,
+            flags(f,message), runCatching { hasAttachments(message) }.getOrDefault(false),
+            if ((f.store as IMAPStore).hasCapability("X-GM-EXT-1")) (message as IMAPMessage).getItem(GmailThreadFetch.item) as? Long else null)
+    }
+    private fun envelopeHeader(f: IMAPFolder, m: Message): Header = Header(
         f.getUID(m), m.getHeader("Message-ID")?.firstOrNull(), Threading.ids(m.getHeader("References")?.joinToString(" ")), Threading.ids(m.getHeader("In-Reply-To")?.firstOrNull()).firstOrNull(),
         addresses(m.from), addresses(m.getRecipients(Message.RecipientType.TO)), addresses(m.getRecipients(Message.RecipientType.CC)), addresses(m.getRecipients(Message.RecipientType.BCC)), addresses(m.replyTo),
         m.subject.orEmpty(), (m.sentDate ?: m.receivedDate ?: Date(0)).time, flags(f, m),
         // BODYSTRUCTURE only: never access content or inputStream during header sync.
-        hasAttachments(m), if ((f.store as IMAPStore).hasCapability("X-GM-EXT-1")) (m as IMAPMessage).getItem(GmailThreadFetch.item) as? Long else null, m.getHeader("List-Unsubscribe")?.firstOrNull()?.let { Regex("<(https://[^>]+|mailto:[^>]+)>", RegexOption.IGNORE_CASE).find(it)?.groupValues?.get(1) },
+        runCatching { hasAttachments(m) }.getOrDefault(false), if ((f.store as IMAPStore).hasCapability("X-GM-EXT-1")) (m as IMAPMessage).getItem(GmailThreadFetch.item) as? Long else null, m.getHeader("List-Unsubscribe")?.firstOrNull()?.let { Regex("<(https://[^>]+|mailto:[^>]+)>", RegexOption.IGNORE_CASE).find(it)?.groupValues?.get(1) },
     )
     private fun hasAttachments(part: Part, depth: Int = 0): Boolean {
         if (depth >= 40) return false
@@ -100,15 +121,30 @@ class MailClient(val timeoutMs: Int = 30_000) {
         val source = part.dataHandler.dataSource as? MultipartDataSource ?: return false
         return (0 until source.count).any { hasAttachments(source.getBodyPart(it), depth + 1) }
     }
-    suspend fun body(endpoint: Endpoint, credentials: Credentials, path: String, uid: Long, expectedValidity: Long? = null): ParsedBody = store(endpoint, credentials) { s -> folder(s, path) { f -> require(expectedValidity == null || expectedValidity == f.uidValidity) { "Folder UIDVALIDITY changed" }
+    private suspend fun <T> rawBody(endpoint: Endpoint, credentials: Credentials, path: String, uid: Long, expectedValidity: Long?, directory: java.io.File, parse: (MimeMessage) -> T): T = store(endpoint, credentials) { store ->
         require(uid > 0) { "A server message UID must be positive" }
-        val message = requireNotNull(f.getMessageByUID(uid)) { "Message no longer exists" }
-        val output = object : java.io.ByteArrayOutputStream() {
-            override fun write(b: ByteArray, off: Int, len: Int) { require(count.toLong() + len <= 25 * 1024 * 1024) { "Message exceeds 25 MiB" }; super.write(b, off, len) }
-            override fun write(b: Int) { require(count < 25 * 1024 * 1024) { "Message exceeds 25 MiB" }; super.write(b) }
-        }
-        message.writeTo(output)
-        Mime.parse(MimeMessage(Session.getInstance(Properties()), java.io.ByteArrayInputStream(output.toByteArray()))) } }
+        directory.mkdirs()
+        val raw = java.io.File.createTempFile("raw-", ".eml", directory)
+        try { folder(store,path) { folder ->
+            require(expectedValidity == null || expectedValidity == folder.uidValidity) { "Folder UIDVALIDITY changed" }
+            val message = requireNotNull(folder.getMessageByUID(uid)) { "Message no longer exists" }
+            raw.outputStream().use { file ->
+                val bounded = object : java.io.FilterOutputStream(file) {
+                    var count = 0L
+                    override fun write(bytes: ByteArray, offset: Int, length: Int) { require(count + length <= 40L * 1024 * 1024) { "Encoded message exceeds download limit" }; out.write(bytes,offset,length); count += length }
+                    override fun write(value: Int) { require(++count <= 40L * 1024 * 1024) { "Encoded message exceeds download limit" }; out.write(value) }
+                }
+                message.writeTo(bounded)
+            }
+            jakarta.mail.util.SharedFileInputStream(raw).use { input -> parse(MimeMessage(Session.getInstance(Properties()), input)) }
+        } } finally { raw.delete() }
+    }
+    suspend fun body(endpoint: Endpoint, credentials: Credentials, path: String, uid: Long, expectedValidity: Long? = null): ParsedBody {
+        val directory = java.io.File.createTempFile("dotmail-body-", "").apply { delete(); mkdirs() }
+        return try { rawBody(endpoint,credentials,path,uid,expectedValidity,directory) { Mime.parse(it) } } finally { directory.deleteRecursively() }
+    }
+    suspend fun cacheBody(endpoint: Endpoint, credentials: Credentials, path: String, uid: Long, directory: java.io.File, expectedValidity: Long? = null): CachedBody =
+        rawBody(endpoint,credentials,path,uid,expectedValidity,directory) { Mime.cache(it, directory) }
     /** Bounded partial text previews only. Never changes flags or populates a complete body. */
     suspend fun snippets(endpoint: Endpoint, credentials: Credentials, path: String, uids: LongArray, expectedValidity: Long, maxBytes: Int = 2048): Map<Long, String> = store(endpoint, credentials) { store ->
         require(uids.size <= 200 && uids.all { it > 0 } && maxBytes in 128..2048)

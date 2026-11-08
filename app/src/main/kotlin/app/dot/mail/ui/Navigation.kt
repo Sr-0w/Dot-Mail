@@ -115,6 +115,7 @@ fun DotMailRoot(requests: StateFlow<ExternalRequest?>, onRequestConsumed: () -> 
                 ThreadScreen(
                     threadId = entry.toRoute<ThreadRoute>().threadId,
                     onBack = { nav.popBackStack() },
+                    onOpenAdjacent = { next -> nav.navigate(ThreadRoute(next)) { popUpTo<ThreadRoute> { inclusive = true } } },
                     onReply = { messageId, mode -> nav.openCompose(ComposeRoute(replyToMessageId = messageId, replyMode = mode.name)) },
                     onComposeTo = { target ->
                         val m = if (target.startsWith("mailto:", true)) app.dot.mail.MailtoParser.parse(target) else ExternalRequest.Compose(to = listOf(target))

@@ -83,6 +83,12 @@ class DeviceRegressionTest {
         assertTrue(state is SyncState.Error)
         assertFalse((state as SyncState.Error).message.contains("a@example.org"))
     }
+    @Test fun protocolResponseRetainsUsefulTextAndScrubsIdentityAndCredentials() {
+        val error = Class.forName("org.eclipse.angus.mail.iap.BadCommandException").getConstructor(String::class.java).newInstance("A4 BAD FETCH unsupported for person@example.org password=secret-value token=opaque-value") as Throwable
+        val clean = SyncDiagnostics.response(error, listOf("secret-value"))!!
+        assertTrue(clean.contains("BAD FETCH unsupported")); assertFalse(clean.contains("person@example.org"))
+        assertFalse(clean.contains("secret-value")); assertFalse(clean.contains("opaque-value")); assertTrue(clean.length <= 200)
+    }
     @Test fun diagnosticsNeverRetainProviderMessages() {
         val raw = jakarta.mail.MessagingException("token=secret@example.org body=private", java.net.ConnectException("password=do-not-print"))
         val cleaned = SyncDiagnostics.sanitized(raw)

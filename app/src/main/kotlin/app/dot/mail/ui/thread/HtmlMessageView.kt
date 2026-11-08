@@ -9,6 +9,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
@@ -35,8 +36,13 @@ fun HtmlMessageView(
     modifier: Modifier = Modifier,
     /** Exact content:// URIs of this message's inline parts; nothing else local is ever served. */
     inlineUris: Set<String> = emptySet(),
+    textZoom: Int = 100,
 ) {
     val document = remember(html, dark, textColor, linkColor) { wrap(html, dark, textColor, linkColor) }
+    val currentOnLink by androidx.compose.runtime.rememberUpdatedState(onLink)
+    val linkHandler: (String) -> Unit = remember { { url -> currentOnLink(url) } }
+    // The WebView's theme (algorithmic darkening) is fixed at creation: recreate it when the theme flips.
+    androidx.compose.runtime.key(dark) {
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
@@ -70,7 +76,7 @@ fun HtmlMessageView(
                 if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
                     WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, dark)
                 }
-                webViewClient = SafeClient(allowRemote, inlineUris, ctx.contentResolver, onLink)
+                webViewClient = SafeClient(allowRemote, inlineUris, ctx.contentResolver, linkHandler)
                 tag = null
             }
         },
@@ -79,8 +85,9 @@ fun HtmlMessageView(
             if (client == null || client.allowRemote != allowRemote || client.inline != inlineUris) {
                 web.settings.blockNetworkLoads = !allowRemote
                 web.settings.blockNetworkImage = !allowRemote
-                web.webViewClient = SafeClient(allowRemote, inlineUris, web.context.contentResolver, onLink)
+                web.webViewClient = SafeClient(allowRemote, inlineUris, web.context.contentResolver, linkHandler)
             }
+            if (web.settings.textZoom != textZoom) web.settings.textZoom = textZoom
             if (web.tag != document) {
                 web.tag = document
                 // Null base URL = opaque origin: the content can't reach anything relative.
@@ -89,6 +96,7 @@ fun HtmlMessageView(
         },
         onRelease = { it.destroy() },
     )
+    }
 }
 
 private class SafeClient(

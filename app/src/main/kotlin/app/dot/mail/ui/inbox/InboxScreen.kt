@@ -9,6 +9,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -99,6 +100,7 @@ import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import app.dot.design.Dot
+import app.dot.design.DotMotion
 import app.dot.design.DotShapes
 import app.dot.design.DotSpacing
 import app.dot.design.components.Avatar
@@ -146,6 +148,7 @@ fun InboxScreen(
     val snackbar = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
     var showMove by remember { mutableStateOf(false) }
+    var pendingTrash by remember { mutableStateOf<List<Long>?>(null) }
     val pullState = rememberPullToRefreshState()
 
     LaunchedEffect(Unit) { vm.events.collect { snackbar.showSnackbar(it) } }
@@ -183,7 +186,7 @@ fun InboxScreen(
                             count = selection.size,
                             role = header.role,
                             onClose = vm::clearSelection,
-                            onAction = { vm.act(it) },
+                            onAction = { if (it == MessageAction.TRASH && prefs.confirmDelete) pendingTrash = selection.toList() else vm.act(it) },
                             onMove = { showMove = true },
                         )
                     } else {
@@ -193,6 +196,25 @@ fun InboxScreen(
                             elevated = listState.canScrollBackward,
                             navigation = { DotIconButton(Icons.Outlined.Menu, "Open mailboxes", onClick = { scope.launch { drawerState.open() } }) },
                             actions = { DotIconButton(Icons.Outlined.Search, "Search", onClick = onSearch) },
+                        )
+                    }
+                }
+                val accountsNow by vm.accounts.collectAsStateWithLifecycle()
+                val failing = accountsNow.filter { it.syncState is app.dot.mail.data.model.SyncState.Error }
+                androidx.compose.animation.AnimatedVisibility(failing.isNotEmpty() && selection.isEmpty()) {
+                    val err = failing.firstOrNull()?.syncState as? app.dot.mail.data.model.SyncState.Error
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.xs)
+                            .clip(DotShapes.medium).background(Dot.colors.surface)
+                            .combinedClickable(onClick = onSettings).padding(horizontal = DotSpacing.m, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Outlined.WifiOff, null, Modifier.size(18.dp), tint = Dot.colors.danger)
+                        Spacer(Modifier.width(DotSpacing.s))
+                        Text(
+                            (if (failing.size == 1) failing.first().email + ": " else "${failing.size} accounts: ") +
+                                (err?.message ?: "sync problem") + if (err?.isAuthError == true) " — sign in again" else "",
+                            style = Dot.type.caption, color = Dot.colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
@@ -210,6 +232,7 @@ fun InboxScreen(
                     },
                 ) {
                     ThreadList(
+                        myAddresses = remember(accountsNow) { accountsNow.map { it.email.lowercase() }.toSet() },
                         threads = threads,
                         listState = listState,
                         selection = selection,
@@ -220,12 +243,14 @@ fun InboxScreen(
                         onOpen = { t ->
                             when {
                                 selection.isNotEmpty() -> vm.toggleSelection(t.threadId)
-                                header.role == FolderRole.DRAFTS -> onOpenDraft(t.threadId)
+                                t.draftId != null -> onOpenDraft(t.draftId!!)
                                 else -> onOpenThread(t.threadId)
                             }
                         },
                         onToggleSelect = vm::toggleSelection,
-                        onSwipe = { action, t -> vm.act(action, listOf(t.threadId)) },
+                        onSwipe = { action, t ->
+                            if (action == MessageAction.TRASH && prefs.confirmDelete) pendingTrash = listOf(t.threadId) else vm.act(action, listOf(t.threadId))
+                        },
                     )
                 }
             }
@@ -238,6 +263,14 @@ fun InboxScreen(
         }
     }
 
+    pendingTrash?.let { ids ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pendingTrash = null }, containerColor = Dot.colors.surface, shape = DotShapes.large,
+            title = { Text(if (ids.size == 1) "Move to trash?" else "Move ${ids.size} conversations to trash?", style = Dot.type.title, color = Dot.colors.textPrimary) },
+            confirmButton = { app.dot.design.components.DotButton("Delete", { pendingTrash = null; vm.act(MessageAction.TRASH, ids) }, style = app.dot.design.components.ButtonStyle.Danger, compact = true) },
+            dismissButton = { app.dot.design.components.DotButton("Cancel", { pendingTrash = null }, style = app.dot.design.components.ButtonStyle.Ghost, compact = true) },
+        )
+    }
     if (showMove) {
         ModalBottomSheet(
             onDismissRequest = { showMove = false },
@@ -260,6 +293,7 @@ fun InboxScreen(
 
 @Composable
 private fun ThreadList(
+    myAddresses: Set<String>,
     threads: LazyPagingItems<ThreadSummary>,
     listState: LazyListState,
     selection: Set<Long>,
@@ -281,13 +315,21 @@ private fun ThreadList(
             // Must be scrollable for pull-to-refresh to work on an empty list.
             item { EmptyFor(role) }
         }
-        else -> LazyColumn(
+        else -> {
+            LaunchedEffect(threads.itemSnapshotList.items) { app.dot.mail.ui.thread.ThreadOrder.ids = threads.itemSnapshotList.items.map { it.threadId } }
+            LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 112.dp),
         ) {
             items(threads.itemCount, key = threads.itemKey { it.threadId }, contentType = { "thread" }) { index ->
                 val t = threads[index] ?: return@items
+                // Archive/delete/arrivals animate instead of popping (fade + slide of neighbours).
+                Box(Modifier.animateItem(
+                    fadeInSpec = tween(DotMotion.medium),
+                    placementSpec = androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow, visibilityThreshold = androidx.compose.ui.unit.IntOffset.VisibilityThreshold),
+                    fadeOutSpec = tween(DotMotion.fast),
+                )) {
                 SwipeableRow(
                     thread = t,
                     swipeStart = swipeStart,
@@ -297,6 +339,8 @@ private fun ThreadList(
                 ) {
                     ThreadRow(
                         thread = t,
+                        showRecipients = role == FolderRole.SENT || role == FolderRole.DRAFTS,
+                        myAddresses = myAddresses,
                         selected = t.threadId in selection,
                         selectionMode = selection.isNotEmpty(),
                         compact = density == Density.COMPACT,
@@ -304,8 +348,10 @@ private fun ThreadList(
                         onLongClick = { onToggleSelect(t.threadId) },
                     )
                 }
+                }
             }
             if (threads.loadState.append is LoadState.Loading) item { SkeletonRow() }
+        }
         }
     }
 }
@@ -396,6 +442,8 @@ private fun swipeVisual(action: SwipeAction, t: ThreadSummary): Pair<ImageVector
 fun ThreadRow(
     thread: ThreadSummary,
     selected: Boolean,
+    showRecipients: Boolean = false,
+    myAddresses: Set<String> = emptySet(),
     selectionMode: Boolean,
     compact: Boolean,
     onClick: () -> Unit,
@@ -405,7 +453,9 @@ fun ThreadRow(
     val haptics = LocalHapticFeedback.current
     val bg by animateColorAsState(if (selected) c.surfaceRaised else c.background, label = "row-bg")
     val unread = thread.isUnread
-    val sender = senderLine(thread)
+    val sender = if (showRecipients && thread.recipients.isNotEmpty()) {
+        "To " + thread.recipients.joinToString(", ") { it.displayName.substringBefore(' ').ifBlank { it.displayName } }
+    } else if (thread.draftId != null && thread.recipients.isEmpty()) "Draft" else senderLine(thread, myAddresses)
     Row(
         Modifier
             .fillMaxWidth()
@@ -435,8 +485,8 @@ fun ThreadRow(
                 AnimatedContent(selected || selectionMode, label = "avatar") { sel ->
                     if (sel) SelectCircle(selected)
                     else {
-                        val first = thread.participants.lastOrNull()
-                        Avatar(first?.displayName ?: "?", first?.email ?: "?")
+                        val first = if (showRecipients) thread.recipients.firstOrNull() ?: thread.participants.lastOrNull() else thread.participants.lastOrNull()
+                        app.dot.mail.ui.avatar.SenderAvatar(first ?: app.dot.mail.data.model.EmailAddress("?"))
                     }
                 }
             }
@@ -499,11 +549,13 @@ fun ThreadRow(
     }
 }
 
-private fun senderLine(t: ThreadSummary): String {
-    val names = t.participants.map { it.displayName.substringBefore(' ').ifBlank { it.displayName } }.distinct()
+private fun senderLine(t: ThreadSummary, me: Set<String> = emptySet()): String {
+    fun short(a: app.dot.mail.data.model.EmailAddress) =
+        if (a.email.lowercase() in me) "me" else a.displayName.substringBefore(' ').ifBlank { a.displayName }
+    val names = t.participants.map(::short).distinct()
     return when {
         names.isEmpty() -> "(unknown sender)"
-        t.participants.size == 1 -> t.participants.first().displayName
+        t.participants.size == 1 -> t.participants.first().let { if (it.email.lowercase() in me) "me" else it.displayName }
         names.size <= 3 -> names.joinToString(", ")
         else -> names.first() + " … " + names.takeLast(2).joinToString(", ")
     }

@@ -13,12 +13,13 @@ object HtmlSanitizer {
     private val properties = setOf("color", "background-color", "font-family", "font-size", "font-weight", "font-style", "text-align", "text-decoration", "line-height", "letter-spacing", "white-space", "vertical-align", "border", "border-color", "border-width", "border-style", "border-collapse", "border-spacing", "padding", "padding-top", "padding-bottom", "padding-left", "padding-right", "margin", "margin-top", "margin-bottom", "margin-left", "margin-right", "width", "height", "max-width", "min-width", "display")
     fun sanitize(input: String, allowRemoteImages: Boolean = false, cidUris: Map<String, String> = emptyMap()): Result {
         val doc = Jsoup.parse(input)
+        doc.outputSettings().prettyPrint(false)
         var remote = false
         var blocked = 0
         for (el in doc.allElements) {
             if (el.hasAttr("srcset") || el.hasAttr("background")) { remote = true; blocked++ }
             val style = el.attr("style")
-            if (Regex("(?i)url\\s*\\(|@import|\\\\").containsMatchIn(style) || el.tagName() == "style") { remote = true; blocked++ }
+            if (Regex("(?i)url\\s*\\(|@import|\\\\").containsMatchIn(if (el.tagName() == "style") el.data() else style)) { remote = true; blocked++ }
             if (el.tagName() == "img") {
                 val src = el.attr("src").trim()
                 if (src.startsWith("cid:", true)) {
@@ -52,6 +53,7 @@ object HtmlSanitizer {
             .addAttributes("font", "color", "face", "size")
         if (allowRemoteImages) safe.addProtocols("img", "src", "https", "http")
         val cleaned = Cleaner(safe).clean(doc)
+        cleaned.outputSettings().prettyPrint(false)
         cleaned.select("a").attr("rel", "noreferrer noopener")
         return Result(cleaned.body().html(), remote, blocked)
     }

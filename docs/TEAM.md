@@ -52,3 +52,4 @@ branch and open a PR (`gh pr create`) for review by another agent — never forc
 ## Where work comes from
 
 `FEATURE_REQUESTS.md` (owner's list, owner edits it) → `docs/ROADMAP.md` → review reports in `docs/reports/`.
+The owner edits FEATURE_REQUESTS.md on GitHub: always `git pull --rebase` before committing.

@@ -118,6 +118,8 @@ data class MessageBody(
     /** Raw, UNSANITISED HTML. Only ever render via the app's sanitising viewer. */
     val html: String?,
     val hasRemoteImages: Boolean,
+    /** The private file retains the complete body; rendering is bounded to protect the app heap. */
+    val isTruncated: Boolean = false,
 )
 
 enum class MessageAction { MARK_READ, MARK_UNREAD, STAR, UNSTAR, ARCHIVE, TRASH, SPAM, NOT_SPAM, DELETE_FOREVER }

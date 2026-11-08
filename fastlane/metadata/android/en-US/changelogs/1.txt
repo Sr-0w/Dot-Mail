@@ -1,0 +1,8 @@
+First public release of Dot Mail.
+
+- IMAP/SMTP with password and app passwords; automatic server detection for major providers
+- Unified inbox, conversation threads, folders, local and server search
+- Offline-first: cached mail, queued actions that replay, undo send and scheduled send
+- HTML mail sanitised and rendered safely; remote images blocked by default
+- Notifications with Mark read / Archive actions; optional app lock and hidden Recents
+- No telemetry, no accounts with us, no Play Services

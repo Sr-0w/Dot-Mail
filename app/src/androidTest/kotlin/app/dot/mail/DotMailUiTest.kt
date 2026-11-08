@@ -108,7 +108,7 @@ class DotMailUiTest {
     @Test fun settings_themeToggle() {
         compose.openDrawer()
         compose.onNodeWithText("Settings").performClick()
-        compose.waitForText("Appearance")
+        compose.waitForText("APPEARANCE") // SectionLabel upper-cases
         assertEquals(ThemeMode.LIGHT, demo.app.settings.ui.value.theme)
         compose.onNodeWithText("Dark").performScrollTo().performClick()
         compose.waitUntil(WAIT_MS) { demo.app.settings.ui.value.theme == ThemeMode.DARK }

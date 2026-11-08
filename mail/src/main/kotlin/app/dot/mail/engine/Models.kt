@@ -17,13 +17,17 @@ data class Header(
     val subject: String, val sentAt: Long, val flags: RemoteFlags, val hasAttachments: Boolean,
     val gmailThreadId: Long? = null, val unsubscribe: String? = null,
 )
-data class HeaderSync(val cursor: SyncCursor, val reset: Boolean, val headers: List<Header>, val flags: List<RemoteFlags>, val existingUids: Set<Long>)
+data class HeaderFailure(val uid: Long, val error: Exception)
+data class HeaderSync(val cursor: SyncCursor, val reset: Boolean, val headers: List<Header>, val flags: List<RemoteFlags>, val existingUids: Set<Long>, val failures: List<HeaderFailure> = emptyList())
 data class MimeAttachment(val partId: String, val name: String, val mimeType: String, val contentId: String?, val inline: Boolean, val bytes: ByteArray)
 data class ParsedBody(val text: String?, val html: String?, val attachments: List<MimeAttachment>)
-data class OutgoingAttachment(val name: String, val mimeType: String, val bytes: ByteArray, val contentId: String? = null)
+data class OutgoingAttachment(val name: String, val mimeType: String, val bytes: ByteArray = byteArrayOf(), val contentId: String? = null, val source: jakarta.activation.DataSource? = null)
 data class OutgoingMail(
     val from: Address, val to: List<Address>, val cc: List<Address> = emptyList(), val bcc: List<Address> = emptyList(),
     val subject: String, val text: String, val html: String? = null, val attachments: List<OutgoingAttachment> = emptyList(),
     val inReplyTo: String? = null, val references: List<String> = emptyList(),
     val messageId: String? = null, val date: Instant = Instant.now(),
 )
+
+data class CachedPart(val partId: String, val name: String, val mimeType: String, val contentId: String?, val inline: Boolean, val file: java.io.File)
+data class CachedBody(val text: java.io.File?, val html: java.io.File?, val attachments: List<CachedPart>)

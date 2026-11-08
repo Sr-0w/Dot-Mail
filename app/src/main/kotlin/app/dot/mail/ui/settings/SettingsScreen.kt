@@ -1,11 +1,15 @@
 package app.dot.mail.ui.settings
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.biometric.BiometricManager
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -18,26 +22,51 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.Archive
+import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.ContactPage
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.Fingerprint
+import androidx.compose.material.icons.outlined.FormatQuote
+import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.MarkEmailRead
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Public
+import androidx.compose.material.icons.outlined.Reply
+import androidx.compose.material.icons.outlined.ReplyAll
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.ShieldMoon
+import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.SwipeLeft
 import androidx.compose.material.icons.outlined.SwipeRight
+import androidx.compose.material.icons.outlined.TextFields
+import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.dot.design.Dot
 import app.dot.design.DotShapes
@@ -47,25 +76,26 @@ import app.dot.design.components.Avatar
 import app.dot.design.components.BackButton
 import app.dot.design.components.ButtonStyle
 import app.dot.design.components.DotButton
-import app.dot.design.components.DotSwitch
 import app.dot.design.components.DotTopBar
 import app.dot.design.components.Hairline
 import app.dot.design.components.ListRow
 import app.dot.design.components.SectionLabel
+import app.dot.mail.AfterAction
 import app.dot.mail.BuildConfig
 import app.dot.mail.Density
 import app.dot.mail.LocalMailGraph
 import app.dot.mail.LocalSettings
+import app.dot.mail.MarkRead
 import app.dot.mail.SwipeAction
 import app.dot.mail.data.model.Account
-import app.dot.mail.ui.account.Segmented
-import app.dot.design.components.DotMenu
-import app.dot.design.components.DotMenuItem
 import app.dot.mail.data.model.SyncState
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.ui.semantics.Role
+import app.dot.mail.ui.avatar.AvatarRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+const val SOURCE_URL = "https://github.com/Sr-0w/Dot-Mail"
 
 @Composable
 fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRemoved: () -> Unit) {
@@ -78,6 +108,8 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
     val scroll = rememberScrollState()
     var removing by remember { mutableStateOf<Account?>(null) }
     var about by remember { mutableStateOf(false) }
+    var licences by remember { mutableStateOf(false) }
+    var cacheVersion by remember { mutableIntStateOf(0) }
     val c = Dot.colors
     val canLock = remember {
         BiometricManager.from(context).canAuthenticate(
@@ -85,10 +117,23 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             else BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL,
         ) == BiometricManager.BIOMETRIC_SUCCESS
     }
+    val hasContacts = {
+        ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
+    }
+    var contactsGranted by remember { mutableStateOf(hasContacts()) }
+    var contactsDenied by remember { mutableStateOf(false) }
+    val contactsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        contactsGranted = ok
+        contactsDenied = !ok
+        if (ok) settings.update { it.copy(contactPhotos = true) }
+    }
+    // Permission revoked in system settings while the toggle was on: show it off.
+    LaunchedEffect(Unit) { contactsGranted = hasContacts() }
 
     Column(Modifier.fillMaxSize().background(c.background)) {
         DotTopBar(title = "Settings", elevated = scroll.value > 0, navigation = { BackButton(onBack) })
         Column(Modifier.verticalScroll(scroll)) {
+            // ---- Accounts
             SectionLabel("Accounts", Modifier.padding(top = DotSpacing.s))
             accounts.forEach { a ->
                 val err = a.syncState as? SyncState.Error
@@ -101,59 +146,166 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
                 )
             }
             ListRow("Add account", icon = Icons.Outlined.Add, onClick = onAddAccount)
-            Hairline(Modifier.padding(vertical = DotSpacing.s))
+            Divider()
 
-            SectionLabel("Appearance")
-            Column(Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s)) {
-                Text("Theme", style = Dot.type.bodyStrong, color = c.textPrimary)
-                Spacer(Modifier.height(DotSpacing.s))
-                Segmented(
-                    listOf(ThemeMode.SYSTEM to "System", ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark"),
-                    prefs.theme, { m -> settings.update { it.copy(theme = m) } },
-                )
-                Spacer(Modifier.height(DotSpacing.l))
-                Text("List density", style = Dot.type.bodyStrong, color = c.textPrimary)
-                Spacer(Modifier.height(DotSpacing.s))
-                Segmented(
-                    listOf(Density.COMFORTABLE to "Comfortable", Density.COMPACT to "Compact"),
-                    prefs.density, { d -> settings.update { it.copy(density = d) } },
-                )
+            // ---- General
+            SectionLabel("General")
+            if (accounts.size > 1) {
+                ChoiceRow(
+                    "Default account for new mail", Icons.Outlined.AccountCircle,
+                    value = accounts.firstOrNull { it.id == prefs.defaultAccountId }?.id ?: accounts.first().id,
+                    options = accounts.map { it.id to it.email },
+                ) { id -> settings.update { it.copy(defaultAccountId = id) } }
             }
-            Spacer(Modifier.height(DotSpacing.s))
-            // swipeStart = start→end: physically rightwards in LTR, leftwards in RTL.
-            val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
-            SwipeSetting(if (rtl) "Swipe left" else "Swipe right", if (rtl) Icons.Outlined.SwipeLeft else Icons.Outlined.SwipeRight, prefs.swipeStart) { a -> settings.update { it.copy(swipeStart = a) } }
-            SwipeSetting(if (rtl) "Swipe right" else "Swipe left", if (rtl) Icons.Outlined.SwipeRight else Icons.Outlined.SwipeLeft, prefs.swipeEnd) { a -> settings.update { it.copy(swipeEnd = a) } }
-            Hairline(Modifier.padding(vertical = DotSpacing.s))
+            val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+            ChoiceRow(
+                if (rtl) "Swipe left" else "Swipe right", if (rtl) Icons.Outlined.SwipeLeft else Icons.Outlined.SwipeRight,
+                prefs.swipeStart, SwipeAction.entries.map { it to swipeName(it) },
+            ) { a -> settings.update { it.copy(swipeStart = a) } }
+            ChoiceRow(
+                if (rtl) "Swipe right" else "Swipe left", if (rtl) Icons.Outlined.SwipeRight else Icons.Outlined.SwipeLeft,
+                prefs.swipeEnd, SwipeAction.entries.map { it to swipeName(it) },
+            ) { a -> settings.update { it.copy(swipeEnd = a) } }
+            ToggleRow("Confirm before deleting", "Ask before moving conversations to Trash.", Icons.Outlined.Delete, prefs.confirmDelete) { v ->
+                settings.update { it.copy(confirmDelete = v) }
+            }
+            ChoiceRow(
+                "After archive or delete", Icons.Outlined.Archive, prefs.afterAction,
+                listOf(AfterAction.LIST to "Back to the list", AfterAction.NEXT to "Open the next conversation", AfterAction.PREVIOUS to "Open the previous conversation"),
+            ) { v -> settings.update { it.copy(afterAction = v) } }
+            ChoiceRow(
+                "Mark as read", Icons.Outlined.MarkEmailRead, prefs.markRead,
+                listOf(MarkRead.IMMEDIATELY to "When opened", MarkRead.AFTER_2S to "After 2 seconds", MarkRead.MANUALLY to "Only manually"),
+            ) { v -> settings.update { it.copy(markRead = v) } }
+            Divider()
 
-            SectionLabel("Privacy & security")
+            // ---- Appearance
+            SectionLabel("Appearance")
+            SegmentedSetting("Theme", listOf(ThemeMode.SYSTEM to "System", ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark"), prefs.theme) { m ->
+                settings.update { it.copy(theme = m) }
+            }
+            SegmentedSetting("List density", listOf(Density.COMFORTABLE to "Comfortable", Density.COMPACT to "Compact"), prefs.density) { d ->
+                settings.update { it.copy(density = d) }
+            }
+            PercentSlider("Reading text size", prefs.readingTextPercent, 90..130, 10) { v -> settings.update { it.copy(readingTextPercent = v) } }
+            ToggleRow("Coloured avatars", "Give every sender a colour. Off: one neutral grey.", Icons.Outlined.Palette, prefs.avatarColors) { v ->
+                settings.update { it.copy(avatarColors = v) }
+            }
+            SectionLabel("Sender pictures")
+            Text(
+                "Initials are used unless you turn a source on. Every source below except contacts asks another server, which learns that you received mail from that sender.",
+                style = Dot.type.caption, color = c.textSecondary,
+                modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.xs),
+            )
+            ToggleRow(
+                "Contact photos",
+                if (contactsDenied) "Contacts permission was denied. Allow it in system settings to use this." else "Photos from your address book. Stays on this device.",
+                Icons.Outlined.ContactPage, prefs.contactPhotos && contactsGranted,
+            ) { v ->
+                when {
+                    !v -> settings.update { it.copy(contactPhotos = false) }
+                    contactsGranted -> settings.update { it.copy(contactPhotos = true) }
+                    else -> contactsLauncher.launch(Manifest.permission.READ_CONTACTS)
+                }
+            }
+            ToggleRow("Gravatar", "Sends a hash of the sender's address to gravatar.com.", Icons.Outlined.Public, prefs.gravatar) { v ->
+                settings.update { it.copy(gravatar = v) }
+            }
+            ToggleRow("Brand logos", "Looks up the sender's domain in DNS and downloads its BIMI logo from the sender's host.", Icons.Outlined.VerifiedUser, prefs.brandLogos) { v ->
+                settings.update { it.copy(brandLogos = v) }
+            }
+            ToggleRow("Website icons", "Downloads the icon of the sender's website (not for Gmail, Outlook and similar).", Icons.Outlined.Language, prefs.websiteIcons) { v ->
+                settings.update { it.copy(websiteIcons = v) }
+            }
+            Divider()
+
+            // ---- Reading
+            SectionLabel("Reading")
             ToggleRow("Load remote images", "Off by default: remote images can reveal when and where you read mail.", Icons.Outlined.Image, prefs.loadRemoteImages) { v ->
                 settings.update { it.copy(loadRemoteImages = v) }
             }
+            ListRow(
+                "Tracking pixels are always blocked", subtitle = "Invisible 1-pixel images that report you opened a message never load.",
+                icon = Icons.Outlined.Block,
+            )
             ToggleRow("Confirm links", "Show the real address before opening a link.", Icons.Outlined.Link, prefs.confirmLinks) { v ->
                 settings.update { it.copy(confirmLinks = v) }
             }
-            ToggleRow(
-                "App lock", if (canLock) "Require fingerprint, face or screen lock to open." else "Set up a screen lock on this device to use this.",
-                Icons.Outlined.Fingerprint, prefs.appLock, enabled = canLock,
-            ) { v -> settings.update { it.copy(appLock = v) } }
-            ToggleRow("Hide content in Recents", "Also blocks screenshots.", Icons.Outlined.VisibilityOff, prefs.secureScreen) { v ->
-                settings.update { it.copy(secureScreen = v) }
+            ToggleRow("Show quoted text", "Expand earlier messages quoted in a reply.", Icons.Outlined.FormatQuote, prefs.quotedExpanded) { v ->
+                settings.update { it.copy(quotedExpanded = v) }
             }
-            Hairline(Modifier.padding(vertical = DotSpacing.s))
+            Divider()
 
-            SectionLabel("Sending")
+            // ---- Composing
+            SectionLabel("Composing")
             UndoSetting(prefs.undoSendSeconds) { s -> settings.update { it.copy(undoSendSeconds = s) } }
+            ToggleRow("Reply to all by default", "Tapping Reply addresses everyone on the message.", Icons.Outlined.ReplyAll, prefs.replyAllByDefault) { v ->
+                settings.update { it.copy(replyAllByDefault = v) }
+            }
+            ToggleRow("Include original message", "Quote the message you are replying to.", Icons.Outlined.Reply, prefs.includeOriginal) { v ->
+                settings.update { it.copy(includeOriginal = v) }
+            }
+            Divider()
+
+            // ---- Notifications
+            SectionLabel("Notifications")
             ListRow(
-                "Notifications", subtitle = "Per-account channels, sound and vibration", icon = Icons.Outlined.Notifications,
+                "System notification settings", subtitle = "Sound, vibration and channels per account", icon = Icons.Outlined.Notifications,
                 onClick = {
                     context.startActivity(
                         Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
                     )
                 },
             )
-            Hairline(Modifier.padding(vertical = DotSpacing.s))
+            Divider()
+
+            // ---- Privacy & security
+            SectionLabel("Privacy & security")
+            ToggleRow(
+                "App lock", if (canLock) "Require fingerprint, face or screen lock to open." else "Set up a screen lock on this device to use this.",
+                Icons.Outlined.Fingerprint, prefs.appLock, enabled = canLock,
+            ) { v -> settings.update { it.copy(appLock = v) } }
+            ChoiceRow(
+                "Lock after", Icons.Outlined.Lock, prefs.lockAfterMinutes,
+                listOf(0 to "Immediately", 1 to "1 minute", 5 to "5 minutes", 15 to "15 minutes"), enabled = prefs.appLock && canLock,
+            ) { m -> settings.update { it.copy(lockAfterMinutes = m) } }
+            ToggleRow("Hide content in Recents", "Also blocks screenshots.", Icons.Outlined.VisibilityOff, prefs.secureScreen) { v ->
+                settings.update { it.copy(secureScreen = v) }
+            }
+            Divider()
+
+            // ---- Storage
+            SectionLabel("Storage")
+            val cacheBytes by produceState(0L, cacheVersion) {
+                value = withContext(Dispatchers.IO) { context.cacheDir.walkTopDown().filter { it.isFile }.sumOf { it.length() } }
+            }
+            ListRow(
+                "Clear cache", subtitle = "${formatSize(cacheBytes)} of temporary files. Mail stays on your account and this device.",
+                icon = Icons.Outlined.DeleteSweep,
+                onClick = {
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            AvatarRepository.get(context).clearCache()
+                            context.cacheDir.listFiles()?.forEach { it.deleteRecursively() }
+                        }
+                        cacheVersion++
+                    }
+                },
+            )
+            Divider()
+
+            // ---- About
+            SectionLabel("About")
             ListRow("About Dot Mail", subtitle = "Version ${BuildConfig.VERSION_NAME} · GPL-3.0-or-later", icon = Icons.Outlined.Info, onClick = { about = true })
+            ListRow(
+                "Source code", subtitle = SOURCE_URL.removePrefix("https://"), icon = Icons.Outlined.Code,
+                onClick = { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(SOURCE_URL))) } },
+            )
+            ListRow("Open-source licences", icon = Icons.Outlined.Gavel, onClick = { licences = true })
+            ListRow(
+                "No telemetry", subtitle = "No ads, analytics, crash reporting or account with us. Mail goes only between this device and your provider.",
+                icon = Icons.Outlined.ShieldMoon,
+            )
             if (BuildConfig.DEBUG) {
                 ToggleRow("Demo mode", "Sample mail, no network. Restart the app to apply.", Icons.Outlined.Palette, settings.demoMode) { v ->
                     settings.demoMode = v
@@ -193,38 +345,49 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             text = {
                 Text(
                     "Free software under the GNU GPL v3 or later. No ads, no analytics, no tracking, no account with us. " +
-                        "Your mail goes only between this device and your mail provider.\n\nTypeface: Inter (SIL Open Font License).",
+                        "Your mail goes only between this device and your mail provider.",
                     style = Dot.type.callout, color = c.textSecondary,
                 )
             },
             confirmButton = { DotButton("Close", { about = false }, style = ButtonStyle.Ghost, compact = true) },
         )
     }
-}
-
-@Composable
-private fun ToggleRow(
-    title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector, checked: Boolean,
-    enabled: Boolean = true, onChange: (Boolean) -> Unit,
-) {
-    // The row is the single toggle target (merged semantics: "Title, switch, on/off"); the switch is visual only.
-    ListRow(
-        title = title, subtitle = subtitle, icon = icon,
-        titleColor = if (enabled) Dot.colors.textPrimary else Dot.colors.textTertiary,
-        modifier = Modifier.toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange),
-        trailing = { DotSwitch(checked, onCheckedChange = null, enabled = enabled) },
-    )
-}
-
-@Composable
-private fun SwipeSetting(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, value: SwipeAction, onChange: (SwipeAction) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        ListRow(title, subtitle = swipeName(value), icon = icon, onClick = { open = true })
-        DotMenu(open, { open = false }) {
-            SwipeAction.entries.forEach { a -> DotMenuItem(swipeName(a), null) { open = false; onChange(a) } }
-        }
+    if (licences) {
+        AlertDialog(
+            onDismissRequest = { licences = false },
+            containerColor = c.surface,
+            shape = DotShapes.large,
+            title = { Text("Open-source licences", style = Dot.type.title, color = c.textPrimary) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    LICENCES.forEach { (name, licence) ->
+                        Text(name, style = Dot.type.bodyStrong, color = c.textPrimary)
+                        Text(licence, style = Dot.type.caption, color = c.textSecondary, modifier = Modifier.padding(bottom = DotSpacing.m))
+                    }
+                }
+            },
+            confirmButton = { DotButton("Close", { licences = false }, style = ButtonStyle.Ghost, compact = true) },
+        )
     }
+}
+
+private val LICENCES = listOf(
+    "Dot Mail" to "GNU General Public License v3.0 or later",
+    "Inter typeface" to "SIL Open Font License 1.1",
+    "AndroidX, Jetpack Compose, Glance, Room, WorkManager, Paging" to "Apache License 2.0",
+    "Kotlin and kotlinx libraries" to "Apache License 2.0",
+    "Jakarta Mail (Eclipse Angus)" to "EPL 2.0 / GPL 2.0 with Classpath Exception",
+    "jsoup" to "MIT License",
+    "AndroidSVG" to "Apache License 2.0",
+)
+
+@Composable
+private fun Divider() = Hairline(Modifier.padding(vertical = DotSpacing.s))
+
+private fun formatSize(bytes: Long): String = when {
+    bytes < 1024 -> "$bytes B"
+    bytes < 1024 * 1024 -> "${bytes / 1024} KB"
+    else -> "%.1f MB".format(bytes / 1048576.0)
 }
 
 private fun swipeName(a: SwipeAction) = when (a) {
@@ -237,12 +400,8 @@ private fun swipeName(a: SwipeAction) = when (a) {
 
 @Composable
 private fun UndoSetting(seconds: Int, onChange: (Int) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        ListRow("Undo send", subtitle = if (seconds == 0) "Off" else "$seconds seconds", icon = Icons.Outlined.Schedule, onClick = { open = true })
-        DotMenu(open, { open = false }) {
-            listOf(0, 5, 10, 20, 30).forEach { s -> DotMenuItem(if (s == 0) "Off" else "$s seconds", null) { open = false; onChange(s) } }
-        }
-    }
+    ChoiceRow(
+        "Undo send", Icons.Outlined.Schedule, seconds,
+        listOf(0, 5, 10, 20, 30).map { it to if (it == 0) "Off" else "$it seconds" }, onChange = onChange,
+    )
 }
-

@@ -33,14 +33,26 @@ internal object SyncDiagnostics {
             add(item); current = item.cause
         }
     }
-    internal fun sanitized(error: Throwable): Throwable {
+    internal fun response(error: Throwable, secrets: Collection<String> = emptyList()): String? {
+        val raw = error.message ?: return null
+        val isProtocol = generateSequence(error.javaClass as Class<*>) { it.superclass }.any { it.name == "org.eclipse.angus.mail.iap.ProtocolException" }
+        val isReply = error.javaClass == jakarta.mail.MessagingException::class.java && Regex("(?i)^(?:\\*?\\s*(?:[A-Z][0-9]+\\s+)?(?:NO|BAD|BYE)\\b|Failed to load IMAP envelope)").containsMatchIn(raw)
+        if (!isProtocol && !isReply) return null
+        var clean = raw.replace(Regex("[\\r\\n\\t]+"), " ")
+        secrets.filter { it.isNotBlank() }.sortedByDescending { it.length }.forEach { clean = clean.replace(it, "<redacted>") }
+        clean = clean.replace(Regex("(?i)[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9.-]+"), "<email>")
+        clean = clean.replace(Regex("(?i)(?:Bearer\\s+|(?:password|access_token|refresh_token|token|authorization)[=:]\\s*)[^\\s]+"), "<credential>")
+        clean = clean.replace(Regex("[A-Za-z0-9_+/=-]{32,}"), "<opaque>")
+        return clean.take(200)
+    }
+    internal fun sanitized(error: Throwable, secrets: Collection<String> = emptyList()): Throwable {
         var result: Throwable? = null
         for (cause in chain(error).asReversed()) {
-            result = RuntimeException("${cause.javaClass.simpleName}: ${reason(cause)}", result).apply { stackTrace = cause.stackTrace }
+            result = RuntimeException("${cause.javaClass.simpleName}: ${reason(cause)}${response(cause, secrets)?.let { "; server=$it" }.orEmpty()}", result).apply { stackTrace = cause.stackTrace }
         }
         return requireNotNull(result)
     }
-    fun warn(phase: String, error: Throwable) {
-        Log.w("DotMail/Sync", "$phase: ${reason(error)}", sanitized(error))
+    fun warn(phase: String, error: Throwable, secrets: Collection<String> = emptyList()) {
+        Log.w("DotMail/Sync", "$phase: ${reason(error)}", sanitized(error, secrets))
     }
 }

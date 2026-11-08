@@ -133,8 +133,8 @@ class EmailHtmlTest {
         val out = EmailHtml.compose("<a href=\"data:text/html;base64,AA\">d</a> <a href=\"ftp://x\">f</a>")
         assertThat(out).doesNotContain("data:")
         assertThat(out).doesNotContain("ftp:")
-        assertThat(out).contains(">d<")
-        assertThat(out).contains(">f<")
+        assertThat(out).doesNotContain("<a ")
+        assertThat(out).contains("d f")
     }
 
     @Test

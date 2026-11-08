@@ -92,9 +92,21 @@ class MainActivity : FragmentActivity() {
 
     override fun onStop() {
         super.onStop()
-        // Re-lock when the app leaves the screen (not on configuration changes).
-        if (dotApp.settings.ui.value.appLock && !isChangingConfigurations) locked.value = true
+        if (!isChangingConfigurations) leftAt = android.os.SystemClock.elapsedRealtime()
+        // "Lock after 0 min" locks as soon as the app leaves the screen.
+        val prefs = dotApp.settings.ui.value
+        if (prefs.appLock && prefs.lockAfterMinutes == 0 && !isChangingConfigurations) locked.value = true
     }
+
+    override fun onStart() {
+        super.onStart()
+        val prefs = dotApp.settings.ui.value
+        val away = leftAt?.let { android.os.SystemClock.elapsedRealtime() - it }
+        if (prefs.appLock && away != null && away >= prefs.lockAfterMinutes * 60_000L) locked.value = true
+        leftAt = null
+    }
+
+    private var leftAt: Long? = null
 
     private fun authenticate() {
         val authenticators = if (Build.VERSION.SDK_INT >= 30) BIOMETRIC_STRONG or DEVICE_CREDENTIAL else BIOMETRIC_WEAK or DEVICE_CREDENTIAL

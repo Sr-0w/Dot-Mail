@@ -10,6 +10,7 @@ import app.dot.mail.data.local.MailDatabase
 import app.dot.mail.data.local.MIGRATION_1_2
 import app.dot.mail.data.local.MIGRATION_2_3
 import app.dot.mail.data.local.MIGRATION_3_4
+import app.dot.mail.data.local.MIGRATION_4_5
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -42,7 +43,7 @@ class MigrationTest {
             override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) = error("Room owns the upgrade")
         }).build())
         helper.writableDatabase; helper.close()
-        val upgraded = Room.databaseBuilder(context, MailDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).allowMainThreadQueries().build()
+        val upgraded = Room.databaseBuilder(context, MailDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).allowMainThreadQueries().build()
         try {
             assertEquals("a@example.org", upgraded.mail().account(1)!!.email)
             val cursor = upgraded.openHelper.writableDatabase.query("PRAGMA table_info(messages)")

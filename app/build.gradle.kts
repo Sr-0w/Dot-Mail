@@ -48,6 +48,7 @@ dependencies {
     implementation(libs.biometric)
     implementation(libs.glance.appwidget)
     implementation(libs.androidsvg) // Apache-2.0; renders BIMI brand logos (SVG Tiny PS) to a bitmap
+    implementation(libs.richeditor.compose) // Apache-2.0; rich-text email composer
     implementation(libs.work.runtime.ktx)
     implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.webkit)

@@ -124,6 +124,8 @@ object EmailHtml {
     private fun sanitizeFragment(html: String): String {
         if (html.isBlank()) return ""
         val doc = Jsoup.parse(html)
+        // jsoup 1.18 pretty-prints html()/outerHtml() by default; we need the raw tree.
+        doc.outputSettings().prettyPrint(false)
         val body = doc.body() ?: return ""
         clean(body)
         return body.html()
@@ -141,12 +143,17 @@ object EmailHtml {
             val tag = el.tagName().lowercase()
             val keep = when {
                 tag in ALLOWED -> normalizeAttributes(el, tag)
-                tag in UNWRAP -> { el.unwrap(); true }
-                else -> { el.unwrap(); true } // unknown tag: keep its text
+                else -> {
+                    // Unwrap structural/unknown tags (content kept). Snapshot the children
+                    // first: after unwrap() they are reparented and no longer el's children.
+                    val kids = el.children().toList()
+                    el.unwrap()
+                    kids.forEach { stack.addLast(it) }
+                    true
+                }
             }
             if (keep) {
                 normalizeStyle(el, tag)
-                // Push children in document order; unwrap reparents them but they remain in el.
                 for (child in el.children()) stack.addLast(child)
             }
         }
@@ -160,7 +167,10 @@ object EmailHtml {
         "a" -> {
             val href = el.attr("href").trim()
             el.clearAttributes()
-            if (href.isNotEmpty() && isSafeHref(href)) el.attr("href", href) else {
+            if (href.isNotEmpty() && isSafeHref(href)) {
+                el.attr("href", href)
+                true
+            } else {
                 el.unwrap()
                 false
             }
@@ -247,16 +257,19 @@ object EmailHtml {
         val v = value.trim()
         if (HEX_COLOR.matches(v)) return true
         if (RGB_VALUE.matches(v)) {
-            val nums = v.substringBetween('(', ')').split(',').map { it.trim() }
+            val nums = v.substringAfter('(').substringBeforeLast(')').split(',').map { it.trim() }
+            val alpha = if (nums.size == 4) nums[3].toDoubleOrNull() else null
             return nums.size in 3..4 &&
                 nums.take(3).all { it.toIntOrNull() != null && it.toInt() in 0..255 } &&
-                (nums.size == 3 || nums[3].toDoubleOrNull() in 0.0..1.0)
+                (alpha == null || alpha in 0.0..1.0)
         }
         return v.lowercase() in NAMED_COLORS
     }
 
+    private val LEADING_NUMBER = Regex("^\\d+(\\.\\d+)?")
+
     private fun fontSizeInBounds(v: String): Boolean {
-        val num = v.substringBefore(Regex("[a-z%]+")).toDoubleOrNull() ?: return false
+        val num = LEADING_NUMBER.find(v)?.value?.toDoubleOrNull() ?: return false
         return when {
             v.endsWith("em") -> num in 0.5..4.0
             v.endsWith("px") -> num in 8.0..60.0
@@ -267,7 +280,7 @@ object EmailHtml {
     }
 
     private fun lineHeightInBounds(v: String): Boolean {
-        val num = v.toDoubleOrNull() ?: (v.substringBefore(Regex("[a-z%]+")).toDoubleOrNull()) ?: return false
+        val num = LEADING_NUMBER.find(v)?.value?.toDoubleOrNull() ?: return false
         return num in 0.5..4.0 || (v.endsWith('%') && num in 40.0..300.0)
     }
 
@@ -344,7 +357,11 @@ object EmailHtml {
 
         private fun walkNode(node: Node) {
             when (node) {
-                is TextNode -> out.append(node.text())
+                is TextNode -> {
+                    // wholeText() is raw; text() would collapse newlines (breaking <pre>).
+                    val raw = node.wholeText
+                    out.append(if (inPre(node)) raw else raw.replace('\n', ' ').replace('\r', ' ').replace('\t', ' '))
+                }
                 is Element -> {
                     val tag = node.tagName().lowercase()
                     when (tag) {
@@ -395,7 +412,7 @@ object EmailHtml {
                             val inner = snapshot { walkElements(node) }
                             if (inner.trim().isNotEmpty()) {
                                 inner.trimEnd().lines().forEach { line ->
-                                    out.append(if (line.isEmpty() || line == ">") ">" else "> $line")
+                                    out.append(quotePrefix(line))
                                     out.append('\n')
                                 }
                                 out.append('\n')
@@ -449,15 +466,32 @@ object EmailHtml {
             out.delete(start, out.length)
             return s
         }
+
+        private fun inPre(node: Node): Boolean {
+            var p = node.parent()
+            while (p != null) {
+                if (p is Element && p.tagName().lowercase() == "pre") return true
+                p = p.parent()
+            }
+            return false
+        }
+
+        private fun quotePrefix(line: String): String = when {
+            line.isEmpty() || line == ">" -> ">"
+            line.startsWith(">") -> ">" + line // already quoted (nested blockquote)
+            else -> "> $line"
+        }
     }
 
     private fun normalize(raw: String): String {
-        val lines = raw.replace('\u00A0', ' ').lines().map {
-            it.replace(Regex("[ \\t]+"), " ").trimEnd()
+        val lines = raw.replace('\u00A0', ' ').lines().map { line ->
+            // Collapse inner whitespace runs but keep the leading indent (nested lists).
+            val m = Regex("^(\\s*)(.*)$").find(line)!!
+            m.groupValues[1] + m.groupValues[2].replace(Regex("[ \\t]+"), " ").trimEnd()
         }
         val kept = mutableListOf<String>()
         for (line in lines) {
-            if (line.isEmpty()) {
+            if (line.isBlank()) {
                 if (kept.isNotEmpty() && kept.last() != "") kept.add("")
             } else kept.add(line)
         }
@@ -473,7 +507,7 @@ object EmailHtml {
      * auto-linked, and `> `-prefixed lines become nested `<blockquote>`s.
      */
     fun fromPlainText(text: String): String {
-        val lines = text.split('\n').map { it.removeSuffix('\r').trim() }
+        val lines = text.split('\n').map { it.removeSuffix("\r").trim() }
         return renderPlainLines(lines).trim()
     }
 
@@ -483,18 +517,19 @@ object EmailHtml {
         while (i < lines.size) {
             val line = lines[i]
             if (line.isEmpty()) { i++; continue }
-            val isQuote = line.startsWith("> ")
+            val isQuote = isQuoteLine(line)
             val chunk = mutableListOf<String>()
             var j = i
             while (j < lines.size) {
                 val l = lines[j]
                 if (l.isEmpty()) break
-                if (l.startsWith("> ") != isQuote) break
+                if (isQuoteLine(l) != isQuote) break
                 chunk.add(l); j++
             }
             if (isQuote) {
-                val stripped = chunk.map { it.removePrefix("> ") }
-                sb.append("<blockquote>").append(renderPlainLines(stripped)).append("</blockquote>")
+                val stripped = chunk.map { it.removePrefix(">").trimStart(' ') }
+                val inner = renderPlainLines(stripped)
+                if (inner.isNotEmpty()) sb.append("<blockquote>").append(inner).append("</blockquote>")
             } else {
                 val rendered = chunk.map { linkify(it) }
                 sb.append("<p>").append(rendered.joinToString("<br>")).append("</p>")
@@ -503,6 +538,10 @@ object EmailHtml {
         }
         return sb.toString()
     }
+
+    /** `> x`, `>> x` and a bare `>` are quote lines; `>x` is not (consistent with the splitter). */
+    private fun isQuoteLine(line: String): Boolean =
+        line.startsWith(">") && (line.length == 1 || line[1] == ' ' || line[1] == '>')
 
     /** Escapes the line and auto-links URLs and email addresses (link first, escape pieces). */
     private fun linkify(line: String): String {

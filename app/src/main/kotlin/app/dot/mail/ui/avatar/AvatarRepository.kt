@@ -96,9 +96,10 @@ class AvatarRepository private constructor(
         ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
 
     private fun contactPhoto(email: String): Bitmap? {
-        val e = ContactsContract.CommonDataKinds.Email
+        val email0 = ContactsContract.CommonDataKinds.Email.CONTENT_URI
         val uri = context.contentResolver.query(
-            e.CONTENT_URI, arrayOf(e.PHOTO_THUMBNAIL_URI), "LOWER(${e.ADDRESS}) = ?", arrayOf(email), null,
+            email0, arrayOf(ContactsContract.CommonDataKinds.Email.PHOTO_THUMBNAIL_URI),
+            "LOWER(${ContactsContract.CommonDataKinds.Email.ADDRESS}) = ?", arrayOf(email), null,
         )?.use { c -> if (c.moveToFirst()) c.getString(0) else null } ?: return null
         val bytes = context.contentResolver.openInputStream(Uri.parse(uri))?.use { it.readBytes() } ?: return null
         return decode(bytes, minSide = 1)

@@ -74,7 +74,18 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
             folders.filter { it.accountId == accountId }.map { f -> f.copy(unreadCount = msgs.count { it.folderId == f.id && it.isUnread }) }
         }
 
-        override fun threads(mailbox: Mailbox): Flow<PagingData<ThreadSummary>> = combine(messages, accountsState) { msgs, accts ->
+        override fun threads(mailbox: Mailbox): Flow<PagingData<ThreadSummary>> = combine(messages, accountsState, drafts) { msgs, accts, localDrafts ->
+            val draftsBox = when (mailbox) {
+                is Mailbox.Unified -> mailbox.role == FolderRole.DRAFTS
+                is Mailbox.InFolder -> folders.firstOrNull { it.id == mailbox.folderId }?.role == FolderRole.DRAFTS
+            }
+            val draftRows = if (!draftsBox) emptyList() else localDrafts.values.map { d ->
+                ThreadSummary(
+                    threadId = -d.localId, accountId = d.accountId, subject = d.subject, participants = emptyList(),
+                    snippet = d.bodyText.take(140), lastMessageAt = System.currentTimeMillis(), messageCount = 1, unreadCount = 0,
+                    isStarred = false, hasAttachments = d.attachmentUris.isNotEmpty(), draftId = d.localId, recipients = d.to,
+                )
+            }
             val ids = accts.map { it.id }.toSet()
             val inBox = when (mailbox) {
                 is Mailbox.Unified -> {
@@ -83,7 +94,7 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
                 }
                 is Mailbox.InFolder -> msgs.filter { it.folderId == mailbox.folderId }
             }.filter { it.accountId in ids }
-            PagingData.from(summaries(inBox))
+            PagingData.from(draftRows + summaries(inBox))
         }
 
         override fun search(query: String, accountId: Long?): Flow<PagingData<ThreadSummary>> = messages.map { msgs ->
@@ -178,6 +189,7 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
             snippet = last.snippet, lastMessageAt = last.sentAt, messageCount = sorted.size,
             unreadCount = sorted.count { it.isUnread }, isStarred = sorted.any { it.isStarred },
             hasAttachments = sorted.any { m -> m.attachments.any { !it.isInline } },
+            recipients = last.to,
         )
     }.sortedByDescending { it.lastMessageAt }
 
