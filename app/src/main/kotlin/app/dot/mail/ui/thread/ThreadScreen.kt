@@ -53,6 +53,7 @@ import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Report
 import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.Snooze
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.Unsubscribe
@@ -214,6 +215,14 @@ class ThreadViewModel(
     fun alwaysAllowDomain(m: Message) { remotePolicy.addRule(isDomain = true, raw = app.dot.mail.ui.settings.RemoteImageMatching.domainOf(m.from.email), accountId = m.accountId) }
     fun stopRemote(m: Message, reason: app.dot.mail.ui.settings.LoadReason) = remotePolicy.stop(m, reason)
 
+    fun snooze(untilMillis: Long) {
+        viewModelScope.launch {
+            runCatching { graph.mail.snooze(listOf(threadId), untilMillis) }
+                .onSuccess { _events.send(ThreadEvent.Close) }
+                .onFailure { _events.send(ThreadEvent.Message(it.message ?: "Couldn't snooze")) }
+        }
+    }
+
     fun act(action: MessageAction) {
         viewModelScope.launch {
             runCatching { if (source != null) graph.mail.apply(action, listOf(threadId), source) else @Suppress("DEPRECATION") graph.mail.apply(action, listOf(threadId)) }
@@ -270,6 +279,7 @@ fun ThreadScreen(
     var pendingLink by remember { mutableStateOf<String?>(null) }
     var confirmUnsubscribe by remember { mutableStateOf<String?>(null) }
     var menu by remember { mutableStateOf(false) }
+    var snoozing by remember { mutableStateOf(false) }
     var showMove by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var confirmTrash by remember { mutableStateOf(false) }
@@ -332,6 +342,7 @@ fun ThreadScreen(
                         DotIconButton(Icons.Outlined.MoreVert, "More", onClick = { menu = true })
                         DotMenu(menu, { menu = false }) {
                             val starred = list?.any { it.isStarred } == true
+                            DotMenuItem("Snooze…", Icons.Outlined.Snooze) { menu = false; snoozing = true }
                             DotMenuItem(if (starred) "Remove star" else "Star", if (starred) Icons.Outlined.StarOutline else Icons.Outlined.Star) {
                                 menu = false; vm.act(if (starred) MessageAction.UNSTAR else MessageAction.STAR)
                             }
@@ -444,6 +455,7 @@ fun ThreadScreen(
             dismissButton = { DotButton("Cancel", { confirmDelete = false }, style = ButtonStyle.Ghost, compact = true) },
         )
     }
+    if (snoozing) app.dot.mail.ui.snooze.SnoozeSheet(onDismiss = { snoozing = false }, onPick = { until -> snoozing = false; vm.snooze(until) })
     confirmUnsubscribe?.let { endpoint ->
         AlertDialog(
             onDismissRequest = { confirmUnsubscribe = null },

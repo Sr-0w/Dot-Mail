@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-enum class SwipeAction { ARCHIVE, TRASH, READ_TOGGLE, STAR_TOGGLE, NONE }
+enum class SwipeAction { ARCHIVE, TRASH, READ_TOGGLE, STAR_TOGGLE, SNOOZE, NONE }
 enum class Density { COMFORTABLE, COMPACT }
 
 /** Format of newly started messages. */

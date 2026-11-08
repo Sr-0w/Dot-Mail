@@ -135,6 +135,27 @@ class InboxViewModel(
         }
     }
 
+    fun snooze(ids: Collection<Long>, untilMillis: Long) {
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            runCatching { graph.mail.snooze(ids.toList(), untilMillis) }
+                .onSuccess {
+                    _selection.value = emptySet()
+                    _events.send(if (ids.size == 1) "Snoozed" else "Snoozed ${ids.size} conversations")
+                }
+                .onFailure { _events.send(it.message ?: "Couldn't snooze") }
+        }
+    }
+
+    fun unsnooze(ids: Collection<Long> = _selection.value) {
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            runCatching { graph.mail.unsnooze(ids.toList()) }
+                .onSuccess { _selection.value = emptySet(); _events.send(if (ids.size == 1) "Back in your list" else "${ids.size} conversations are back") }
+                .onFailure { _events.send(it.message ?: "Couldn't unsnooze") }
+        }
+    }
+
     fun moveSelection(folderId: Long) {
         val ids = _selection.value.toList()
         if (ids.isEmpty()) return

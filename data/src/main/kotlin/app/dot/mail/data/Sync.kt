@@ -110,6 +110,7 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null, schedu
                     val pendingLocalIds = operations.mapNotNull { it.messageLocalId }.toSet()
                     result.headers.filter { !it.flags.deleted && it.uid !in pending }.forEach { header ->
                         val (thread, fresh) = upsertHeader(folder.copy(validity = result.cursor.uidValidity), header)
+                        if (fresh && !result.reset) dao.deleteThreadSnooze(thread) // new mail in a snoozed conversation wakes it
                         if (fresh && !result.reset && !header.flags.seen && remote.role == Role.INBOX) notifications += thread to header.subject
                     }
                     result.flags.filter { it.uid !in pending }.forEach { flag -> dao.byUid(folder.id, flag.uid)?.let { row ->

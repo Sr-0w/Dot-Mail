@@ -33,10 +33,11 @@ internal fun RealMailGraph.messagesPaging(mailbox: Mailbox): Flow<PagingData<Thr
         }
         is Mailbox.Unified -> {
             if (mailbox.role == FolderRole.DRAFTS) { emitAll(threads(mailbox)); return@flow }
+            if (mailbox.role == FolderRole.SNOOZED) { emitAll(snoozedMessagesPaging()); return@flow }
             "folderId IN (SELECT id FROM folders WHERE role=?)" to listOf<Any>(mailbox.role.name)
         }
     }
-    val sql = "SELECT $MESSAGE_META FROM messages WHERE $where ORDER BY sentAt DESC,id DESC"
+    val sql = "SELECT $MESSAGE_META FROM messages WHERE $where AND NOT EXISTS(SELECT 1 FROM snoozed z WHERE z.resurfacedAt IS NULL AND (z.messageId=messages.id OR (z.messageId IS NULL AND z.threadId=messages.threadId))) ORDER BY sentAt DESC,id DESC"
     emitAll(
         Pager(PagingConfig(pageSize = 40)) { dao.pageMessages(SimpleSQLiteQuery(sql, args.toTypedArray())) }
             .flow.map { data -> data.map(::messageSummary) },

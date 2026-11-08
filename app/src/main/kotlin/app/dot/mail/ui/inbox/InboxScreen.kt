@@ -45,6 +45,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Archive
+import androidx.compose.material.icons.outlined.Snooze
 import androidx.compose.material.icons.outlined.Attachment
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
@@ -163,6 +164,8 @@ fun InboxScreen(
     val snackbar = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
     var showMove by remember { mutableStateOf(false) }
+    // Conversations waiting for a snooze time (from the selection bar, or a swipe).
+    var snoozeTargets by remember { mutableStateOf<List<Long>?>(null) }
     var pendingTrash by remember { mutableStateOf<List<Long>?>(null) }
     val pullState = rememberPullToRefreshState()
 
@@ -218,6 +221,8 @@ fun InboxScreen(
                             onClose = vm::clearSelection,
                             onAction = { if (it == MessageAction.TRASH && prefs.confirmDelete) pendingTrash = selection.toList() else vm.act(it) },
                             onMove = { showMove = true },
+                            onSnooze = { snoozeTargets = selection.toList() },
+                            onUnsnooze = { vm.unsnooze() },
                         )
                     } else {
                         DotTopBar(
@@ -282,6 +287,7 @@ fun InboxScreen(
                             }
                         },
                         onToggleSelect = vm::toggleSelection,
+                        onSnooze = { t -> snoozeTargets = listOf(t.threadId) },
                         onSwipe = { action, t ->
                             if (action == MessageAction.TRASH && prefs.confirmDelete) pendingTrash = listOf(t.threadId) else vm.act(action, listOf(t.threadId))
                         },
@@ -307,6 +313,10 @@ fun InboxScreen(
             dismissButton = { app.dot.design.components.DotButton("Cancel", { pendingTrash = null }, style = app.dot.design.components.ButtonStyle.Ghost, compact = true) },
         )
     }
+    snoozeTargets?.let { targets ->
+        app.dot.mail.ui.snooze.SnoozeSheet(onDismiss = { snoozeTargets = null }, onPick = { until -> snoozeTargets = null; vm.snooze(targets, until) })
+    }
+
     if (showMove) {
         ModalBottomSheet(
             onDismissRequest = { showMove = false },
@@ -341,6 +351,7 @@ private fun ThreadList(
     onOpen: (ThreadSummary) -> Unit,
     onToggleSelect: (Long) -> Unit,
     onSwipe: (MessageAction, ThreadSummary) -> Unit,
+    onSnooze: (ThreadSummary) -> Unit,
 ) {
     val refresh = threads.loadState.refresh
     when {
@@ -373,6 +384,7 @@ private fun ThreadList(
                     swipeEnd = swipeEnd,
                     enabled = selection.isEmpty(),
                     onSwipe = onSwipe,
+                    onSnooze = onSnooze,
                 ) {
                     ThreadRow(
                         thread = t,
@@ -402,6 +414,7 @@ private fun EmptyFor(role: FolderRole?) {
         FolderRole.SENT -> "Nothing sent yet" to "Messages you send appear here."
         FolderRole.SPAM -> "No spam" to "Suspicious mail lands here."
         FolderRole.TRASH -> "Trash is empty" to "Deleted conversations stay here for a while."
+        FolderRole.SNOOZED -> "Nothing snoozed" to "Snoozed conversations wait here until their time."
         else -> "Nothing here" to "This folder is empty."
     }
     EmptyState(if (role == FolderRole.INBOX || role == null) Icons.Outlined.Inbox else Format.roleIcon(role), title, msg)
@@ -415,6 +428,7 @@ private fun SwipeableRow(
     swipeEnd: SwipeAction,
     enabled: Boolean,
     onSwipe: (MessageAction, ThreadSummary) -> Unit,
+    onSnooze: (ThreadSummary) -> Unit,
     content: @Composable () -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
@@ -427,7 +441,7 @@ private fun SwipeableRow(
             }
             if (action != null) {
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                toMessageAction(action, thread)?.let { onSwipe(it, thread) }
+                if (action == SwipeAction.SNOOZE) onSnooze(thread) else toMessageAction(action, thread)?.let { onSwipe(it, thread) }
             }
             // Never stay dismissed: the row disappears when the DB updates (archive/trash)
             // or springs back for toggles (read/star).
@@ -463,7 +477,7 @@ private fun toMessageAction(action: SwipeAction, t: ThreadSummary): MessageActio
     SwipeAction.TRASH -> MessageAction.TRASH
     SwipeAction.READ_TOGGLE -> if (t.isUnread) MessageAction.MARK_READ else MessageAction.MARK_UNREAD
     SwipeAction.STAR_TOGGLE -> if (t.isStarred) MessageAction.UNSTAR else MessageAction.STAR
-    SwipeAction.NONE -> null
+    SwipeAction.SNOOZE, SwipeAction.NONE -> null
 }
 
 private fun swipeVisual(action: SwipeAction, t: ThreadSummary): Pair<ImageVector, String> = when (action) {
@@ -471,6 +485,7 @@ private fun swipeVisual(action: SwipeAction, t: ThreadSummary): Pair<ImageVector
     SwipeAction.TRASH -> Icons.Outlined.Delete to "Delete"
     SwipeAction.READ_TOGGLE -> (if (t.isUnread) Icons.Outlined.MarkEmailRead else Icons.Outlined.MarkEmailUnread) to "Toggle read"
     SwipeAction.STAR_TOGGLE -> (if (t.isStarred) Icons.Outlined.StarOutline else Icons.Outlined.Star) to "Toggle star"
+    SwipeAction.SNOOZE -> Icons.Outlined.Snooze to "Snooze"
     SwipeAction.NONE -> Icons.Outlined.Mail to ""
 }
 
@@ -671,6 +686,8 @@ private fun SelectionBar(
     onClose: () -> Unit,
     onAction: (MessageAction) -> Unit,
     onMove: () -> Unit,
+    onSnooze: () -> Unit,
+    onUnsnooze: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
     DotTopBar(
@@ -678,6 +695,7 @@ private fun SelectionBar(
         elevated = true,
         navigation = { DotIconButton(Icons.Outlined.Close, "Clear selection", onClick = onClose) },
         actions = {
+            if (role == FolderRole.SNOOZED) DotIconButton(Icons.Outlined.Snooze, "Unsnooze", onClick = onUnsnooze)
             if (role != FolderRole.ARCHIVE) DotIconButton(Icons.Outlined.Archive, "Archive", onClick = { onAction(MessageAction.ARCHIVE) })
             if (role == FolderRole.TRASH) DotIconButton(Icons.Outlined.Delete, "Delete forever", onClick = { onAction(MessageAction.DELETE_FOREVER) })
             else DotIconButton(Icons.Outlined.Delete, "Delete", onClick = { onAction(MessageAction.TRASH) })
@@ -687,6 +705,7 @@ private fun SelectionBar(
                 DotMenu(menu, onDismiss = { menu = false }) {
                     DotMenuItem("Mark as unread", Icons.Outlined.MarkEmailUnread) { menu = false; onAction(MessageAction.MARK_UNREAD) }
                     DotMenuItem("Star", Icons.Outlined.StarOutline) { menu = false; onAction(MessageAction.STAR) }
+                    DotMenuItem("Snooze…", Icons.Outlined.Snooze) { menu = false; onSnooze() }
                     DotMenuItem("Move to…", Icons.Outlined.DriveFileMove) { menu = false; onMove() }
                     if (role == FolderRole.SPAM) DotMenuItem("Not spam", Icons.Outlined.Inbox) { menu = false; onAction(MessageAction.NOT_SPAM) }
                     else DotMenuItem("Report spam", Icons.Outlined.Report) { menu = false; onAction(MessageAction.SPAM) }

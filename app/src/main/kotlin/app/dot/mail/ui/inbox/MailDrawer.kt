@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.outlined.CreateNewFolder
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -72,6 +73,7 @@ fun MailDrawer(
     onOutbox: () -> Unit = {},
 ) {
     val c = Dot.colors
+    val graph = app.dot.mail.LocalMailGraph.current
     var folderDialog by remember { mutableStateOf<FolderDialog?>(null) }
     FolderDialogs(
         dialog = folderDialog, accountId = state.focusedAccountId, folders = state.folders,
@@ -112,6 +114,13 @@ fun MailDrawer(
                             navigation = false,
                             onClick = onOutbox,
                         )
+                    }
+                }
+                item {
+                    val snoozed by graph.mail.snoozedCount().collectAsStateWithLifecycle(0)
+                    val isCurrent = current == Mailbox.Unified(FolderRole.SNOOZED)
+                    if (snoozed > 0 || isCurrent) {
+                        DrawerItem("Snoozed", Format.roleIcon(FolderRole.SNOOZED), snoozed.takeIf { it > 0 }, selected = isCurrent, onClick = { onOpen(Mailbox.Unified(FolderRole.SNOOZED)) })
                     }
                 }
                 val focused = state.accounts.firstOrNull { it.id == state.focusedAccountId }

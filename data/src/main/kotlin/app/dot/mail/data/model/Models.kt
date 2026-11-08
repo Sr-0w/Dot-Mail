@@ -36,7 +36,11 @@ sealed interface SyncState {
     data class Error(val message: String, val isAuthError: Boolean = false) : SyncState
 }
 
-enum class FolderRole { INBOX, SENT, DRAFTS, ARCHIVE, TRASH, SPAM, ALL_MAIL, STARRED, CUSTOM }
+enum class FolderRole {
+    INBOX, SENT, DRAFTS, ARCHIVE, TRASH, SPAM, ALL_MAIL, STARRED, CUSTOM,
+    /** Virtual: only used as Mailbox.Unified(SNOOZED), the list of snoozed conversations. Never stored on a folder. */
+    SNOOZED,
+}
 
 data class Folder(
     val id: Long,
