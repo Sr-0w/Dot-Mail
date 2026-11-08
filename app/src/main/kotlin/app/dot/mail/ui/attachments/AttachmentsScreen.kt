@@ -1,7 +1,7 @@
 package app.dot.mail.ui.attachments
 
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import dev.chrisbanes.haze.hazeSource
+import app.dot.design.components.backdropSource
 import androidx.compose.runtime.setValue
 
 import androidx.compose.runtime.mutableStateOf
@@ -200,7 +200,7 @@ fun AttachmentsScreen(onBack: () -> Unit) {
                     stringResource(if (query.isBlank() && kind == null) R.string.attachments_empty_body else R.string.attachments_no_match_body),
                 ) }
             } else {
-                LazyColumn(Modifier.fillMaxSize().nestedScroll(headerControls.connection).hazeSource(frostedSource), state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(top=headerPadding.calculateTopPadding(),bottom = 24.dp)) {
+                LazyColumn(Modifier.fillMaxSize().nestedScroll(headerControls.connection).backdropSource(frostedSource), state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(top=headerPadding.calculateTopPadding(),bottom = 24.dp)) {
                     items(items.itemCount, key = items.itemKey { it.attachment.id }) { index ->
                         val item = items[index] ?: return@items
                         val month = remember(item.sentAt) { YearMonth.from(Instant.ofEpochMilli(item.sentAt).atZone(ZoneId.systemDefault())) }

@@ -18,10 +18,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.dot.design.Dot
 import app.dot.design.rememberReducedMotion
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeStyle
-import dev.chrisbanes.haze.HazeTint
-import dev.chrisbanes.haze.hazeEffect
 
 /**
  * How far content has scrolled under the top edge, 0 (at rest) … 1 (fully under). Interpolated, never on/off.
@@ -71,13 +67,13 @@ private fun maskBrush(stops: Array<Pair<Float, Float>>, color: androidx.compose.
  * top and stay crisp. Without a usable [state] (no RenderEffect, or WebView content that must not be captured) it is a
  * page-coloured gradient of the same shape. Not a glass control: see [glassSurface] for those.
  *
- * Place it as a **sibling above** the scrolling content, and mark only that content with `hazeSource(state)` (never an
+ * Place it as a **sibling above** the scrolling content, and mark only that content with `backdropSource(state)` (never an
  * ancestor of this overlay). Keep its [height] stable while scrolling (it is the blur texture size) and move
  * [solidUntil] instead: changing a mask is cheap, resizing the effect reallocates and flickers.
  */
 @Composable
 fun TopEdgeFade(
-    state: HazeState?,
+    state: Backdrop?,
     progress: Float,
     modifier: Modifier = Modifier,
     height: Dp = 32.dp,
@@ -92,14 +88,9 @@ fun TopEdgeFade(
     val stops = edgeMaskStops(solidUntil, fadeLength)
     val box = modifier.fillMaxWidth().height(height).graphicsLayer { alpha = p }
     if (blur) {
-        Box(box.hazeEffect(
-            state!!,
-            // Neutral page-colour tint only (no accent hue); light enough that the moving blurred content stays visible.
-            HazeStyle(backgroundColor = bg, tints = listOf(HazeTint(bg.copy(alpha = if (Dot.colors.isDark) 0.34f else 0.42f))), blurRadius = 28.dp, noiseFactor = 0f),
-        ) {
-            mask = maskBrush(stops, androidx.compose.ui.graphics.Color.White)
-            inputScale = dev.chrisbanes.haze.HazeInputScale.Fixed(0.5f)
-        })
+        // Neutral page-colour veil only (no accent hue); light enough that the moving blurred content stays visible.
+        val veil = androidx.compose.ui.graphics.SolidColor(bg.copy(alpha = if (Dot.colors.isDark) 0.34f else 0.42f))
+        Box(box.backdropBlur(state!!, radius = 28.dp, background = bg, tint = veil, mask = maskBrush(stops, androidx.compose.ui.graphics.Color.White)))
     } else {
         Box(box.background(maskBrush(stops, bg, 0.94f)))
     }

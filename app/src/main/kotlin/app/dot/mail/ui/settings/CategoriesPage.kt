@@ -1,6 +1,6 @@
 package app.dot.mail.ui.settings
 
-import dev.chrisbanes.haze.hazeSource
+import app.dot.design.components.backdropSource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -121,7 +121,7 @@ internal fun CategoriesPage(onBack: () -> Unit) {
         backdrop=frostedSource,modifier=Modifier.fillMaxSize().background(c.background),
         header={ DotTopBar(title = stringResource(R.string.categories_title), elevated = scroll.value > 0, navigation = { BackButton(onBack) }) },
     ) { topPadding ->
-        Column(Modifier.fillMaxSize().hazeSource(frostedSource).verticalScroll(scroll).navigationBarsPadding()) {
+        Column(Modifier.fillMaxSize().backdropSource(frostedSource).verticalScroll(scroll).navigationBarsPadding()) {
             androidx.compose.foundation.layout.Spacer(Modifier.height(topPadding.calculateTopPadding()))
 
             Text(

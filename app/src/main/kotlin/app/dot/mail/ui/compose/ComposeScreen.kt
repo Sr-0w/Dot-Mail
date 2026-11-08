@@ -42,7 +42,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import dev.chrisbanes.haze.hazeSource
+import app.dot.design.components.backdropSource
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -291,7 +291,7 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
         ) },
     ) { headerPadding ->
         if(draft!=null) {
-        Column(Modifier.fillMaxSize().hazeSource(edgeState).verticalScroll(bodyScroll)) { Spacer(Modifier.height(headerPadding.calculateTopPadding()))
+        Column(Modifier.fillMaxSize().backdropSource(edgeState).verticalScroll(bodyScroll)) { Spacer(Modifier.height(headerPadding.calculateTopPadding()))
 
             // From
             if (state.senders.size > 1) {

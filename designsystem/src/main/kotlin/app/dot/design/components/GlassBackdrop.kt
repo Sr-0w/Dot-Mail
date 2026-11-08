@@ -8,12 +8,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import app.dot.design.Dot
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeStyle
-import dev.chrisbanes.haze.HazeTint
-import dev.chrisbanes.haze.hazeEffect
-import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.rememberHazeState
 
 /**
  * Real backdrop blur for the Soft Frosted Glass controls.
@@ -23,17 +17,17 @@ import dev.chrisbanes.haze.rememberHazeState
  * [DotFloatingCapsule] / [DotFrostedPill]. Each control then blurs only the pixels behind its own clipped shape and
  * draws its translucent tint on top; icons and labels stay sharp because they are drawn after the effect.
  *
- * Android 12+ blurs with RenderEffect on the GPU. Older devices (or no state) keep the previous opaque frosted
+ * Android 12+ blurs with RenderEffect on the GPU (see [Backdrop]). Older devices (or no state) keep the previous opaque frosted
  * gradient, which is the graceful fallback.
  */
 @Composable
-fun rememberGlassBackdrop(): HazeState = rememberHazeState()
+fun rememberGlassBackdrop(): Backdrop = rememberBackdrop()
 
-fun Modifier.glassBackdropSource(state: HazeState?): Modifier = if (state == null) this else hazeSource(state)
+fun Modifier.glassBackdropSource(state: Backdrop?): Modifier = if (state == null) this else backdropSource(state)
 
 /** Surface of a glass control: blurred backdrop + tint when [state] can blur, otherwise the opaque frosted gradient. */
 @Composable
-internal fun Modifier.glassSurface(state: HazeState?, pressed: Boolean): Modifier =
+internal fun Modifier.glassSurface(state: Backdrop?, pressed: Boolean): Modifier =
     if (LocalHeaderGlass.current != null) {
         // On the frosted header the band behind is already blurred: a light neutral veil reads as glass; a second live
         // blur per button would only cost frames, and the opaque fallback looked like a solid disc.
@@ -41,15 +35,7 @@ internal fun Modifier.glassSurface(state: HazeState?, pressed: Boolean): Modifie
     } else if (state == null || !state.blurEnabled || !androidx.compose.ui.platform.LocalView.current.isHardwareAccelerated) {
         background(frostedSurfaceBrush(pressed), CircleShape)
     } else {
-        hazeEffect(
-            state,
-            HazeStyle(
-                backgroundColor = Dot.colors.background,
-                tints = listOf(HazeTint(glassTintBrush(pressed))),
-                blurRadius = 24.dp,
-                noiseFactor = 0f,
-            ),
-        )
+        backdropBlur(state, radius = 24.dp, background = Dot.colors.background, tint = glassTintBrush(pressed))
     }
 
 /**

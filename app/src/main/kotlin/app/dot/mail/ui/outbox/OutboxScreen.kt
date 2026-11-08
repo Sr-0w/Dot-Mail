@@ -1,6 +1,6 @@
 package app.dot.mail.ui.outbox
 
-import dev.chrisbanes.haze.hazeSource
+import app.dot.design.components.backdropSource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -75,7 +75,7 @@ fun OutboxScreen(onBack: () -> Unit, onEdit: (Long) -> Unit = {}) {
             }
             return@FrostedHeaderLayout
         }
-        LazyColumn(state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(top=headerPadding.calculateTopPadding(),bottom = 24.dp), modifier = Modifier.fillMaxSize().hazeSource(frostedSource).navigationBarsPadding()) {
+        LazyColumn(state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(top=headerPadding.calculateTopPadding(),bottom = 24.dp), modifier = Modifier.fillMaxSize().backdropSource(frostedSource).navigationBarsPadding()) {
             items(items, key = { it.id }) { item ->
                 Column(
                     Modifier.then(if (reducedMotion) Modifier else Modifier.animateItem()).fillMaxWidth().padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.l),

@@ -24,7 +24,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.rememberScrollState
-import dev.chrisbanes.haze.hazeSource
+import app.dot.design.components.backdropSource
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
@@ -199,7 +199,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
         app.dot.design.components.FrostedHeaderLayout(backdrop=edgeState,modifier=Modifier.fillMaxSize().background(c.background),header={ DotTopBar(title = stringResource(R.string.settings_title), elevated = scroll.value > 0, navigation = { BackButton(onBack) }) }) { headerPadding ->
         val headerInset=with(androidx.compose.ui.platform.LocalDensity.current) { headerPadding.calculateTopPadding().roundToPx() }
         androidx.compose.runtime.SideEffect { headerInsetPx=headerInset }
-        Column(Modifier.fillMaxSize().hazeSource(edgeState).verticalScroll(scroll)) { Spacer(Modifier.height(headerPadding.calculateTopPadding()))
+        Column(Modifier.fillMaxSize().backdropSource(edgeState).verticalScroll(scroll)) { Spacer(Modifier.height(headerPadding.calculateTopPadding()))
 
             app.dot.design.components.SearchField(
                 value = query,
@@ -524,7 +524,6 @@ private val LICENCES = listOf(
     "Jakarta Mail (Eclipse Angus)" to "EPL 2.0 / GPL 2.0 with Classpath Exception",
     "jsoup" to "MIT License",
     "AndroidSVG" to "Apache License 2.0",
-    "Haze (backdrop blur)" to "Apache License 2.0",
 )
 
 @Composable

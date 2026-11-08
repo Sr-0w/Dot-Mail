@@ -1,6 +1,6 @@
 package app.dot.mail.ui.pdf
 
-import dev.chrisbanes.haze.hazeSource
+import app.dot.design.components.backdropSource
 import app.dot.mail.data.PdfText
 import android.graphics.Bitmap
 import android.graphics.Color as AColor
@@ -97,8 +97,8 @@ fun PdfViewerDialog(
                     DotIconButton(Icons.AutoMirrored.Outlined.OpenInNew, stringResource(R.string.pdf_open_with), onClick = onOpenExternally)
                 },
             ) }) { headerPadding ->
-            if(showText) PdfTextView(uri,Modifier.fillMaxSize().hazeSource(frostedSource),headerPadding)
-            else PdfPages(uri,onFailed=onOpenExternally,modifier=Modifier.fillMaxSize().hazeSource(frostedSource),headerPadding=headerPadding)
+            if(showText) PdfTextView(uri,Modifier.fillMaxSize().backdropSource(frostedSource),headerPadding)
+            else PdfPages(uri,onFailed=onOpenExternally,modifier=Modifier.fillMaxSize().backdropSource(frostedSource),headerPadding=headerPadding)
         }
     }
 }

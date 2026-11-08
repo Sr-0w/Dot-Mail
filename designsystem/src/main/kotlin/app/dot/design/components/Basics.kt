@@ -280,7 +280,7 @@ fun DotFrostedPill(
     enabled: Boolean = true,
     contentDescription: String? = label,
     /** Content scrolling underneath, for a real backdrop blur ([rememberGlassBackdrop]); null = opaque frosted. */
-    backdrop: dev.chrisbanes.haze.HazeState? = null,
+    backdrop: app.dot.design.components.Backdrop? = null,
 ) {
     val c = Dot.colors
     val haptics = LocalHapticFeedback.current

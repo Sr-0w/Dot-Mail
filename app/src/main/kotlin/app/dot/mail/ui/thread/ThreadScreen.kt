@@ -426,7 +426,7 @@ fun ThreadScreen(
     // Hardware keyboard shortcuts (tablets, Chromebooks, DeX), Gmail-style single keys.
     val keyFocus = remember { androidx.compose.ui.focus.FocusRequester() }
     LaunchedEffect(Unit) { runCatching { keyFocus.requestFocus() } }
-    // Haze records its entire source into a graphics layer. Recording an Android WebView's
+    // The backdrop records its entire source into a graphics layer. Recording an Android WebView's
     // hardware draw functor can flash blank tiles and crash RenderThread when that retained
     // layer outlives WebView.destroy() during Back. HTML (and still-loading bodies) must stay
     // outside the capture path; capsules keep their neutral frosted fallback and edge gradient.
@@ -1193,7 +1193,7 @@ private fun BoxScope.ReaderChrome(
     topScrim: androidx.compose.ui.unit.Dp,
     bottomScrim: androidx.compose.ui.unit.Dp,
     /** Lets the top scrim blur plain-text messages passing under it (WebView content cannot be captured: gradient only). */
-    backdrop: dev.chrisbanes.haze.HazeState? = null,
+    backdrop: app.dot.design.components.Backdrop? = null,
     back: @Composable () -> Unit,
     actions: @Composable () -> Unit,
     reply: (@Composable () -> Unit)?,

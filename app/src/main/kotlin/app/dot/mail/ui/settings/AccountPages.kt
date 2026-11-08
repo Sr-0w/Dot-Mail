@@ -1,6 +1,6 @@
 package app.dot.mail.ui.settings
 
-import dev.chrisbanes.haze.hazeSource
+import app.dot.design.components.backdropSource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -73,7 +73,7 @@ internal fun AccountPage(account: Account, onBack: () -> Unit, onEditIdentity: (
         backdrop=frostedSource,modifier=Modifier.fillMaxSize().background(c.background),
         header={ DotTopBar(title = account.displayName, subtitle = account.email, elevated = scroll.value > 0, navigation = { BackButton(onBack) }) },
     ) { topPadding ->
-        Column(Modifier.fillMaxSize().hazeSource(frostedSource).verticalScroll(scroll).navigationBarsPadding()) {
+        Column(Modifier.fillMaxSize().backdropSource(frostedSource).verticalScroll(scroll).navigationBarsPadding()) {
             androidx.compose.foundation.layout.Spacer(Modifier.height(topPadding.calculateTopPadding()))
 
             (account.syncState as? SyncState.Error)?.let { err ->
@@ -260,7 +260,7 @@ internal fun IdentityEditorPage(account: Account, identityId: Long, onBack: () -
         ) },
     ) { topPadding ->
         Column(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().weight(1f).hazeSource(frostedSource).verticalScroll(scroll).padding(horizontal = DotSpacing.gutter), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(DotSpacing.l)) {
+        Column(Modifier.fillMaxSize().weight(1f).backdropSource(frostedSource).verticalScroll(scroll).padding(horizontal = DotSpacing.gutter), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(DotSpacing.l)) {
             androidx.compose.foundation.layout.Spacer(Modifier.height(topPadding.calculateTopPadding()))
 
             DotTextField(name, { name = it }, label = stringResource(R.string.identity_name), placeholder = stringResource(R.string.identity_name_placeholder))

@@ -53,7 +53,7 @@ import app.dot.mail.data.MailGraph
 import app.dot.mail.data.model.ThreadSummary
 import app.dot.mail.ui.inbox.ThreadRow
 import androidx.compose.foundation.border
-import dev.chrisbanes.haze.hazeSource
+import app.dot.design.components.backdropSource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.width
@@ -248,9 +248,9 @@ internal fun searchDisplayState(query: String, count: Int, refresh: LoadState, p
 }
 
 @Composable
-private fun ResultsList(results: androidx.paging.compose.LazyPagingItems<SearchResult>, onOpenThread: (Long) -> Unit, edgeState: dev.chrisbanes.haze.HazeState, headerPadding: androidx.compose.foundation.layout.PaddingValues, listState: androidx.compose.foundation.lazy.LazyListState, headerControls: app.dot.design.components.HeaderControlsState) {
+private fun ResultsList(results: androidx.paging.compose.LazyPagingItems<SearchResult>, onOpenThread: (Long) -> Unit, edgeState: app.dot.design.components.Backdrop, headerPadding: androidx.compose.foundation.layout.PaddingValues, listState: androidx.compose.foundation.lazy.LazyListState, headerControls: app.dot.design.components.HeaderControlsState) {
     Box(Modifier.fillMaxSize()) {
-        LazyColumn(state = listState, contentPadding=headerPadding, modifier = Modifier.fillMaxSize().nestedScroll(headerControls.connection).hazeSource(edgeState).navigationBarsPadding()) {
+        LazyColumn(state = listState, contentPadding=headerPadding, modifier = Modifier.fillMaxSize().nestedScroll(headerControls.connection).backdropSource(edgeState).navigationBarsPadding()) {
             items(results.itemCount, key = results.itemKey { it.messageId }) { i ->
                 val result = results[i] ?: return@items
                 SearchResultRow(result, onClick = { onOpenThread(result.thread.threadId) })

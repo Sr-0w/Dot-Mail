@@ -1,6 +1,6 @@
 package app.dot.mail.ui.account
 
-import dev.chrisbanes.haze.hazeSource
+import app.dot.design.components.backdropSource
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -376,7 +376,7 @@ fun AddAccountScreen(onBack: () -> Unit, onDone: () -> Unit) {
     ) { topPadding ->
         Column(Modifier.fillMaxSize()) {
         Column(
-            Modifier.fillMaxSize().weight(1f).hazeSource(frostedSource).verticalScroll(rememberScrollState()).padding(horizontal = DotSpacing.gutter),
+            Modifier.fillMaxSize().weight(1f).backdropSource(frostedSource).verticalScroll(rememberScrollState()).padding(horizontal = DotSpacing.gutter),
         ) {
             androidx.compose.foundation.layout.Spacer(Modifier.height(topPadding.calculateTopPadding()))
 

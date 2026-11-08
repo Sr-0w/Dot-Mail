@@ -38,7 +38,7 @@ import app.dot.design.DotSpacing
 fun DotFloatingCapsule(
     modifier: Modifier = Modifier,
     /** Content scrolling underneath, for a real backdrop blur ([rememberGlassBackdrop]); null = opaque frosted. */
-    backdrop: dev.chrisbanes.haze.HazeState? = null,
+    backdrop: app.dot.design.components.Backdrop? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
     Row(

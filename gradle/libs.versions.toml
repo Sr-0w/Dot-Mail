@@ -1,12 +1,11 @@
 [versions]
-haze = "1.6.10"
 agp = "8.7.3"
 kotlin = "2.1.0"
 ksp = "2.1.0-1.0.29"
 coroutines = "1.9.0"
 serialization = "1.7.3"
 composeBom = "2025.06.01"
-activityCompose = "1.9.3"
+activityCompose = "1.10.1"
 lifecycle = "2.8.7"
 navigation = "2.8.5"
 coreKtx = "1.15.0"
@@ -30,7 +29,6 @@ androidsvg = "1.4"
 richeditor = "1.0.0-rc13"
 
 [libraries]
-haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }

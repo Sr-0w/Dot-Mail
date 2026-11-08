@@ -19,7 +19,7 @@ import androidx.compose.ui.input.key.key
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.horizontalScroll
-import dev.chrisbanes.haze.hazeSource
+import app.dot.design.components.backdropSource
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.foundation.rememberScrollState
 import app.dot.design.components.DotButton
