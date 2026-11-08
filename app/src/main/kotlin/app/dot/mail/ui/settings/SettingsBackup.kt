@@ -6,6 +6,7 @@ import app.dot.mail.ComposeFormat
 import app.dot.mail.Density
 import app.dot.mail.MarkRead
 import app.dot.mail.SwipeAction
+import app.dot.mail.R
 import app.dot.mail.UiPrefs
 import app.dot.mail.engine.text.EmailTemplate
 import kotlinx.serialization.json.Json
@@ -132,15 +133,15 @@ object SettingsBackup {
 
     class Parsed(val dataSection: String, val prefs: JsonObject?, val rules: JsonArray?, val templates: JsonArray?)
 
-    /** Either the sections, or a user-readable reason why the file can't be used. */
-    fun parse(text: String): Pair<Parsed?, String?> {
-        if (text.length > MAX_BYTES) return null to "This file is too large to be a Dot Mail backup."
+    /** Either the sections, or the string resource explaining why the file can't be used. */
+    fun parse(text: String): Pair<Parsed?, Int?> {
+        if (text.length > MAX_BYTES) return null to R.string.backup_too_large
         val root = try { Json.parseToJsonElement(text) as? JsonObject } catch (e: Exception) { null }
-            ?: return null to "This file isn't a Dot Mail backup."
-        if ((root["app"] as? JsonPrimitive)?.contentOrNull != APP) return null to "This file isn't a Dot Mail backup."
-        val format = (root["format"] as? JsonPrimitive)?.intOrNull ?: return null to "This backup has no version."
-        if (format > FORMAT) return null to "This backup was made by a newer version of Dot Mail. Update the app to import it."
-        if (format < 1) return null to "This backup format is not supported."
+            ?: return null to R.string.backup_not_backup
+        if ((root["app"] as? JsonPrimitive)?.contentOrNull != APP) return null to R.string.backup_not_backup
+        val format = (root["format"] as? JsonPrimitive)?.intOrNull ?: return null to R.string.backup_no_version
+        if (format > FORMAT) return null to R.string.backup_newer
+        if (format < 1) return null to R.string.backup_unsupported
         return Parsed(
             dataSection = (root["data"] as? JsonObject)?.toString() ?: "{}",
             prefs = root["preferences"] as? JsonObject, rules = root["remoteImageRules"] as? JsonArray, templates = root["templates"] as? JsonArray,

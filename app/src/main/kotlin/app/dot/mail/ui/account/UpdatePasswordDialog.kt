@@ -19,6 +19,8 @@ import app.dot.design.DotSpacing
 import app.dot.design.components.ButtonStyle
 import app.dot.design.components.DotButton
 import app.dot.design.components.DotTextField
+import androidx.compose.ui.res.stringResource
+import app.dot.mail.R
 import app.dot.mail.LocalMailGraph
 import app.dot.mail.data.model.Account
 import app.dot.mail.data.model.VerifyResult
@@ -38,6 +40,7 @@ fun UpdatePasswordDialog(account: Account, onDismiss: () -> Unit, onSuccess: () 
     var password by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    val failedText = stringResource(R.string.signin_failed)
 
     fun submit() {
         if (password.isEmpty() || busy) return
@@ -53,7 +56,7 @@ fun UpdatePasswordDialog(account: Account, onDismiss: () -> Unit, onSuccess: () 
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                error = e.message ?: "Couldn't update the password."
+                error = e.message ?: failedText
             } finally {
                 busy = false
             }
@@ -64,20 +67,20 @@ fun UpdatePasswordDialog(account: Account, onDismiss: () -> Unit, onSuccess: () 
         onDismissRequest = { if (!busy) onDismiss() },
         containerColor = c.surface,
         shape = DotShapes.large,
-        title = { Text("Sign in again", style = Dot.type.title, color = c.textPrimary) },
+        title = { Text(stringResource(R.string.signin_title), style = Dot.type.title, color = c.textPrimary) },
         text = {
             Column {
                 Text(account.email, style = Dot.type.callout, color = c.textSecondary, modifier = Modifier.padding(bottom = DotSpacing.m))
                 DotTextField(
                     value = password, onValueChange = { password = it; error = null },
-                    label = "Password", password = true, contentType = ContentType.Password,
+                    label = stringResource(R.string.signin_password), password = true, contentType = ContentType.Password,
                     imeAction = ImeAction.Done, onImeAction = ::submit, enabled = !busy,
                     isError = error != null,
-                    supporting = error ?: "Checked with your mail server before it is saved. Use an app password if your provider requires one.",
+                    supporting = error ?: stringResource(R.string.signin_note),
                 )
             }
         },
-        confirmButton = { DotButton("Sign in", enabled = password.isNotEmpty() && !busy, loading = busy, compact = true, onClick = ::submit) },
-        dismissButton = { DotButton("Cancel", onDismiss, style = ButtonStyle.Ghost, compact = true, enabled = !busy) },
+        confirmButton = { DotButton(stringResource(R.string.signin_confirm), enabled = password.isNotEmpty() && !busy, loading = busy, compact = true, onClick = ::submit) },
+        dismissButton = { DotButton(stringResource(R.string.signin_cancel), onDismiss, style = ButtonStyle.Ghost, compact = true, enabled = !busy) },
     )
 }

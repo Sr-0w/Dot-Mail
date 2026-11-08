@@ -26,6 +26,8 @@ import app.dot.design.components.ButtonStyle
 import app.dot.design.components.DotButton
 import app.dot.design.components.ListRow
 import app.dot.design.components.SectionLabel
+import androidx.compose.ui.res.stringResource
+import app.dot.mail.R
 import app.dot.mail.BuildConfig
 import app.dot.mail.LocalMailGraph
 import app.dot.mail.LocalSettings
@@ -55,6 +57,14 @@ internal fun BackupSettings() {
     var pending by remember { mutableStateOf<PendingImport?>(null) }
     var notice by remember { mutableStateOf<Pair<String, List<String>>?>(null) } // title to lines
     var busy by remember { mutableStateOf(false) }
+    val exportedTitle = stringResource(R.string.backup_exported_title)
+    val exportedBody = stringResource(R.string.backup_exported_body)
+    val exportFailedTitle = stringResource(R.string.backup_export_failed_title)
+    val writeFailed = stringResource(R.string.backup_write_failed)
+    val importFailedTitle = stringResource(R.string.backup_import_failed_title)
+    val readFailed = stringResource(R.string.backup_read_failed)
+    val unusable = stringResource(R.string.backup_unusable)
+    val importedTitle = stringResource(R.string.backup_imported_title)
 
     val createLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         uri ?: return@rememberLauncherForActivityResult
@@ -73,8 +83,8 @@ internal fun BackupSettings() {
                 withContext(Dispatchers.IO) { context.contentResolver.openOutputStream(uri, "wt")!!.use { it.write(text.toByteArray()) } }
             }
             busy = false
-            notice = if (result.isSuccess) "Settings exported" to listOf("The file has no passwords. Keep it private anyway: it lists your accounts, servers and signatures.")
-            else "Couldn't export" to listOf(result.exceptionOrNull()?.message ?: "The file couldn't be written.")
+            notice = if (result.isSuccess) exportedTitle to listOf(exportedBody)
+            else exportFailedTitle to listOf(result.exceptionOrNull()?.message ?: writeFailed)
         }
     }
 
@@ -93,67 +103,70 @@ internal fun BackupSettings() {
                 }.getOrNull()
             }
             busy = false
-            if (text == null) { notice = "Couldn't import" to listOf("The file couldn't be read."); return@launch }
+            if (text == null) { notice = importFailedTitle to listOf(readFailed); return@launch }
             val (parsed, error) = SettingsBackup.parse(text)
-            if (parsed == null) { notice = "Couldn't import" to listOf(error ?: "This file can't be used."); return@launch }
+            if (parsed == null) { notice = importFailedTitle to listOf(error?.let { context.getString(it) } ?: unusable); return@launch }
             val accountPreview: BackupPreview = graph.accounts.previewBackup(parsed.dataSection)
-            if (accountPreview.error != null) { notice = "Couldn't import" to listOf(accountPreview.error!!); return@launch }
+            if (accountPreview.error != null) { notice = importFailedTitle to listOf(accountPreview.error!!); return@launch }
             val lines = buildList {
-                addAll(accountPreview.lines)
-                if (parsed.prefs != null) add("App preferences (appearance, reading, composing, privacy) are replaced. App lock and contact photos are never imported.")
-                parsed.rules?.let { add("${it.size} remote-image rules are merged in.") }
-                parsed.templates?.let { add("${it.size} templates: those with a new name are added.") }
-                if (isEmpty()) add("Nothing to import.")
+                accountPreview.items.forEach { i ->
+                    add(if (!i.added) context.getString(R.string.backup_preview_account_update, i.email)
+                    else context.getString(if (i.oauth) R.string.backup_preview_account_add_oauth else R.string.backup_preview_account_add, i.email, i.host))
+                }
+                accountPreview.warnings.forEach { add(context.getString(R.string.backup_skipped_prefix, it)) }
+                if (parsed.prefs != null) add(context.getString(R.string.backup_preview_prefs))
+                parsed.rules?.let { add(context.resources.getQuantityString(R.plurals.backup_preview_rules, it.size, it.size)) }
+                parsed.templates?.let { add(context.resources.getQuantityString(R.plurals.backup_preview_templates, it.size, it.size)) }
+                if (isEmpty()) add(context.getString(R.string.backup_preview_nothing))
             }
             pending = PendingImport(parsed, lines, accountPreview.accountsNeedingSignIn)
         }
     }
 
-    SectionLabel("Backup")
+    SectionLabel(stringResource(R.string.backup_section))
     ListRow(
-        "Export settings", subtitle = "Accounts, identities, signatures, preferences, templates and rules — no passwords",
+        stringResource(R.string.backup_export), subtitle = stringResource(R.string.backup_export_sub),
         icon = Icons.Outlined.FileUpload, onClick = { infoExport = true },
     )
     ListRow(
-        "Import settings", subtitle = "From a Dot Mail backup file. You see what changes first.",
+        stringResource(R.string.backup_import), subtitle = stringResource(R.string.backup_import_sub),
         icon = Icons.Outlined.FileDownload, onClick = { if (!busy) openLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) },
     )
 
     if (infoExport) {
         AlertDialog(
             onDismissRequest = { infoExport = false }, containerColor = c.surface, shape = DotShapes.large,
-            title = { Text("Export settings", style = Dot.type.title, color = c.textPrimary) },
+            title = { Text(stringResource(R.string.backup_export), style = Dot.type.title, color = c.textPrimary) },
             text = {
                 Text(
-                    "The file holds your accounts' addresses and server settings, sender identities and signatures, preferences, templates and remote-image rules. " +
-                        "It never contains passwords or sign-in tokens, so after importing you sign in to each account again. It is not encrypted: store it somewhere private.",
+                    stringResource(R.string.backup_export_info),
                     style = Dot.type.callout, color = c.textSecondary,
                 )
             },
-            confirmButton = { DotButton("Choose where to save", compact = true, onClick = { infoExport = false; createLauncher.launch("dotmail-settings-${LocalDate.now()}.json") }) },
-            dismissButton = { DotButton("Cancel", { infoExport = false }, style = ButtonStyle.Ghost, compact = true) },
+            confirmButton = { DotButton(stringResource(R.string.backup_choose_where), compact = true, onClick = { infoExport = false; createLauncher.launch("dotmail-settings-${LocalDate.now()}.json") }) },
+            dismissButton = { DotButton(stringResource(R.string.backup_cancel), { infoExport = false }, style = ButtonStyle.Ghost, compact = true) },
         )
     }
 
     pending?.let { p ->
         AlertDialog(
             onDismissRequest = { pending = null }, containerColor = c.surface, shape = DotShapes.large,
-            title = { Text("Import settings?", style = Dot.type.title, color = c.textPrimary) },
+            title = { Text(stringResource(R.string.backup_import_title), style = Dot.type.title, color = c.textPrimary) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
                     p.lines.forEach { Text("• $it", style = Dot.type.callout, color = c.textSecondary, modifier = Modifier.padding(bottom = DotSpacing.s)) }
                     if (p.needSignIn.isNotEmpty()) {
-                        Text("Added accounts start signed out; you'll be asked for the password from the banner in the inbox.", style = Dot.type.caption, color = c.textTertiary)
+                        Text(stringResource(R.string.backup_preview_signed_out_note), style = Dot.type.caption, color = c.textTertiary)
                     }
                 }
             },
             confirmButton = {
-                DotButton("Import", compact = true, onClick = {
+                DotButton(stringResource(R.string.backup_import_confirm), compact = true, onClick = {
                     pending = null
-                    scope.launch { notice = "Imported" to applyImport(context, graph, settings, p.parsed) }
+                    scope.launch { notice = importedTitle to applyImport(context, graph, settings, p.parsed) }
                 })
             },
-            dismissButton = { DotButton("Cancel", { pending = null }, style = ButtonStyle.Ghost, compact = true) },
+            dismissButton = { DotButton(stringResource(R.string.backup_cancel), { pending = null }, style = ButtonStyle.Ghost, compact = true) },
         )
     }
 
@@ -162,7 +175,7 @@ internal fun BackupSettings() {
             onDismissRequest = { notice = null }, containerColor = c.surface, shape = DotShapes.large,
             title = { Text(title, style = Dot.type.title, color = c.textPrimary) },
             text = { Column(Modifier.verticalScroll(rememberScrollState())) { lines.forEach { Text(it, style = Dot.type.callout, color = c.textSecondary, modifier = Modifier.padding(bottom = DotSpacing.s)) } } },
-            confirmButton = { DotButton("Close", { notice = null }, style = ButtonStyle.Ghost, compact = true) },
+            confirmButton = { DotButton(stringResource(R.string.backup_close), { notice = null }, style = ButtonStyle.Ghost, compact = true) },
         )
     }
 }
@@ -177,22 +190,23 @@ private suspend fun applyImport(
     val lines = mutableListOf<String>()
     val result = graph.accounts.applyBackup(parsed.dataSection)
     if (result.error != null) return listOf(result.error!!)
-    lines += result.lines
+    result.items.forEach { lines += context.getString(if (it.added) R.string.backup_done_added else R.string.backup_done_updated, it.email) }
+    result.warnings.forEach { lines += context.getString(R.string.backup_skipped_prefix, it) }
     val accounts = graph.accounts.accounts.first()
     val idOf = { email: String -> accounts.firstOrNull { it.email.equals(email, ignoreCase = true) }?.id }
-    parsed.prefs?.let { json -> settings.update { SettingsBackup.decodePrefs(json, it, idOf) }; lines += "Preferences restored." }
+    parsed.prefs?.let { json -> settings.update { SettingsBackup.decodePrefs(json, it, idOf) }; lines += context.getString(R.string.backup_done_prefs) }
     parsed.rules?.let { arr ->
         val (rules, dropped) = SettingsBackup.decodeRules(arr, idOf)
         val policy = RemoteImagePolicy.get(context.applicationContext)
         rules.forEach { policy.addRule(it.isDomain, it.value, it.accountId) }
-        lines += "${rules.size} remote-image rules merged" + if (dropped > 0) " ($dropped skipped: their account isn't here)." else "."
+        lines += if (dropped > 0) context.getString(R.string.backup_done_rules_skipped, rules.size, dropped) else context.getString(R.string.backup_done_rules, rules.size)
     }
     parsed.templates?.let { arr ->
         val store = TemplateStore.get(context.applicationContext)
         val fresh = SettingsBackup.newTemplates(store.templates.value, SettingsBackup.decodeTemplates(arr))
         fresh.forEach { store.save(it.name, it.subject, it.bodyText, it.bodyHtml) }
-        lines += "${fresh.size} templates added."
+        lines += context.getString(R.string.backup_done_templates, fresh.size)
     }
-    if (result.accountsNeedingSignIn.isNotEmpty()) lines += "Sign in again: " + result.accountsNeedingSignIn.joinToString(", ")
+    if (result.accountsNeedingSignIn.isNotEmpty()) lines += context.getString(R.string.backup_done_sign_in, result.accountsNeedingSignIn.joinToString(", "))
     return lines
 }

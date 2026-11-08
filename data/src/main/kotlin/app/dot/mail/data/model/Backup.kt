@@ -9,4 +9,10 @@ data class BackupPreview(
     /** Accounts that will be (or were) re-created and need their password / browser sign-in. */
     val accountsNeedingSignIn: List<String> = emptyList(),
     val error: String? = null,
+    /** The same information, structured, so the UI can phrase it in the user's language ([lines] is English). */
+    val items: List<BackupItem> = emptyList(),
+    /** Entries of the file that were skipped as invalid (English, rare). */
+    val warnings: List<String> = emptyList(),
 )
+
+data class BackupItem(val email: String, val host: String, val added: Boolean, val oauth: Boolean)

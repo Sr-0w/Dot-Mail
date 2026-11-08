@@ -88,6 +88,9 @@ import app.dot.design.components.ListRow
 import app.dot.design.components.SectionLabel
 import app.dot.design.components.dotSurfaceEnter
 import app.dot.mail.AfterAction
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import app.dot.mail.R
 import app.dot.mail.BuildConfig
 import app.dot.mail.ComposeFormat
 import app.dot.mail.Density
@@ -151,10 +154,10 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
     } else if (pageAccount != null) {
         AccountPage(pageAccount, onBack = { accountPage = 0 }, onEditIdentity = { identityPage = it }, onRemove = { removing = pageAccount })
     } else Column(Modifier.fillMaxSize().background(c.background)) {
-        DotTopBar(title = "Settings", elevated = scroll.value > 0, navigation = { BackButton(onBack) })
+        DotTopBar(title = stringResource(R.string.settings_title), elevated = scroll.value > 0, navigation = { BackButton(onBack) })
         Column(Modifier.verticalScroll(scroll)) {
             // ---- Accounts
-            SectionLabel("Accounts", Modifier.padding(top = DotSpacing.s))
+            SectionLabel(stringResource(R.string.settings_section_accounts), Modifier.padding(top = DotSpacing.s))
             accounts.forEach { a ->
                 val err = a.syncState as? SyncState.Error
                 ListRow(
@@ -165,64 +168,64 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
                     trailing = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = c.textTertiary) },
                 )
             }
-            ListRow("Add account", icon = Icons.Outlined.Add, onClick = onAddAccount)
+            ListRow(stringResource(R.string.settings_add_account), icon = Icons.Outlined.Add, onClick = onAddAccount)
             Divider()
 
             // ---- General
-            SectionLabel("General")
+            SectionLabel(stringResource(R.string.settings_section_general))
             if (accounts.size > 1) {
                 ChoiceRow(
-                    "Default account for new mail", Icons.Outlined.AccountCircle,
+                    stringResource(R.string.settings_default_account), Icons.Outlined.AccountCircle,
                     value = accounts.firstOrNull { it.id == prefs.defaultAccountId }?.id ?: accounts.first().id,
                     options = accounts.map { it.id to it.email },
                 ) { id -> settings.update { it.copy(defaultAccountId = id) } }
             }
             val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
             ChoiceRow(
-                if (rtl) "Swipe left" else "Swipe right", if (rtl) Icons.Outlined.SwipeLeft else Icons.Outlined.SwipeRight,
+                stringResource(if (rtl) R.string.settings_swipe_left else R.string.settings_swipe_right), if (rtl) Icons.Outlined.SwipeLeft else Icons.Outlined.SwipeRight,
                 prefs.swipeStart, SwipeAction.entries.map { it to swipeName(it) },
             ) { a -> settings.update { it.copy(swipeStart = a) } }
             ChoiceRow(
-                if (rtl) "Swipe right" else "Swipe left", if (rtl) Icons.Outlined.SwipeRight else Icons.Outlined.SwipeLeft,
+                stringResource(if (rtl) R.string.settings_swipe_right else R.string.settings_swipe_left), if (rtl) Icons.Outlined.SwipeRight else Icons.Outlined.SwipeLeft,
                 prefs.swipeEnd, SwipeAction.entries.map { it to swipeName(it) },
             ) { a -> settings.update { it.copy(swipeEnd = a) } }
-            ToggleRow("Confirm before deleting", "Ask before moving conversations to Trash.", Icons.Outlined.Delete, prefs.confirmDelete) { v ->
+            ToggleRow(stringResource(R.string.settings_confirm_delete), stringResource(R.string.settings_confirm_delete_sub), Icons.Outlined.Delete, prefs.confirmDelete) { v ->
                 settings.update { it.copy(confirmDelete = v) }
             }
             ChoiceRow(
-                "After archive or delete", Icons.Outlined.Archive, prefs.afterAction,
-                listOf(AfterAction.LIST to "Back to the list", AfterAction.NEXT to "Open the next conversation", AfterAction.PREVIOUS to "Open the previous conversation"),
+                stringResource(R.string.settings_after_action), Icons.Outlined.Archive, prefs.afterAction,
+                listOf(AfterAction.LIST to stringResource(R.string.settings_after_list), AfterAction.NEXT to stringResource(R.string.settings_after_next), AfterAction.PREVIOUS to stringResource(R.string.settings_after_previous)),
             ) { v -> settings.update { it.copy(afterAction = v) } }
             ChoiceRow(
-                "Mark as read", Icons.Outlined.MarkEmailRead, prefs.markRead,
-                listOf(MarkRead.IMMEDIATELY to "When opened", MarkRead.AFTER_2S to "After 2 seconds", MarkRead.MANUALLY to "Only manually"),
+                stringResource(R.string.settings_mark_read), Icons.Outlined.MarkEmailRead, prefs.markRead,
+                listOf(MarkRead.IMMEDIATELY to stringResource(R.string.settings_mark_read_opened), MarkRead.AFTER_2S to stringResource(R.string.settings_mark_read_2s), MarkRead.MANUALLY to stringResource(R.string.settings_mark_read_manual)),
             ) { v -> settings.update { it.copy(markRead = v) } }
             Divider()
 
             // ---- Appearance
-            SectionLabel("Appearance")
-            SegmentedSetting("Theme", listOf(ThemeMode.SYSTEM to "System", ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark"), prefs.theme) { m ->
+            SectionLabel(stringResource(R.string.settings_section_appearance))
+            SegmentedSetting(stringResource(R.string.settings_theme), listOf(ThemeMode.SYSTEM to stringResource(R.string.settings_theme_system), ThemeMode.LIGHT to stringResource(R.string.settings_theme_light), ThemeMode.DARK to stringResource(R.string.settings_theme_dark)), prefs.theme) { m ->
                 settings.update { it.copy(theme = m) }
             }
-            ToggleRow("Group into conversations", "Show replies together in one row. Off: every message is listed on its own.", Icons.Outlined.Forum, prefs.conversationView) { v ->
+            ToggleRow(stringResource(R.string.settings_group_conversations), stringResource(R.string.settings_group_conversations_sub), Icons.Outlined.Forum, prefs.conversationView) { v ->
                 settings.update { it.copy(conversationView = v) }
             }
-            SegmentedSetting("List density", listOf(Density.COMFORTABLE to "Comfortable", Density.COMPACT to "Compact"), prefs.density) { d ->
+            SegmentedSetting(stringResource(R.string.settings_density), listOf(Density.COMFORTABLE to stringResource(R.string.settings_density_comfortable), Density.COMPACT to stringResource(R.string.settings_density_compact)), prefs.density) { d ->
                 settings.update { it.copy(density = d) }
             }
-            PercentSlider("Reading text size", prefs.readingTextPercent, 90..130, 10) { v -> settings.update { it.copy(readingTextPercent = v) } }
-            ToggleRow("Coloured avatars", "Give every sender a colour. Off: one neutral grey.", Icons.Outlined.Palette, prefs.avatarColors) { v ->
+            PercentSlider(stringResource(R.string.settings_reading_size), prefs.readingTextPercent, 90..130, 10) { v -> settings.update { it.copy(readingTextPercent = v) } }
+            ToggleRow(stringResource(R.string.settings_avatar_colors), stringResource(R.string.settings_avatar_colors_sub), Icons.Outlined.Palette, prefs.avatarColors) { v ->
                 settings.update { it.copy(avatarColors = v) }
             }
-            SectionLabel("Sender pictures")
+            SectionLabel(stringResource(R.string.settings_section_sender_pictures))
             Text(
-                "Initials are used unless you turn a source on. Every source below except contacts asks another server, which learns that you received mail from that sender.",
+                stringResource(R.string.settings_sender_pictures_intro),
                 style = Dot.type.caption, color = c.textSecondary,
                 modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.xs),
             )
             ToggleRow(
-                "Contact photos",
-                if (contactsDenied) "Contacts permission was denied. Allow it in system settings to use this." else "Photos from your address book. Stays on this device.",
+                stringResource(R.string.settings_contact_photos),
+                stringResource(if (contactsDenied) R.string.settings_contact_photos_denied else R.string.settings_contact_photos_sub),
                 Icons.Outlined.ContactPage, prefs.contactPhotos && contactsGranted,
             ) { v ->
                 when {
@@ -231,53 +234,53 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
                     else -> contactsLauncher.launch(Manifest.permission.READ_CONTACTS)
                 }
             }
-            ToggleRow("Gravatar", "Sends a hash of the sender's address to gravatar.com.", Icons.Outlined.Public, prefs.gravatar) { v ->
+            ToggleRow(stringResource(R.string.settings_gravatar), stringResource(R.string.settings_gravatar_sub), Icons.Outlined.Public, prefs.gravatar) { v ->
                 settings.update { it.copy(gravatar = v) }
             }
-            ToggleRow("Brand logos", "Looks up the sender's domain in DNS and downloads its BIMI logo from the sender's host.", Icons.Outlined.VerifiedUser, prefs.brandLogos) { v ->
+            ToggleRow(stringResource(R.string.settings_brand_logos), stringResource(R.string.settings_brand_logos_sub), Icons.Outlined.VerifiedUser, prefs.brandLogos) { v ->
                 settings.update { it.copy(brandLogos = v) }
             }
-            ToggleRow("Website icons", "Downloads the icon of the sender's website (not for Gmail, Outlook and similar).", Icons.Outlined.Language, prefs.websiteIcons) { v ->
+            ToggleRow(stringResource(R.string.settings_website_icons), stringResource(R.string.settings_website_icons_sub), Icons.Outlined.Language, prefs.websiteIcons) { v ->
                 settings.update { it.copy(websiteIcons = v) }
             }
             Divider()
 
             // ---- Reading
-            SectionLabel("Reading")
+            SectionLabel(stringResource(R.string.settings_section_reading))
             ListRow(
-                "Tracking pixels are always blocked", subtitle = "Invisible 1-pixel images that report you opened a message never load.",
+                stringResource(R.string.settings_tracking_blocked), subtitle = stringResource(R.string.settings_tracking_blocked_sub),
                 icon = Icons.Outlined.Block,
             )
-            ToggleRow("Confirm links", "Show the real address before opening a link.", Icons.Outlined.Link, prefs.confirmLinks) { v ->
+            ToggleRow(stringResource(R.string.settings_confirm_links), stringResource(R.string.settings_confirm_links_sub), Icons.Outlined.Link, prefs.confirmLinks) { v ->
                 settings.update { it.copy(confirmLinks = v) }
             }
-            ToggleRow("Show quoted text", "Expand earlier messages quoted in a reply.", Icons.Outlined.FormatQuote, prefs.quotedExpanded) { v ->
+            ToggleRow(stringResource(R.string.settings_show_quoted), stringResource(R.string.settings_show_quoted_sub), Icons.Outlined.FormatQuote, prefs.quotedExpanded) { v ->
                 settings.update { it.copy(quotedExpanded = v) }
             }
-            ToggleRow("Swipe between conversations", "Swipe left for the next conversation, right for the previous one.", Icons.Outlined.SwipeLeft, prefs.swipeBetweenMessages) { v ->
+            ToggleRow(stringResource(R.string.settings_swipe_between), stringResource(R.string.settings_swipe_between_sub), Icons.Outlined.SwipeLeft, prefs.swipeBetweenMessages) { v ->
                 settings.update { it.copy(swipeBetweenMessages = v) }
             }
             Divider()
 
             // ---- Composing
-            SectionLabel("Composing")
+            SectionLabel(stringResource(R.string.settings_section_composing))
             ChoiceRow(
-                "Default format", Icons.Outlined.TextFields, prefs.defaultFormat,
-                listOf(ComposeFormat.RICH to "Rich text", ComposeFormat.PLAIN to "Plain text"),
+                stringResource(R.string.settings_default_format), Icons.Outlined.TextFields, prefs.defaultFormat,
+                listOf(ComposeFormat.RICH to stringResource(R.string.settings_format_rich), ComposeFormat.PLAIN to stringResource(R.string.settings_format_plain)),
             ) { f -> settings.update { it.copy(defaultFormat = f) } }
             UndoSetting(prefs.undoSendSeconds) { s -> settings.update { it.copy(undoSendSeconds = s) } }
-            ToggleRow("Reply to all by default", "Tapping Reply addresses everyone on the message.", Icons.Outlined.ReplyAll, prefs.replyAllByDefault) { v ->
+            ToggleRow(stringResource(R.string.settings_reply_all), stringResource(R.string.settings_reply_all_sub), Icons.Outlined.ReplyAll, prefs.replyAllByDefault) { v ->
                 settings.update { it.copy(replyAllByDefault = v) }
             }
-            ToggleRow("Include original message", "Quote the message you are replying to.", Icons.Outlined.Reply, prefs.includeOriginal) { v ->
+            ToggleRow(stringResource(R.string.settings_include_original), stringResource(R.string.settings_include_original_sub), Icons.Outlined.Reply, prefs.includeOriginal) { v ->
                 settings.update { it.copy(includeOriginal = v) }
             }
             Divider()
 
             // ---- Notifications
-            SectionLabel("Notifications")
+            SectionLabel(stringResource(R.string.settings_section_notifications))
             ListRow(
-                "System notification settings", subtitle = "Sound, vibration and channels per account", icon = Icons.Outlined.Notifications,
+                stringResource(R.string.settings_system_notifications), subtitle = stringResource(R.string.settings_system_notifications_sub), icon = Icons.Outlined.Notifications,
                 onClick = {
                     context.startActivity(
                         Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
@@ -287,42 +290,43 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             val rules = remember { app.dot.mail.data.NotificationRules.get(context.applicationContext) }
             val buttons by rules.actions.collectAsStateWithLifecycle()
             val actionOptions = listOf(
-                app.dot.mail.data.NotificationAction.MARK_READ to "Mark as read", app.dot.mail.data.NotificationAction.ARCHIVE to "Archive",
-                app.dot.mail.data.NotificationAction.DELETE to "Delete", app.dot.mail.data.NotificationAction.REPLY to "Reply",
+                app.dot.mail.data.NotificationAction.MARK_READ to stringResource(R.string.settings_action_mark_read), app.dot.mail.data.NotificationAction.ARCHIVE to stringResource(R.string.settings_action_archive),
+                app.dot.mail.data.NotificationAction.DELETE to stringResource(R.string.settings_action_delete), app.dot.mail.data.NotificationAction.REPLY to stringResource(R.string.settings_action_reply),
             )
-            ChoiceRow("First notification button", Icons.Outlined.Notifications, buttons[0], actionOptions) { rules.setActions(it, buttons[1]) }
-            ChoiceRow("Second notification button", Icons.Outlined.Notifications, buttons[1], actionOptions) { rules.setActions(buttons[0], it) }
+            ChoiceRow(stringResource(R.string.settings_notif_button_first), Icons.Outlined.Notifications, buttons[0], actionOptions) { rules.setActions(it, buttons[1]) }
+            ChoiceRow(stringResource(R.string.settings_notif_button_second), Icons.Outlined.Notifications, buttons[1], actionOptions) { rules.setActions(buttons[0], it) }
             Divider()
 
             // ---- Privacy & security
-            SectionLabel("Privacy & security")
+            SectionLabel(stringResource(R.string.settings_section_privacy))
             val imageRules by remember { RemoteImagePolicy.get(context.applicationContext).rules }.collectAsStateWithLifecycle()
             ListRow(
-                "Remote images",
-                subtitle = (if (prefs.loadRemoteImages) "Always loaded" else "Blocked by default") + if (imageRules.isEmpty()) "" else " · ${imageRules.size} allowed " + if (imageRules.size == 1) "sender" else "senders",
+                stringResource(R.string.settings_remote_images),
+                subtitle = stringResource(if (prefs.loadRemoteImages) R.string.settings_remote_images_always else R.string.settings_remote_images_blocked) +
+                    if (imageRules.isEmpty()) "" else " · " + pluralStringResource(R.plurals.settings_remote_images_rules, imageRules.size, imageRules.size),
                 icon = Icons.Outlined.Image, onClick = { remoteImagesPage = true },
                 trailing = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = Dot.colors.textTertiary) },
             )
             ToggleRow(
-                "App lock", if (canLock) "Require fingerprint, face or screen lock to open." else "Set up a screen lock on this device to use this.",
+                stringResource(R.string.settings_app_lock), stringResource(if (canLock) R.string.settings_app_lock_sub else R.string.settings_app_lock_unavailable),
                 Icons.Outlined.Fingerprint, prefs.appLock, enabled = canLock,
             ) { v -> settings.update { it.copy(appLock = v) } }
             ChoiceRow(
-                "Lock after", Icons.Outlined.Lock, prefs.lockAfterMinutes,
-                listOf(0 to "Immediately", 1 to "1 minute", 5 to "5 minutes", 15 to "15 minutes"), enabled = prefs.appLock && canLock,
+                stringResource(R.string.settings_lock_after), Icons.Outlined.Lock, prefs.lockAfterMinutes,
+                listOf(0 to stringResource(R.string.settings_lock_immediately)) + listOf(1, 5, 15).map { it to pluralStringResource(R.plurals.settings_lock_minutes, it, it) }, enabled = prefs.appLock && canLock,
             ) { m -> settings.update { it.copy(lockAfterMinutes = m) } }
-            ToggleRow("Hide content in Recents", "Also blocks screenshots.", Icons.Outlined.VisibilityOff, prefs.secureScreen) { v ->
+            ToggleRow(stringResource(R.string.settings_hide_recents), stringResource(R.string.settings_hide_recents_sub), Icons.Outlined.VisibilityOff, prefs.secureScreen) { v ->
                 settings.update { it.copy(secureScreen = v) }
             }
             Divider()
 
             // ---- Storage
-            SectionLabel("Storage")
+            SectionLabel(stringResource(R.string.settings_section_storage))
             val cacheBytes by produceState(0L, cacheVersion) {
                 value = withContext(Dispatchers.IO) { context.cacheDir.walkTopDown().filter { it.isFile }.sumOf { it.length() } }
             }
             ListRow(
-                "Clear cache", subtitle = "${formatSize(cacheBytes)} of temporary files. Mail stays on your account and this device.",
+                stringResource(R.string.settings_clear_cache), subtitle = stringResource(R.string.settings_clear_cache_sub, formatSize(cacheBytes)),
                 icon = Icons.Outlined.DeleteSweep,
                 onClick = {
                     scope.launch {
@@ -340,19 +344,19 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             Divider()
 
             // ---- About
-            SectionLabel("About")
-            ListRow("About Dot Mail", subtitle = "Version ${BuildConfig.VERSION_NAME} · GPL-3.0-or-later", icon = Icons.Outlined.Info, onClick = { about = true })
+            SectionLabel(stringResource(R.string.settings_section_about))
+            ListRow(stringResource(R.string.settings_about), subtitle = stringResource(R.string.settings_about_version, BuildConfig.VERSION_NAME), icon = Icons.Outlined.Info, onClick = { about = true })
             ListRow(
-                "Source code", subtitle = SOURCE_URL.removePrefix("https://"), icon = Icons.Outlined.Code,
+                stringResource(R.string.settings_source_code), subtitle = SOURCE_URL.removePrefix("https://"), icon = Icons.Outlined.Code,
                 onClick = { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(SOURCE_URL))) } },
             )
-            ListRow("Open-source licences", icon = Icons.Outlined.Gavel, onClick = { licences = true })
+            ListRow(stringResource(R.string.settings_licences), icon = Icons.Outlined.Gavel, onClick = { licences = true })
             ListRow(
-                "No telemetry", subtitle = "No ads, analytics, crash reporting or account with us. Mail goes only between this device and your provider.",
+                stringResource(R.string.settings_no_telemetry), subtitle = stringResource(R.string.settings_no_telemetry_sub),
                 icon = Icons.Outlined.ShieldMoon,
             )
             if (BuildConfig.DEBUG) {
-                ToggleRow("Demo mode", "Sample mail, no network. Restart the app to apply.", Icons.Outlined.Palette, settings.demoMode) { v ->
+                ToggleRow(stringResource(R.string.settings_demo_mode), stringResource(R.string.settings_demo_mode_sub), Icons.Outlined.Palette, settings.demoMode) { v ->
                     settings.demoMode = v
                 }
             }
@@ -369,9 +373,9 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             shape = DotShapes.large,
             icon = { Avatar(a.displayName, a.email) },
             title = { Text(a.email, style = Dot.type.title, color = c.textPrimary) },
-            text = { Text("Remove this account from Dot Mail? Mail stays on your server; the local copy and saved password are deleted.", style = Dot.type.callout, color = c.textSecondary) },
+            text = { Text(stringResource(R.string.settings_remove_account_text), style = Dot.type.callout, color = c.textSecondary) },
             confirmButton = {
-                DotButton("Remove", style = ButtonStyle.Danger, compact = true, onClick = {
+                DotButton(stringResource(R.string.settings_remove), style = ButtonStyle.Danger, compact = true, onClick = {
                     removing = null
                     scope.launch {
                         accountPage = 0
@@ -380,7 +384,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
                     }
                 })
             },
-            dismissButton = { DotButton("Cancel", { removing = null }, style = ButtonStyle.Ghost, compact = true) },
+            dismissButton = { DotButton(stringResource(R.string.settings_cancel), { removing = null }, style = ButtonStyle.Ghost, compact = true) },
         )
     }
     if (about) {
@@ -389,15 +393,14 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             modifier = Modifier.dotSurfaceEnter(),
             containerColor = c.surface,
             shape = DotShapes.large,
-            title = { Text("Dot Mail ${BuildConfig.VERSION_NAME}", style = Dot.type.title, color = c.textPrimary) },
+            title = { Text(stringResource(R.string.settings_about_title, BuildConfig.VERSION_NAME), style = Dot.type.title, color = c.textPrimary) },
             text = {
                 Text(
-                    "Free software under the GNU GPL v3 or later. No ads, no analytics, no tracking, no account with us. " +
-                        "Your mail goes only between this device and your mail provider.",
+                    stringResource(R.string.settings_about_text),
                     style = Dot.type.callout, color = c.textSecondary,
                 )
             },
-            confirmButton = { DotButton("Close", { about = false }, style = ButtonStyle.Ghost, compact = true) },
+            confirmButton = { DotButton(stringResource(R.string.settings_close), { about = false }, style = ButtonStyle.Ghost, compact = true) },
         )
     }
     if (licences) {
@@ -406,7 +409,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             modifier = Modifier.dotSurfaceEnter(),
             containerColor = c.surface,
             shape = DotShapes.large,
-            title = { Text("Open-source licences", style = Dot.type.title, color = c.textPrimary) },
+            title = { Text(stringResource(R.string.settings_licences_title), style = Dot.type.title, color = c.textPrimary) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
                     LICENCES.forEach { (name, licence) ->
@@ -415,7 +418,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
                     }
                 }
             },
-            confirmButton = { DotButton("Close", { licences = false }, style = ButtonStyle.Ghost, compact = true) },
+            confirmButton = { DotButton(stringResource(R.string.settings_close), { licences = false }, style = ButtonStyle.Ghost, compact = true) },
         )
     }
 }
@@ -439,19 +442,20 @@ private fun formatSize(bytes: Long): String = when {
     else -> "%.1f MB".format(bytes / 1048576.0)
 }
 
-private fun swipeName(a: SwipeAction) = when (a) {
-    SwipeAction.ARCHIVE -> "Archive"
-    SwipeAction.TRASH -> "Delete"
-    SwipeAction.READ_TOGGLE -> "Mark read / unread"
-    SwipeAction.STAR_TOGGLE -> "Star / unstar"
-    SwipeAction.SNOOZE -> "Snooze"
-    SwipeAction.NONE -> "Nothing"
-}
+@Composable
+private fun swipeName(a: SwipeAction) = stringResource(when (a) {
+    SwipeAction.ARCHIVE -> R.string.settings_swipe_name_archive
+    SwipeAction.TRASH -> R.string.settings_swipe_name_delete
+    SwipeAction.READ_TOGGLE -> R.string.settings_swipe_name_read
+    SwipeAction.STAR_TOGGLE -> R.string.settings_swipe_name_star
+    SwipeAction.SNOOZE -> R.string.settings_swipe_name_snooze
+    SwipeAction.NONE -> R.string.settings_swipe_name_none
+})
 
 @Composable
 private fun UndoSetting(seconds: Int, onChange: (Int) -> Unit) {
     ChoiceRow(
-        "Undo send", Icons.Outlined.Schedule, seconds,
-        listOf(0, 5, 10, 20, 30).map { it to if (it == 0) "Off" else "$it seconds" }, onChange = onChange,
+        stringResource(R.string.settings_undo_send), Icons.Outlined.Schedule, seconds,
+        listOf(0, 5, 10, 20, 30).map { it to if (it == 0) stringResource(R.string.settings_undo_off) else stringResource(R.string.settings_undo_seconds, it) }, onChange = onChange,
     )
 }

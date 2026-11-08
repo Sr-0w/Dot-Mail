@@ -5,6 +5,7 @@ import app.dot.mail.AfterAction
 import app.dot.mail.ComposeFormat
 import app.dot.mail.Density
 import app.dot.mail.MarkRead
+import app.dot.mail.R
 import app.dot.mail.SwipeAction
 import app.dot.mail.UiPrefs
 import app.dot.mail.engine.text.EmailTemplate
@@ -97,12 +98,12 @@ class SettingsBackupTest {
     }
 
     @Test fun `foreign, newer and oversized files are refused with a reason`() {
-        assertThat(SettingsBackup.parse("hello").second).contains("isn't a Dot Mail backup")
-        assertThat(SettingsBackup.parse("""{"app":"other","format":1}""").second).contains("isn't a Dot Mail backup")
-        assertThat(SettingsBackup.parse("""{"app":"dot-mail"}""").second).contains("no version")
-        assertThat(SettingsBackup.parse("""{"app":"dot-mail","format":99}""").second).contains("newer version")
-        assertThat(SettingsBackup.parse("""{"app":"dot-mail","format":0}""").second).contains("not supported")
-        assertThat(SettingsBackup.parse("x".repeat(2_000_001)).second).contains("too large")
+        assertThat(SettingsBackup.parse("hello").second).isEqualTo(R.string.backup_not_backup)
+        assertThat(SettingsBackup.parse("""{"app":"other","format":1}""").second).isEqualTo(R.string.backup_not_backup)
+        assertThat(SettingsBackup.parse("""{"app":"dot-mail"}""").second).isEqualTo(R.string.backup_no_version)
+        assertThat(SettingsBackup.parse("""{"app":"dot-mail","format":99}""").second).isEqualTo(R.string.backup_newer)
+        assertThat(SettingsBackup.parse("""{"app":"dot-mail","format":0}""").second).isEqualTo(R.string.backup_unsupported)
+        assertThat(SettingsBackup.parse("x".repeat(2_000_001)).second).isEqualTo(R.string.backup_too_large)
         // Missing sections are fine: a file with fewer parts still imports what it has.
         val (parsed, error) = SettingsBackup.parse("""{"app":"dot-mail","format":1,"futureSection":{"a":1}}""")
         assertThat(error).isNull(); assertThat(parsed!!.prefs).isNull(); assertThat(parsed.dataSection).isEqualTo("{}")

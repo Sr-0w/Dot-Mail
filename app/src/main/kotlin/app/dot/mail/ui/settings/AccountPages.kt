@@ -53,6 +53,8 @@ import app.dot.design.components.Hairline
 import app.dot.design.components.ListRow
 import app.dot.design.components.SectionLabel
 import app.dot.design.components.dotSurfaceEnter
+import androidx.compose.ui.res.stringResource
+import app.dot.mail.R
 import app.dot.mail.LocalMailGraph
 import app.dot.mail.data.IdentityStore
 import app.dot.mail.data.model.Account
@@ -78,34 +80,34 @@ internal fun AccountPage(account: Account, onBack: () -> Unit, onEditIdentity: (
             var renaming by remember { mutableStateOf(false) }
             var signingIn by remember { mutableStateOf(false) }
 
-            SectionLabel("Account", Modifier.padding(top = DotSpacing.s))
-            ListRow("Name", subtitle = account.displayName, icon = Icons.Outlined.Edit, onClick = { renaming = true })
-            ListRow("Update password", subtitle = "Sign in again with a new password or app password", icon = Icons.Outlined.Key, onClick = { signingIn = true })
+            SectionLabel(stringResource(R.string.account_section_account), Modifier.padding(top = DotSpacing.s))
+            ListRow(stringResource(R.string.account_name), subtitle = account.displayName, icon = Icons.Outlined.Edit, onClick = { renaming = true })
+            ListRow(stringResource(R.string.account_update_password), subtitle = stringResource(R.string.account_update_password_sub), icon = Icons.Outlined.Key, onClick = { signingIn = true })
             ListRow(
-                "Signature", subtitle = account.identities.firstOrNull { it.id == account.id }?.signature?.lineSequence()?.firstOrNull { it.isNotBlank() } ?: "None",
+                stringResource(R.string.account_signature), subtitle = account.identities.firstOrNull { it.id == account.id }?.signature?.lineSequence()?.firstOrNull { it.isNotBlank() } ?: stringResource(R.string.account_signature_none),
                 icon = Icons.Outlined.Edit, onClick = { onEditIdentity(account.id) },
             )
 
-            SectionLabel("Sync")
+            SectionLabel(stringResource(R.string.account_section_sync))
             ChoiceRow(
-                "Check for new mail", Icons.Outlined.Schedule, cfg.syncIntervalMinutes,
-                listOf(15 to "Every 15 minutes", 30 to "Every 30 minutes", 60 to "Every hour", 0 to "Only when I refresh"),
+                stringResource(R.string.account_check_mail), Icons.Outlined.Schedule, cfg.syncIntervalMinutes,
+                listOf(15 to stringResource(R.string.account_check_15), 30 to stringResource(R.string.account_check_30), 60 to stringResource(R.string.account_check_60), 0 to stringResource(R.string.account_check_manual)),
             ) { v -> store.update(account.id) { it.copy(syncIntervalMinutes = v) } }
             Text(
-                if (cfg.syncIntervalMinutes == 0) "Background checks are off for this account. Opening the app or pulling to refresh still syncs." else "Used for background checks. Opening the app always syncs.",
+                stringResource(if (cfg.syncIntervalMinutes == 0) R.string.account_check_off_note else R.string.account_check_on_note),
                 style = Dot.type.caption, color = c.textSecondary, modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.xs),
             )
             ChoiceRow(
-                "Download mail from", Icons.Outlined.History, cfg.syncWindowDays,
-                listOf(14 to "The last 2 weeks", 30 to "The last month", 90 to "The last 3 months", 0 to "All mail"),
+                stringResource(R.string.account_window), Icons.Outlined.History, cfg.syncWindowDays,
+                listOf(14 to stringResource(R.string.account_window_14), 30 to stringResource(R.string.account_window_30), 90 to stringResource(R.string.account_window_90), 0 to stringResource(R.string.account_window_all)),
             ) { v -> store.update(account.id) { it.copy(syncWindowDays = v) } }
             Text(
-                "Older mail stays on the server and is found by search. Changing this downloads message lists again on the next sync. \"All mail\" is capped at the newest 5000 messages per folder.",
+                stringResource(R.string.account_window_note),
                 style = Dot.type.caption, color = c.textSecondary, modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.xs),
             )
 
-            SectionLabel("Notifications")
-            ToggleRow("Notify about new mail", "For ${account.email}", Icons.Outlined.Notifications, cfg.notificationsEnabled) { v ->
+            SectionLabel(stringResource(R.string.account_section_notifications))
+            ToggleRow(stringResource(R.string.account_notify), stringResource(R.string.account_notify_for, account.email), Icons.Outlined.Notifications, cfg.notificationsEnabled) { v ->
                 store.update(account.id) { it.copy(notificationsEnabled = v) }
             }
             if (cfg.notificationsEnabled) {
@@ -113,20 +115,20 @@ internal fun AccountPage(account: Account, onBack: () -> Unit, onEditIdentity: (
                 val rules = remember { app.dot.mail.data.NotificationRules.get(context.applicationContext) }
                 val overrides by rules.folderOverrides.collectAsStateWithLifecycle()
                 Text(
-                    "Choose which folders notify. The Inbox does by default; other folders stay quiet unless you switch them on.",
+                    stringResource(R.string.account_notify_folders_note),
                     style = Dot.type.caption, color = c.textSecondary, modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.xs),
                 )
                 folders.filter { it.role != app.dot.mail.data.model.FolderRole.ALL_MAIL && it.role != app.dot.mail.data.model.FolderRole.STARRED }
                     .sortedWith(compareBy({ app.dot.mail.ui.common.Format.roleOrder.indexOf(it.role).let { i -> if (i < 0) 99 else i } }, { it.path.lowercase() }))
                     .forEach { f ->
                         ToggleRow(
-                            if (f.role == app.dot.mail.data.model.FolderRole.CUSTOM) f.path else app.dot.mail.ui.common.Format.roleName(f.role), null, null,
+                            app.dot.mail.ui.common.Format.folderTitle(f.role, f.path), null, null,
                             app.dot.mail.data.NotificationRules.effective(overrides, f.id, f.role.name),
                         ) { on -> rules.setFolderNotify(f.id, f.role.name, on) }
                     }
             }
             ListRow(
-                "Sound and vibration", subtitle = "Opens this account's notification channel in system settings", icon = Icons.Outlined.NotificationsActive,
+                stringResource(R.string.account_sound_vibration), subtitle = stringResource(R.string.account_sound_vibration_sub), icon = Icons.Outlined.NotificationsActive,
                 onClick = {
                     context.startActivity(
                         android.content.Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
@@ -137,27 +139,30 @@ internal fun AccountPage(account: Account, onBack: () -> Unit, onEditIdentity: (
             )
             if (renaming) RenameAccountDialog(account) { renaming = false }
             if (signingIn) app.dot.mail.ui.account.UpdatePasswordDialog(account, onDismiss = { signingIn = false }, onSuccess = {})
-            SectionLabel("Sender identities", Modifier.padding(top = DotSpacing.m))
+            SectionLabel(stringResource(R.string.account_section_identities), Modifier.padding(top = DotSpacing.m))
             Text(
-                "Addresses you can send from. Replies use the identity the original message was sent to.",
+                stringResource(R.string.account_identities_note),
                 style = Dot.type.caption, color = c.textSecondary,
                 modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.xs),
             )
+            val defaultSuffix = stringResource(R.string.account_identity_default_suffix)
+            val repliesToTemplate = stringResource(R.string.account_identity_replies_to, "\u0001")
+            fun repliesTo(a: String) = repliesToTemplate.replace("\u0001", a)
             account.identities.forEach { i ->
                 ListRow(
                     title = i.name.ifBlank { i.email },
                     subtitle = buildString {
                         append(i.email)
-                        if (i.isDefault) append(" · Default")
-                        if (i.replyTo != null) append("\nReplies to ${i.replyTo}")
+                        if (i.isDefault) append(defaultSuffix)
+                        if (i.replyTo != null) append("\n").append(repliesTo(i.replyTo!!))
                     },
                     onClick = { onEditIdentity(i.id) },
                     trailing = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = c.textTertiary) },
                 )
             }
-            ListRow("Add identity", icon = Icons.Outlined.Add, onClick = { onEditIdentity(0) })
+            ListRow(stringResource(R.string.account_add_identity), icon = Icons.Outlined.Add, onClick = { onEditIdentity(0) })
             Hairline(Modifier.padding(vertical = DotSpacing.s))
-            ListRow("Remove account", subtitle = "Mail stays on your server; the local copy and saved password are deleted.",
+            ListRow(stringResource(R.string.account_remove), subtitle = stringResource(R.string.account_remove_sub),
                 icon = Icons.Outlined.DeleteOutline, titleColor = c.danger, onClick = onRemove)
             Spacer(Modifier.height(DotSpacing.xl))
         }
@@ -180,6 +185,7 @@ internal fun IdentityEditorPage(account: Account, identityId: Long, onBack: () -
     var confirmDelete by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    val saveFailed = stringResource(R.string.identity_save_failed)
 
     val emailOk = isPrimary || IdentityStore.isValidAddress(email)
     val replyToOk = replyTo.isBlank() || IdentityStore.isValidAddress(replyTo)
@@ -187,40 +193,40 @@ internal fun IdentityEditorPage(account: Account, identityId: Long, onBack: () -
 
     Column(Modifier.fillMaxSize().background(c.background).imePadding()) {
         DotTopBar(
-            title = if (existing == null) "New identity" else "Edit identity",
+            title = stringResource(if (existing == null) R.string.identity_new else R.string.identity_edit),
             elevated = scroll.value > 0,
             navigation = { BackButton(onBack) },
         )
         Column(Modifier.weight(1f).verticalScroll(scroll).padding(horizontal = DotSpacing.gutter), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(DotSpacing.l)) {
-            DotTextField(name, { name = it }, label = "Name", placeholder = "Shown to recipients")
+            DotTextField(name, { name = it }, label = stringResource(R.string.identity_name), placeholder = stringResource(R.string.identity_name_placeholder))
             DotTextField(
-                email, { email = it }, label = "Address", keyboardType = KeyboardType.Email,
+                email, { email = it }, label = stringResource(R.string.identity_address), keyboardType = KeyboardType.Email,
                 enabled = !isPrimary,
                 isError = email.isNotBlank() && !emailOk,
                 supporting = when {
-                    isPrimary -> "This is the address you sign in with; it can't be changed."
-                    email.isNotBlank() && !emailOk -> "Enter a valid address."
-                    else -> "An alias your provider accepts for this account. Mail is sent through ${account.email}."
+                    isPrimary -> stringResource(R.string.identity_address_primary)
+                    email.isNotBlank() && !emailOk -> stringResource(R.string.identity_address_invalid)
+                    else -> stringResource(R.string.identity_address_alias, account.email)
                 },
             )
             DotTextField(
-                replyTo, { replyTo = it }, label = "Reply-to (optional)", keyboardType = KeyboardType.Email,
+                replyTo, { replyTo = it }, label = stringResource(R.string.identity_reply_to), keyboardType = KeyboardType.Email,
                 isError = !replyToOk,
-                supporting = if (!replyToOk) "Enter a valid address." else "Replies to messages sent from this identity go here instead.",
+                supporting = stringResource(if (!replyToOk) R.string.identity_address_invalid else R.string.identity_reply_to_note),
             )
-            DotTextField(signature, { signature = it }, label = "Signature", singleLine = false, placeholder = "Added to new messages")
+            DotTextField(signature, { signature = it }, label = stringResource(R.string.identity_signature), singleLine = false, placeholder = stringResource(R.string.identity_signature_placeholder))
             ToggleRow(
-                "Default identity", "Used for new messages.", null, makeDefault,
+                stringResource(R.string.identity_default), stringResource(R.string.identity_default_sub), null, makeDefault,
                 enabled = existing?.isDefault != true, // choose another one to change the default
             ) { makeDefault = it }
             error?.let { Text(it, style = Dot.type.callout, color = c.danger) }
             if (existing != null && !isPrimary) {
-                DotButton("Delete identity", { confirmDelete = true }, style = ButtonStyle.Danger, modifier = Modifier.fillMaxWidth())
+                DotButton(stringResource(R.string.identity_delete), { confirmDelete = true }, style = ButtonStyle.Danger, modifier = Modifier.fillMaxWidth())
             }
             Spacer(Modifier.height(DotSpacing.l))
         }
         DotButton(
-            text = "Save",
+            text = stringResource(R.string.identity_save),
             enabled = emailOk && replyToOk && (isPrimary || email.isNotBlank()) && !busy,
             loading = busy,
             modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(DotSpacing.gutter),
@@ -240,7 +246,7 @@ internal fun IdentityEditorPage(account: Account, identityId: Long, onBack: () -
                         if (makeDefault && existing?.isDefault != true) graph.accounts.setDefaultIdentity(account.id, id)
                         onBack()
                     } catch (e: IllegalArgumentException) {
-                        error = e.message ?: "Couldn't save this identity."
+                        error = e.message ?: saveFailed
                     } finally {
                         busy = false
                     }
@@ -255,15 +261,15 @@ internal fun IdentityEditorPage(account: Account, identityId: Long, onBack: () -
             modifier = Modifier.dotSurfaceEnter(),
             containerColor = c.surface,
             shape = DotShapes.large,
-            title = { Text("Delete ${existing?.email}?", style = Dot.type.title, color = c.textPrimary) },
-            text = { Text("Drafts using it will be sent from your default identity instead.", style = Dot.type.callout, color = c.textSecondary) },
+            title = { Text(stringResource(R.string.identity_delete_title, existing?.email.orEmpty()), style = Dot.type.title, color = c.textPrimary) },
+            text = { Text(stringResource(R.string.identity_delete_body), style = Dot.type.callout, color = c.textSecondary) },
             confirmButton = {
-                DotButton("Delete", style = ButtonStyle.Danger, compact = true, onClick = {
+                DotButton(stringResource(R.string.identity_delete_confirm), style = ButtonStyle.Danger, compact = true, onClick = {
                     confirmDelete = false
                     scope.launch { graph.accounts.deleteIdentity(account.id, identityId); onBack() }
                 })
             },
-            dismissButton = { DotButton("Cancel", { confirmDelete = false }, style = ButtonStyle.Ghost, compact = true) },
+            dismissButton = { DotButton(stringResource(R.string.identity_cancel), { confirmDelete = false }, style = ButtonStyle.Ghost, compact = true) },
         )
     }
 }
@@ -277,13 +283,13 @@ private fun RenameAccountDialog(account: Account, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = c.surface, shape = DotShapes.large,
-        title = { Text("Account name", style = Dot.type.title, color = c.textPrimary) },
-        text = { DotTextField(name, { name = it }, label = "Name", supporting = "Shown in the account list and as your sender name.") },
+        title = { Text(stringResource(R.string.account_name_title), style = Dot.type.title, color = c.textPrimary) },
+        text = { DotTextField(name, { name = it }, label = stringResource(R.string.identity_name), supporting = stringResource(R.string.account_name_note)) },
         confirmButton = {
-            DotButton("Save", enabled = name.isNotBlank() && name.trim() != account.displayName, compact = true, onClick = {
+            DotButton(stringResource(R.string.identity_save), enabled = name.isNotBlank() && name.trim() != account.displayName, compact = true, onClick = {
                 scope.launch { graph.accounts.renameAccount(account.id, name); onDismiss() }
             })
         },
-        dismissButton = { DotButton("Cancel", onDismiss, style = ButtonStyle.Ghost, compact = true) },
+        dismissButton = { DotButton(stringResource(R.string.identity_cancel), onDismiss, style = ButtonStyle.Ghost, compact = true) },
     )
 }
