@@ -14,9 +14,16 @@ they are passed at build time instead of being committed:
 # ~/.gradle/gradle.properties (or -P on the command line / CI secret)
 dotmail.oauth.microsoft.clientId=00000000-0000-0000-0000-000000000000
 dotmail.oauth.google.clientId=1234567890-abc.apps.googleusercontent.com
+# optional: Google binds an Android client to a signing certificate, so debug builds can use their own client
+dotmail.oauth.google.clientId.debug=1234567890-def.apps.googleusercontent.com
 ```
 
-## Microsoft (Outlook.com, Hotmail, Microsoft 365): needed, ~10 minutes, free
+## Microsoft (Outlook.com, Hotmail, Microsoft 365): not registered yet
+
+Status: postponed by the maintainer (Azure asks for a payment card to create the free directory). Until then,
+Outlook/Hotmail personal accounts cannot sign in (Microsoft refuses passwords for IMAP); the setup screen says so.
+
+Steps, ~10 minutes, free:
 
 Microsoft no longer accepts passwords for IMAP on personal accounts, so this is what makes Outlook/Hotmail work.
 
@@ -32,7 +39,10 @@ Microsoft no longer accepts passwords for IMAP on personal accounts, so this is 
 7. Optional but recommended before a public release: **Branding & properties** → publisher verification
    (blue check in the consent screen).
 
-## Google (Gmail): optional
+## Google (Gmail): registered (Testing mode)
+
+Release and debug Android clients exist for `app.dot.mail`; the consent screen is in **Testing** (only listed test
+users can sign in, grants expire after 7 days) until Google's verification is requested.
 
 Gmail keeps working with app passwords (Google account → Security → 2-Step Verification → App passwords). Full
 mail access (`https://mail.google.com/`) is a *restricted* scope: a client ID works immediately for up to 100 test
@@ -47,7 +57,8 @@ through a server; Dot Mail talks directly from the phone to Google, so it is
 3. **Credentials** → Create OAuth client ID → **Android**, package `app.dot.mail`, SHA-1 of the release key
    (`keytool -list -v -keystore release.jks`). Use the **iOS** type instead if Android-type verification of the
    custom scheme causes trouble; both are public clients.
-4. Copy the client ID into `dotmail.oauth.google.clientId`. The redirect scheme
+4. Copy the client ID into `dotmail.oauth.google.clientId`. Create a second Android client with the debug key's
+   SHA-1 for development builds and put it in `dotmail.oauth.google.clientId.debug`. The redirect scheme
    (`com.googleusercontent.apps.<id>:/oauth2redirect`) is derived automatically at build time.
 
 ## Release builds
