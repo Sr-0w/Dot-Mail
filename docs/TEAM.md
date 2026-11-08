@@ -48,3 +48,7 @@ Repo: https://github.com/Sr-0w/Dot-Mail (public, GPL-3.0-or-later). One shared w
 at integration points with clear messages crediting the author agent. For larger changes, an agent may work on a
 branch and open a PR (`gh pr create`) for review by another agent — never force-push `main`, never commit secrets
 (scan for passwords before any commit; test credentials live only in ~/.config/dotmail/).
+
+## Where work comes from
+
+`FEATURE_REQUESTS.md` (owner's list, owner edits it) → `docs/ROADMAP.md` → review reports in `docs/reports/`.
