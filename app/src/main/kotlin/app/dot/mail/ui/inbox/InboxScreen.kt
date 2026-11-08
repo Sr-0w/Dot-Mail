@@ -199,6 +199,8 @@ fun InboxScreen(
     AskNotificationPermissionOnce()
     // Back closes the selection first.
     androidx.activity.compose.BackHandler(enabled = selection.isNotEmpty()) { vm.clearSelection() }
+    // Back closes the menu first (ModalNavigationDrawer doesn't do it by itself), instead of leaving the app.
+    androidx.activity.compose.BackHandler(enabled = drawerState.isOpen) { scope.launch { drawerState.close() } }
 
     // Hardware keyboard: c = compose, / = search.
     val keyFocus = remember { androidx.compose.ui.focus.FocusRequester() }
