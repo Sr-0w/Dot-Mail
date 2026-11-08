@@ -720,9 +720,10 @@ private fun MessageCard(
                         message.from.displayName,
                         style = Dot.type.headline.copy(fontWeight = if (message.isUnread) FontWeight.SemiBold else FontWeight.Medium),
                         color = c.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
+                        // The name takes all free width so the date sits at the end (two weights split it in half).
+                        modifier = Modifier.weight(1f),
                     )
-                    Spacer(Modifier.weight(1f).width(DotSpacing.s))
+                    Spacer(Modifier.width(DotSpacing.s))
                     if (message.isStarred) {
                         Icon(Icons.Outlined.Star, stringResource(R.string.thread_starred), Modifier.size(15.dp), tint = c.star)
                         Spacer(Modifier.width(6.dp))
