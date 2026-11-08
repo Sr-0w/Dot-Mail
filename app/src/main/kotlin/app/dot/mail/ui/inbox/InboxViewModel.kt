@@ -169,7 +169,7 @@ class InboxViewModel(
             runCatching { graph.mail.applyUndoable(action, ids.toList(), source) }
                 .onSuccess { token ->
                     _selection.value = emptySet()
-                    val text = confirmation(action, count)
+                    val text = confirmation(action, count, inDrafts = header.value.role == FolderRole.DRAFTS)
                     // Archive/trash/spam can be undone from the snackbar (a swipe is easy to trigger by accident).
                     if (text != null && token != null && (token.moves.isNotEmpty() || token.drafts.isNotEmpty())) _undoEvents.send(text to token)
                     else text?.let { _events.send(it) }
@@ -246,9 +246,10 @@ class InboxViewModel(
         }
     }
 
-    private fun confirmation(action: MessageAction, n: Int): String? = when (action) {
+    /** [inDrafts]: the rows are drafts, which are not "conversations" (a draft being trashed says so). */
+    internal fun confirmation(action: MessageAction, n: Int, inDrafts: Boolean = false): String? = when (action) {
         MessageAction.ARCHIVE -> plural(R.plurals.inbox_archived_toast, n)
-        MessageAction.TRASH -> plural(R.plurals.inbox_trashed_toast, n)
+        MessageAction.TRASH -> plural(if (inDrafts) R.plurals.inbox_draft_trashed_toast else R.plurals.inbox_trashed_toast, n)
         MessageAction.SPAM -> plural(R.plurals.inbox_spam_toast, n)
         MessageAction.NOT_SPAM -> plural(R.plurals.inbox_not_spam_toast, n)
         MessageAction.DELETE_FOREVER -> plural(R.plurals.inbox_deleted_toast, n)
