@@ -37,6 +37,7 @@ internal class BodyStore(private val context: Context, private val dao: MailDao)
     }
 
     private fun pgp(dir: File, text: String?): app.dot.mail.data.model.PgpContent? {
+        if (File(dir, ".unsupported-encryption").isFile) return app.dot.mail.data.model.PgpContent.Unsupported
         val encrypted = File(dir, app.dot.mail.engine.Pgp.ENCRYPTED_FILE)
         if (encrypted.isFile) return app.dot.mail.data.model.PgpContent.Encrypted(encrypted.path)
         val signed = File(dir, app.dot.mail.engine.Pgp.SIGNED_FILE); val signature = File(dir, app.dot.mail.engine.Pgp.SIGNATURE_FILE)

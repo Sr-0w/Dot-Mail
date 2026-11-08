@@ -197,7 +197,12 @@ class MailClient(val timeoutMs: Int = 30_000, private val timing: (String,Long) 
             flags(f,message), runCatching { hasAttachments(message) }.getOrDefault(false),
             if ((f.store as IMAPStore).hasCapability("X-GM-EXT-1")) (message as IMAPMessage).getItem(GmailThreadFetch.item) as? Long else null)
     }
-        return basic.copy(classificationHeaders=ClassificationHeaders.read(message),hasPdfAttachment=runCatching { hasPdf(message) }.getOrDefault(false),attachmentNames=runCatching { attachmentNames(message) }.getOrDefault(emptyList()))
+        return basic.copy(
+            classificationHeaders=ClassificationHeaders.read(message),
+            hasPdfAttachment=runCatching { hasPdf(message) }.getOrDefault(false),
+            attachmentNames=runCatching { attachmentNames(message) }.getOrDefault(emptyList()),
+            encryptionHint=encryptionHintFromMime(runCatching { message.contentType }.getOrNull()),
+        )
     }
     /** Bounded metadata backfill for cached messages written by builds predating classification. */
     suspend fun headers(endpoint: Endpoint, credentials: Credentials, path: String, uids: LongArray, expectedValidity: Long): List<Header> = store(endpoint,credentials) { s -> folder(s,path) { f ->

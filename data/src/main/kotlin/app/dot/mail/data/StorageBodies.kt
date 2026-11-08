@@ -43,6 +43,7 @@ internal class StorageBodies(private val graph:RealMailGraph,private val manager
         val created=mutableListOf<File>(); var committed=false; var delta=0L
         try {
             val body=graph.client.cacheBodyParts(config.imap.endpoint(),credentials,folder.path,pending?.uid ?: message.uid,directory,folder.validity,attachments,budget.bytes)
+            if (body.encryptionHint == app.dot.mail.engine.EncryptionHint.UNSUPPORTED) File(directory,".unsupported-encryption").writeText("")
             val previous=graph.dao.attachments(id).associateBy { it.partId }
             val saved=body.attachments.associate { part ->
                 val target=graph.attachmentFile(account.id,"${UUID.randomUUID()}/${graph.safeFileName(part.name)}")

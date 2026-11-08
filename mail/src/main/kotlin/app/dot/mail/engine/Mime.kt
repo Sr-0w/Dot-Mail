@@ -88,6 +88,8 @@ object Mime {
     /** Streams decoded MIME parts into caller-owned private files, retaining no attachment arrays. */
     fun cache(part: Part, directory: java.io.File, maxBytes: Long = 25L * 1024 * 1024,includeAttachments:Boolean=true,checkCancelled:()->Unit={}): CachedBody {
         directory.mkdirs()
+        val encryptionHint = encryptionHintFromMime(runCatching { part.contentType }.getOrNull())
+        if (encryptionHint == EncryptionHint.UNSUPPORTED) return CachedBody(null, null, emptyList(), encryptionHint = encryptionHint)
         val texts = mutableListOf<java.io.File>(); val htmls = mutableListOf<java.io.File>(); val attachments = mutableListOf<CachedPart>()
         val metadata=mutableListOf<RemotePart>()
         var remaining = maxBytes
@@ -146,7 +148,7 @@ object Mime {
             target.outputStream().use { out -> files.forEachIndexed { index,file -> if(index>0) out.write(10); file.inputStream().use { it.copyTo(out) }; file.delete() } }
             return target
         }
-        try { visit(part,"1",0); return CachedBody(join(texts,"plain.txt"),join(htmls,"body.html"),attachments,metadata) }
+        try { visit(part,"1",0); return CachedBody(join(texts,"plain.txt"),join(htmls,"body.html"),attachments,metadata,encryptionHint) }
         catch (e: Exception) { directory.deleteRecursively(); throw e }
     }
     private fun safeType(part: Part): String = runCatching { part.contentType.substringBefore(';').trim().lowercase() }.getOrDefault("application/octet-stream")

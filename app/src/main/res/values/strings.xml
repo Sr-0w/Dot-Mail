@@ -1009,6 +1009,9 @@
     <string name="pgp_install_encrypted">This message is encrypted. Install OpenKeychain to read it.</string>
     <string name="pgp_install_signed">This message is signed. Install OpenKeychain to check it.</string>
     <string name="pgp_get_openkeychain">Get OpenKeychain</string>
+    <string name="pgp_unsupported_encryption">Unsupported encryption</string>
+    <string name="pgp_unsupported_encryption_body">This message uses an encrypted format Dot Mail cannot read yet. Its contents remain hidden.</string>
+    <string name="pgp_list_encrypted">Encrypted message</string>
         <string name="inbox_undo">Undo</string>
         <string name="inbox_undo_partial">Some messages couldn’t be put back; they will be after the next sync.</string>
 

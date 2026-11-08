@@ -85,6 +85,7 @@ import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.Mail
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.MarkEmailRead
 import androidx.compose.material.icons.outlined.MarkEmailUnread
 import androidx.compose.material.icons.outlined.Menu
@@ -754,6 +755,7 @@ fun ThreadRow(
     val unreadLabel = stringResource(R.string.inbox_state_unread)
     val starredLabel = stringResource(R.string.inbox_state_starred)
     val attachmentsLabel = stringResource(R.string.inbox_state_has_attachments)
+    val encryptionLabel = stringResource(R.string.pgp_list_encrypted)
     val selectedLabel = stringResource(R.string.inbox_state_selected)
     val sender = if (showRecipients && thread.recipients.isNotEmpty()) {
         stringResource(R.string.inbox_to_prefix, thread.recipients.joinToString(", ") { it.displayName.substringBefore(' ').ifBlank { it.displayName } })
@@ -773,6 +775,7 @@ fun ThreadRow(
                     if (unread) append(unreadLabel).append(" ")
                     if (thread.isStarred) append(starredLabel).append(" ")
                     if (thread.hasAttachments) append(attachmentsLabel).append(" ")
+                    if (thread.encryptionHint != app.dot.mail.engine.EncryptionHint.NONE) append(encryptionLabel).append(" ")
                     if (selected) append(selectedLabel)
                 }
             }
@@ -848,6 +851,10 @@ fun ThreadRow(
                 }
                 if (thread.hasAttachments) {
                     Icon(Icons.Outlined.Attachment, null, Modifier.size(15.dp), tint = c.textTertiary)
+                    Spacer(Modifier.width(6.dp))
+                }
+                if (thread.encryptionHint != app.dot.mail.engine.EncryptionHint.NONE) {
+                    Icon(Icons.Outlined.Lock, encryptionLabel, Modifier.size(15.dp), tint = c.textTertiary)
                     Spacer(Modifier.width(6.dp))
                 }
                 if (thread.snoozedUntil != null) {
