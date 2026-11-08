@@ -763,7 +763,7 @@ private fun MessageCard(
                     modifier = Modifier.fillMaxWidth().padding(
                         horizontal = if (clean.layoutWidth > 0 || clean.responsive) DotSpacing.s else DotSpacing.gutter,
                         vertical = DotSpacing.s,
-                    ),
+                    ).pinchToZoom(),
                 )
             } else {
                 PlainTextBody(body.plainText.orEmpty(), onLink, textScale = readingScale, quotedExpanded = quotedExpanded)
