@@ -3,71 +3,95 @@ package app.dot.design.components
 import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.composed
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.Dp
-import dev.chrisbanes.haze.HazeInput
-import dev.chrisbanes.haze.HazePerformanceMode
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.blur.HazeBlurStyle
-import dev.chrisbanes.haze.blur.HazeColorEffect
-import dev.chrisbanes.haze.blur.hazeBlur
-import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.rememberHazeState
+import io.github.nadeemiqbal.liquidglass.LiquidGlassQuality
+import io.github.nadeemiqbal.liquidglass.LiquidGlassState
+import io.github.nadeemiqbal.liquidglass.liquidGlassSource
+import io.github.nadeemiqbal.liquidglass.rememberLiquidGlassState
 
 /**
- * Dot's backdrop blur: one small API over Haze 2, so screens never depend on the blur engine directly.
+ * Dot's backdrop blur: one small API over liquid-glass (Nadeem Iqbal, Apache-2.0), so screens never depend on the
+ * blur engine directly.
  *
- * Effects read the content marked with [backdropSource] ([HazeInput.Sources]) at full resolution
- * ([HazePerformanceMode.Quality]). The default Balanced mode downsamples the captured list, and a downsampled moving
- * list shimmers from frame to frame: that was the header flicker. A little noise hides banding in large flat blurs.
+ * [backdropSource] records the scrolling content into liquid-glass's full-resolution GraphicsLayer
+ * ([LiquidGlassQuality.Full], no downsampling). [backdropBlur] draws that layer behind a surface. liquid-glass's own
+ * `liquidGlass()` draws the layer at the surface's origin, which only works when surface and source share a corner, so
+ * we draw it ourselves: shifted by where the source sits relative to the surface, blurred (edges read as transparent
+ * over the opaque background, never smeared), tinted and masked.
  *
  * Usage: `val backdrop = rememberBackdrop()`, `Modifier.backdropSource(backdrop)` on the scrolling content (a sibling
  * of the blur surfaces, never their ancestor), `Modifier.backdropBlur(backdrop, …)` on the surfaces. Blur needs
  * Android 12+; [blurEnabled] is false below, where callers draw their opaque fallback.
  */
 @Stable
-class Backdrop internal constructor(internal val haze: HazeState) {
-    val blurEnabled: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+class Backdrop internal constructor(internal val glass: LiquidGlassState) {
+    val blurEnabled: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && glass.backdrop != null
+
+    /** Where the recorded source sits in the root; surfaces offset the layer by it. */
+    internal var sourceInRoot by mutableStateOf(Offset.Zero)
 }
 
 @Composable
 fun rememberBackdrop(): Backdrop {
-    val haze = rememberHazeState()
-    return remember(haze) { Backdrop(haze) }
+    val glass = rememberLiquidGlassState(LiquidGlassQuality.Full)
+    return remember(glass) { Backdrop(glass) }
 }
 
-/** Marks the content that glass and the frosted header blur where the platform can't blur the window itself. */
-fun Modifier.backdropSource(backdrop: Backdrop): Modifier = hazeSource(backdrop.haze)
+/** Marks the content that glass and the frosted header blur. */
+fun Modifier.backdropSource(backdrop: Backdrop): Modifier =
+    onPlaced { backdrop.sourceInRoot = it.positionInRoot() }.liquidGlassSource(backdrop.glass)
 
 /**
  * Draws the backdrop behind this element: blurred by [radius] over an opaque [background], veiled by [tint], shaped by
  * the alpha [mask] (vertical gradient, white = fully frosted) when given. This element's own content stays sharp on top.
  */
-@Composable
-fun Modifier.backdropBlur(backdrop: Backdrop, radius: Dp, background: Color, tint: Brush?, mask: Brush? = null): Modifier {
-    // The style block is replayed under snapshot observation; reading these State objects keeps one remembered style
-    // (Haze compares styles by identity) that still follows new values without being rebuilt.
-    val r = rememberUpdatedState(radius)
-    val bg = rememberUpdatedState(background)
-    val t = rememberUpdatedState(tint)
-    val m = rememberUpdatedState(mask)
-    val style = remember {
-        HazeBlurStyle {
-            blurRadius(r.value)
-            backgroundColor(bg.value)
-            noiseFactor(0.05f)
-            colorEffects(t.value?.let { listOf(HazeColorEffect.tint(it)) } ?: emptyList())
-            mask(m.value)
-            // Beyond the captured content is transparent (filled by the background), never a repeat of the edge row:
-            // with Clamp, a bright row touching the screen top was smeared over the band, then vanished in one frame.
-            blurredEdgeTreatment(BlurredEdgeTreatment.Unbounded)
+fun Modifier.backdropBlur(backdrop: Backdrop, radius: Dp, background: Color, tint: Brush?, mask: Brush? = null): Modifier =
+    composed {
+        val here = remember { mutableStateOf(Offset.Zero) }
+        onPlaced { here.value = it.positionInRoot() }.drawWithCache {
+            val radiusPx = radius.toPx()
+            val blur = if (radiusPx > 0f) BlurEffect(radiusPx, radiusPx, TileMode.Decal) else null
+            val bounds = Rect(Offset.Zero, size)
+            val maskPaint = Paint()
+            // Our own layer carries the blur: the shared source layer has one renderEffect, and surfaces with
+            // different radii would overwrite each other's within a frame.
+            val own = obtainGraphicsLayer().apply { renderEffect = blur }
+            onDrawWithContent {
+                val layer = backdrop.glass.backdrop
+                drawIntoCanvas { if (mask != null) it.saveLayer(bounds, maskPaint) }
+                drawRect(background)
+                if (layer != null && layer.size.width > 0 && backdrop.blurEnabled) {
+                    val d = backdrop.sourceInRoot - here.value
+                    own.record { translate(d.x, d.y) { drawLayer(layer) } }
+                    clipRect { drawLayer(own) }
+                }
+                if (tint != null) drawRect(tint)
+                if (mask != null) {
+                    drawRect(mask, blendMode = BlendMode.DstIn)
+                    drawIntoCanvas { it.restore() }
+                }
+                drawContent()
+            }
         }
     }
-    val input = remember(backdrop) { HazeInput.Sources(backdrop.haze) }
-    return hazeBlur(input = input, style = style, performanceMode = HazePerformanceMode.Quality, expandLayerBounds = true)
-}

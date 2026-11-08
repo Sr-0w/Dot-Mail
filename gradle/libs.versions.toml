@@ -5,7 +5,7 @@ ksp = "2.3.13"
 coroutines = "1.11.0"
 serialization = "1.12.0"
 composeBom = "2026.09.00"
-haze = "2.1.0"
+liquidGlass = "0.2.3"
 activityCompose = "1.13.0"
 lifecycle = "2.11.0"
 navigation = "2.10.2"
@@ -76,8 +76,7 @@ richeditor-compose = { module = "com.mohamedrejeb.richeditor:richeditor-compose"
 glance-appwidget = { module = "androidx.glance:glance-appwidget", version.ref = "glance" }
 espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "espresso" }
 
-haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
-haze-blur = { module = "dev.chrisbanes.haze:haze-blur", version.ref = "haze" }
+liquid-glass = { module = "io.github.nadeemiqbal:liquid-glass", version.ref = "liquidGlass" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

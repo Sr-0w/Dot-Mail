@@ -521,6 +521,7 @@ private val LICENCES = listOf(
     "Inter typeface" to "SIL Open Font License 1.1",
     "AndroidX, Jetpack Compose, Glance, Room, WorkManager, Paging" to "Apache License 2.0",
     "Kotlin and kotlinx libraries" to "Apache License 2.0",
+    "liquid-glass (Nadeem Iqbal)" to "Apache License 2.0",
     "Jakarta Mail (Eclipse Angus)" to "EPL 2.0 / GPL 2.0 with Classpath Exception",
     "jsoup" to "MIT License",
     "AndroidSVG" to "Apache License 2.0",

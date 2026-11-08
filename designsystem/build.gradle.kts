@@ -21,8 +21,7 @@ dependencies {
     api(libs.compose.material.icons.extended)
     api(libs.compose.ui.tooling.preview)
     // Backdrop blur for the frosted header and glass controls (Apache-2.0, pure Compose, no Play Services).
-    api(libs.haze)
-    implementation(libs.haze.blur)
+    implementation(libs.liquid.glass)
     debugImplementation(libs.compose.ui.tooling)
 }
 
