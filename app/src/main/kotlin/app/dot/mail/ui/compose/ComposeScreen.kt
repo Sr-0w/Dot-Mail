@@ -867,11 +867,12 @@ private fun scheduleOptions(): List<Pair<String, Long>> {
 
 @Composable
 private fun SendButton(enabled: Boolean, onClick: () -> Unit) {
+    val haptics = app.dot.design.rememberDotHaptics()
     DotPrimaryButton(
         icon = Icons.AutoMirrored.Outlined.Send,
         contentDescription = stringResource(R.string.compose_send),
         enabled = enabled,
-        onClick = onClick,
+        onClick = { haptics.confirm(); onClick() },
         compact = true,
         modifier = Modifier.padding(start = 4.dp, end = 8.dp),
     )

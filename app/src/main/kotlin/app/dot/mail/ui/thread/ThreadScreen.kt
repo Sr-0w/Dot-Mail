@@ -388,6 +388,8 @@ fun ThreadScreen(
     val chromeTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 60.dp
     val chromeBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 84.dp
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val dotHaptics = app.dot.design.rememberDotHaptics()
+    val act: (MessageAction) -> Unit = { dotHaptics.confirm(); vm.act(it) }
     // Hardware keyboard shortcuts (tablets, Chromebooks, DeX), Gmail-style single keys.
     val keyFocus = remember { androidx.compose.ui.focus.FocusRequester() }
     LaunchedEffect(Unit) { runCatching { keyFocus.requestFocus() } }
@@ -401,11 +403,11 @@ fun ThreadScreen(
                     Key.R -> { target?.let { onReply(it.id, ReplyMode.REPLY) }; true }
                     Key.A -> { target?.let { onReply(it.id, ReplyMode.REPLY_ALL) }; true }
                     Key.F -> { target?.let { onReply(it.id, ReplyMode.FORWARD) }; true }
-                    Key.E -> { vm.act(MessageAction.ARCHIVE); true }
-                    Key.Three -> if (e.isShiftPressed) { vm.act(MessageAction.TRASH); true } else false
-                    Key.Delete -> { vm.act(MessageAction.TRASH); true }
-                    Key.U -> { vm.act(MessageAction.MARK_UNREAD); true }
-                    Key.S -> { vm.act(if (list?.any { it.isStarred } == true) MessageAction.UNSTAR else MessageAction.STAR); true }
+                    Key.E -> { act(MessageAction.ARCHIVE); true }
+                    Key.Three -> if (e.isShiftPressed) { act(MessageAction.TRASH); true } else false
+                    Key.Delete -> { act(MessageAction.TRASH); true }
+                    Key.U -> { act(MessageAction.MARK_UNREAD); true }
+                    Key.S -> { act(if (list?.any { it.isStarred } == true) MessageAction.UNSTAR else MessageAction.STAR); true }
                     Key.J -> { ThreadOrder.after(threadId)?.let(onOpenAdjacent); true }
                     Key.K -> { ThreadOrder.before(threadId)?.let(onOpenAdjacent); true }
                     Key.Escape -> { onBack(); true }
@@ -478,11 +480,11 @@ fun ThreadScreen(
             back = { DotFloatingCapsule { DotCapsuleButton(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(app.dot.design.R.string.ds_back), onClick = onBack) } },
             actions = {
                 DotFloatingCapsule {
-                    DotCapsuleButton(Icons.Outlined.Archive, stringResource(R.string.inbox_action_archive), onClick = { vm.act(MessageAction.ARCHIVE) })
+                    DotCapsuleButton(Icons.Outlined.Archive, stringResource(R.string.inbox_action_archive), onClick = { act(MessageAction.ARCHIVE) })
                     DotCapsuleDivider()
-                    DotCapsuleButton(Icons.Outlined.Delete, stringResource(R.string.inbox_action_delete), onClick = { if (prefs.confirmDelete) confirmTrash = true else vm.act(MessageAction.TRASH) })
+                    DotCapsuleButton(Icons.Outlined.Delete, stringResource(R.string.inbox_action_delete), onClick = { if (prefs.confirmDelete) confirmTrash = true else act(MessageAction.TRASH) })
                     DotCapsuleDivider()
-                    DotCapsuleButton(Icons.Outlined.MarkEmailUnread, stringResource(R.string.inbox_action_mark_unread), onClick = { vm.act(MessageAction.MARK_UNREAD) })
+                    DotCapsuleButton(Icons.Outlined.MarkEmailUnread, stringResource(R.string.inbox_action_mark_unread), onClick = { act(MessageAction.MARK_UNREAD) })
                     DotCapsuleDivider()
                     Box {
                         DotCapsuleButton(Icons.Outlined.MoreVert, stringResource(R.string.thread_more), onClick = { menu = true })
@@ -491,10 +493,10 @@ fun ThreadScreen(
                             DotMenuItem(stringResource(R.string.inbox_action_snooze_ellipsis), Icons.Outlined.Snooze) { menu = false; snoozing = true }
                             DotMenuItem(stringResource(if (muted) R.string.thread_unmute_conversation else R.string.thread_mute_conversation), if (muted) Icons.Outlined.NotificationsActive else Icons.Outlined.NotificationsOff) { menu = false; vm.setMuted(!muted) }
                             DotMenuItem(stringResource(if (starred) R.string.thread_remove_star else R.string.thread_star), if (starred) Icons.Outlined.StarOutline else Icons.Outlined.Star) {
-                                menu = false; vm.act(if (starred) MessageAction.UNSTAR else MessageAction.STAR)
+                                menu = false; act(if (starred) MessageAction.UNSTAR else MessageAction.STAR)
                             }
-                            DotMenuItem(stringResource(R.string.inbox_action_report_spam), Icons.Outlined.Report) { menu = false; vm.act(MessageAction.SPAM) }
-                            DotMenuItem(stringResource(R.string.inbox_action_not_spam), Icons.Outlined.Inbox) { menu = false; vm.act(MessageAction.NOT_SPAM) }
+                            DotMenuItem(stringResource(R.string.inbox_action_report_spam), Icons.Outlined.Report) { menu = false; act(MessageAction.SPAM) }
+                            DotMenuItem(stringResource(R.string.inbox_action_not_spam), Icons.Outlined.Inbox) { menu = false; act(MessageAction.NOT_SPAM) }
                             DotMenuItem(stringResource(R.string.inbox_action_move_ellipsis), Icons.Outlined.DriveFileMove) { menu = false; showMove = true }
                             DotMenuItem(stringResource(R.string.inbox_action_delete_forever), Icons.Outlined.DeleteForever, color = c.danger) { menu = false; confirmDelete = true }
                             val oneClick = list?.lastOrNull { it.unsubscribeOneClick != null }?.unsubscribeOneClick
@@ -556,7 +558,7 @@ fun ThreadScreen(
         AlertDialog(
             onDismissRequest = { confirmTrash = false }, containerColor = c.surface, shape = DotShapes.large,
             title = { Text(stringResource(R.string.thread_confirm_trash_title), style = Dot.type.title, color = c.textPrimary) },
-            confirmButton = { DotButton(stringResource(R.string.inbox_delete), { confirmTrash = false; vm.act(MessageAction.TRASH) }, style = ButtonStyle.Danger, compact = true) },
+            confirmButton = { DotButton(stringResource(R.string.inbox_delete), { confirmTrash = false; act(MessageAction.TRASH) }, style = ButtonStyle.Danger, compact = true) },
             dismissButton = { DotButton(stringResource(R.string.inbox_cancel), { confirmTrash = false }, style = ButtonStyle.Ghost, compact = true) },
         )
     }
@@ -565,11 +567,11 @@ fun ThreadScreen(
             onDismissRequest = { confirmDelete = false }, containerColor = c.surface, shape = DotShapes.large,
             title = { Text(stringResource(R.string.thread_confirm_delete_title), style = Dot.type.title, color = c.textPrimary) },
             text = { Text(stringResource(R.string.thread_confirm_delete_body), style = Dot.type.callout, color = c.textSecondary) },
-            confirmButton = { DotButton(stringResource(R.string.inbox_delete), { confirmDelete = false; vm.act(MessageAction.DELETE_FOREVER) }, style = ButtonStyle.Danger, compact = true) },
+            confirmButton = { DotButton(stringResource(R.string.inbox_delete), { confirmDelete = false; act(MessageAction.DELETE_FOREVER) }, style = ButtonStyle.Danger, compact = true) },
             dismissButton = { DotButton(stringResource(R.string.inbox_cancel), { confirmDelete = false }, style = ButtonStyle.Ghost, compact = true) },
         )
     }
-    if (snoozing) app.dot.mail.ui.snooze.SnoozeSheet(onDismiss = { snoozing = false }, onPick = { until -> snoozing = false; vm.snooze(until) })
+    if (snoozing) app.dot.mail.ui.snooze.SnoozeSheet(onDismiss = { snoozing = false }, onPick = { until -> snoozing = false; dotHaptics.confirm(); vm.snooze(until) })
     pdfPreview?.let { pdf ->
         fun launch(share: Boolean) {
             val uri = Uri.parse(pdf.uri)
