@@ -408,7 +408,7 @@ fun ThreadScreen(
             dismissButton = { DotButton("Cancel", { confirmDelete = false }, style = ButtonStyle.Ghost, compact = true) },
         )
     }
-    pendingLink?.let { url -> LinkDialog(url, onDismiss = { pendingLink = null }, onOpen = { pendingLink = null; openUrl(context, url) }) }
+    pendingLink?.let { url -> LinkDialog(url, onDismiss = { pendingLink = null }, onOpen = { target -> pendingLink = null; openUrl(context, target) }) }
 }
 
 private fun openUrl(context: android.content.Context, url: String) {
@@ -421,9 +421,13 @@ private fun openUrl(context: android.content.Context, url: String) {
 
 /** Shows the real destination before leaving the app: the main defence against disguised phishing links. */
 @Composable
-private fun LinkDialog(url: String, onDismiss: () -> Unit, onOpen: () -> Unit) {
-    val uri = remember(url) { Uri.parse(url) }
-    val host = uri.host.orEmpty()
+private fun LinkDialog(url: String, onDismiss: () -> Unit, onOpen: (String) -> Unit) {
+    val info = remember(url) { app.dot.mail.engine.text.Links.describe(url) }
+    val cleaned = remember(url) { app.dot.mail.engine.text.Links.stripTracking(url) }
+    val hasTracking = cleaned != url
+    var strip by remember(url) { mutableStateOf(true) }
+    val target = if (hasTracking && strip) cleaned else url
+    val host = info?.displayHost ?: Uri.parse(url).host.orEmpty()
     val c = Dot.colors
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -433,17 +437,37 @@ private fun LinkDialog(url: String, onDismiss: () -> Unit, onOpen: () -> Unit) {
         text = {
             Column {
                 if (host.isNotEmpty()) {
-                    Text(host, style = Dot.type.bodyStrong, color = c.textPrimary)
+                    Text(host, style = Dot.type.bodyStrong, color = if (info?.isIdnHomographRisk == true) c.danger else c.textPrimary)
                     Spacer(Modifier.height(DotSpacing.xs))
                 }
-                Text(url, style = Dot.type.caption, color = c.textSecondary, maxLines = 4, overflow = TextOverflow.Ellipsis)
-                if (uri.scheme?.lowercase() == "http") {
+                Text(target, style = Dot.type.caption, color = c.textSecondary, maxLines = 4, overflow = TextOverflow.Ellipsis)
+                if (info?.isIdnHomographRisk == true) {
+                    Spacer(Modifier.height(DotSpacing.s))
+                    Text(
+                        "This address mixes alphabets or uses look-alike letters — it may imitate another site.",
+                        style = Dot.type.caption, color = c.danger,
+                    )
+                }
+                if (info != null && !info.isHttps) {
                     Spacer(Modifier.height(DotSpacing.s))
                     Text("This link is not encrypted.", style = Dot.type.caption, color = c.danger)
                 }
+                if (hasTracking) {
+                    Spacer(Modifier.height(DotSpacing.s))
+                    Row(
+                        Modifier.fillMaxWidth().clip(DotShapes.medium).clickable { strip = !strip }.padding(vertical = DotSpacing.xs),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        androidx.compose.material3.Checkbox(
+                            checked = strip, onCheckedChange = { strip = it },
+                            colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = c.accent, uncheckedColor = c.textTertiary),
+                        )
+                        Text("Remove tracking parameters", style = Dot.type.callout, color = c.textPrimary)
+                    }
+                }
             }
         },
-        confirmButton = { DotButton("Open", onOpen, compact = true) },
+        confirmButton = { DotButton("Open", { onOpen(target) }, compact = true) },
         dismissButton = { DotButton("Cancel", onDismiss, style = ButtonStyle.Ghost, compact = true) },
     )
 }
