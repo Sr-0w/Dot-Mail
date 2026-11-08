@@ -955,4 +955,20 @@
     <string name="settings_kw_backup">backup export import restore transfer</string>
     <string name="settings_search_placeholder">Search settings</string>
     <string name="settings_search_empty">No setting matches “%1$s”</string>
+    <!-- Full-content search -->
+    <string name="search_scope_folder">This folder</string>
+    <string name="search_scope_all_folders">All folders</string>
+    <string name="search_scope_all_accounts">All accounts</string>
+    <string name="search_server_toggle">Server</string>
+    <string name="search_sort">Sort results</string>
+    <string name="search_sort_relevance">Relevance</string>
+    <string name="search_sort_newest">Newest first</string>
+    <string name="search_sort_oldest">Oldest first</string>
+    <string name="search_indexing">Indexing mail… %1$d of %2$d</string>
+    <string name="search_index_error">Indexing paused; results may be incomplete.</string>
+    <string name="search_server_running">Searching the server…</string>
+    <string name="search_server_limited">Showing the newest matches per folder. Narrow your search to see more.</string>
+    <string name="search_server_error">The server couldn’t be searched. Showing results from this device.</string>
+    <string name="search_server_only">On server</string>
+    <string name="search_result_in_folder">in %1$s</string>
 </resources>

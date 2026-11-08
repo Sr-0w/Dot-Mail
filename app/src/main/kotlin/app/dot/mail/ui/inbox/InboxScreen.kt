@@ -174,7 +174,7 @@ import kotlinx.coroutines.launch
 fun InboxScreen(
     onOpenThread: (threadId: Long, source: app.dot.mail.data.model.Mailbox) -> Unit,
     onCompose: () -> Unit,
-    onSearch: () -> Unit,
+    onSearch: (Mailbox) -> Unit,
     onSettings: () -> Unit,
     onAddAccount: () -> Unit,
     onOpenDraft: (Long) -> Unit,
@@ -223,7 +223,7 @@ fun InboxScreen(
             if (e.type != androidx.compose.ui.input.key.KeyEventType.KeyDown || e.isCtrlPressed || e.isAltPressed || e.isMetaPressed) return@onPreviewKeyEvent false
             when (e.key) {
                 androidx.compose.ui.input.key.Key.C -> { onCompose(); true }
-                androidx.compose.ui.input.key.Key.Slash -> { onSearch(); true }
+                androidx.compose.ui.input.key.Key.Slash -> { onSearch(mailbox); true }
                 else -> false
             }
         },
@@ -292,7 +292,7 @@ fun InboxScreen(
                             },
                             elevated = listState.canScrollBackward,
                             navigation = { DotIconButton(Icons.Outlined.Menu, stringResource(R.string.inbox_open_mailboxes), onClick = { scope.launch { drawerState.open() } }) },
-                            actions = { DotIconButton(Icons.Outlined.Search, stringResource(R.string.inbox_search), onClick = onSearch) },
+                            actions = { DotIconButton(Icons.Outlined.Search, stringResource(R.string.inbox_search), onClick = { onSearch(mailbox) }) },
                         )
                     }
                 }
