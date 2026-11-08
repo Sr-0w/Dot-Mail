@@ -278,7 +278,7 @@ private fun Thumbnail(item: AttachmentItem) {
     val context = LocalContext.current
     val bitmap by produceState<Bitmap?>(null, a.localUri) {
         val uri = a.localUri
-        value = if (kind != AttachmentKind.IMAGES || uri == null) null else Thumbs.cache.get(uri) ?: withContext(Dispatchers.IO) {
+        val loaded = if (kind != AttachmentKind.IMAGES || uri == null) null else Thumbs.cache.get(uri) ?: withContext(Dispatchers.IO) {
             runCatching {
                 val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                 context.contentResolver.openInputStream(Uri.parse(uri))?.use { BitmapFactory.decodeStream(it, null, bounds) }
@@ -287,6 +287,7 @@ private fun Thumbnail(item: AttachmentItem) {
                 context.contentResolver.openInputStream(Uri.parse(uri))?.use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample }) }
             }.getOrNull()?.also { Thumbs.cache.put(uri, it) }
         }
+        value = loaded
     }
     Box(Modifier.size(48.dp).clip(DotShapes.small).background(c.surface), contentAlignment = Alignment.Center) {
         val b = bitmap

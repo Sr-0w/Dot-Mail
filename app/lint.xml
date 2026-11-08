@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!-- False positive with `val x by produceState { value = withContext(...) { ... } }`: the value IS assigned. -->
+    <issue id="ProduceStateDoesNotAssignValue" severity="ignore" />
+</lint>

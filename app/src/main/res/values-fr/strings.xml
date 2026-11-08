@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="ImpliedQuantity">
     <string name="app_name">Dot Mail</string>
     <string name="shortcut_compose_short">Rédiger</string>
     <string name="shortcut_compose_long">Nouveau message</string>
@@ -134,7 +134,7 @@
     <string name="inbox_sync_problem">problème de synchronisation</string>
     <string name="inbox_sign_in_again_suffix"> — reconnectez-vous</string>
     <plurals name="inbox_confirm_trash_title">
-        <item quantity="one">Déplacer dans la corbeille ?</item>
+        <item quantity="one">Déplacer %1$d conversation dans la corbeille ?</item>
         <item quantity="other">Déplacer %1$d conversations dans la corbeille ?</item>
     </plurals>
     <string name="inbox_delete">Supprimer</string>
