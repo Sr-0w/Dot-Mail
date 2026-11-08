@@ -22,5 +22,7 @@ dependencies {
     api(libs.compose.material3)
     api(libs.compose.material.icons.extended)
     api(libs.compose.ui.tooling.preview)
+    // Backdrop blur for the frosted glass controls (Apache-2.0, pure Compose, no Play Services).
+    api(libs.haze)
     debugImplementation(libs.compose.ui.tooling)
 }

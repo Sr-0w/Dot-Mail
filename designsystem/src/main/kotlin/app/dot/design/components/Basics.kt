@@ -279,6 +279,8 @@ fun DotFrostedPill(
     expanded: Boolean = true,
     enabled: Boolean = true,
     contentDescription: String? = label,
+    /** Content scrolling underneath, for a real backdrop blur ([rememberGlassBackdrop]); null = opaque frosted. */
+    backdrop: dev.chrisbanes.haze.HazeState? = null,
 ) {
     val c = Dot.colors
     val haptics = LocalHapticFeedback.current
@@ -286,7 +288,6 @@ fun DotFrostedPill(
     val pressed by interaction.collectIsPressedAsState()
     val reduceMotion = rememberReducedMotion()
 
-    val surfaceBrush = frostedSurfaceBrush(pressed)
     val borderBrush = frostedBorderBrush()
 
     val fg = if (!enabled) c.textTertiary else c.textPrimary
@@ -313,7 +314,7 @@ fun DotFrostedPill(
                 spotColor = Color(0x33000000),
             )
             .clip(CircleShape)
-            .background(surfaceBrush, CircleShape)
+            .glassSurface(backdrop, pressed)
             .border(DotSpacing.hairline * 2, borderBrush, CircleShape)
             .clickable(
                 interactionSource = interaction,

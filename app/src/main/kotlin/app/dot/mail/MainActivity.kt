@@ -200,7 +200,7 @@ object MailtoParser {
 @androidx.compose.runtime.Composable
 private fun SyncSystemBars(mode: ThemeMode) {
     // enableEdgeToEdge(auto) follows the system theme; when the user forces a theme, fix icon contrast.
-    val activity = androidx.compose.ui.platform.LocalContext.current as? FragmentActivity ?: return
+    val activity = androidx.activity.compose.LocalActivity.current ?: return
     val dark = app.dot.design.Dot.colors.isDark
     LaunchedEffect(dark, mode) {
         val controller = androidx.core.view.WindowCompat.getInsetsController(activity.window, activity.window.decorView)

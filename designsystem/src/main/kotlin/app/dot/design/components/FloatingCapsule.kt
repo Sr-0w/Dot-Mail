@@ -35,13 +35,18 @@ import app.dot.design.DotSpacing
  * Height 48dp, so every action is a 48dp touch target.
  */
 @Composable
-fun DotFloatingCapsule(modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
+fun DotFloatingCapsule(
+    modifier: Modifier = Modifier,
+    /** Content scrolling underneath, for a real backdrop blur ([rememberGlassBackdrop]); null = opaque frosted. */
+    backdrop: dev.chrisbanes.haze.HazeState? = null,
+    content: @Composable RowScope.() -> Unit,
+) {
     Row(
         modifier
             .height(48.dp)
             .shadow(3.dp, CircleShape, ambientColor = Color(0x26000000), spotColor = Color(0x33000000))
             .clip(CircleShape)
-            .background(frostedSurfaceBrush(pressed = false), CircleShape)
+            .glassSurface(backdrop, pressed = false)
             .border(DotSpacing.hairline * 2, frostedBorderBrush(), CircleShape)
             .padding(horizontal = 2.dp),
         verticalAlignment = Alignment.CenterVertically,

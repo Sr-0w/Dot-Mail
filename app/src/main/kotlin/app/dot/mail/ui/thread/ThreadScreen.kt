@@ -133,6 +133,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import app.dot.design.components.DotFloatingCapsule
+import app.dot.design.components.glassBackdropSource
 import app.dot.design.components.DotCapsuleButton
 import app.dot.design.components.DotCapsuleDivider
 import androidx.compose.foundation.layout.WindowInsets
@@ -395,6 +396,8 @@ fun ThreadScreen(
     // Hardware keyboard shortcuts (tablets, Chromebooks, DeX), Gmail-style single keys.
     val keyFocus = remember { androidx.compose.ui.focus.FocusRequester() }
     LaunchedEffect(Unit) { runCatching { keyFocus.requestFocus() } }
+    // The message scrolls under the floating capsules; they blur exactly what passes behind them.
+    val glass = app.dot.design.components.rememberGlassBackdrop()
     Box(
         Modifier.fillMaxSize().background(c.background)
             .focusRequester(keyFocus).focusable()
@@ -424,7 +427,7 @@ fun ThreadScreen(
                 }
             },
     ) {
-        Column(Modifier.fillMaxSize().nestedScroll(chromeConnection)) {
+        Column(Modifier.fillMaxSize().nestedScroll(chromeConnection).glassBackdropSource(glass)) {
             when {
                 list == null -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     app.dot.design.components.DotSpinner(size = 22.dp, color = c.textTertiary)
@@ -480,9 +483,9 @@ fun ThreadScreen(
         ReaderChrome(
             visible = showChrome, reducedMotion = reducedMotionChrome,
             topScrim = chromeTop, bottomScrim = chromeBottom,
-            back = { DotFloatingCapsule { DotCapsuleButton(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(app.dot.design.R.string.ds_back), onClick = onBack) } },
+            back = { DotFloatingCapsule(backdrop = glass) { DotCapsuleButton(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(app.dot.design.R.string.ds_back), onClick = onBack) } },
             actions = {
-                DotFloatingCapsule {
+                DotFloatingCapsule(backdrop = glass) {
                     DotCapsuleButton(Icons.Outlined.Archive, stringResource(R.string.inbox_action_archive), onClick = { act(MessageAction.ARCHIVE) })
                     DotCapsuleDivider()
                     DotCapsuleButton(Icons.Outlined.Delete, stringResource(R.string.inbox_action_delete), onClick = { if (prefs.confirmDelete) confirmTrash = true else act(MessageAction.TRASH) })
@@ -521,7 +524,7 @@ fun ThreadScreen(
             reply = if (last == null) null else ({
                 val multiple = (last.to + last.cc).size > 1
                 val allFirst = multiple && prefs.replyAllByDefault
-                DotFloatingCapsule {
+                DotFloatingCapsule(backdrop = glass) {
                     if (allFirst) {
                         DotCapsuleButton(Icons.AutoMirrored.Outlined.ReplyAll, stringResource(R.string.compose_reply_all), onClick = { onReply(last.id, ReplyMode.REPLY_ALL) })
                         DotCapsuleDivider()

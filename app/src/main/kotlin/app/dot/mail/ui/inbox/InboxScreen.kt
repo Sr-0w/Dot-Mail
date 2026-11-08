@@ -128,6 +128,7 @@ import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import app.dot.design.Dot
+import app.dot.design.components.glassBackdropSource
 import app.dot.design.DotMotion
 import app.dot.design.DotShapes
 import app.dot.design.DotSpacing
@@ -235,7 +236,9 @@ fun InboxScreen(
         Box(Modifier.fillMaxSize().background(Dot.colors.background)) {
             val reducedMotion = rememberReducedMotion()
             val screenHaptics = app.dot.design.rememberDotHaptics()
-            Column(Modifier.fillMaxSize()) {
+            // The list scrolls under the Compose pill, which blurs what passes behind it.
+            val glass = app.dot.design.components.rememberGlassBackdrop()
+            Column(Modifier.fillMaxSize().glassBackdropSource(glass)) {
                 val accountsNow by vm.accounts.collectAsStateWithLifecycle()
                 AnimatedContent(
                     targetState = selection.isNotEmpty(),
@@ -357,6 +360,7 @@ fun InboxScreen(
                 }
             }
             app.dot.design.components.DotFrostedPill(
+                backdrop = glass,
                 icon = Icons.Outlined.Edit,
                 label = stringResource(R.string.inbox_compose),
                 expanded = !listState.canScrollBackward,
