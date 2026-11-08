@@ -1113,6 +1113,17 @@ private fun BoxScope.ReaderChrome(
         else androidx.compose.animation.fadeOut(tween(DotMotion.fast)) +
             androidx.compose.animation.slideOutVertically(tween(DotMotion.fast, easing = DotMotion.accelerate)) { if (toTop) -it / 2 else it / 2 }
     }
+    // Always: the status bar area never shows message content underneath (clock and icons stay readable over images),
+    // even while the capsules are hidden. Solid up to the bar's bottom edge, then a short fade.
+    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val fade = 10.dp
+    Box(
+        Modifier.align(Alignment.TopCenter).fillMaxWidth().height(statusBar + fade).background(
+            androidx.compose.ui.graphics.Brush.verticalGradient(
+                0f to c.background, (statusBar / (statusBar + fade)).coerceIn(0f, 1f) to c.background, 1f to c.background.copy(alpha = 0f),
+            ),
+        ),
+    )
     // Scrims only make sense while the capsules are there; they are plain gradients of the page colour.
     AnimatedVisibility(visible, Modifier.align(Alignment.TopCenter), enter = androidx.compose.animation.fadeIn(), exit = androidx.compose.animation.fadeOut()) {
         Box(Modifier.fillMaxWidth().height(topScrim - 8.dp).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(c.background, c.background.copy(alpha = 0f)))))
