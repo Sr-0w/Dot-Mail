@@ -1,6 +1,11 @@
 package app.dot.mail.ui.settings
 
 import android.Manifest
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Box
+import kotlinx.coroutines.flow.filterNotNull
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.onGloballyPositioned
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -131,6 +136,29 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
     var categoriesPage by rememberSaveable { mutableStateOf(false) }
     var smartPage by rememberSaveable { mutableStateOf(false) }
     val pageAccount = accounts.firstOrNull { it.id == accountPage }
+    // Settings search: a field on top of the page; while it has text, matching settings replace the sections.
+    var query by rememberSaveable { mutableStateOf("") }
+    var pendingSection by remember { mutableStateOf<SettingsSection?>(null) }
+    val anchors = remember { androidx.compose.runtime.mutableStateMapOf<SettingsSection, Int>() }
+    fun Modifier.anchor(section: SettingsSection) = onGloballyPositioned { anchors[section] = it.positionInParent().y.toInt() }
+    LaunchedEffect(pendingSection) {
+        val section = pendingSection ?: return@LaunchedEffect
+        val y = androidx.compose.runtime.snapshotFlow { anchors[section] }.filterNotNull().first()
+        scroll.animateScrollTo((y - 8).coerceAtLeast(0))
+        pendingSection = null
+    }
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    fun go(target: SettingsTarget) {
+        query = ""
+        focusManager.clearFocus()
+        when (target) {
+            is SettingsTarget.Section -> pendingSection = target.section
+            is SettingsTarget.Account -> { accountPage = target.accountId; identityPage = -1 }
+            SettingsTarget.SmartFolders -> smartPage = true
+            SettingsTarget.Categories -> categoriesPage = true
+            SettingsTarget.RemoteImages -> remoteImagesPage = true
+        }
+    }
     BackHandler(enabled = accountPage != 0L || remoteImagesPage || categoriesPage || smartPage) { if (smartPage) smartPage = false else if (categoriesPage) categoriesPage = false else if (remoteImagesPage) remoteImagesPage = false else if (identityPage >= 0) identityPage = -1 else accountPage = 0 }
     val c = Dot.colors
     val canLock = remember {
@@ -165,8 +193,18 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
     } else Column(Modifier.fillMaxSize().background(c.background)) {
         DotTopBar(title = stringResource(R.string.settings_title), elevated = scroll.value > 0, navigation = { BackButton(onBack) })
         Column(Modifier.verticalScroll(scroll)) {
+            app.dot.design.components.SearchField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.xs),
+                placeholder = stringResource(R.string.settings_search_placeholder),
+                onSearch = { focusManager.clearFocus() },
+            )
+            if (query.isNotBlank()) {
+                SettingsSearchResults(query, accounts, onOpen = ::go)
+            } else {
             // ---- Accounts
-            SectionLabel(stringResource(R.string.settings_section_accounts), Modifier.padding(top = DotSpacing.s))
+            SectionLabel(stringResource(R.string.settings_section_accounts), Modifier.padding(top = DotSpacing.s).anchor(SettingsSection.ACCOUNTS))
             accounts.forEach { a ->
                 val err = a.syncState as? SyncState.Error
                 ListRow(
@@ -181,7 +219,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             Divider()
 
             // ---- General
-            SectionLabel(stringResource(R.string.settings_section_general))
+            SectionLabel(stringResource(R.string.settings_section_general), Modifier.anchor(SettingsSection.GENERAL))
             if (accounts.size > 1) {
                 ChoiceRow(
                     stringResource(R.string.settings_default_account), Icons.Outlined.AccountCircle,
@@ -212,7 +250,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             Divider()
 
             // ---- Appearance
-            SectionLabel(stringResource(R.string.settings_section_appearance))
+            SectionLabel(stringResource(R.string.settings_section_appearance), Modifier.anchor(SettingsSection.APPEARANCE))
             SegmentedSetting(stringResource(R.string.settings_theme), listOf(ThemeMode.SYSTEM to stringResource(R.string.settings_theme_system), ThemeMode.LIGHT to stringResource(R.string.settings_theme_light), ThemeMode.DARK to stringResource(R.string.settings_theme_dark)), prefs.theme) { m ->
                 settings.update { it.copy(theme = m) }
             }
@@ -226,7 +264,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             ToggleRow(stringResource(R.string.settings_avatar_colors), stringResource(R.string.settings_avatar_colors_sub), Icons.Outlined.Palette, prefs.avatarColors) { v ->
                 settings.update { it.copy(avatarColors = v) }
             }
-            SectionLabel(stringResource(R.string.settings_section_sender_pictures))
+            SectionLabel(stringResource(R.string.settings_section_sender_pictures), Modifier.anchor(SettingsSection.SENDER_PICTURES))
             Text(
                 stringResource(R.string.settings_sender_pictures_intro),
                 style = Dot.type.caption, color = c.textSecondary,
@@ -258,7 +296,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             Divider()
 
             // ---- Reading
-            SectionLabel(stringResource(R.string.settings_section_reading))
+            SectionLabel(stringResource(R.string.settings_section_reading), Modifier.anchor(SettingsSection.READING))
             ListRow(
                 stringResource(R.string.settings_tracking_blocked), subtitle = stringResource(R.string.settings_tracking_blocked_sub),
                 icon = Icons.Outlined.Block,
@@ -275,7 +313,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             Divider()
 
             // ---- Composing
-            SectionLabel(stringResource(R.string.settings_section_composing))
+            SectionLabel(stringResource(R.string.settings_section_composing), Modifier.anchor(SettingsSection.COMPOSING))
             ChoiceRow(
                 stringResource(R.string.settings_default_format), Icons.Outlined.TextFields, prefs.defaultFormat,
                 listOf(ComposeFormat.RICH to stringResource(R.string.settings_format_rich), ComposeFormat.PLAIN to stringResource(R.string.settings_format_plain)),
@@ -290,7 +328,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             Divider()
 
             // ---- Notifications
-            SectionLabel(stringResource(R.string.settings_section_notifications))
+            SectionLabel(stringResource(R.string.settings_section_notifications), Modifier.anchor(SettingsSection.NOTIFICATIONS))
             ListRow(
                 stringResource(R.string.settings_system_notifications), subtitle = stringResource(R.string.settings_system_notifications_sub), icon = Icons.Outlined.Notifications,
                 onClick = {
@@ -334,7 +372,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             Divider()
 
             // ---- Privacy & security
-            SectionLabel(stringResource(R.string.settings_section_privacy))
+            SectionLabel(stringResource(R.string.settings_section_privacy), Modifier.anchor(SettingsSection.PRIVACY))
             val imageRules by remember { RemoteImagePolicy.get(context.applicationContext).rules }.collectAsStateWithLifecycle()
             ListRow(
                 stringResource(R.string.settings_remote_images),
@@ -357,7 +395,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             Divider()
 
             // ---- Storage
-            SectionLabel(stringResource(R.string.settings_section_storage))
+            SectionLabel(stringResource(R.string.settings_section_storage), Modifier.anchor(SettingsSection.STORAGE))
             val cacheBytes by produceState(0L, cacheVersion) {
                 value = withContext(Dispatchers.IO) { context.cacheDir.walkTopDown().filter { it.isFile }.sumOf { it.length() } }
             }
@@ -376,11 +414,11 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             )
             Divider()
 
-            BackupSettings()
+            Box(Modifier.anchor(SettingsSection.BACKUP)) { BackupSettings() }
             Divider()
 
             // ---- About
-            SectionLabel(stringResource(R.string.settings_section_about))
+            SectionLabel(stringResource(R.string.settings_section_about), Modifier.anchor(SettingsSection.ABOUT))
             ListRow(stringResource(R.string.settings_about), subtitle = stringResource(R.string.settings_about_version, BuildConfig.VERSION_NAME), icon = Icons.Outlined.Info, onClick = { about = true })
             ListRow(
                 stringResource(R.string.settings_source_code), subtitle = SOURCE_URL.removePrefix("https://"), icon = Icons.Outlined.Code,
@@ -395,6 +433,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
                 ToggleRow(stringResource(R.string.settings_demo_mode), stringResource(R.string.settings_demo_mode_sub), Icons.Outlined.Palette, settings.demoMode) { v ->
                     settings.demoMode = v
                 }
+            }
             }
             Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
             Spacer(Modifier.height(DotSpacing.xl))
@@ -467,6 +506,7 @@ private val LICENCES = listOf(
     "Jakarta Mail (Eclipse Angus)" to "EPL 2.0 / GPL 2.0 with Classpath Exception",
     "jsoup" to "MIT License",
     "AndroidSVG" to "Apache License 2.0",
+    "Haze (backdrop blur)" to "Apache License 2.0",
 )
 
 @Composable
@@ -489,4 +529,36 @@ private fun UndoSetting(seconds: Int, onChange: (Int) -> Unit) {
         stringResource(R.string.settings_undo_send), Icons.Outlined.Schedule, seconds,
         listOf(0, 5, 10, 20, 30).map { it to if (it == 0) stringResource(R.string.settings_undo_off) else stringResource(R.string.settings_undo_seconds, it) }, onChange = onChange,
     )
+}
+
+@Composable
+private fun SettingsSearchResults(query: String, accounts: List<Account>, onOpen: (SettingsTarget) -> Unit) {
+    val accountsLabel = stringResource(R.string.settings_section_accounts)
+    val hits = SettingsIndex.entries.map { e ->
+        SettingsHit(
+            title = stringResource(e.title),
+            subtitle = e.subtitle?.let { stringResource(it) },
+            breadcrumb = stringResource(e.section.label),
+            keywords = e.keywords?.let { stringResource(it) }.orEmpty(),
+            target = e.target,
+        )
+    } + accounts.map { a -> SettingsHit(a.displayName, a.email, accountsLabel, a.email, SettingsTarget.Account(a.id)) }
+    val results = remember(query, hits) { SettingsMatcher.match(query, hits) }
+    if (results.isEmpty()) {
+        Text(
+            stringResource(R.string.settings_search_empty, query.trim()),
+            style = Dot.type.callout, color = Dot.colors.textTertiary,
+            modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.l),
+        )
+        return
+    }
+    results.forEach { h ->
+        ListRow(
+            title = h.title,
+            // Breadcrumb first ("Appearance › …"), so the user learns where the setting lives.
+            subtitle = h.breadcrumb + (h.subtitle?.let { " · $it" } ?: ""),
+            onClick = { onOpen(h.target) },
+            trailing = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = Dot.colors.textTertiary) },
+        )
+    }
 }

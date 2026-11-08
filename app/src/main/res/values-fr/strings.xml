@@ -940,4 +940,19 @@
     <string name="oauth_error_denied">La connexion a été annulée ou refusée.</string>
     <string name="oauth_error_provider_response">La réponse du fournisseur n’est pas exploitable.</string>
     <string name="oauth_error_other">La connexion a échoué.</string>
+    <string name="settings_kw_swipe">glisser balayer geste gauche droite swipe</string>
+    <string name="settings_kw_theme">sombre clair nuit mode couleur apparence thème dark</string>
+    <string name="settings_kw_threads">fils discussion regrouper</string>
+    <string name="settings_kw_density">compact espacement lignes liste</string>
+    <string name="settings_kw_text_size">police texte taille zoom plus grand accessibilité</string>
+    <string name="settings_kw_avatars">avatar image photo profil icône logo</string>
+    <string name="settings_kw_privacy">confidentialité vie privée pistage traqueur sécurité pixel</string>
+    <string name="settings_kw_undo">annuler délai envoi</string>
+    <string name="settings_kw_notifications">notifications alertes son push</string>
+    <string name="settings_kw_folders">dossiers filtres règles libellés</string>
+    <string name="settings_kw_lock">verrouillage empreinte biométrie code mot de passe visage sécurité</string>
+    <string name="settings_kw_storage">stockage cache espace disque mémoire</string>
+    <string name="settings_kw_backup">sauvegarde export import restaurer transfert</string>
+    <string name="settings_search_placeholder">Rechercher dans les réglages</string>
+    <string name="settings_search_empty">Aucun réglage ne correspond à « %1$s »</string>
 </resources>

@@ -940,4 +940,19 @@
     <string name="oauth_error_denied">Sign-in was cancelled or denied.</string>
     <string name="oauth_error_provider_response">The provider’s response couldn’t be used.</string>
     <string name="oauth_error_other">Sign-in failed.</string>
+    <string name="settings_kw_swipe">swipe gesture slide left right</string>
+    <string name="settings_kw_theme">dark light night mode colour color appearance</string>
+    <string name="settings_kw_threads">threads conversation grouping</string>
+    <string name="settings_kw_density">compact spacing rows list</string>
+    <string name="settings_kw_text_size">font text size zoom bigger smaller accessibility</string>
+    <string name="settings_kw_avatars">avatar picture photo profile icon logo</string>
+    <string name="settings_kw_privacy">privacy tracking tracker security pixel</string>
+    <string name="settings_kw_undo">undo cancel delay send later</string>
+    <string name="settings_kw_notifications">notifications alerts sound push</string>
+    <string name="settings_kw_folders">folders filters rules labels</string>
+    <string name="settings_kw_lock">lock fingerprint biometric pin password face security</string>
+    <string name="settings_kw_storage">storage cache space disk memory</string>
+    <string name="settings_kw_backup">backup export import restore transfer</string>
+    <string name="settings_search_placeholder">Search settings</string>
+    <string name="settings_search_empty">No setting matches “%1$s”</string>
 </resources>

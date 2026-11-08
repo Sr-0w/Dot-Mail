@@ -940,4 +940,19 @@
     <string name="oauth_error_denied">Die Anmeldung wurde abgebrochen oder verweigert.</string>
     <string name="oauth_error_provider_response">Die Antwort des Anbieters war nicht verwendbar.</string>
     <string name="oauth_error_other">Anmeldung fehlgeschlagen.</string>
+    <string name="settings_kw_swipe">wischen geste links rechts swipe</string>
+    <string name="settings_kw_theme">dunkel hell nacht modus farbe aussehen design dark</string>
+    <string name="settings_kw_threads">threads unterhaltung gruppieren</string>
+    <string name="settings_kw_density">kompakt abstand zeilen liste</string>
+    <string name="settings_kw_text_size">schrift text größe zoom größer barrierefreiheit</string>
+    <string name="settings_kw_avatars">avatar bild foto profil symbol logo</string>
+    <string name="settings_kw_privacy">datenschutz privatsphäre tracking tracker sicherheit pixel</string>
+    <string name="settings_kw_undo">rückgängig abbrechen verzögerung senden</string>
+    <string name="settings_kw_notifications">benachrichtigungen hinweise ton push</string>
+    <string name="settings_kw_folders">ordner filter regeln labels</string>
+    <string name="settings_kw_lock">sperre fingerabdruck biometrie pin passwort gesicht sicherheit</string>
+    <string name="settings_kw_storage">speicher cache platz festplatte</string>
+    <string name="settings_kw_backup">sicherung export import wiederherstellen übertragen</string>
+    <string name="settings_search_placeholder">Einstellungen durchsuchen</string>
+    <string name="settings_search_empty">Keine Einstellung passt zu „%1$s“</string>
 </resources>
