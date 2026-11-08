@@ -293,9 +293,19 @@ fun InboxScreen(
                         Spacer(Modifier.width(DotSpacing.s))
                         Text(
                             (if (failing.size == 1) stringResource(R.string.inbox_failing_prefix_single, failing.first().email) else pluralStringResource(R.plurals.inbox_failing_prefix_many, failing.size, failing.size)) +
-                                (err?.message ?: stringResource(R.string.inbox_sync_problem)) + if (err?.isAuthError == true) stringResource(R.string.inbox_sign_in_again_suffix) else "",
+                                syncErrorText(err) + if (err?.isAuthError == true) stringResource(R.string.inbox_sign_in_again_suffix) else "",
                             style = Dot.type.caption, color = Dot.colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
                         )
+                        val retryable = failing.firstOrNull { (it.syncState as? app.dot.mail.data.model.SyncState.Error)?.canRetry == true }
+                        if (authFailing == null && retryable != null) {
+                            Spacer(Modifier.width(DotSpacing.s))
+                            Text(
+                                stringResource(R.string.inbox_retry), style = Dot.type.label, color = Dot.colors.accent,
+                                modifier = Modifier.clip(DotShapes.small).combinedClickable(onClick = { failing.forEach { vm.retrySync(it.id) } })
+                                    .padding(horizontal = DotSpacing.s, vertical = DotSpacing.xs),
+                            )
+                        }
                     }
                 }
                 // Real sync activity (pull-to-refresh after its spinner left, background or IDLE syncs): a hairline
@@ -907,4 +917,18 @@ private fun QuietRefreshIndicator(
             }
         }
     }
+}
+
+/** The banner text for a sync error, in the user's language when the kind of failure is known. */
+@Composable
+private fun syncErrorText(err: app.dot.mail.data.model.SyncState.Error?): String = when (err?.errorKind) {
+    null -> err?.message ?: stringResource(R.string.inbox_sync_problem)
+    app.dot.mail.engine.ConnectionFailure.DNS -> stringResource(R.string.sync_error_dns)
+    app.dot.mail.engine.ConnectionFailure.TIMEOUT -> stringResource(R.string.sync_error_timeout)
+    app.dot.mail.engine.ConnectionFailure.TLS -> stringResource(R.string.sync_error_tls)
+    app.dot.mail.engine.ConnectionFailure.AUTH -> stringResource(R.string.sync_error_auth)
+    app.dot.mail.engine.ConnectionFailure.SERVER_CLOSED -> stringResource(R.string.sync_error_server_closed)
+    app.dot.mail.engine.ConnectionFailure.THROTTLED -> stringResource(R.string.sync_error_throttled)
+    app.dot.mail.engine.ConnectionFailure.NETWORK -> stringResource(R.string.sync_error_network)
+    app.dot.mail.engine.ConnectionFailure.OTHER -> stringResource(R.string.sync_error_other)
 }

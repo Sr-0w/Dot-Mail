@@ -731,4 +731,13 @@
     <string name="settings_instant_title">Instant notifications</string>
     <string name="settings_instant_body">Keeps a direct connection to your inbox open so new mail arrives within seconds, with no Google push service. Uses more battery and shows a permanent notification. Off: checks follow the sync interval.</string>
     <string name="settings_instant_failed">Instant notifications couldn\'t be started on this device.</string>
+    <string name="sync_error_dns">mail server not found — check your connection</string>
+    <string name="sync_error_timeout">the server took too long to answer</string>
+    <string name="sync_error_tls">secure connection couldn\'t be verified — check the date and time</string>
+    <string name="sync_error_auth">sign-in failed</string>
+    <string name="sync_error_server_closed">the server closed the connection</string>
+    <string name="sync_error_throttled">the server is limiting connections — try again in a moment</string>
+    <string name="sync_error_network">no connection to the server</string>
+    <string name="sync_error_other">couldn\'t synchronize</string>
+    <string name="inbox_retry">Retry</string>
 </resources>

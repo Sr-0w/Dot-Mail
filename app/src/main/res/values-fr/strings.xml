@@ -731,4 +731,13 @@
     <string name="settings_instant_title">Notifications instantanées</string>
     <string name="settings_instant_body">Garde une connexion directe à votre boîte de réception pour recevoir les nouveaux e-mails en quelques secondes, sans service de push Google. Consomme plus de batterie et affiche une notification permanente. Désactivé : les vérifications suivent l\'intervalle de synchronisation.</string>
     <string name="settings_instant_failed">Impossible de démarrer les notifications instantanées sur cet appareil.</string>
+    <string name="sync_error_dns">serveur de messagerie introuvable — vérifiez votre connexion</string>
+    <string name="sync_error_timeout">le serveur a mis trop de temps à répondre</string>
+    <string name="sync_error_tls">la connexion sécurisée n\'a pas pu être vérifiée — vérifiez la date et l\'heure</string>
+    <string name="sync_error_auth">échec de la connexion au compte</string>
+    <string name="sync_error_server_closed">le serveur a fermé la connexion</string>
+    <string name="sync_error_throttled">le serveur limite les connexions — réessayez dans un instant</string>
+    <string name="sync_error_network">pas de connexion au serveur</string>
+    <string name="sync_error_other">synchronisation impossible</string>
+    <string name="inbox_retry">Réessayer</string>
 </resources>

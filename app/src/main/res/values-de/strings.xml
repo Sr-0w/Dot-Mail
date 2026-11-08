@@ -731,4 +731,13 @@
     <string name="settings_instant_title">Sofortbenachrichtigungen</string>
     <string name="settings_instant_body">Hält eine direkte Verbindung zum Posteingang offen, damit neue Mails innerhalb von Sekunden ankommen – ohne Google-Push-Dienst. Verbraucht mehr Akku und zeigt eine dauerhafte Benachrichtigung. Aus: Abrufe folgen dem Sync-Intervall.</string>
     <string name="settings_instant_failed">Sofortbenachrichtigungen konnten auf diesem Gerät nicht gestartet werden.</string>
+    <string name="sync_error_dns">Mailserver nicht gefunden – Verbindung prüfen</string>
+    <string name="sync_error_timeout">der Server hat zu lange nicht geantwortet</string>
+    <string name="sync_error_tls">sichere Verbindung konnte nicht geprüft werden – Datum und Uhrzeit prüfen</string>
+    <string name="sync_error_auth">Anmeldung fehlgeschlagen</string>
+    <string name="sync_error_server_closed">der Server hat die Verbindung getrennt</string>
+    <string name="sync_error_throttled">der Server begrenzt Verbindungen – gleich erneut versuchen</string>
+    <string name="sync_error_network">keine Verbindung zum Server</string>
+    <string name="sync_error_other">Synchronisierung nicht möglich</string>
+    <string name="inbox_retry">Erneut versuchen</string>
 </resources>

@@ -228,4 +228,9 @@ class InboxViewModel(
         const val SPINNER_MIN_MS = 600L
         const val SPINNER_MAX_MS = 900L
     }
+
+    /** Retry a failed sync for one account (the error banner's "Retry"). */
+    fun retrySync(accountId: Long) {
+        viewModelScope.launch { runCatching { graph.mail.retrySync(accountId) } }
+    }
 }
