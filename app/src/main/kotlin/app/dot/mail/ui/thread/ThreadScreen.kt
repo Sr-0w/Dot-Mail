@@ -801,10 +801,11 @@ private fun MessageCard(
                 message.attachments.mapNotNull { a -> a.contentId?.let { id -> a.localUri?.let { id.trim('<', '>') to it } } }.toMap()
             }
             val html = body.html
-            val sanitized by androidx.compose.runtime.produceState<app.dot.mail.engine.html.SanitizedHtml?>(null, html, allowRemote, cids) {
+            val blockPixels = app.dot.mail.LocalSettings.current.ui.collectAsStateWithLifecycle().value.blockTrackingPixels
+            val sanitized by androidx.compose.runtime.produceState<app.dot.mail.engine.html.SanitizedHtml?>(null, html, allowRemote, cids, blockPixels) {
                 value = html?.let {
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                        HtmlSanitizer.sanitize(it, allowRemoteImages = allowRemote, cidUris = cids)
+                        HtmlSanitizer.sanitize(it, allowRemoteImages = allowRemote, cidUris = cids, blockTrackers = blockPixels)
                     }
                 }
             }

@@ -52,6 +52,7 @@ import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.automirrored.outlined.Reply
 import androidx.compose.material.icons.automirrored.outlined.ReplyAll
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.ShieldMoon
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.KeyboardDoubleArrowLeft
@@ -388,6 +389,9 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
                 icon = Icons.Outlined.Image, onClick = { remoteImagesPage = true },
                 trailing = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = Dot.colors.textTertiary) },
             )
+            ToggleRow(stringResource(R.string.settings_block_pixels), stringResource(R.string.settings_block_pixels_sub), Icons.Outlined.Shield, prefs.blockTrackingPixels) { v ->
+                settings.update { it.copy(blockTrackingPixels = v) }
+            }
             ToggleRow(
                 stringResource(R.string.settings_app_lock), stringResource(if (canLock) R.string.settings_app_lock_sub else R.string.settings_app_lock_unavailable),
                 Icons.Outlined.Fingerprint, prefs.appLock, enabled = canLock,

@@ -24,7 +24,7 @@ class SettingsBackupTest {
 
     private val custom = UiPrefs(
         theme = ThemeMode.DARK, density = Density.COMPACT, swipeStart = SwipeAction.SNOOZE, swipeEnd = SwipeAction.NONE,
-        loadRemoteImages = true, appLock = true, secureScreen = true, undoSendSeconds = 20, confirmLinks = false, defaultAccountId = 2,
+        loadRemoteImages = true, blockTrackingPixels = false, appLock = true, secureScreen = true, undoSendSeconds = 20, confirmLinks = false, defaultAccountId = 2,
         confirmDelete = true, afterAction = AfterAction.NEXT, markRead = MarkRead.AFTER_2S, conversationView = false, avatarColors = false,
         contactPhotos = true, gravatar = true, brandLogos = true, websiteIcons = true, readingTextPercent = 120, quotedExpanded = true,
         replyAllByDefault = true, swipeBetweenMessages = true, includeOriginal = false, defaultFormat = ComposeFormat.PLAIN, lockAfterMinutes = 5,

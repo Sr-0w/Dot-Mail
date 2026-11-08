@@ -46,7 +46,7 @@ object SettingsBackup {
     fun encodePrefs(p: UiPrefs, accountEmailOf: (Long) -> String?): JsonObject = buildJsonObject {
         put("theme", p.theme.name); put("density", p.density.name); put("swipeStart", p.swipeStart.name); put("swipeEnd", p.swipeEnd.name)
         put("loadRemoteImages", p.loadRemoteImages); put("secureScreen", p.secureScreen); put("undoSendSeconds", p.undoSendSeconds)
-        put("confirmLinks", p.confirmLinks)
+        put("confirmLinks", p.confirmLinks); put("blockTrackingPixels", p.blockTrackingPixels)
         put("defaultAccount", accountEmailOf(p.defaultAccountId))
         put("confirmDelete", p.confirmDelete); put("afterAction", p.afterAction.name); put("markRead", p.markRead.name)
         put("conversationView", p.conversationView); put("avatarColors", p.avatarColors)
@@ -68,7 +68,7 @@ object SettingsBackup {
             swipeStart = enum("swipeStart", SwipeAction.entries.toTypedArray(), base.swipeStart),
             swipeEnd = enum("swipeEnd", SwipeAction.entries.toTypedArray(), base.swipeEnd),
             loadRemoteImages = bool("loadRemoteImages", base.loadRemoteImages), secureScreen = bool("secureScreen", base.secureScreen),
-            undoSendSeconds = int("undoSendSeconds", base.undoSendSeconds, 0..30), confirmLinks = bool("confirmLinks", base.confirmLinks),
+            undoSendSeconds = int("undoSendSeconds", base.undoSendSeconds, 0..30), confirmLinks = bool("confirmLinks", base.confirmLinks), blockTrackingPixels = bool("blockTrackingPixels", base.blockTrackingPixels),
             defaultAccountId = str("defaultAccount")?.let(accountIdOf) ?: base.defaultAccountId,
             confirmDelete = bool("confirmDelete", base.confirmDelete),
             afterAction = enum("afterAction", AfterAction.entries.toTypedArray(), base.afterAction),

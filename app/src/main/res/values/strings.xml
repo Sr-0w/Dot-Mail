@@ -1041,4 +1041,8 @@
 
     <!-- Continue with Google (2) -->
     <string name="setup_error_oauth_use_google">%1$s requires browser sign-in: use “Continue with Google” above.</string>
+
+    <!-- Tracking-pixel toggle -->
+    <string name="settings_block_pixels">Block tracking pixels</string>
+    <string name="settings_block_pixels_sub">Removes the tiny images senders use to learn that you opened a message, even when you load images. Detection is heuristic and cannot catch everything. Separate from loading remote images.</string>
 </resources>

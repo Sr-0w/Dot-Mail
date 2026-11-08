@@ -196,7 +196,11 @@ object HtmlSanitizer {
         return out.toString()
     }
 
-    fun sanitize(input: String, allowRemoteImages: Boolean = false, cidUris: Map<String, String> = emptyMap()): Result {
+    /**
+     * [blockTrackers]: email-open tracking pixels are removed even when [allowRemoteImages] is on (the default). Turned off
+     * they are treated like any other remote image: blocked unless remote images are allowed.
+     */
+    fun sanitize(input: String, allowRemoteImages: Boolean = false, cidUris: Map<String, String> = emptyMap(), blockTrackers: Boolean = true): Result {
         val doc = Jsoup.parse(input)
         doc.outputSettings().prettyPrint(false)
         var remote = false
@@ -213,7 +217,7 @@ object HtmlSanitizer {
             if (bgUrl != null) {
                 remote = true
                 when {
-                    isTrackerUrl(bgUrl) -> trackers++
+                    blockTrackers && isTrackerUrl(bgUrl) -> trackers++
                     allowRemoteImages -> { el.addClass("$BG_MARKER${backgrounds.size}"); backgrounds += bgUrl }
                     else -> blocked++
                 }
@@ -238,7 +242,7 @@ object HtmlSanitizer {
                     if (uri != null && uri.startsWith("content://")) el.attr("src", uri) else el.removeAttr("src")
                 } else if (src.isNotEmpty()) {
                     remote = true
-                    if (isTrackingPixel(el, src)) { el.remove(); trackers++; continue }
+                    if (blockTrackers && isTrackingPixel(el, src)) { el.remove(); trackers++; continue }
                     if (!allowRemoteImages || !Regex("(?i)^https?://[^\\s]+$").matches(src)) { el.removeAttr("src"); blocked++ }
                 }
             }
