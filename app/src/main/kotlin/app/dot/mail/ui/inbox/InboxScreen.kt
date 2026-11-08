@@ -232,6 +232,7 @@ fun InboxScreen(
     ) {
         Box(Modifier.fillMaxSize().background(Dot.colors.background)) {
             val reducedMotion = rememberReducedMotion()
+            val screenHaptics = app.dot.design.rememberDotHaptics()
             Column(Modifier.fillMaxSize()) {
                 AnimatedContent(
                     targetState = selection.isNotEmpty(),
@@ -257,7 +258,7 @@ fun InboxScreen(
                             count = selection.size,
                             role = header.role,
                             onClose = vm::clearSelection,
-                            onAction = { if (it == MessageAction.TRASH && prefs.confirmDelete) pendingTrash = selection.toList() else vm.act(it) },
+                            onAction = { if (it == MessageAction.TRASH && prefs.confirmDelete) pendingTrash = selection.toList() else { screenHaptics.confirm(); vm.act(it) } },
                             onMove = { showMove = true },
                             onSnooze = { snoozeTargets = selection.toList() },
                             allMuted = selection.isNotEmpty() && selection.all { it in mutedThreads },
@@ -496,7 +497,7 @@ private fun SwipeableRow(
     onSnooze: (ThreadSummary) -> Unit,
     content: @Composable () -> Unit,
 ) {
-    val haptics = LocalHapticFeedback.current
+    val haptics = app.dot.design.rememberDotHaptics()
     val state = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             val action = when (value) {
@@ -505,7 +506,7 @@ private fun SwipeableRow(
                 SwipeToDismissBoxValue.Settled -> null
             }
             if (action != null) {
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                haptics.confirm()
                 if (action == SwipeAction.SNOOZE) onSnooze(thread) else toMessageAction(action, thread)?.let { onSwipe(it, thread) }
             }
             // Never stay dismissed: the row disappears when the DB updates (archive/trash)
@@ -514,6 +515,9 @@ private fun SwipeableRow(
         },
         positionalThreshold = { it * 0.35f },
     )
+    // A light tick the moment the swipe becomes committable, so release is predictable.
+    val armedNow = state.targetValue != SwipeToDismissBoxValue.Settled
+    androidx.compose.runtime.LaunchedEffect(armedNow) { if (armedNow) haptics.tick() }
     SwipeToDismissBox(
         state = state,
         enableDismissFromStartToEnd = enabled && swipeStart != SwipeAction.NONE,
@@ -697,9 +701,12 @@ fun ThreadRow(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                if (thread.isStarred) {
-                    Spacer(Modifier.width(DotSpacing.s))
-                    Icon(Icons.Outlined.Star, null, Modifier.size(16.dp), tint = c.star)
+                AnimatedVisibility(
+                    visible = thread.isStarred,
+                    enter = if (rememberReducedMotion()) EnterTransition.None else scaleIn(androidx.compose.animation.core.spring(dampingRatio = 0.5f, stiffness = 600f)) + fadeIn(tween(100)),
+                    exit = if (rememberReducedMotion()) ExitTransition.None else scaleOut(tween(100)) + fadeOut(tween(100)),
+                ) {
+                    Icon(Icons.Outlined.Star, null, Modifier.padding(start = DotSpacing.s).size(16.dp), tint = c.star)
                 }
             }
             // A preview of only an ellipsis / punctuation is no preview: no empty third line.

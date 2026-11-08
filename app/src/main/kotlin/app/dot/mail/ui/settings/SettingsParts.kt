@@ -37,10 +37,11 @@ internal fun ToggleRow(
     enabled: Boolean = true,
     onChange: (Boolean) -> Unit,
 ) {
+    val haptics = app.dot.design.rememberDotHaptics()
     ListRow(
         title = title, subtitle = subtitle, icon = icon, subtitleMaxLines = 4,
         titleColor = if (enabled) Dot.colors.textPrimary else Dot.colors.textTertiary,
-        modifier = Modifier.toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange),
+        modifier = Modifier.toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = { haptics.toggle(it); onChange(it) }),
         trailing = { DotSwitch(checked, onCheckedChange = null, enabled = enabled) },
     )
 }
