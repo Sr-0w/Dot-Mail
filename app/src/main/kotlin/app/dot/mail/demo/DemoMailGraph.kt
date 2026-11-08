@@ -94,6 +94,7 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
             editIdentities(accountId) { l -> val rest = l.filter { it.id != identityId }; if (rest.none { it.isDefault }) rest.map { it.copy(isDefault = it.id == accountId) } else rest }
         }
         override suspend fun setDefaultIdentity(accountId: Long, identityId: Long) = editIdentities(accountId) { l -> l.map { it.copy(isDefault = it.id == identityId) } }
+        override suspend fun renameAccount(accountId: Long, displayName: String) = accountsState.update { l -> l.map { if (it.id == accountId && displayName.isNotBlank()) it.copy(displayName = displayName.trim()) else it } }
         override suspend fun removeAccount(accountId: Long) = accountsState.update { list -> list.filterNot { it.id == accountId } }
     }
 

@@ -12,8 +12,8 @@ data class AccountSettings(
     val signature: String = "",
     /** Minutes between background syncs of this account; 0 = manual only. UI offers 15 / 30 / 60 / 0. */
     val syncIntervalMinutes: Int = 15,
-    /** Only mail newer than this many days is kept offline; 0 = everything. UI offers 30 / 90 / 365 / 0. */
-    val syncWindowDays: Int = 90,
+    /** Only mail from the last N days is downloaded when a folder is (re)synced; 0 = everything (up to 5000 per folder). UI offers 14 / 30 / 90 / 0. */
+    val syncWindowDays: Int = 30,
     val notificationsEnabled: Boolean = true,
 )
 
@@ -75,6 +75,14 @@ class AccountSettingsStore private constructor(context: Context) {
             putBoolean("sync.instant", next.instantNotifications)
         }
     }
+
+    // ---- bookkeeping for the sync engine (not user settings) ----
+    fun lastSynced(accountId: Long): Long = prefs.getLong("$accountId.lastSync", 0L)
+    fun markSynced(accountId: Long, at: Long = System.currentTimeMillis()) = prefs.edit { putLong("$accountId.lastSync", at) }
+
+    /** The window the folders were last downloaded with; null if never recorded (then the current one is assumed). */
+    fun appliedWindow(accountId: Long): Int? = if (prefs.contains("$accountId.appliedWindow")) prefs.getInt("$accountId.appliedWindow", 0) else null
+    fun markWindowApplied(accountId: Long, days: Int) = prefs.edit { putInt("$accountId.appliedWindow", days) }
 
     /** Drop everything stored for a removed account. */
     @Synchronized

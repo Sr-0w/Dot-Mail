@@ -113,6 +113,7 @@ internal class RealMailGraph(
     }
     override suspend fun deleteIdentity(accountId: Long, identityId: Long) = withContext(Dispatchers.IO) { identityStore.delete(accountId, identityId) }
     override suspend fun setDefaultIdentity(accountId: Long, identityId: Long) = withContext(Dispatchers.IO) { identityStore.setDefault(accountId, identityId) }
+    override suspend fun renameAccount(accountId: Long, displayName: String) = withContext(Dispatchers.IO) { dao.accountName(accountId, displayName.trim().ifEmpty { return@withContext }) }
     override suspend fun removeAccount(accountId: Long) = withContext(Dispatchers.IO) { syncLock.withLock { dao.deleteAccount(accountId); identityStore.forget(accountId); AccountSettingsStore.get(context).forget(accountId); File(context.filesDir, "attachments/$accountId").deleteRecursively(); File(context.filesDir, "outbox/$accountId").deleteRecursively(); Unit } }
     override fun folders(accountId: Long): Flow<List<app.dot.mail.data.model.Folder>> = combine(dao.observeFolders(accountId), dao.observeDeletingFolderIds()) { rows, deleting -> rows.filter { it.id !in deleting } }.map { rows -> rows.map { app.dot.mail.data.model.Folder(it.id, it.accountId, it.path, it.name, FolderRole.valueOf(it.role), it.unread, it.total) } }
     internal suspend fun summary(t: ThreadRow, draftView: Boolean = false): ThreadSummary {

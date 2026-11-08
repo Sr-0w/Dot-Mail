@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 
 internal object MailNotifications {
     fun newMail(context: Context, account: AccountRow, threadId: Long, subject: String) {
+        if (!AccountSettingsStore.get(context).current(account.id).notificationsEnabled) return
         val manager = context.getSystemService(NotificationManager::class.java)
         val channel = "dotmail.account.${account.id}"
         manager.createNotificationChannel(NotificationChannel(channel, account.email, NotificationManager.IMPORTANCE_DEFAULT))

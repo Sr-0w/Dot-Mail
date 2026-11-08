@@ -15,9 +15,13 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
-internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null): Boolean = syncLock.withLock {
+/** [scheduled] = background run (WorkManager): per-account "manual only" and sync intervals apply. User-initiated runs always sync. */
+internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null, scheduled: Boolean = false): Boolean = syncLock.withLock {
     var success = true
+    val settingsStore = AccountSettingsStore.get(context)
     dao.accounts().filter { accountIds == null || it.id in accountIds }.forEach { account ->
+        val accountSettings = settingsStore.current(account.id)
+        if (scheduled && !isScheduledSyncDue(accountSettings, settingsStore.lastSynced(account.id))) return@forEach
         syncing.value = syncing.value + account.id
         var stage = "Connect"
         var folderLabel: String? = null
@@ -28,6 +32,13 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null): Boole
             val config = Codec.config(account.config); val creds = credentials(account)
             redactions = setOf(account.email, creds.secret)
             var deferredExpunge = false
+            // A changed sync window re-downloads the folder headers inside the new window (only when nothing is waiting to be sent).
+            val appliedWindow = settingsStore.appliedWindow(account.id)
+            if (appliedWindow == null) settingsStore.markWindowApplied(account.id, accountSettings.syncWindowDays)
+            else if (appliedWindow != accountSettings.syncWindowDays && dao.operations(account.id).isEmpty()) {
+                dao.folders(account.id).forEach { dao.updateFolder(it.copy(validity = 0, nextUid = 1, modSeq = -1)) }
+            }
+            val windowLimit = if (accountSettings.syncWindowDays <= 0) 5000 else 500
             stage = "Folder commands"
             runFolderOps(account, config, creds).let { if (!it.success) success = false; folderWarning = it.warning }
             stage = "Connect"
@@ -43,7 +54,7 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null): Boole
                     folder = requireNotNull(dao.folder(id))
                 }
                 val initialCursor = SyncCursor(folder.validity, folder.nextUid, folder.modSeq)
-                var result = client.sync(config.imap.endpoint(), creds, folder.path, initialCursor)
+                var result = client.sync(config.imap.endpoint(), creds, folder.path, initialCursor, limit = windowLimit, windowDays = accountSettings.syncWindowDays)
                 if (result.failures.isNotEmpty()) {
                     result.failures.forEach { SyncDiagnostics.warn("Header UID=${it.uid} account=${account.id} folderRole=${remote.role}", it.error, redactions) }
                     headerWarning = "Folder ${remote.role}: some message headers could not be read; retrying"
@@ -88,7 +99,7 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null): Boole
                         dao.updateOperation(op.copy(attempts = op.attempts + 1, error = SyncDiagnostics.reason(e))); success = false; break
                     }
                 }
-                if (replayed) result = client.sync(config.imap.endpoint(), creds, folder.path, initialCursor)
+                if (replayed) result = client.sync(config.imap.endpoint(), creds, folder.path, initialCursor, limit = windowLimit, windowDays = accountSettings.syncWindowDays)
                 val notifications = mutableListOf<Pair<Long, String>>()
                 database.withTransaction {
                     val old = dao.folderMessages(folder.id)
@@ -120,6 +131,8 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null): Boole
                 }
                 notifications.distinctBy { it.first }.forEach { (id, subject) -> MailNotifications.newMail(context, account, id, subject) }
             }
+            settingsStore.markWindowApplied(account.id, accountSettings.syncWindowDays)
+            settingsStore.markSynced(account.id)
             stage = "Folder delete"
             finishFolderDeletes(account, config, creds).let { if (!it.success) success = false; if (folderWarning == null) folderWarning = it.warning }
             dao.syncError(account.id, if (folderWarning != null) folderWarning else if (headerWarning != null) headerWarning else if (deferredExpunge) "Move copied messages and marked the originals deleted; server lacks targeted expunge" else if (dao.operations(account.id).any { it.error != null }) "Some server changes are pending or require review" else null)
@@ -215,3 +228,7 @@ internal suspend fun RealMailGraph.deliverOutbox(id: Long): Boolean = outboxLock
     }
     true
 }
+
+/** Background-sync schedule of one account: never for "manual only", else when its own interval has elapsed (1 minute of slack for WorkManager jitter). */
+internal fun isScheduledSyncDue(settings: AccountSettings, lastSyncedAt: Long, now: Long = System.currentTimeMillis()): Boolean =
+    settings.syncIntervalMinutes > 0 && now - lastSyncedAt >= settings.syncIntervalMinutes * 60_000L - 60_000L

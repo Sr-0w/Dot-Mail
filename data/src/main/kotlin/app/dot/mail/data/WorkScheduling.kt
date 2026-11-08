@@ -26,7 +26,7 @@ internal object WorkScheduling {
 }
 class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result = try {
-        if (GraphRegistry.get(applicationContext).syncAll()) Result.success() else Result.retry()
+        if (GraphRegistry.get(applicationContext).syncAll(scheduled = true)) Result.success() else Result.retry()
     } catch (e: CancellationException) { throw e } catch (e: Exception) { SyncDiagnostics.warn("Sync worker", e); Result.retry() }
 }
 class OutboxWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
