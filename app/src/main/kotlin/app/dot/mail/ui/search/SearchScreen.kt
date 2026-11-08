@@ -52,6 +52,7 @@ import app.dot.mail.data.MailGraph
 import app.dot.mail.data.model.ThreadSummary
 import app.dot.mail.ui.inbox.ThreadRow
 import androidx.compose.foundation.border
+import dev.chrisbanes.haze.hazeSource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.width
@@ -162,6 +163,8 @@ fun SearchScreen(onBack: () -> Unit, onOpenThread: (Long) -> Unit, folderId: Lon
     val keyboard = LocalSoftwareKeyboardController.current
     val c = Dot.colors
     LaunchedEffect(Unit) { focus.requestFocus() }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val edgeState = app.dot.design.components.rememberGlassBackdrop()
 
     Column(Modifier.fillMaxSize().background(c.background).imePadding()) {
         Row(
@@ -194,11 +197,14 @@ fun SearchScreen(onBack: () -> Unit, onOpenThread: (Long) -> Unit, folderId: Lon
                 EmptyState(Icons.Outlined.WifiOff, stringResource(R.string.search_error_title), (results.loadState.refresh as LoadState.Error).error.message ?: stringResource(R.string.search_error_body))
             results.itemCount == 0 && results.loadState.refresh is LoadState.NotLoading && !progress.serverRunning ->
                 EmptyState(Icons.Outlined.SearchOff, stringResource(R.string.search_no_results_title), stringResource(R.string.search_no_results_body, q))
-            else -> LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
+            else -> Box(Modifier.fillMaxSize()) {
+                LazyColumn(state = listState, modifier = Modifier.fillMaxSize().hazeSource(edgeState).navigationBarsPadding()) {
                 items(results.itemCount, key = results.itemKey { it.messageId }) { i ->
                     val r = results[i] ?: return@items
                     SearchResultRow(r, onClick = { onOpenThread(r.thread.threadId) })
                 }
+            }
+                app.dot.design.components.TopEdgeFade(edgeState, app.dot.design.components.rememberTopEdgeProgress(listState), Modifier.align(Alignment.TopCenter))
             }
         }
     }
