@@ -9,6 +9,11 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -261,7 +266,7 @@ fun AddAccountScreen(onBack: () -> Unit, onDone: () -> Unit) {
             if (state.step == SetupState.Step.Credentials) {
                 Row(
                     Modifier.padding(top = DotSpacing.xl).clip(DotShapes.small)
-                        .clickable(enabled = !state.busy) {
+                        .clickable(enabled = !state.busy, role = Role.Button) {
                             vm.edit {
                                 it.copy(
                                     step = SetupState.Step.Manual,
@@ -270,6 +275,7 @@ fun AddAccountScreen(onBack: () -> Unit, onDone: () -> Unit) {
                                 )
                             }
                         }
+                        .heightIn(min = 48.dp)
                         .padding(vertical = DotSpacing.s),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -346,7 +352,7 @@ private fun ServerFields(
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(DotSpacing.m)) {
         DotTextField(host, onHost, Modifier.weight(1f), label = "Server", keyboardType = KeyboardType.Uri)
-        DotTextField(port, onPort, Modifier.width(92.dp), label = "Port", keyboardType = KeyboardType.Number)
+        DotTextField(port, onPort, Modifier.widthIn(min = 100.dp).weight(0.4f), label = "Port", keyboardType = KeyboardType.Number)
     }
     Spacer(Modifier.height(DotSpacing.m))
     Segmented(
@@ -367,18 +373,19 @@ private fun ServerFields(
 fun <T> Segmented(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit, modifier: Modifier = Modifier) {
     val c = Dot.colors
     Row(
-        modifier.fillMaxWidth().clip(DotShapes.medium).border(1.dp, c.border, DotShapes.medium).padding(3.dp),
+        modifier.fillMaxWidth().selectableGroup().clip(DotShapes.medium).border(1.dp, c.border, DotShapes.medium).padding(3.dp),
     ) {
         options.forEach { (value, label) ->
             val isSel = value == selected
             Box(
                 Modifier.weight(1f).clip(DotShapes.small)
                     .background(if (isSel) c.surfaceRaised else androidx.compose.ui.graphics.Color.Transparent)
-                    .clickable { onSelect(value) }
-                    .padding(vertical = 10.dp),
+                    .selectable(selected = isSel, role = Role.RadioButton, onClick = { onSelect(value) })
+                    .heightIn(min = 48.dp)
+                    .padding(vertical = 10.dp, horizontal = 4.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(label, style = Dot.type.label, color = if (isSel) c.textPrimary else c.textSecondary)
+                Text(label, style = Dot.type.label, color = if (isSel) c.textPrimary else c.textSecondary, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             }
         }
     }

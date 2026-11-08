@@ -59,8 +59,11 @@ import app.dot.mail.LocalSettings
 import app.dot.mail.SwipeAction
 import app.dot.mail.data.model.Account
 import app.dot.mail.ui.account.Segmented
-import app.dot.mail.ui.inbox.DotMenu
-import app.dot.mail.ui.inbox.MenuItem
+import app.dot.design.components.DotMenu
+import app.dot.design.components.DotMenuItem
+import app.dot.mail.data.model.SyncState
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -88,11 +91,13 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
         Column(Modifier.verticalScroll(scroll)) {
             SectionLabel("Accounts", Modifier.padding(top = DotSpacing.s))
             accounts.forEach { a ->
+                val err = a.syncState as? SyncState.Error
                 ListRow(
                     title = a.displayName,
-                    subtitle = a.email,
+                    subtitle = if (err != null) "${a.email}\n${err.message}" else a.email,
+                    subtitleColor = if (err != null) c.danger else c.textSecondary,
                     onClick = { removing = a },
-                    trailing = { Text("Remove", style = Dot.type.label, color = c.textTertiary) },
+                    trailing = { Text("Remove", style = Dot.type.label, color = c.textSecondary) },
                 )
             }
             ListRow("Add account", icon = Icons.Outlined.Add, onClick = onAddAccount)
@@ -115,8 +120,10 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
                 )
             }
             Spacer(Modifier.height(DotSpacing.s))
-            SwipeSetting("Swipe right", Icons.Outlined.SwipeRight, prefs.swipeStart) { a -> settings.update { it.copy(swipeStart = a) } }
-            SwipeSetting("Swipe left", Icons.Outlined.SwipeLeft, prefs.swipeEnd) { a -> settings.update { it.copy(swipeEnd = a) } }
+            // swipeStart = start→end: physically rightwards in LTR, leftwards in RTL.
+            val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
+            SwipeSetting(if (rtl) "Swipe left" else "Swipe right", if (rtl) Icons.Outlined.SwipeLeft else Icons.Outlined.SwipeRight, prefs.swipeStart) { a -> settings.update { it.copy(swipeStart = a) } }
+            SwipeSetting(if (rtl) "Swipe right" else "Swipe left", if (rtl) Icons.Outlined.SwipeRight else Icons.Outlined.SwipeLeft, prefs.swipeEnd) { a -> settings.update { it.copy(swipeEnd = a) } }
             Hairline(Modifier.padding(vertical = DotSpacing.s))
 
             SectionLabel("Privacy & security")
@@ -200,11 +207,12 @@ private fun ToggleRow(
     title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector, checked: Boolean,
     enabled: Boolean = true, onChange: (Boolean) -> Unit,
 ) {
+    // The row is the single toggle target (merged semantics: "Title, switch, on/off"); the switch is visual only.
     ListRow(
         title = title, subtitle = subtitle, icon = icon,
         titleColor = if (enabled) Dot.colors.textPrimary else Dot.colors.textTertiary,
-        onClick = if (enabled) ({ onChange(!checked) }) else null,
-        trailing = { DotSwitch(checked, { if (enabled) onChange(it) }) },
+        modifier = Modifier.toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange),
+        trailing = { DotSwitch(checked, onCheckedChange = null, enabled = enabled) },
     )
 }
 
@@ -214,7 +222,7 @@ private fun SwipeSetting(title: String, icon: androidx.compose.ui.graphics.vecto
     Box {
         ListRow(title, subtitle = swipeName(value), icon = icon, onClick = { open = true })
         DotMenu(open, { open = false }) {
-            SwipeAction.entries.forEach { a -> MenuItem(swipeName(a), null) { open = false; onChange(a) } }
+            SwipeAction.entries.forEach { a -> DotMenuItem(swipeName(a), null) { open = false; onChange(a) } }
         }
     }
 }
@@ -233,7 +241,7 @@ private fun UndoSetting(seconds: Int, onChange: (Int) -> Unit) {
     Box {
         ListRow("Undo send", subtitle = if (seconds == 0) "Off" else "$seconds seconds", icon = Icons.Outlined.Schedule, onClick = { open = true })
         DotMenu(open, { open = false }) {
-            listOf(0, 5, 10, 20, 30).forEach { s -> MenuItem(if (s == 0) "Off" else "$s seconds", null) { open = false; onChange(s) } }
+            listOf(0, 5, 10, 20, 30).forEach { s -> DotMenuItem(if (s == 0) "Off" else "$s seconds", null) { open = false; onChange(s) } }
         }
     }
 }

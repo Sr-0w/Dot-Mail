@@ -48,3 +48,7 @@ After Qwen’s fixes, full integration also passes: `scripts/gw :mail:test :data
 * Attachment files are removed on account deletion. Per-message orphan-file eviction and attachment-cache quotas are future maintenance work.
 
 Dependencies added: :data directly uses existing MIT jsoup for HTML-derived plain text, consumer ProGuard rules; no new external data-layer libraries. Engine adds Angus Activation/API as documented in codex-mail.md.
+
+## Follow-up
+
+Outbox review/retry/delete, bounded snippet prefetch, and Room v2 migration are now implemented and tested; the earlier outbox-API and blank-header-snippet limitations above are superseded. See [codex-interop-outbox.md](codex-interop-outbox.md) for the contract and live/release verification.

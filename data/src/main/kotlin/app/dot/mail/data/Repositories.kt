@@ -25,6 +25,14 @@ import kotlinx.coroutines.flow.Flow
  */
 
 interface AccountRepository {
+    fun oauthAvailability(provider: app.dot.mail.data.model.OAuthProvider): app.dot.mail.data.model.OAuthAvailability
+
+    /** Launch the returned Custom Tabs Intent from the visible Activity. accountId reauthorizes that account. */
+    suspend fun beginOAuth(email: String, provider: app.dot.mail.data.model.OAuthProvider, accountId: Long? = null): android.content.Intent
+
+    /** Consume the callback once. Throws a safe OAuthException; never log the callback URI. */
+    suspend fun completeOAuth(resultUri: android.net.Uri): Long
+
     val accounts: Flow<List<Account>>
 
     /** Autodiscovery: built-in providers, then Mozilla ISPDB / autoconfig, then MX-based guess. Null if nothing found. */

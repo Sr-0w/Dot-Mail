@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -35,6 +36,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -96,10 +99,7 @@ fun DotButton(
     val fgFinal = if (enabled) fg else c.textTertiary
     Row(
         modifier
-            .heightIn(min = if (compact) 36.dp else 48.dp)
-            .clip(DotShapes.medium)
-            .background(bgAnimated)
-            .border(DotSpacing.hairline * 2, if (enabled) outline else c.border, DotShapes.medium)
+            // Clickable outermost so the 48dp touch target of compact buttons is fully tappable.
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -109,7 +109,12 @@ fun DotButton(
                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onClick()
             }
-            .padding(horizontal = if (compact) 14.dp else 20.dp),
+            .minimumInteractiveComponentSize()
+            .heightIn(min = if (compact) 36.dp else 48.dp)
+            .clip(DotShapes.medium)
+            .background(bgAnimated)
+            .border(DotSpacing.hairline * 2, if (enabled || outline == Color.Transparent) outline else c.border, DotShapes.medium)
+            .padding(horizontal = if (compact) 14.dp else 20.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -124,7 +129,7 @@ fun DotButton(
     }
 }
 
-/** 44dp touch target, 22dp glyph, soft circular press feedback. */
+/** 48dp touch target, 22dp glyph, soft circular press feedback. */
 @Composable
 fun DotIconButton(
     icon: ImageVector,
@@ -136,7 +141,7 @@ fun DotIconButton(
 ) {
     Box(
         modifier
-            .size(44.dp)
+            .size(48.dp)
             .clip(CircleShape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -197,7 +202,7 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier) {
         text.uppercase(),
         style = Dot.type.overline,
         color = Dot.colors.textTertiary,
-        modifier = modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s),
+        modifier = modifier.semantics { heading() }.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s),
     )
 }
 
@@ -237,6 +242,7 @@ fun ListRow(
     subtitle: String? = null,
     icon: ImageVector? = null,
     titleColor: Color = Dot.colors.textPrimary,
+    subtitleColor: Color = Dot.colors.textSecondary,
     onClick: (() -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = DotSpacing.gutter, vertical = 14.dp),
     trailing: (@Composable () -> Unit)? = null,
@@ -244,7 +250,8 @@ fun ListRow(
     Row(
         modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .heightIn(min = 48.dp)
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
             .padding(contentPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -255,7 +262,7 @@ fun ListRow(
         Column(Modifier.weight(1f)) {
             Text(title, style = Dot.type.bodyStrong, color = titleColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (subtitle != null) {
-                Text(subtitle, style = Dot.type.caption, color = Dot.colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(subtitle, style = Dot.type.caption, color = subtitleColor, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
         if (trailing != null) {

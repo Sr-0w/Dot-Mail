@@ -226,4 +226,66 @@ internal object BuiltInProviders {
 
     /** Look up a provider by its (already normalised) domain. Returns null when unknown. */
     fun lookup(domain: String): Entry? = byDomain[domain]
+
+    // --- MX-based detection ---------------------------------------------------------------------
+    // Custom domains hosted at a known provider: the domain's MX host reveals the provider.
+    // Each target was verified against ISPDB / the provider's own documentation (2026-11-08).
+
+    /** Microsoft 365 / Exchange Online (business domains). Password auth is disabled; OAuth2 needed. */
+    private val microsoft365 = Entry(
+        providerName = "Microsoft 365",
+        imapHost = "outlook.office365.com", imapPort = 993, imapSocket = SocketType.SSL,
+        smtpHost = "smtp.office365.com", smtpPort = 587, smtpSocket = SocketType.STARTTLS,
+        oauthRequired = true,
+        hint = "Microsoft 365: password sign-in is usually disabled — use OAuth2.",
+    )
+
+    /** OVH shared e-mail (ISPDB ovh.net): ssl0.ovh.net, IMAP 993 SSL, SMTP 465 SSL. */
+    private val ovh = Entry(
+        providerName = "OVHcloud",
+        imapHost = "ssl0.ovh.net", imapPort = 993, imapSocket = SocketType.SSL,
+        smtpHost = "ssl0.ovh.net", smtpPort = 465, smtpSocket = SocketType.SSL,
+    )
+
+    /** Gandi (ISPDB gandi.net): mail.gandi.net, IMAP 993 SSL, SMTP 465 SSL. */
+    private val gandi = Entry(
+        providerName = "Gandi",
+        imapHost = "mail.gandi.net", imapPort = 993, imapSocket = SocketType.SSL,
+        smtpHost = "mail.gandi.net", smtpPort = 465, smtpSocket = SocketType.SSL,
+    )
+
+    private fun domainEntry(domain: String): Entry = checkNotNull(byDomain[domain]) { domain }
+
+    /** MX host suffix (a domain: matches itself and any subdomain) → provider. Order is irrelevant. */
+    private val byMxSuffix: Map<String, Entry> by lazy {
+        mapOf(
+            "infomaniak.ch" to domainEntry("infomaniak.com"),
+            "infomaniak.com" to domainEntry("infomaniak.com"),
+            "google.com" to domainEntry("gmail.com"),
+            "googlemail.com" to domainEntry("gmail.com"),
+            "outlook.com" to microsoft365,
+            "messagingengine.com" to domainEntry("fastmail.com"),
+            "mailbox.org" to domainEntry("mailbox.org"),
+            "posteo.de" to domainEntry("posteo.de"),
+            "zoho.com" to domainEntry("zoho.com"),
+            "zoho.eu" to domainEntry("zoho.eu"),
+            "ovh.net" to ovh,
+            "gandi.net" to gandi,
+        )
+    }
+
+    /**
+     * Provider for an MX host name (e.g. `mx1.mail.infomaniak.ch`), or null. Matches whole labels
+     * only, so `evilinfomaniak.ch` does not match `infomaniak.ch`.
+     */
+    fun lookupByMx(mxHost: String): Entry? {
+        val host = mxHost.trim().trimEnd('.').lowercase()
+        var candidate = host
+        while (true) {
+            byMxSuffix[candidate]?.let { return it }
+            val dot = candidate.indexOf('.')
+            if (dot < 0) return null
+            candidate = candidate.substring(dot + 1)
+        }
+    }
 }

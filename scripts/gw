@@ -22,4 +22,7 @@ rsync -az --delete "$HOST:dotmail/app/build/outputs/apk/" "$ROOT/build-out/apk/"
 for m in app mail data designsystem; do
   rsync -az --delete "$HOST:dotmail/$m/build/reports/" "$ROOT/build-out/reports/$m/" 2>/dev/null
 done
+# Room exports schemas into the source tree; retain them locally before the next source sync.
+mkdir -p "$ROOT/data/schemas"
+rsync -az "$HOST:dotmail/data/schemas/" "$ROOT/data/schemas/" 2>/dev/null
 exit $rc

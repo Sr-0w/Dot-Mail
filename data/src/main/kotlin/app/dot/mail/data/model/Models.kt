@@ -184,3 +184,8 @@ data class OutboxItem(
     val canRetry: Boolean,
     val canDelete: Boolean,
 )
+
+// OAuth client IDs belong to the build maintainer; no project borrows another app's registration.
+enum class OAuthProvider { GOOGLE, MICROSOFT }
+data class OAuthAvailability(val provider: OAuthProvider, val available: Boolean, val reason: String?)
+class OAuthException(message: String) : Exception(message)

@@ -33,6 +33,8 @@ fun HtmlMessageView(
     linkColor: Int,
     onLink: (String) -> Unit,
     modifier: Modifier = Modifier,
+    /** Exact content:// URIs of this message's inline parts; nothing else local is ever served. */
+    inlineUris: Set<String> = emptySet(),
 ) {
     val document = remember(html, dark, textColor, linkColor) { wrap(html, dark, textColor, linkColor) }
     AndroidView(
@@ -48,7 +50,7 @@ fun HtmlMessageView(
                     javaScriptEnabled = false
                     javaScriptCanOpenWindowsAutomatically = false
                     allowFileAccess = false
-                    allowContentAccess = true // inline images are served from our FileProvider
+                    allowContentAccess = false // inline parts are served by SafeClient from an exact allow-list
                     domStorageEnabled = false
                     databaseEnabled = false
                     @Suppress("DEPRECATION")
@@ -68,16 +70,16 @@ fun HtmlMessageView(
                 if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
                     WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, dark)
                 }
-                webViewClient = SafeClient(allowRemote, onLink)
+                webViewClient = SafeClient(allowRemote, inlineUris, ctx.contentResolver, onLink)
                 tag = null
             }
         },
         update = { web ->
             val client = web.webViewClient as? SafeClient
-            if (client == null || client.allowRemote != allowRemote) {
+            if (client == null || client.allowRemote != allowRemote || client.inline != inlineUris) {
                 web.settings.blockNetworkLoads = !allowRemote
                 web.settings.blockNetworkImage = !allowRemote
-                web.webViewClient = SafeClient(allowRemote, onLink)
+                web.webViewClient = SafeClient(allowRemote, inlineUris, web.context.contentResolver, onLink)
             }
             if (web.tag != document) {
                 web.tag = document
@@ -89,7 +91,12 @@ fun HtmlMessageView(
     )
 }
 
-private class SafeClient(val allowRemote: Boolean, val onLink: (String) -> Unit) : WebViewClient() {
+private class SafeClient(
+    val allowRemote: Boolean,
+    val inline: Set<String>,
+    private val resolver: android.content.ContentResolver,
+    val onLink: (String) -> Unit,
+) : WebViewClient() {
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
         if (request.isForMainFrame || request.hasGesture()) onLink(request.url.toString())
         return true
@@ -97,8 +104,12 @@ private class SafeClient(val allowRemote: Boolean, val onLink: (String) -> Unit)
 
     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
         val scheme = request.url.scheme?.lowercase()
+        val url = request.url.toString()
         return when {
-            scheme == "content" || scheme == "data" -> null
+            scheme == "content" && url in inline -> runCatching {
+                WebResourceResponse(resolver.getType(request.url) ?: "application/octet-stream", null, resolver.openInputStream(request.url))
+            }.getOrElse { EMPTY() }
+            scheme == "data" -> null
             (scheme == "http" || scheme == "https") && allowRemote -> null
             else -> EMPTY()
         }

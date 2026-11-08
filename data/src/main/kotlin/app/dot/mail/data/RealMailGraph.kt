@@ -19,6 +19,7 @@ import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.util.UUID
 import javax.net.ssl.SSLException
+import app.dot.mail.data.oauth.*
 
 fun createMailGraph(context: Context): MailGraph {
     val graph = GraphRegistry.get(context)
@@ -28,7 +29,7 @@ internal object GraphRegistry {
     @Volatile private var graph: RealMailGraph? = null
     fun get(context: Context): RealMailGraph = graph ?: synchronized(this) {
         graph ?: RealMailGraph(context.applicationContext,
-            Room.databaseBuilder(context.applicationContext, MailDatabase::class.java, "dotmail.db").build(),
+            Room.databaseBuilder(context.applicationContext, MailDatabase::class.java, "dotmail.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3).build(),
             KeystoreCredentialVault()).also { graph = it; it.start() }
     }
 }
@@ -40,14 +41,17 @@ internal class RealMailGraph(
     private val vault: CredentialVault,
     internal val client: MailClient = MailClient(),
     private val scheduling: Boolean = true,
+    oauthClients: Map<OAuthProvider, String> = mapOf(OAuthProvider.GOOGLE to BuildConfig.OAUTH_GOOGLE_CLIENT_ID, OAuthProvider.MICROSOFT to BuildConfig.OAUTH_MICROSOFT_CLIENT_ID),
+    tokenEndpoint: TokenEndpoint = HttpsTokenEndpoint(),
 ) : AccountRepository, MailRepository, ComposeRepository {
     internal val dao = database.mail()
     internal val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     internal val syncLock = Mutex()
+    private val oauth = OAuthManager(context, database, vault, oauthClients, tokenEndpoint)
     internal val syncing = MutableStateFlow<Set<Long>>(emptySet())
     override val accounts: Flow<List<Account>> = combine(dao.observeAccounts(), syncing) { rows, active -> rows.map { row ->
         Account(row.id, row.name, row.email, row.color, listOf(Identity(row.id, row.id, row.name, row.email, isDefault = true)),
-            if (row.id in active) SyncState.Syncing else row.syncError?.let { SyncState.Error(it) } ?: SyncState.Idle)
+            if (row.id in active) SyncState.Syncing else row.syncError?.let { SyncState.Error(it, isAuthError = row.authError) } ?: SyncState.Idle)
     } }
     override val outbox: Flow<List<OutboxItem>> = dao.observeOutbox().map { rows -> rows.map { row ->
         val draft = Codec.draft(row.draft)
@@ -61,7 +65,12 @@ internal class RealMailGraph(
             row.state in setOf("UNCERTAIN", "APPEND") || (row.state == "PENDING" && row.error != null), row.state in setOf("PENDING", "APPEND", "UNCERTAIN"))
     } }.flowOn(Dispatchers.IO)
     internal fun start() { if (scheduling) { WorkScheduling.periodic(context); ForegroundIdle(this).start(); scope.launch { recoverOutbox() } } }
-    internal suspend fun credentials(row: AccountRow): Credentials = withContext(Dispatchers.IO) { Credentials(vault.decrypt(row.email, row.secret), Codec.config(row.config).authType == AuthType.OAUTH2) }
+    internal suspend fun credentials(row: AccountRow): Credentials = withContext(Dispatchers.IO) {
+        if (Codec.config(row.config).authType == AuthType.OAUTH2) oauth.credentials(row.id) else Credentials(vault.decrypt(row.email, row.secret))
+    }
+    override fun oauthAvailability(provider: OAuthProvider) = oauth.availability(provider)
+    override suspend fun beginOAuth(email: String, provider: OAuthProvider, accountId: Long?): android.content.Intent = oauth.begin(email, provider, accountId)
+    override suspend fun completeOAuth(resultUri: android.net.Uri): Long = oauth.complete(resultUri) { config, credentials -> client.verify(config.imap.endpoint(), config.smtp.endpoint(), credentials) }.also { requestSync() }
     private val syncEnqueuePending = java.util.concurrent.atomic.AtomicBoolean(false)
     internal fun requestSync() {
         if (scheduling && syncEnqueuePending.compareAndSet(false, true)) scope.launch {
@@ -70,9 +79,11 @@ internal class RealMailGraph(
     }
 
     override suspend fun discover(email: String): AccountConfig? = withContext(Dispatchers.IO) {
-        val result = AutoDiscovery().discover(email) ?: return@withContext null
+        val result = AutoDiscovery(mxResolver = AndroidMxResolver()).discover(email) ?: return@withContext null
         fun endpoint(s: app.dot.mail.engine.autoconfig.DiscoveredServer) = ServerConfig(s.host, s.port, when(s.socket) { SocketType.SSL -> Security.SSL_TLS; SocketType.STARTTLS -> Security.STARTTLS; SocketType.PLAIN -> Security.NONE }, s.username)
-        AccountConfig(email, email.substringBefore('@'), endpoint(result.imap), endpoint(result.smtp), if (result.oauthRequired) AuthType.OAUTH2 else AuthType.PASSWORD, result.hint)
+        val provider = when { result.imap.host.endsWith("gmail.com") || result.imap.host.endsWith("googlemail.com") -> OAuthProvider.GOOGLE; result.imap.host == "outlook.office365.com" -> OAuthProvider.MICROSOFT; else -> null }
+        val hint = provider?.let { oauth.availability(it).reason } ?: result.hint
+        AccountConfig(email, email.substringBefore('@'), endpoint(result.imap), endpoint(result.smtp), if (result.oauthRequired || provider != null) AuthType.OAUTH2 else AuthType.PASSWORD, hint)
     }
     override suspend fun verify(config: AccountConfig, password: String): VerifyResult = withContext(Dispatchers.IO) {
         try { client.verify(config.imap.endpoint(), config.smtp.endpoint(), Credentials(password, config.authType == AuthType.OAUTH2)); VerifyResult.Ok }
@@ -83,6 +94,7 @@ internal class RealMailGraph(
         }
     }
     override suspend fun addAccount(config: AccountConfig, password: String): Long = withContext(Dispatchers.IO) {
+        require(config.authType == AuthType.PASSWORD) { "OAuth accounts must be added through browser sign-in" }
         require(config.email.isNotBlank() && config.imap.host.isNotBlank() && config.smtp.host.isNotBlank())
         val id = dao.insertAccount(AccountRow(email = config.email, name = config.displayName, color = dao.accounts().size % 6, config = Codec.config(config), secret = vault.encrypt(config.email, password)))
         requestSync(); id
@@ -148,7 +160,7 @@ internal class RealMailGraph(
         val parts = body.attachments.map { part -> val file = attachmentFile(account.id, "${UUID.randomUUID()}/${safeFileName(part.name)}"); file.writeBytes(part.bytes); AttachmentRow(messageId = messageId, partId = part.partId, name = part.name, mime = part.mimeType, size = part.bytes.size.toLong(), cid = part.contentId, inline = part.inline, localUri = uri(file)) }
         database.withTransaction {
             dao.clearAttachments(messageId); parts.forEach { dao.insertAttachment(it) }
-            dao.updateMessage(message.copy(text = body.text ?: body.html?.let { org.jsoup.Jsoup.parse(it).text() }, html = body.html, bodyLoaded = true, remoteImages = body.html?.let { HtmlSanitizer.sanitize(it).hasRemoteImages } ?: false, snippet = (body.text ?: body.html?.let { org.jsoup.Jsoup.parse(it).text() })?.replace(Regex("\\s+"), " ")?.take(180) ?: "", hasAttachments = parts.any { !it.inline }))
+            dao.updateMessage(message.copy(text = body.text ?: body.html?.let { org.jsoup.Jsoup.parse(it).text() }, html = body.html, bodyLoaded = true, snippetFetched = true, remoteImages = body.html?.let { HtmlSanitizer.sanitize(it).hasRemoteImages } ?: false, snippet = body.text?.let { app.dot.mail.engine.text.Snippets.fromPlainText(it) } ?: body.html?.let { app.dot.mail.engine.text.Snippets.fromHtml(it) }.orEmpty(), hasAttachments = parts.any { !it.inline }))
             rebuildThread(message.threadId)
         }
     } }
@@ -266,13 +278,13 @@ internal class RealMailGraph(
         deleted.mimePath?.let { File(it).delete() }
         true
     }
-    private suspend fun recoverOutbox() {
+    internal suspend fun recoverOutbox() = syncLock.withLock {
         dao.submittingOutbox().forEach { row ->
             dao.transitionOutbox(row.id, "SUBMITTING", "UNCERTAIN", "App stopped during SMTP submission. Check Sent before retrying.")
             dao.syncError(row.accountId, "A send could not be confirmed. Check Sent before retrying.")
         }
         dao.appendingOutbox().forEach { dao.transitionOutbox(it.id, "APPENDING", "APPEND", "Sent; saving its copy will resume") }
-        dao.pendingOutbox().forEach { WorkScheduling.outbox(context, it.id, it.dueAt) }
+        if (scheduling) dao.pendingOutbox().forEach { WorkScheduling.outbox(context, it.id, it.dueAt) }
     }
     private suspend fun cacheAttachments(draft: Draft): Pair<Draft, org.json.JSONObject> {
         require(draft.attachmentUris.size <= 50) { "Too many attachments" }

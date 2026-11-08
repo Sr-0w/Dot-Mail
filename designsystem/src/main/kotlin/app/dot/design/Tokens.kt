@@ -55,7 +55,8 @@ val DarkColors = DotColors(
     borderStrong = Color(0xFF38383D),
     textPrimary = Color(0xFFEDEDEF),
     textSecondary = Color(0xFFA0A0A7),
-    textTertiary = Color(0xFF6C6C73),
+    // 5.1:1 on background, 4.75:1 on surface (WCAG AA); still clearly below textSecondary.
+    textTertiary = Color(0xFF82828B),
     inverse = Color(0xFFEDEDEF),
     onInverse = Color(0xFF0D0D0E),
     accent = Color(0xFF7C9CFF),
@@ -75,7 +76,8 @@ val LightColors = DotColors(
     borderStrong = Color(0xFFD4D4D9),
     textPrimary = Color(0xFF0D0D0E),
     textSecondary = Color(0xFF5E5E66),
-    textTertiary = Color(0xFF8E8E96),
+    // 5.36:1 on background, 4.96:1 on surface (WCAG AA).
+    textTertiary = Color(0xFF6A6A72),
     inverse = Color(0xFF0D0D0E),
     onInverse = Color(0xFFFFFFFF),
     accent = Color(0xFF3D63E0),

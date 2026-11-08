@@ -7,8 +7,18 @@ plugins {
 android {
     namespace = "app.dot.mail.data"
     compileSdk = 35
+    buildFeatures { buildConfig = true }
     defaultConfig {
         minSdk = 26
+        fun oauthProperty(name: String) = providers.gradleProperty(name).orElse("").get().let {
+            require(it.matches(Regex("[A-Za-z0-9._-]*"))) { "OAuth client ID contains invalid characters" }
+            "\"$it\""
+        }
+        val googleScheme = providers.gradleProperty("dotmail.oauth.google.clientId").orElse("").get().let { if (it.isBlank()) "app.dot.mail.oauth.google.unconfigured" else "com.googleusercontent.apps.${it.removeSuffix(".apps.googleusercontent.com")}" }
+        manifestPlaceholders["dotmailGoogleOAuthScheme"] = googleScheme
+        buildConfigField("String", "OAUTH_GOOGLE_REDIRECT_SCHEME", "\"$googleScheme\"")
+        buildConfigField("String", "OAUTH_GOOGLE_CLIENT_ID", oauthProperty("dotmail.oauth.google.clientId"))
+        buildConfigField("String", "OAUTH_MICROSOFT_CLIENT_ID", oauthProperty("dotmail.oauth.microsoft.clientId"))
         consumerProguardFiles("consumer-rules.pro")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -26,6 +36,7 @@ dependencies {
     api(libs.kotlinx.coroutines.android)
     api(libs.paging.common)
     implementation(libs.androidx.core.ktx)
+    implementation("androidx.browser:browser:1.8.0")
     implementation(libs.jsoup)
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
@@ -42,3 +53,6 @@ dependencies {
     testImplementation(libs.work.testing)
     testImplementation(libs.greenmail)
 }
+
+// Exported schemas are JVM-test resources for real upgrade validation.
+android.sourceSets.getByName("test").resources.srcDir("$projectDir/schemas")

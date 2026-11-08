@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -147,22 +148,29 @@ class ThreadViewModel(private val graph: MailGraph, private val threadId: Long) 
         }
     }
 
-    fun onOpened() {
+    /** Latch which messages start expanded *before* marking read, or unread ones would collapse a frame later. */
+    fun onOpened(initial: List<Message>) {
         if (markedRead) return
         markedRead = true
-        viewModelScope.launch { graph.mail.apply(MessageAction.MARK_READ, listOf(threadId)) }
+        _toggled.update { current ->
+            initial.associate { m -> m.id to (m.isUnread || m == initial.lastOrNull() || initial.size == 1) } + current
+        }
+        if (initial.any { it.isUnread }) viewModelScope.launch { runCatching { graph.mail.apply(MessageAction.MARK_READ, listOf(threadId)) } }
     }
 
     fun allowRemote(messageId: Long) = _remoteAllowed.update { it + messageId }
 
     fun act(action: MessageAction) {
         viewModelScope.launch {
-            graph.mail.apply(action, listOf(threadId))
-            when (action) {
-                MessageAction.ARCHIVE, MessageAction.TRASH, MessageAction.SPAM, MessageAction.DELETE_FOREVER, MessageAction.MARK_UNREAD ->
-                    _events.send(ThreadEvent.Close)
-                else -> Unit
-            }
+            runCatching { graph.mail.apply(action, listOf(threadId)) }
+                .onSuccess {
+                    when (action) {
+                        MessageAction.ARCHIVE, MessageAction.TRASH, MessageAction.SPAM, MessageAction.NOT_SPAM,
+                        MessageAction.DELETE_FOREVER, MessageAction.MARK_UNREAD -> _events.send(ThreadEvent.Close)
+                        else -> Unit
+                    }
+                }
+                .onFailure { _events.send(ThreadEvent.Message(it.message ?: "That action couldn't be completed")) }
         }
     }
 
@@ -224,7 +232,7 @@ fun ThreadScreen(
             }
         }
     }
-    LaunchedEffect(messages != null) { if (messages != null) vm.onOpened() }
+    LaunchedEffect(messages != null) { messages?.let { vm.onOpened(it) } }
 
     val list = messages
     val last = list?.lastOrNull()
@@ -248,7 +256,10 @@ fun ThreadScreen(
                             }
                             MenuItem("Report spam", Icons.Outlined.Report) { menu = false; vm.act(MessageAction.SPAM) }
                             last?.unsubscribe?.let { target ->
-                                MenuItem("Unsubscribe", Icons.Outlined.Unsubscribe) { menu = false; pendingLink = target }
+                                MenuItem("Unsubscribe", Icons.Outlined.Unsubscribe) {
+                                    menu = false
+                                    if (target.startsWith("mailto:", ignoreCase = true)) onComposeTo(target) else pendingLink = target
+                                }
                             }
                         }
                     }
@@ -287,7 +298,7 @@ fun ThreadScreen(
                             onToggle = { vm.toggle(m, list) },
                             onAllowRemote = { vm.allowRemote(m.id) },
                             onLink = { url ->
-                                if (url.startsWith("mailto:", ignoreCase = true)) onComposeTo(url.removePrefix("mailto:").substringBefore('?'))
+                                if (url.startsWith("mailto:", ignoreCase = true)) onComposeTo(url)
                                 else if (prefs.confirmLinks) pendingLink = url
                                 else openUrl(context, url)
                             },
@@ -403,15 +414,24 @@ private fun MessageCard(
             val cids = remember(message.attachments) {
                 message.attachments.mapNotNull { a -> a.contentId?.let { id -> a.localUri?.let { id.trim('<', '>') to it } } }.toMap()
             }
-            val sanitized = remember(body.html, allowRemote, cids) {
-                body.html?.let { HtmlSanitizer.sanitize(it, allowRemoteImages = allowRemote, cidUris = cids) }
+            val html = body.html
+            val sanitized by androidx.compose.runtime.produceState<app.dot.mail.engine.html.SanitizedHtml?>(null, html, allowRemote, cids) {
+                value = html?.let {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                        HtmlSanitizer.sanitize(it, allowRemoteImages = allowRemote, cidUris = cids)
+                    }
+                }
             }
-            if (sanitized != null && sanitized.blockedRemoteResources > 0 && !allowRemote) {
-                RemoteContentBanner(sanitized.blockedRemoteResources, onAllowRemote)
+            val clean = sanitized
+            if (clean != null && clean.blockedRemoteResources > 0 && !allowRemote) {
+                RemoteContentBanner(clean.blockedRemoteResources, onAllowRemote)
             }
-            if (sanitized != null) {
+            if (html != null && clean == null) {
+                Box(Modifier.fillMaxWidth().height(120.dp))
+            } else if (clean != null) {
                 HtmlMessageView(
-                    html = sanitized.html,
+                    html = clean.html,
+                    inlineUris = cids.values.toSet(),
                     dark = c.isDark,
                     allowRemote = allowRemote,
                     textColor = c.textPrimary.toArgb(),
@@ -524,6 +544,7 @@ private fun linkify(text: String, color: androidx.compose.ui.graphics.Color, onL
     append(text, last, text.length)
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun AttachmentStrip(files: List<Attachment>, onOpen: (Attachment, Boolean) -> Unit) {
     val c = Dot.colors
@@ -535,7 +556,8 @@ private fun AttachmentStrip(files: List<Attachment>, onOpen: (Attachment, Boolea
         files.forEach { a ->
             Row(
                 Modifier.widthIn(max = 240.dp).clip(DotShapes.medium).border(1.dp, c.border, DotShapes.medium)
-                    .clickable { onOpen(a, false) }.padding(horizontal = DotSpacing.m, vertical = 10.dp),
+                    .combinedClickable(onClickLabel = "Open", onLongClickLabel = "Share", onLongClick = { onOpen(a, true) }) { onOpen(a, false) }
+                    .padding(horizontal = DotSpacing.m, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(

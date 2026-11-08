@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
@@ -34,7 +35,7 @@ import app.dot.design.DotShapes
 import app.dot.design.DotSpacing
 
 /**
- * Minimal top bar: 56dp, background-coloured, a hairline appears only once content scrolls
+ * Minimal top bar: at least 56dp, background-coloured, a hairline appears only once content scrolls
  * under it ([elevated]). No tinted surfaces, no shadow.
  */
 @Composable
@@ -50,7 +51,8 @@ fun DotTopBar(
     val lineColor by animateColorAsState(if (elevated) Dot.colors.border else Color.Transparent, label = "bar-line")
     Column(modifier.background(Dot.colors.background).windowInsetsPadding(WindowInsets.statusBars)) {
         Row(
-            Modifier.fillMaxWidth().height(56.dp).padding(horizontal = DotSpacing.xs),
+            // Min height, not fixed: title + subtitle must not clip at large font scales.
+            Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = DotSpacing.xs, vertical = DotSpacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (navigation != null) navigation() else Spacer(Modifier.width(DotSpacing.l))
@@ -102,7 +104,9 @@ fun DotSnackbar(data: SnackbarData) {
                 Modifier
                     .clip(DotShapes.small)
                     .clickable(role = Role.Button) { data.performAction() }
-                    .padding(horizontal = DotSpacing.m, vertical = DotSpacing.m),
+                    .heightIn(min = 48.dp)
+                    .padding(horizontal = DotSpacing.m),
+                contentAlignment = Alignment.Center,
             ) {
                 Text(label, style = Dot.type.label, color = c.onInverse)
             }

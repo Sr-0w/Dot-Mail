@@ -386,4 +386,96 @@ class AutoDiscoveryTest {
         assertThat(c.imap.host).isEqualTo("imap.xn--mnch-0ra.de")
         assertThat(c.imap.username).isEqualTo("jürgen@xn--mnch-0ra.de")
     }
+
+    // ------------------------------------------------------------------ MX
+
+    private fun mx(vararg hosts: String) = MxResolver { hosts.toList() }
+
+    @Test
+    fun `custom domain at infomaniak is found by MX`() = runTest {
+        val f = FakeFetcher()
+        val c = AutoDiscovery(f, mx("mta-gw.infomaniak.ch")).discover("robin@snyders.xyz")!!
+        assertThat(c.source).isEqualTo(Source.MX)
+        assertThat(c.providerName).isEqualTo("Infomaniak")
+        assertThat(c.imap.host).isEqualTo("mail.infomaniak.com")
+        assertThat(c.imap.username).isEqualTo("robin@snyders.xyz")
+        assertThat(c.smtp.username).isEqualTo("robin@snyders.xyz")
+        // Provider autoconfig is tried first, ISPDB-by-domain never reached.
+        assertThat(f.requested).containsExactly(
+            "https://autoconfig.snyders.xyz/mail/config-v1.1.xml",
+            "https://snyders.xyz/.well-known/autoconfig/mail/config-v1.1.xml",
+        ).inOrder()
+    }
+
+    @Test
+    fun `MX suffix table`() {
+        fun p(h: String) = BuiltInProviders.lookupByMx(h)?.providerName
+        assertThat(p("mx1.mail.infomaniak.com.")).isEqualTo("Infomaniak")
+        assertThat(p("ASPMX.L.GOOGLE.COM")).isEqualTo("Gmail")
+        assertThat(p("alt1.aspmx.l.googlemail.com")).isEqualTo("Gmail")
+        assertThat(p("x-example-com.mail.protection.outlook.com")).isEqualTo("Microsoft 365")
+        assertThat(p("in1-smtp.messagingengine.com")).isEqualTo("Fastmail")
+        assertThat(p("mxext1.mailbox.org")).isEqualTo("mailbox.org")
+        assertThat(p("mx01.posteo.de")).isEqualTo("Posteo")
+        assertThat(p("mx.zoho.com")).isEqualTo("Zoho")
+        assertThat(BuiltInProviders.lookupByMx("mx.zoho.eu")!!.imapHost).isEqualTo("imap.zoho.eu")
+        assertThat(BuiltInProviders.lookupByMx("mx1.mail.ovh.net")!!.imapHost).isEqualTo("ssl0.ovh.net")
+        assertThat(BuiltInProviders.lookupByMx("spool.mail.gandi.net")!!.smtpHost).isEqualTo("mail.gandi.net")
+        // whole labels only, and unknown hosts
+        assertThat(p("evilinfomaniak.ch")).isNull()
+        assertThat(p("mail.example.org")).isNull()
+        assertThat(p("")).isNull()
+    }
+
+    @Test
+    fun `microsoft 365 via MX requires oauth`() = runTest {
+        val c = AutoDiscovery(FakeFetcher(), mx("contoso-com.mail.protection.outlook.com")).discover("a@contoso.com")!!
+        assertThat(c.source).isEqualTo(Source.MX)
+        assertThat(c.oauthRequired).isTrue()
+        assertThat(c.smtp.host).isEqualTo("smtp.office365.com")
+    }
+
+    @Test
+    fun `unknown MX falls back to ISPDB for the MX registrable domain`() = runTest {
+        val xml = fixture("simple.xml")
+        val f = FakeFetcher(mapOf("https://autoconfig.thunderbird.net/v1.1/hoster.example" to xml))
+        val c = AutoDiscovery(f, mx("mx1.eu.hoster.example")).discover("me@mydomain.org")!!
+        assertThat(c.source).isEqualTo(Source.MX)
+        assertThat(f.requested).contains("https://autoconfig.thunderbird.net/v1.1/hoster.example")
+        assertThat(f.requested).doesNotContain("https://autoconfig.thunderbird.net/v1.1/mydomain.org")
+    }
+
+    @Test
+    fun `MX that leads nowhere continues to ISPDB by domain then guess`() = runTest {
+        val f = FakeFetcher()
+        val c = AutoDiscovery(f, mx("mx.nowhere.example")).discover("me@mydomain.org")!!
+        assertThat(c.source).isEqualTo(Source.GUESS)
+        val urls = f.requested
+        assertThat(urls.indexOf("https://autoconfig.thunderbird.net/v1.1/nowhere.example"))
+            .isLessThan(urls.indexOf("https://autoconfig.thunderbird.net/v1.1/mydomain.org"))
+    }
+
+    @Test
+    fun `a throwing or empty MX resolver changes nothing`() = runTest {
+        val boom = AutoDiscovery(FakeFetcher(), MxResolver { error("dns down") }).discover("me@mydomain.org")!!
+        assertThat(boom.source).isEqualTo(Source.GUESS)
+        val none = AutoDiscovery(FakeFetcher(), mx()).discover("me@mydomain.org")!!
+        assertThat(none.source).isEqualTo(Source.GUESS)
+    }
+
+    @Test
+    fun `built-in and provider autoconfig win over MX`() = runTest {
+        var asked = false
+        val r = MxResolver { asked = true; listOf("aspmx.l.google.com") }
+        assertThat(AutoDiscovery(FakeFetcher(), r).discover("a@gmail.com")!!.source).isEqualTo(Source.BUILT_IN)
+        assertThat(asked).isFalse()
+    }
+
+    @Test
+    fun `registrable domain heuristic`() {
+        assertThat(registrableDomain("mx1.mail.ovh.net.")).isEqualTo("ovh.net")
+        assertThat(registrableDomain("mx.example.co.uk")).isEqualTo("example.co.uk")
+        assertThat(registrableDomain("hoster.example")).isEqualTo("hoster.example")
+        assertThat(registrableDomain("localhost")).isEqualTo("localhost")
+    }
 }

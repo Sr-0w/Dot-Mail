@@ -39,8 +39,11 @@ import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -122,6 +125,11 @@ fun DotTextField(
                     modifier = Modifier
                         .fillMaxWidth()
                         .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+                        .semantics {
+                            // The visible label is a sibling Text; say it on the field itself for screen readers.
+                            (label ?: placeholder)?.let { contentDescription = it }
+                            if (isError && supporting != null) error(supporting)
+                        }
                         .then(if (contentType != null) Modifier.semantics { this.contentType = contentType } else Modifier),
                 )
             }
@@ -154,7 +162,7 @@ fun SearchField(
     val c = Dot.colors
     Row(
         modifier
-            .heightIn(min = 46.dp)
+            .heightIn(min = 48.dp)
             .clip(DotShapes.medium)
             .background(c.surface)
             .padding(start = DotSpacing.m),
@@ -174,6 +182,7 @@ fun SearchField(
                 keyboardActions = KeyboardActions(onSearch = { onSearch() }),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .semantics { contentDescription = placeholder }
                     .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
             )
         }
@@ -185,14 +194,23 @@ fun SearchField(
     }
 }
 
-/** Switch re-skinned to the monochrome palette. */
+/**
+ * Switch re-skinned to the monochrome palette. Pass a null [onCheckedChange] when the switch sits in a
+ * row that is itself `toggleable` (the row then carries the semantics, the switch is purely visual).
+ */
 @Composable
-fun DotSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+fun DotSwitch(
+    checked: Boolean,
+    onCheckedChange: ((Boolean) -> Unit)?,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
     val c = Dot.colors
     Switch(
         checked = checked,
         onCheckedChange = onCheckedChange,
         modifier = modifier,
+        enabled = enabled,
         colors = SwitchDefaults.colors(
             checkedThumbColor = c.onInverse,
             checkedTrackColor = c.inverse,
@@ -200,6 +218,12 @@ fun DotSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, modifier: Mo
             uncheckedThumbColor = c.textTertiary,
             uncheckedTrackColor = c.surfaceRaised,
             uncheckedBorderColor = c.borderStrong,
+            disabledCheckedThumbColor = c.onInverse.copy(alpha = 0.6f),
+            disabledCheckedTrackColor = c.textTertiary.copy(alpha = 0.5f),
+            disabledCheckedBorderColor = Color.Transparent,
+            disabledUncheckedThumbColor = c.borderStrong,
+            disabledUncheckedTrackColor = c.surface,
+            disabledUncheckedBorderColor = c.border,
         ),
     )
 }

@@ -4,7 +4,7 @@ package app.dot.mail.engine.autoconfig
 enum class SocketType { SSL, STARTTLS, PLAIN }
 
 /** Where a [DiscoveredConfig] came from, in order of trust. */
-enum class Source { BUILT_IN, PROVIDER_AUTOCONFIG, ISPDB, GUESS }
+enum class Source { BUILT_IN, PROVIDER_AUTOCONFIG, MX, ISPDB, GUESS }
 
 /**
  * One server (IMAP or SMTP) with every field resolved and ready to use:

@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -36,9 +38,12 @@ data class ComposeState(
     val error: String? = null,
     val sending: Boolean = false,
     val savedOnce: Boolean = false,
+    /** Text typed in a recipient field but not yet turned into a chip. */
+    val pending: Map<RecipientField, String> = emptyMap(),
 ) {
     val sender: Sender? get() = draft?.let { d -> senders.firstOrNull { it.accountId == d.accountId && it.identityId == d.identityId } ?: senders.firstOrNull { it.accountId == d.accountId } }
-    val hasRecipients: Boolean get() = draft?.let { it.to.isNotEmpty() || it.cc.isNotEmpty() || it.bcc.isNotEmpty() } == true
+    val hasRecipients: Boolean get() = draft?.let { it.to.isNotEmpty() || it.cc.isNotEmpty() || it.bcc.isNotEmpty() } == true ||
+        pending.values.any { it.isNotBlank() }
     val isEmpty: Boolean get() = draft?.let { !hasRecipients && it.subject.isBlank() && it.bodyText.isBlank() && it.attachmentUris.isEmpty() } != false
 }
 
@@ -52,7 +57,7 @@ object UndoSendBus {
 private val appScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
 
 @OptIn(FlowPreview::class)
-class ComposeViewModel(private val graph: MailGraph, private val route: ComposeRoute, private val undoSeconds: Int) : ViewModel() {
+class ComposeViewModel(private val graph: MailGraph, private val route: ComposeRoute, private val undoSeconds: () -> Int) : ViewModel() {
     private val _state = MutableStateFlow(ComposeState())
     val state: StateFlow<ComposeState> = _state.asStateFlow()
 
@@ -95,7 +100,8 @@ class ComposeViewModel(private val graph: MailGraph, private val route: ComposeR
                 it.copy(loaded = true, draft = prefilled, senders = senders, showCcBcc = prefilled.cc.isNotEmpty() || prefilled.bcc.isNotEmpty())
             }
             // Autosave, debounced: a crash or process death never loses more than ~1.5 s of typing.
-            _state.drop(1).debounce(1_500).collect { s ->
+            _state.map { it.draft }.distinctUntilChanged().drop(1).debounce(1_500).collect {
+                val s = _state.value
                 if (!finished && !_closed.value && !s.isEmpty) save()
             }
         }
@@ -103,7 +109,20 @@ class ComposeViewModel(private val graph: MailGraph, private val route: ComposeR
 
     fun edit(transform: (Draft) -> Draft) = _state.update { s -> s.draft?.let { s.copy(draft = transform(it), error = null) } ?: s }
 
-    fun setSender(sender: Sender) = edit { it.copy(accountId = sender.accountId, identityId = sender.identityId) }
+    fun setSender(sender: Sender) {
+        val d = _state.value.draft ?: return
+        if (d.accountId == sender.accountId) {
+            edit { it.copy(identityId = sender.identityId) }
+            return
+        }
+        // Drafts belong to an account: save a fresh copy under the new one, then drop the old.
+        val oldId = d.localId
+        edit { it.copy(localId = 0, accountId = sender.accountId, identityId = sender.identityId) }
+        if (oldId > 0) viewModelScope.launch {
+            save()
+            writeLock.withLock { runCatching { graph.compose.discardDraft(oldId) } }
+        }
+    }
 
     fun showCcBcc() = _state.update { it.copy(showCcBcc = true) }
 
@@ -154,14 +173,28 @@ class ComposeViewModel(private val graph: MailGraph, private val route: ComposeR
         }
     }
 
+    fun setPending(field: RecipientField, text: String) = _state.update { it.copy(pending = it.pending + (field to text)) }
+
+    /** Turns any typed-but-uncommitted recipient text into chips. False if something is invalid. */
+    private fun commitPending(): Boolean {
+        var ok = true
+        _state.value.pending.forEach { (field, text) ->
+            if (text.isNotBlank()) {
+                if (addRecipient(field, text)) _state.update { it.copy(pending = it.pending - field) } else ok = false
+            }
+        }
+        return ok
+    }
+
     fun clearSuggestions() = _state.update { it.copy(suggestions = emptyList(), suggestFor = null) }
 
     fun addAttachments(uris: List<String>) = edit { it.copy(attachmentUris = (it.attachmentUris + uris).distinct()) }
     fun removeAttachment(uri: String) = edit { it.copy(attachmentUris = it.attachmentUris - uri) }
 
     fun send(scheduledAt: Long? = null) {
+        if (_state.value.sending || finished) return
+        if (!commitPending()) return
         val s = _state.value
-        if (s.sending || finished) return
         val d = s.draft ?: return
         when {
             s.senders.isEmpty() -> { _state.update { it.copy(error = "Add an account before sending") }; return }
@@ -174,7 +207,7 @@ class ComposeViewModel(private val graph: MailGraph, private val route: ComposeR
                 writeLock.withLock {
                     val current = _state.value.draft ?: d
                     val saved = graph.compose.saveDraft(current.copy(scheduledAt = scheduledAt))
-                    saved to graph.compose.send(current.copy(localId = saved, scheduledAt = scheduledAt), undoWindowMs = undoSeconds * 1_000L)
+                    saved to graph.compose.send(current.copy(localId = saved, scheduledAt = scheduledAt), undoWindowMs = undoSeconds() * 1_000L)
                 }
             }.onSuccess { (draftId, outboxId) ->
                 UndoSendBus.pending.value = UndoSendBus.Pending(outboxId, draftId, scheduledAt)
@@ -188,6 +221,7 @@ class ComposeViewModel(private val graph: MailGraph, private val route: ComposeR
 
     /** Back/close: keep a draft if there's anything worth keeping. Returns true if a draft was saved. */
     fun close(): Boolean {
+        commitPending()
         val keep = !_state.value.isEmpty && !finished
         _closed.value = true
         // The final save must outlive this ViewModel, which is cleared as the screen closes.

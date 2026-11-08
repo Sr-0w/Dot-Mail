@@ -46,3 +46,7 @@ JVM and Robolectric are not physical-device certification. Live Gmail/Infomaniak
 ## Combined integration result
 
 After Qwen’s fixes, `scripts/gw :mail:test :data:testDebugUnitTest` **passes: 99 mail tests + 10 data tests, zero failures** (remote BUILD SUCCESSFUL in 37s). This supersedes the earlier full-suite caveat.
+
+## Live follow-up
+
+Infomaniak IMAP TLS/CONDSTORE/body fetch and SMTP 587 STARTTLS/465 SSL attachment round trips passed. SMTP testing led to explicit base64 attachment encoding. Bounded BODY.PEEK text previews are implemented separately from full-body downloads. See [codex-interop-outbox.md](codex-interop-outbox.md).

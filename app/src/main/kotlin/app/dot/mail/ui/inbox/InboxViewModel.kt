@@ -42,6 +42,8 @@ class InboxViewModel(private val graph: MailGraph, private val saved: SavedState
     val mailbox: StateFlow<Mailbox> = _mailbox.asStateFlow()
 
     private val focusedAccount = MutableStateFlow<Long?>(saved["focusedAccount"])
+    /** The folder last opened from the drawer, so its title survives focusing another account. */
+    private val openedFolder = MutableStateFlow<Folder?>(null)
 
     private val _selection = MutableStateFlow<Set<Long>>(emptySet())
     val selection: StateFlow<Set<Long>> = _selection.asStateFlow()
@@ -66,7 +68,7 @@ class InboxViewModel(private val graph: MailGraph, private val saved: SavedState
 
     /** Folders of every account, used to resolve titles for InFolder mailboxes. */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val header: StateFlow<InboxHeader> = combine(_mailbox, drawer, accounts) { box, d, accts ->
+    val header: StateFlow<InboxHeader> = combine(_mailbox, drawer, accounts, openedFolder) { box, d, accts, opened ->
         when (box) {
             is Mailbox.Unified -> InboxHeader(
                 title = app.dot.mail.ui.common.Format.roleName(box.role),
@@ -74,7 +76,7 @@ class InboxViewModel(private val graph: MailGraph, private val saved: SavedState
                 role = box.role,
             )
             is Mailbox.InFolder -> {
-                val folder = d.folders.firstOrNull { it.id == box.folderId }
+                val folder = d.folders.firstOrNull { it.id == box.folderId } ?: opened?.takeIf { it.id == box.folderId }
                 val account = accts.firstOrNull { it.id == folder?.accountId }
                 InboxHeader(
                     title = folder?.let { if (it.role == FolderRole.CUSTOM) it.name else app.dot.mail.ui.common.Format.roleName(it.role) } ?: "",
@@ -90,6 +92,9 @@ class InboxViewModel(private val graph: MailGraph, private val saved: SavedState
         _mailbox.flatMapLatest { graph.mail.threads(it) }.cachedIn(viewModelScope)
 
     fun open(mailbox: Mailbox) {
+        if (mailbox is Mailbox.InFolder) {
+            drawer.value.folders.firstOrNull { it.id == mailbox.folderId }?.let { openedFolder.value = it }
+        }
         _selection.value = emptySet()
         _mailbox.value = mailbox
         when (mailbox) {
@@ -110,9 +115,12 @@ class InboxViewModel(private val graph: MailGraph, private val saved: SavedState
         if (ids.isEmpty()) return
         val count = ids.size
         viewModelScope.launch {
-            graph.mail.apply(action, ids.toList())
-            _selection.value = emptySet()
-            confirmation(action, count)?.let { _events.send(it) }
+            runCatching { graph.mail.apply(action, ids.toList()) }
+                .onSuccess {
+                    _selection.value = emptySet()
+                    confirmation(action, count)?.let { _events.send(it) }
+                }
+                .onFailure { _events.send(it.message ?: "That action couldn't be completed") }
         }
     }
 
@@ -120,9 +128,12 @@ class InboxViewModel(private val graph: MailGraph, private val saved: SavedState
         val ids = _selection.value.toList()
         if (ids.isEmpty()) return
         viewModelScope.launch {
-            graph.mail.move(ids, folderId)
-            _selection.value = emptySet()
-            _events.send(if (ids.size == 1) "Moved" else "Moved ${ids.size} conversations")
+            runCatching { graph.mail.move(ids, folderId) }
+                .onSuccess {
+                    _selection.value = emptySet()
+                    _events.send(if (ids.size == 1) "Moved" else "Moved ${ids.size} conversations")
+                }
+                .onFailure { _events.send(it.message ?: "Couldn't move") }
         }
     }
 
@@ -130,8 +141,9 @@ class InboxViewModel(private val graph: MailGraph, private val saved: SavedState
         if (_refreshing.value) return
         viewModelScope.launch {
             _refreshing.value = true
-            runCatching { graph.mail.refresh(_mailbox.value) }
-                .onFailure { _events.send(it.message ?: "Couldn't refresh") }
+            // Bounded: the spinner must never get stuck if a sync hangs.
+            runCatching { kotlinx.coroutines.withTimeout(60_000) { graph.mail.refresh(_mailbox.value) } }
+                .onFailure { _events.send(if (it is kotlinx.coroutines.TimeoutCancellationException) "Still syncing in the background" else it.message ?: "Couldn't refresh") }
             _refreshing.value = false
         }
     }

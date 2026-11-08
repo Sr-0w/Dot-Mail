@@ -65,10 +65,21 @@ internal suspend fun RealMailGraph.syncAll(): Boolean = syncLock.withLock {
                     (old.map { it.threadId } + dao.folderMessages(folder.id).map { it.threadId }).distinct().forEach { rebuildThread(it) }
                     dao.updateFolder(folder.copy(name = remote.name, role = remote.role.name, unread = remote.unread, total = remote.total, validity = result.cursor.uidValidity, nextUid = result.cursor.uidNext, modSeq = result.cursor.highestModSeq))
                 }
+                // Only newest cached messages without a preview are fetched, at most 200 × 2 KiB per folder.
+                val previewRows = dao.folderMessages(folder.id).filter { it.uid > 0 }.sortedByDescending { it.sentAt }.take(200).filter { !it.snippetFetched && !it.bodyLoaded }
+                if (previewRows.isNotEmpty()) {
+                    val snippets = try { client.snippets(config.imap.endpoint(), creds, folder.path, previewRows.map { it.uid }.toLongArray(), result.cursor.uidValidity) }
+                    catch (e: CancellationException) { throw e }
+                    catch (_: Exception) { emptyMap() } // Header/flag sync remains authoritative even when previews fail.
+                    database.withTransaction {
+                        snippets.forEach { (uid, snippet) -> dao.byUid(folder.id, uid)?.let { dao.updateMessage(it.copy(snippet = snippet, snippetFetched = true)) } }
+                        previewRows.map { it.threadId }.distinct().forEach { rebuildThread(it) }
+                    }
+                }
                 notifications.distinctBy { it.first }.forEach { (id, subject) -> MailNotifications.newMail(context, account, id, subject) }
             }
             dao.syncError(account.id, if (deferredExpunge) "Move copied messages and marked the originals deleted; server lacks targeted expunge" else if (dao.operations(account.id).any { it.error != null }) "Some server changes are pending or require review" else null)
-        } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; success = false; dao.syncError(account.id, if (e is jakarta.mail.AuthenticationFailedException) "Authentication failed" else "Could not synchronize account") }
+        } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; success = false; dao.syncError(account.id, if (e is jakarta.mail.AuthenticationFailedException || e is app.dot.mail.data.oauth.ReauthenticationRequired) "Sign in again to reconnect this account" else "Could not synchronize account", e is jakarta.mail.AuthenticationFailedException || e is app.dot.mail.data.oauth.ReauthenticationRequired) }
         finally { syncing.value = syncing.value - account.id }
     }
     success
@@ -99,6 +110,7 @@ internal suspend fun RealMailGraph.deliverOutbox(id: Long): Boolean = syncLock.w
         try {
             client.send(config.smtp.endpoint(), creds, mime)
         } catch (e: SubmissionNotStartedException) {
+            if (e.cause is jakarta.mail.AuthenticationFailedException) dao.syncError(account.id, "Sign in again to reconnect this account", true)
             dao.transitionOutbox(id, "SUBMITTING", "PENDING", "Connection failed before submission; will retry")
             return@withLock false
         } catch (e: CancellationException) {

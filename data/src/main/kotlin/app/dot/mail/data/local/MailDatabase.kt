@@ -6,7 +6,7 @@ import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "accounts")
-data class AccountRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val email: String, val name: String, val color: Int, val config: String, val secret: String, val syncError: String? = null)
+data class AccountRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val email: String, val name: String, val color: Int, val config: String, val secret: String, val syncError: String? = null, @ColumnInfo(defaultValue = "0") val authError: Boolean = false)
 @Entity(tableName = "folders", foreignKeys = [ForeignKey(entity = AccountRow::class, parentColumns = ["id"], childColumns = ["accountId"], onDelete = ForeignKey.CASCADE)], indices = [Index(value = ["accountId", "path"], unique = true)])
 data class FolderRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val accountId: Long, val path: String, val name: String, val role: String, val unread: Int = 0, val total: Int = 0, val validity: Long = 0, val nextUid: Long = 1, val modSeq: Long = -1)
 @Entity(tableName = "threads", foreignKeys = [ForeignKey(entity = AccountRow::class, parentColumns = ["id"], childColumns = ["accountId"], onDelete = ForeignKey.CASCADE)], indices = [Index("accountId")])
@@ -14,7 +14,7 @@ data class ThreadRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val acco
 @Entity(tableName = "thread_keys", primaryKeys = ["accountId", "key"], foreignKeys = [ForeignKey(entity = ThreadRow::class, parentColumns = ["id"], childColumns = ["threadId"], onDelete = ForeignKey.CASCADE)], indices = [Index("threadId")])
 data class ThreadKeyRow(val accountId: Long, val key: String, val threadId: Long)
 @Entity(tableName = "messages", foreignKeys = [ForeignKey(entity = FolderRow::class, parentColumns = ["id"], childColumns = ["folderId"], onDelete = ForeignKey.CASCADE), ForeignKey(entity = ThreadRow::class, parentColumns = ["id"], childColumns = ["threadId"], onDelete = ForeignKey.CASCADE)], indices = [Index(value = ["folderId", "uid"], unique = true), Index("threadId"), Index("accountId")])
-data class MessageRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val accountId: Long, val folderId: Long, val threadId: Long, val uid: Long, val header: String, val subject: String, val sentAt: Long, val unread: Boolean, val starred: Boolean, val hasAttachments: Boolean, val snippet: String = "", val text: String? = null, val html: String? = null, val bodyLoaded: Boolean = false, val remoteImages: Boolean = false, val senderSearch: String = "", val recipientSearch: String = "")
+data class MessageRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val accountId: Long, val folderId: Long, val threadId: Long, val uid: Long, val header: String, val subject: String, val sentAt: Long, val unread: Boolean, val starred: Boolean, val hasAttachments: Boolean, val snippet: String = "", val text: String? = null, val html: String? = null, val bodyLoaded: Boolean = false, val remoteImages: Boolean = false, val senderSearch: String = "", val recipientSearch: String = "", @ColumnInfo(defaultValue = "0") val snippetFetched: Boolean = false)
 @Entity(tableName = "attachments", foreignKeys = [ForeignKey(entity = MessageRow::class, parentColumns = ["id"], childColumns = ["messageId"], onDelete = ForeignKey.CASCADE)], indices = [Index("messageId")])
 data class AttachmentRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val messageId: Long, val partId: String, val name: String, val mime: String, val size: Long, val cid: String?, val inline: Boolean, val localUri: String?)
 @Entity(tableName = "drafts", foreignKeys = [ForeignKey(entity = AccountRow::class, parentColumns = ["id"], childColumns = ["accountId"], onDelete = ForeignKey.CASCADE)], indices = [Index("accountId")])
@@ -32,8 +32,10 @@ interface MailDao {
     @Query("SELECT * FROM accounts ORDER BY id") suspend fun accounts(): List<AccountRow>
     @Query("SELECT * FROM accounts WHERE id=:id") suspend fun account(id: Long): AccountRow?
     @Insert suspend fun insertAccount(row: AccountRow): Long
+    @Query("UPDATE accounts SET secret=:secret,config=:config,syncError=NULL,authError=0 WHERE id=:id") suspend fun accountAuthorization(id: Long, secret: String, config: String): Int
+    @Query("UPDATE accounts SET secret=:secret,syncError=NULL,authError=0 WHERE id=:id") suspend fun accountSecret(id: Long, secret: String): Int
     @Query("DELETE FROM accounts WHERE id=:id") suspend fun deleteAccount(id: Long)
-    @Query("UPDATE accounts SET syncError=:error WHERE id=:id") suspend fun syncError(id: Long, error: String?)
+    @Query("UPDATE accounts SET syncError=:error,authError=:authError WHERE id=:id") suspend fun syncError(id: Long, error: String?, authError: Boolean = false)
     @Query("SELECT * FROM folders WHERE accountId=:account ORDER BY id") fun observeFolders(account: Long): Flow<List<FolderRow>>
     @Query("SELECT * FROM folders WHERE accountId=:account") suspend fun folders(account: Long): List<FolderRow>
     @Query("SELECT * FROM folders WHERE id=:id") suspend fun folder(id: Long): FolderRow?
@@ -79,5 +81,17 @@ interface MailDao {
     @Query("SELECT email, name, MAX(lastSeen) AS lastSeen, accountId FROM contacts WHERE email LIKE :prefix ESCAPE '!' OR name LIKE :prefix ESCAPE '!' GROUP BY email ORDER BY lastSeen DESC LIMIT :limit") suspend fun contacts(prefix: String, limit: Int): List<ContactRow>
 }
 
-@Database(entities = [AccountRow::class, FolderRow::class, ThreadRow::class, ThreadKeyRow::class, MessageRow::class, AttachmentRow::class, DraftRow::class, OutboxRow::class, OperationRow::class, ContactRow::class], version = 1, exportSchema = true)
+@Database(entities = [AccountRow::class, FolderRow::class, ThreadRow::class, ThreadKeyRow::class, MessageRow::class, AttachmentRow::class, DraftRow::class, OutboxRow::class, OperationRow::class, ContactRow::class], version = 3, exportSchema = true)
 abstract class MailDatabase : RoomDatabase() { abstract fun mail(): MailDao }
+
+internal val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE messages ADD COLUMN snippetFetched INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
+internal val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE accounts ADD COLUMN authError INTEGER NOT NULL DEFAULT 0")
+    }
+}

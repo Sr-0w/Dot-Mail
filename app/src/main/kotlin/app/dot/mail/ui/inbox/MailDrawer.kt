@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -95,6 +96,7 @@ fun MailDrawer(
                             icon = Icons.Outlined.Outbox,
                             count = outboxCount,
                             selected = false,
+                            navigation = false,
                             onClick = onOutbox,
                         )
                     }
@@ -140,7 +142,9 @@ fun MailDrawer(
                         Modifier.fillMaxWidth().padding(horizontal = 10.dp).clip(DotShapes.medium)
                             .background(if (a.id == state.focusedAccountId) c.surface else Color.Transparent)
                             .clickable(role = Role.Tab) { onFocusAccount(a.id) }
-                            .padding(horizontal = 10.dp, vertical = 10.dp),
+                            .semantics { this.selected = a.id == state.focusedAccountId }
+                            .heightIn(min = 48.dp)
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Avatar(a.displayName, a.email, size = 30.dp)
@@ -150,17 +154,17 @@ fun MailDrawer(
                             Text(a.email, style = Dot.type.caption, color = c.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                         if (a.syncState is SyncState.Error) {
-                            Icon(Icons.Outlined.ErrorOutline, "Sync problem", Modifier.size(18.dp), tint = c.danger)
+                            Icon(Icons.Outlined.ErrorOutline, "Sync problem: ${(a.syncState as SyncState.Error).message}", Modifier.size(18.dp), tint = c.danger)
                         }
                     }
                 }
                 item {
-                    DrawerItem("Add account", Icons.Outlined.Add, null, selected = false, onClick = onAddAccount)
+                    DrawerItem("Add account", Icons.Outlined.Add, null, selected = false, navigation = false, onClick = onAddAccount)
                 }
             }
             Hairline()
             Box(Modifier.windowInsetsPadding(WindowInsets.navigationBars).padding(vertical = DotSpacing.s)) {
-                DrawerItem("Settings", Icons.Outlined.Settings, null, selected = false, onClick = onSettings)
+                DrawerItem("Settings", Icons.Outlined.Settings, null, selected = false, navigation = false, onClick = onSettings)
             }
         }
     }
@@ -173,6 +177,8 @@ private fun DrawerItem(
     count: Int?,
     selected: Boolean,
     indent: Int = 0,
+    /** True for mailbox destinations (tab, selectable); false for plain actions like Settings. */
+    navigation: Boolean = true,
     onClick: () -> Unit,
 ) {
     val c = Dot.colors
@@ -182,9 +188,10 @@ private fun DrawerItem(
             .padding(horizontal = 10.dp, vertical = 1.dp)
             .clip(DotShapes.medium)
             .background(if (selected) c.surfaceRaised else Color.Transparent)
-            .clickable(role = Role.Tab, onClick = onClick)
-            .semantics { this.selected = selected }
-            .padding(start = (10 + indent).dp, end = 12.dp, top = 11.dp, bottom = 11.dp),
+            .clickable(role = if (navigation) Role.Tab else Role.Button, onClick = onClick)
+            .then(if (navigation) Modifier.semantics { this.selected = selected } else Modifier)
+            .heightIn(min = 48.dp)
+            .padding(start = (10 + indent).dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, null, Modifier.size(20.dp), tint = if (selected) c.textPrimary else c.textSecondary)

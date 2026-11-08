@@ -65,7 +65,6 @@ class MainActivity : FragmentActivity() {
                 CompositionLocalProvider(LocalMailGraph provides app.graph, LocalSettings provides app.settings) {
                     if (isLocked) {
                         LockScreen(onUnlock = ::authenticate)
-                        LaunchedEffect(Unit) { authenticate() }
                     } else {
                         DotMailRoot(requests = requests, onRequestConsumed = { requests.value = null })
                     }
@@ -82,6 +81,13 @@ class MainActivity : FragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         parse(intent)?.let { requests.value = it }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        app.dot.mail.ui.common.Format.use24h = android.text.format.DateFormat.is24HourFormat(this)
+        // Prompt only while visible (never from the background).
+        if (locked.value) authenticate()
     }
 
     override fun onStop() {

@@ -108,6 +108,16 @@ class MailClient(val timeoutMs: Int = 30_000) {
         }
         message.writeTo(output)
         Mime.parse(MimeMessage(Session.getInstance(Properties()), java.io.ByteArrayInputStream(output.toByteArray()))) } }
+    /** Bounded partial text previews only. Never changes flags or populates a complete body. */
+    suspend fun snippets(endpoint: Endpoint, credentials: Credentials, path: String, uids: LongArray, expectedValidity: Long, maxBytes: Int = 2048): Map<Long, String> = store(endpoint, credentials) { store ->
+        require(uids.size <= 200 && uids.all { it > 0 } && maxBytes in 128..2048)
+        folder(store, path) { folder ->
+            require(folder.uidValidity == expectedValidity) { "Folder UIDVALIDITY changed" }
+            val messages = folder.getMessagesByUID(uids).filterNotNull().toTypedArray()
+            folder.fetch(messages, FetchProfile().apply { add(FetchProfile.Item.CONTENT_INFO); add(UIDFolder.FetchProfileItem.UID) })
+            messages.associate { message -> val uid = folder.getUID(message); uid to SnippetFetcher.fetch(folder, message, uid, maxBytes) }
+        }
+    }
     suspend fun setFlags(endpoint: Endpoint, credentials: Credentials, path: String, uids: LongArray, seen: Boolean? = null, starred: Boolean? = null, delete: Boolean = false) = store(endpoint, credentials) { s -> folder(s, path, true) { f ->
         val messages = f.getMessagesByUID(uids).filterNotNull().toTypedArray()
         seen?.let { f.setFlags(messages, Flags(Flags.Flag.SEEN), it) }

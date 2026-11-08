@@ -20,7 +20,14 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 object Format {
-    private val time = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
+    /** Set from the system setting (DateFormat.is24HourFormat) at app start / resume; null = locale default. */
+    @Volatile var use24h: Boolean? = null
+    private val time: DateTimeFormatter
+        get() = when (use24h) {
+            true -> DateTimeFormatter.ofPattern("HH:mm")
+            false -> DateTimeFormatter.ofPattern("h:mm a")
+            null -> DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
+        }
     private val fullDate = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
 
     /** List timestamps: "14:32", "Tue", "8 Nov", "08/11/2024". */

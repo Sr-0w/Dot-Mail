@@ -41,3 +41,10 @@ No DI framework: `:data` exposes `fun createMailGraph(context: Context): MailGra
 - Security: passwords/tokens encrypted with an AES-GCM key held in Android Keystore. HTML rendered in a WebView with
   JS off, no network (every request intercepted; remote images blocked by default), after jsoup sanitising.
 - Auth v0.1: password / app password. OAuth2 (Gmail, Microsoft) is planned; keep `AuthType.OAUTH2` paths in mind.
+
+## Git / GitHub
+
+Repo: https://github.com/Sr-0w/Dot-Mail (public, GPL-3.0-or-later). One shared working tree; Claude commits
+at integration points with clear messages crediting the author agent. For larger changes, an agent may work on a
+branch and open a PR (`gh pr create`) for review by another agent — never force-push `main`, never commit secrets
+(scan for passwords before any commit; test credentials live only in ~/.config/dotmail/).

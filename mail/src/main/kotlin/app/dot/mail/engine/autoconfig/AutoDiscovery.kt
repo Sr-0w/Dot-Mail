@@ -51,8 +51,11 @@ internal fun parseEmail(email: String): ParsedEmail? {
  *  2. provider autoconfig ([Source.PROVIDER_AUTOCONFIG]):
  *     `https://autoconfig.<domain>/mail/config-v1.1.xml`, then
  *     `https://<domain>/.well-known/autoconfig/mail/config-v1.1.xml`;
- *  3. Mozilla ISPDB ([Source.ISPDB]): `https://autoconfig.thunderbird.net/v1.1/<domain>`;
- *  4. educated guess ([Source.GUESS]): `imap.<domain>:993` SSL, `smtp.<domain>:465` SSL.
+ *  3. MX lookup ([Source.MX]), like Thunderbird: the domain's MX hosts are matched against
+ *     well-known providers (custom domains hosted at Infomaniak, Google, Microsoft 365, ...),
+ *     else ISPDB is queried with the MX host's registrable domain;
+ *  4. Mozilla ISPDB ([Source.ISPDB]): `https://autoconfig.thunderbird.net/v1.1/<domain>`;
+ *  5. educated guess ([Source.GUESS]): `imap.<domain>:993` SSL, `smtp.<domain>:465` SSL.
  *
  * Privacy: every URL contains only the domain — never the full email address.
  *
@@ -61,7 +64,15 @@ internal fun parseEmail(email: String): ParsedEmail? {
  * are unusable for any source are handled by falling back; a syntactically invalid
  * email yields null without touching the network.
  */
-class AutoDiscovery(private val fetcher: ConfigFetcher = HttpsConfigFetcher()) {
+/** Resolves the MX hosts of [domain], best (lowest preference) first. Blocking; empty when unknown/unavailable. */
+fun interface MxResolver {
+    fun lookup(domain: String): List<String>
+}
+
+class AutoDiscovery(
+    private val fetcher: ConfigFetcher = HttpsConfigFetcher(),
+    private val mxResolver: MxResolver = MxResolver { emptyList() },
+) {
 
     suspend fun discover(email: String): DiscoveredConfig? = withContext(Dispatchers.IO) {
         val parsed = parseEmail(email) ?: return@withContext null
@@ -77,13 +88,32 @@ class AutoDiscovery(private val fetcher: ConfigFetcher = HttpsConfigFetcher()) {
         )) {
             fetchConfig(url, full, local, domain, Source.PROVIDER_AUTOCONFIG)?.let { return@withContext it }
         }
+        discoverViaMx(domain, local, full)?.let { return@withContext it }
+
         fetchConfig("https://autoconfig.thunderbird.net/v1.1/$domain", full, local, domain, Source.ISPDB)
             ?.let { return@withContext it }
 
         return@withContext guess(full, domain)
     }
 
-    private fun BuiltInProviders.Entry.toConfig(local: String, email: String): DiscoveredConfig {
+    private fun discoverViaMx(domain: String, local: String, email: String): DiscoveredConfig? {
+        val hosts = try {
+            mxResolver.lookup(domain)
+        } catch (e: Exception) {
+            return null // DNS trouble must not abort discovery
+        }.map { it.trim().trimEnd('.').lowercase() }.filter { it.isNotEmpty() }
+        if (hosts.isEmpty()) return null
+        for (host in hosts) {
+            BuiltInProviders.lookupByMx(host)?.let { return it.toConfig(local, email, Source.MX) }
+        }
+        for (base in hosts.map(::registrableDomain).distinct().filter { it != domain }.take(3)) {
+            fetchConfig("https://autoconfig.thunderbird.net/v1.1/$base", email, local, domain, Source.MX)
+                ?.let { return it }
+        }
+        return null
+    }
+
+    private fun BuiltInProviders.Entry.toConfig(local: String, email: String, source: Source = Source.BUILT_IN): DiscoveredConfig {
         val username = if (usernameIsFullEmail) email else local
         return DiscoveredConfig(
             imap = DiscoveredServer(imapHost, imapPort, imapSocket, username),
@@ -91,7 +121,7 @@ class AutoDiscovery(private val fetcher: ConfigFetcher = HttpsConfigFetcher()) {
             providerName = providerName,
             hint = hint,
             oauthRequired = oauthRequired,
-            source = Source.BUILT_IN,
+            source = source,
         )
     }
 
@@ -127,4 +157,17 @@ class AutoDiscovery(private val fetcher: ConfigFetcher = HttpsConfigFetcher()) {
         oauthRequired = false,
         source = Source.GUESS,
     )
+}
+
+private val SECOND_LEVEL = setOf("co", "com", "org", "net", "gov", "edu", "ac", "ne", "or", "go")
+
+/**
+ * Approximate registrable domain ("eTLD+1") without a public-suffix list: last two labels, or
+ * last three for the common `co.uk` / `com.au` shape. Good enough to address ISPDB.
+ */
+internal fun registrableDomain(host: String): String {
+    val labels = host.trim().trimEnd('.').lowercase().split('.').filter { it.isNotEmpty() }
+    if (labels.size <= 2) return labels.joinToString(".")
+    val n = if (labels.last().length == 2 && labels[labels.size - 2] in SECOND_LEVEL) 3 else 2
+    return labels.takeLast(n).joinToString(".")
 }

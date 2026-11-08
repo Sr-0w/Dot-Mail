@@ -43,19 +43,6 @@ class LiveInfomaniakTest {
                 fetchedBody = true
                 println("LIVE body fetch: OK (contents withheld)")
             }
-            // Recover only our interrupted test runs, identified by exact self-addresses, ID format and known fixture body.
-            phase = "clean up generated mail from interrupted test runs"
-            val interrupted = client.search(imap, credentials, inbox, "subject:\"Dot Mail interoperability\"", limit = 50).filter { h ->
-                h.messageId?.matches(Regex("<dotmail-live-[0-9a-f-]{36}@dotmail[.]invalid>")) == true && h.from.any { it.email == email } && h.to.any { it.email == email }
-            }
-            var cleaned = 0
-            interrupted.forEach { header ->
-                val body = client.body(imap, credentials, inbox, header.uid)
-                if (body.text?.startsWith("Opt-in Dot Mail interoperability test. This message will be moved to Trash by the test.") == true && body.attachments.any { it.name == "dotmail-interop.txt" }) {
-                    client.move(imap, credentials, inbox, longArrayOf(header.uid), trash); cleaned++
-                }
-            }
-            if (cleaned > 0) println("LIVE interrupted test messages moved to Trash: $cleaned")
             for ((port, security) in listOf(587 to TransportSecurity.STARTTLS, 465 to TransportSecurity.SSL_TLS)) {
                 val marker = "Dot Mail interoperability ${UUID.randomUUID()}"
                 val id = "<dotmail-live-${UUID.randomUUID()}@dotmail.invalid>"
@@ -74,6 +61,10 @@ class LiveInfomaniakTest {
                 }
                 val header = requireNotNull(found) { "Self-mail did not arrive before timeout" }
                 try {
+                    phase = "generated text preview for SMTP $port"
+                    val preview = client.snippets(imap, credentials, inbox, longArrayOf(header.uid), initial.cursor.uidValidity).getValue(header.uid)
+                    assertTrue(preview.startsWith("Opt-in Dot Mail interoperability test."))
+                    println("LIVE bounded text preview $port: OK")
                     phase = "generated body/attachment verification for SMTP $port"
                     val body = client.body(imap, credentials, inbox, header.uid)
                     assertArrayEquals(payload, body.attachments.single { it.name == "dotmail-interop.txt" }.bytes)

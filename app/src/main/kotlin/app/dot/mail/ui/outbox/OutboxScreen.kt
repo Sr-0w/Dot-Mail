@@ -2,7 +2,9 @@ package app.dot.mail.ui.outbox
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,6 +13,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import app.dot.design.components.DotSnackbar
+import androidx.compose.ui.Alignment
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Outbox
 import androidx.compose.material3.AlertDialog
@@ -23,6 +30,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.dot.design.Dot
 import app.dot.design.DotShapes
@@ -46,14 +54,18 @@ fun OutboxScreen(onBack: () -> Unit) {
     val items by graph.compose.outbox.collectAsStateWithLifecycle(emptyList())
     val scope = rememberCoroutineScope()
     var confirmDuplicate by remember { mutableStateOf<OutboxItem?>(null) }
+    val snackbar = remember { SnackbarHostState() }
+    val listState = rememberLazyListState()
+    fun busy(ok: Boolean) { if (!ok) scope.launch { snackbar.showSnackbar("This message is being processed. Try again in a moment.") } }
     val c = Dot.colors
-    Column(Modifier.fillMaxSize().background(c.background)) {
-        DotTopBar(title = "Outbox", navigation = { BackButton(onBack) })
+    Box(Modifier.fillMaxSize().background(c.background)) {
+    Column(Modifier.fillMaxSize()) {
+        DotTopBar(title = "Outbox", elevated = listState.canScrollBackward, navigation = { BackButton(onBack) })
         if (items.isEmpty()) {
             EmptyState(Icons.Outlined.Outbox, "Outbox is empty", "Scheduled and pending messages appear here.")
             return@Column
         }
-        LazyColumn {
+        LazyColumn(state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp), modifier = Modifier.navigationBarsPadding()) {
             items(items, key = { it.id }) { item ->
                 Column(Modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.l)) {
                     Row {
@@ -77,11 +89,11 @@ fun OutboxScreen(onBack: () -> Unit) {
                             if (item.canRetry) {
                                 DotButton("Retry", compact = true, style = ButtonStyle.Secondary, onClick = {
                                     if (item.state == OutboxState.NEEDS_REVIEW) confirmDuplicate = item
-                                    else scope.launch { graph.compose.retrySend(item.id) }
+                                    else scope.launch { busy(graph.compose.retrySend(item.id)) }
                                 })
                             }
                             if (item.canDelete) {
-                                DotButton("Delete", compact = true, style = ButtonStyle.Ghost, onClick = { scope.launch { graph.compose.deleteOutbox(item.id) } })
+                                DotButton("Delete", compact = true, style = ButtonStyle.Ghost, onClick = { scope.launch { busy(graph.compose.deleteOutbox(item.id)) } })
                             }
                         }
                     }
@@ -89,6 +101,8 @@ fun OutboxScreen(onBack: () -> Unit) {
                 Hairline(Modifier.padding(horizontal = DotSpacing.gutter))
             }
         }
+    }
+    SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 8.dp)) { DotSnackbar(it) }
     }
     confirmDuplicate?.let { item ->
         AlertDialog(
@@ -106,7 +120,7 @@ fun OutboxScreen(onBack: () -> Unit) {
             confirmButton = {
                 DotButton("Send anyway", compact = true, onClick = {
                     confirmDuplicate = null
-                    scope.launch { graph.compose.retrySend(item.id, confirmPossibleDuplicate = true) }
+                    scope.launch { busy(graph.compose.retrySend(item.id, confirmPossibleDuplicate = true)) }
                 })
             },
             dismissButton = { DotButton("Cancel", { confirmDuplicate = null }, style = ButtonStyle.Ghost, compact = true) },

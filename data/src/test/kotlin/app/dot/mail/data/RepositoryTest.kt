@@ -71,6 +71,7 @@ class RepositoryTest {
             val inbox = db.mail().folders(account).first { it.role == "INBOX" }
             val row = db.mail().folderMessages(inbox.id).single()
             assertFalse(row.bodyLoaded); assertNull(row.text)
+            assertEquals("body", row.snippet); assertTrue(row.snippetFetched)
             graph.loadBody(row.id)
             assertEquals("body", db.mail().message(row.id)!!.text)
             assertTrue(db.mail().message(row.id)!!.remoteImages)
@@ -147,8 +148,8 @@ class RepositoryTest {
     @Test fun savedAttachmentsSurviveOriginalGrantLoss() = runBlocking {
         val account = graph.addAccount(config, "password")
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val file = java.io.File(context.cacheDir, "picked-report.txt").apply { writeText("persistent bytes") }
-        val draft = Draft(accountId = account, identityId = account, to = listOf(EmailAddress("bob@example.org")), attachmentUris = listOf(android.net.Uri.fromFile(file).toString()))
+        val file = java.io.File(context.filesDir, "attachments/picker/picked-report.txt").apply { parentFile!!.mkdirs(); writeText("persistent bytes") }
+        val draft = Draft(accountId = account, identityId = account, to = listOf(EmailAddress("bob@example.org")), attachmentUris = listOf(androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.attachments", file).toString()))
         val id = graph.saveDraft(draft)
         val cached = graph.loadDraft(id)!!
         assertTrue(cached.attachmentUris.single().startsWith("content://"))
@@ -166,6 +167,49 @@ class RepositoryTest {
         assertEquals(0, db.mail().outboxPath(outbox, "/unused"))
         assertEquals(0, db.mail().transitionOutbox(outbox, "PENDING", "SUBMITTING"))
         assertEquals("CANCELLED", db.mail().outbox(outbox)!!.state)
+    }
+    @Test fun externalFileUrisCannotSnapshotPrivateData() = runBlocking {
+        val account = graph.addAccount(config, "password")
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val sensitive = java.io.File(context.filesDir, "private-secret.txt").apply { writeText("private fixture") }
+        val failure = runCatching { graph.saveDraft(Draft(accountId = account, identityId = account, attachmentUris = listOf(android.net.Uri.fromFile(sensitive).toString()))) }.exceptionOrNull()
+        assertTrue(failure is IllegalArgumentException)
+    }
+    @Test fun outboxReviewRequiresAcknowledgementAndProtectsActiveDelivery() = runBlocking {
+        val account = graph.addAccount(config, "password")
+        val id = graph.send(Draft(accountId = account, identityId = account, to = listOf(EmailAddress("bob@example.org")), subject = "Review"), 60_000)
+        assertEquals(OutboxState.QUEUED, graph.outbox.first().single().state)
+        db.mail().transitionOutbox(id, "PENDING", "SUBMITTING")
+        assertEquals(OutboxState.SENDING, graph.outbox.first().single().state)
+        assertFalse(graph.deleteOutbox(id)); assertFalse(graph.retrySend(id, true))
+        graph.recoverOutbox()
+        val review = graph.outbox.first().single()
+        assertEquals(OutboxState.NEEDS_REVIEW, review.state); assertTrue(review.canRetry); assertTrue(review.canDelete)
+        assertFalse(graph.retrySend(id)); assertEquals("UNCERTAIN", db.mail().outbox(id)!!.state)
+        assertTrue(graph.retrySend(id, confirmPossibleDuplicate = true))
+        assertEquals("PENDING", db.mail().outbox(id)!!.state)
+        assertEquals(review.sendAt, graph.outbox.first().single().sendAt)
+        assertTrue(graph.deleteOutbox(id)); assertTrue(graph.outbox.first().isEmpty())
+        assertFalse(graph.deleteOutbox(id)); assertTrue(graph.deliverOutbox(id))
+    }
+    @Test fun savingSentRetryDoesNotResendSmtp() = runBlocking {
+        val server = GreenMail(arrayOf(ServerSetup(0, "127.0.0.1", "imap"), ServerSetup(0, "127.0.0.1", "smtp")))
+        server.start()
+        try {
+            server.setUser("alice@example.org", "alice", "password")
+            val local = config.copy(imap = config.imap.copy(host = "127.0.0.1", port = server.imap.port), smtp = config.smtp.copy(host = "127.0.0.1", port = server.smtp.port))
+            val account = graph.addAccount(local, "password")
+            val id = graph.send(Draft(accountId = account, identityId = account, to = listOf(EmailAddress("alice@example.org")), subject = "Copy retry"), 0)
+            assertTrue(graph.deliverOutbox(id)); assertTrue(graph.outbox.first().isEmpty())
+            val stored = db.mail().outbox(id)!!
+            db.mail().updateOutbox(stored.copy(state = "APPENDING"))
+            assertFalse(graph.deleteOutbox(id)); graph.recoverOutbox()
+            assertEquals(OutboxState.SAVING_SENT, graph.outbox.first().single().state)
+            assertTrue(graph.retrySend(id)); assertEquals("APPEND", db.mail().outbox(id)!!.state)
+            assertTrue(graph.deliverOutbox(id))
+            assertEquals(1, graph.client.sync(local.imap.endpoint(), Credentials("password"), "INBOX").headers.size)
+            assertEquals(1, graph.client.sync(local.imap.endpoint(), Credentials("password"), "Sent").headers.size)
+        } finally { server.stop() }
     }
     @Test fun mimeSerializationOnAndroidRuntime() {
         val mime = Mime.build(OutgoingMail(Address("a@example.org"), listOf(Address("b@example.org")), subject = "Été", text = "hello", html = "<b>hello</b>", attachments = listOf(OutgoingAttachment("test.txt", "text/plain", "file".toByteArray()))))

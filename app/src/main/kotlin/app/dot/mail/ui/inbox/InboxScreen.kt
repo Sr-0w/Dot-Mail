@@ -146,6 +146,7 @@ fun InboxScreen(
     val pullState = rememberPullToRefreshState()
 
     LaunchedEffect(Unit) { vm.events.collect { snackbar.showSnackbar(it) } }
+    AskNotificationPermissionOnce()
     // Back closes the selection first.
     androidx.activity.compose.BackHandler(enabled = selection.isNotEmpty()) { vm.clearSelection() }
 
@@ -613,3 +614,22 @@ private fun SkeletonRow() {
     }
 }
 
+
+/** Android 13+: ask once for notifications, the first time the user reaches their inbox. */
+@Composable
+private fun AskNotificationPermissionOnce() {
+    if (android.os.Build.VERSION.SDK_INT < 33) return
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = remember { context.getSharedPreferences("ui", android.content.Context.MODE_PRIVATE) }
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { }
+    LaunchedEffect(Unit) {
+        val granted = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (!granted && !prefs.getBoolean("askedNotifications", false)) {
+            prefs.edit().putBoolean("askedNotifications", true).apply()
+            launcher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+}

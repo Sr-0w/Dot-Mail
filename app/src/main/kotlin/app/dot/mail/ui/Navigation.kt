@@ -116,7 +116,10 @@ fun DotMailRoot(requests: StateFlow<ExternalRequest?>, onRequestConsumed: () -> 
                     threadId = entry.toRoute<ThreadRoute>().threadId,
                     onBack = { nav.popBackStack() },
                     onReply = { messageId, mode -> nav.openCompose(ComposeRoute(replyToMessageId = messageId, replyMode = mode.name)) },
-                    onComposeTo = { address -> nav.openCompose(ComposeRoute(to = listOf(address))) },
+                    onComposeTo = { target ->
+                        val m = if (target.startsWith("mailto:", true)) app.dot.mail.MailtoParser.parse(target) else ExternalRequest.Compose(to = listOf(target))
+                        nav.openCompose(ComposeRoute(to = m.to, cc = m.cc, bcc = m.bcc, subject = m.subject, body = m.body))
+                    },
                 )
             }
             composable<ComposeRoute> { entry ->
@@ -172,7 +175,8 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.slideOut() =
 @Composable
 private fun UndoSendHost(onRestored: (Long) -> Unit, modifier: Modifier = Modifier) {
     val graph = LocalMailGraph.current
-    val seconds = LocalSettings.current.ui.value.undoSendSeconds
+    val prefs by LocalSettings.current.ui.collectAsStateWithLifecycle()
+    val seconds = prefs.undoSendSeconds
     val host = remember { SnackbarHostState() }
     val pending by UndoSendBus.pending.collectAsStateWithLifecycle()
     LaunchedEffect(pending) {

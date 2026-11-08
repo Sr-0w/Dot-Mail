@@ -44,6 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -88,8 +89,8 @@ import java.time.temporal.TemporalAdjusters
 @Composable
 fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
     val graph = LocalMailGraph.current
-    val undoSeconds = LocalSettings.current.ui.value.undoSendSeconds
-    val vm: ComposeViewModel = viewModel { ComposeViewModel(graph, route, undoSeconds) }
+    val settings = LocalSettings.current
+    val vm: ComposeViewModel = viewModel { ComposeViewModel(graph, route) { settings.ui.value.undoSendSeconds } }
     val state by vm.state.collectAsStateWithLifecycle()
     val closed by vm.closed.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -265,6 +266,8 @@ private fun RecipientRow(
 ) {
     val c = Dot.colors
     var input by rememberSaveable(field) { mutableStateOf("") }
+    val pendingInVm = state.pending[field].orEmpty()
+    LaunchedEffect(pendingInVm) { if (pendingInVm.isEmpty() && input.isNotEmpty() && state.pending.containsKey(field).not()) input = "" }
     Column {
         Row(
             Modifier.fillMaxWidth().padding(start = DotSpacing.gutter, end = DotSpacing.s, top = 6.dp, bottom = 6.dp),
@@ -286,16 +289,17 @@ private fun RecipientRow(
                             input = v
                             vm.query(field, v.trim())
                         }
+                        vm.setPending(field, input)
                     },
                     placeholder = if (list.isEmpty()) "" else null,
                     style = Dot.type.callout,
                     singleLine = true,
                     keyboardType = KeyboardType.Email,
                     imeAction = ImeAction.Next,
-                    onIme = { if (vm.addRecipient(field, input)) input = "" },
+                    onIme = { if (vm.addRecipient(field, input)) { input = ""; vm.setPending(field, "") } },
                     modifier = Modifier.widthIn(min = 120.dp).heightIn(min = 30.dp)
                         .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
-                        .onFocusChanged { if (!it.isFocused && input.isNotBlank()) { if (vm.addRecipient(field, input)) input = "" } }
+                        .onFocusChanged { if (!it.isFocused && input.isNotBlank()) { if (vm.addRecipient(field, input)) { input = ""; vm.setPending(field, "") } } }
                         .onPreviewKeyEvent { e ->
                             if (e.key == Key.Backspace && input.isEmpty() && list.isNotEmpty()) { vm.removeRecipient(field, list.last()); true } else false
                         },
@@ -307,7 +311,7 @@ private fun RecipientRow(
             Column(Modifier.padding(start = 64.dp, end = DotSpacing.gutter, bottom = DotSpacing.s).clip(DotShapes.medium).background(c.surface)) {
                 state.suggestions.forEach { s ->
                     Row(
-                        Modifier.fillMaxWidth().clickable { vm.addSuggestion(field, s); input = "" }.padding(horizontal = DotSpacing.m, vertical = 10.dp),
+                        Modifier.fillMaxWidth().clickable { vm.addSuggestion(field, s); input = ""; vm.setPending(field, "") }.padding(horizontal = DotSpacing.m, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Avatar(s.displayName, s.email, size = 28.dp)
@@ -345,7 +349,10 @@ private fun AttachmentChips(uris: List<String>, onRemove: (String) -> Unit) {
     val c = Dot.colors
     Column(Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s)) {
         uris.forEach { u ->
-            val (name, size) = remember(u) { describe(context, Uri.parse(u)) }
+            val meta by produceState<Pair<String, Long?>>(Uri.parse(u).lastPathSegment.orEmpty() to null, u) {
+                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { describe(context, Uri.parse(u)) }
+            }
+            val (name, size) = meta
             Row(
                 Modifier.padding(vertical = 3.dp).fillMaxWidth().clip(DotShapes.medium).border(1.dp, c.border, DotShapes.medium)
                     .padding(start = DotSpacing.m, top = 2.dp, bottom = 2.dp),

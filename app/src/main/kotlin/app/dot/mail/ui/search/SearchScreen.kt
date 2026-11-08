@@ -14,6 +14,13 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material.icons.outlined.WifiOff
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.size
+import app.dot.mail.Density
+import app.dot.mail.LocalSettings
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -71,6 +78,7 @@ fun SearchScreen(onBack: () -> Unit, onOpenThread: (Long) -> Unit) {
     val vm: SearchViewModel = viewModel { SearchViewModel(graph) }
     val query by vm.current.collectAsStateWithLifecycle()
     val results = vm.results.collectAsLazyPagingItems()
+    val compact = LocalSettings.current.ui.collectAsStateWithLifecycle().value.density == Density.COMPACT
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val c = Dot.colors
@@ -94,12 +102,18 @@ fun SearchScreen(onBack: () -> Unit, onOpenThread: (Long) -> Unit) {
         val q = query.trim()
         when {
             q.length < 2 -> SearchHints()
+            results.itemCount == 0 && results.loadState.refresh is LoadState.Loading ->
+                Box(Modifier.fillMaxSize().padding(top = 64.dp), contentAlignment = Alignment.TopCenter) {
+                    CircularProgressIndicator(Modifier.size(22.dp), color = c.textTertiary, strokeWidth = 1.5.dp)
+                }
+            results.itemCount == 0 && results.loadState.refresh is LoadState.Error ->
+                EmptyState(Icons.Outlined.WifiOff, "Search failed", (results.loadState.refresh as LoadState.Error).error.message ?: "Check your connection and try again.")
             results.itemCount == 0 && results.loadState.refresh is LoadState.NotLoading ->
                 EmptyState(Icons.Outlined.SearchOff, "No results", "Nothing matches “$q” in downloaded mail or on your servers.")
-            else -> LazyColumn(Modifier.fillMaxSize()) {
+            else -> LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
                 items(results.itemCount, key = results.itemKey { it.threadId }) { i ->
                     val t = results[i] ?: return@items
-                    ThreadRow(t, selected = false, selectionMode = false, compact = false, onClick = { onOpenThread(t.threadId) }, onLongClick = {})
+                    ThreadRow(t, selected = false, selectionMode = false, compact = compact, onClick = { onOpenThread(t.threadId) }, onLongClick = {})
                 }
             }
         }

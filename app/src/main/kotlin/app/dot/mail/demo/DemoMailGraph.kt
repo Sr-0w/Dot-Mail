@@ -54,6 +54,11 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
 
     override val accounts = object : AccountRepository {
         override val accounts: Flow<List<Account>> = accountsState
+        override fun oauthAvailability(provider: app.dot.mail.data.model.OAuthProvider) =
+            app.dot.mail.data.model.OAuthAvailability(provider, false, "Not available in demo mode")
+        override suspend fun beginOAuth(email: String, provider: app.dot.mail.data.model.OAuthProvider, accountId: Long?): android.content.Intent =
+            throw UnsupportedOperationException("Demo mode")
+        override suspend fun completeOAuth(resultUri: android.net.Uri): Long = throw UnsupportedOperationException("Demo mode")
         override suspend fun discover(email: String): AccountConfig? = null
         override suspend fun verify(config: AccountConfig, password: String): VerifyResult = VerifyResult.Ok
         override suspend fun addAccount(config: AccountConfig, password: String): Long {
