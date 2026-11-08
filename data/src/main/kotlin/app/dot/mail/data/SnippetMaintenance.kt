@@ -31,13 +31,13 @@ internal suspend fun RealMailGraph.recoverSnippetRepairs() {
 /** Runs after the requested folder's header/flag readiness callback. Bounded work preserves fast refresh. */
 internal suspend fun RealMailGraph.prefetchFolderPreviews(account:AccountRow,config:AccountConfig,creds:Credentials,folder:FolderRow,remote:RemoteFolder,validity:Long) {
     val redactions=setOf(account.email,creds.secret)
-    val cached=dao.folderMessages(folder.id)
-    val local=cached.filter { it.bodyLoaded && !it.snippetFetched }.sortedByDescending { it.sentAt }.take(200)
+    val local=dao.localFolderPreviewRepairs(folder.id)
     val repaired=local.mapNotNull { row -> bodyStore.read(row)?.let { row to Snippets.fromBody(it.plainText,it.html) } }
     database.withTransaction {
         repaired.forEach { (row,value) -> dao.setSnippet(row.id,value) }
         repaired.map { it.first.threadId }.distinct().forEach { rebuildThread(it) }
     }
+    val cached=(dao.remoteFolderPreviewRepairs(folder.id)+dao.recentFolderMessages(folder.id)).distinctBy { it.id }
     val rows=previewCandidates(cached)
     if(rows.isEmpty()) return
     val previews=try { client.snippets(config.imap.endpoint(),creds,folder.path,rows.map { it.uid }.toLongArray(),validity) }

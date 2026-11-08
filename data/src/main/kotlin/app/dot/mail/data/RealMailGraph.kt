@@ -275,17 +275,19 @@ internal class RealMailGraph(
         if (old != null) {
             // Pending optimistic changes win until replay completes.
             val pending = dao.operations(folder.accountId).any { it.messageLocalId == old.id || (it.folderId == folder.id && it.uid == header.uid && it.validity == folder.validity) }
-            dao.updateMessage(old.copy(uid = header.uid, header=Codec.header(header), messageIdKey=header.messageId, unread = if (pending) old.unread else !header.flags.seen, starred = if (pending) old.starred else header.flags.starred))
-            if(old.header!=Codec.header(header)) indexSenders(old.id,header)
+            val encoded=Codec.header(header)
+            val updated=old.copy(uid=header.uid,header=encoded,messageIdKey=header.messageId,unread=if(pending) old.unread else !header.flags.seen,starred=if(pending) old.starred else header.flags.starred)
+            if(updated!=old) dao.updateMessage(updated)
+            if(old.header!=encoded) indexSenders(old.id,header)
             if(rebuild) rebuildThread(old.threadId); return old.threadId to false
         }
         val keys = Threading.keys(header)
         val exact = keys.mapNotNull { dao.threadKey(folder.accountId, it) }.distinct()
-        val fallback = if (exact.isEmpty() && Threading.mayFallback(header)) Threading.fallbackKey(header)?.let { dao.threadKey(folder.accountId, it) }?.takeIf { id -> dao.threadRow(id)?.let { kotlin.math.abs(header.sentAt - it.lastAt) <= 30L * 24 * 60 * 60 * 1000 } == true } else null
-        val threadId = exact.firstOrNull() ?: fallback ?: dao.insertThread(ThreadRow(accountId = folder.accountId, subject = header.subject))
+        val fallback = if (exact.isEmpty() && Threading.mayFallback(header)) Threading.fallbackKey(header)?.let { dao.threadKey(folder.accountId, it) }?.takeIf { id -> !dao.threadHasIdentifiedMessages(id) && dao.threadRow(id)?.let { kotlin.math.abs(header.sentAt - it.lastAt) <= 30L * 24 * 60 * 60 * 1000 } == true } else null
+        val threadId = exact.firstOrNull() ?: fallback ?: dao.insertThread(ThreadRow(accountId = folder.accountId, subject = header.subject, lastAt=header.sentAt))
         exact.filter { it != threadId }.forEach { other -> dao.mergeMessages(other, threadId); dao.mergeKeys(other, threadId); dao.deleteThread(other) }
         keys.forEach { dao.insertKey(ThreadKeyRow(folder.accountId, it, threadId)) }
-        if (header.gmailThreadId == null) Threading.fallbackKey(header)?.let { key ->
+        if (Threading.mayFallback(header)) Threading.fallbackKey(header)?.let { key ->
             val previous = dao.threadKey(folder.accountId, key)?.let { dao.threadRow(it) }
             if (previous == null || previous.lastAt <= header.sentAt) dao.putKey(ThreadKeyRow(folder.accountId, key, threadId))
         }
@@ -368,7 +370,16 @@ internal class RealMailGraph(
             return rows
         }
         return when (mailbox) {
-            is Mailbox.Smart -> rows
+            is Mailbox.Smart -> {
+                val smart=smartFolders.get(mailbox.id) ?: return emptyList()
+                val thread=rows.firstOrNull()?.threadId ?: return emptyList()
+                val where=ThreadQuery.smartMessages(smart)
+                val matching=dao.matchingMessageIds(SimpleSQLiteQuery(
+                    "SELECT m.id FROM messages m JOIN folders f ON f.id=m.folderId WHERE m.threadId=? AND (${where.text})",
+                    (listOf<Any>(thread)+where.args).toTypedArray(),
+                )).toHashSet()
+                rows.filter { it.id in matching }
+            }
             is Mailbox.InFolder -> rows.filter { it.folderId == mailbox.folderId }
             is Mailbox.Unified -> if(mailbox.role.category()!=null) rows.filter { isInCategory(it,dao.folder(it.folderId)?.role,mailbox.role.category()!!) } else rows.filter { dao.folder(it.folderId)?.role == mailbox.role.name }
         }
