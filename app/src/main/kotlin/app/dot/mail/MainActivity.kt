@@ -57,7 +57,7 @@ class MainActivity : FragmentActivity() {
         // theme's colour now so a true-black theme never flashes grey (and Dark/Light never flash the wrong tone).
         window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(windowBackgroundFor(app.settings.ui.value.theme, resources.configuration)))
         locked.value = savedInstanceState?.getBoolean(STATE_LOCKED) ?: app.settings.ui.value.appLock
-        if (savedInstanceState == null) requests.value = parse(intent)
+        if (savedInstanceState == null) { handleOAuthRedirect(intent); requests.value = parse(intent) }
         setContent {
             val prefs by app.settings.ui.collectAsStateWithLifecycle()
             val isLocked by locked.collectAsStateWithLifecycle()
@@ -85,6 +85,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        handleOAuthRedirect(intent)
         parse(intent)?.let { requests.value = it }
     }
 
@@ -126,6 +127,12 @@ class MainActivity : FragmentActivity() {
                 .setAllowedAuthenticators(authenticators)
                 .build(),
         )
+    }
+
+    /** The browser sign-in's redirect (forwarded by OAuthRedirectActivity). It is completed here, whatever screen is showing. */
+    private fun handleOAuthRedirect(intent: Intent?) {
+        val uri = intent?.takeIf { it.action == "app.dot.mail.action.OAUTH_REDIRECT" }?.data ?: return
+        app.dot.mail.ui.account.OAuthSignIn.complete(dotApp.graph.accounts, uri)
     }
 
     private fun parse(intent: Intent?): ExternalRequest? {

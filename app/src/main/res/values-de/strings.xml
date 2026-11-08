@@ -1027,4 +1027,18 @@
     <string name="compose_pgp_error_failed">OpenPGP konnte diese Nachricht nicht schützen. Sie wurde nicht gesendet.</string>
     <string name="compose_pgp_error_cancelled">Senden abgebrochen. Die Nachricht wurde nicht gesendet.</string>
     <string name="compose_pgp_draft_local">Verschlüsselte Entwürfe bleiben auf diesem Gerät und werden nicht hochgeladen.</string>
+
+    <!-- Continue with Google -->
+    <string name="setup_google_continue">Weiter mit Google</string>
+    <string name="setup_google_hint">Geben Sie Ihre Gmail- oder Google-Workspace-Adresse ein und fahren Sie mit Google fort.</string>
+    <string name="setup_google_unavailable">Die Google-Anmeldung ist in diesem Build nicht eingerichtet. Für Gmail wird unten ein App-Passwort benötigt.</string>
+    <string name="setup_google_opening">Google-Anmeldung wird geöffnet…</string>
+    <string name="setup_google_waiting">Warten auf Google…</string>
+    <string name="setup_google_cancel">Abbrechen</string>
+    <string name="setup_google_cancelled">Die Google-Anmeldung wurde abgebrochen.</string>
+    <string name="setup_google_no_browser">Kein Webbrowser zum Anmelden verfügbar.</string>
+    <string name="setup_or_password">oder mit Passwort anmelden</string>
+
+    <!-- Continue with Google (2) -->
+    <string name="setup_error_oauth_use_google">%1$s erfordert eine Browser-Anmeldung: Nutzen Sie oben „Weiter mit Google“.</string>
 </resources>

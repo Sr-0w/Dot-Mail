@@ -78,6 +78,7 @@ import app.dot.mail.data.model.VerifyResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -126,6 +127,9 @@ data class SetupState(
     val error: String? = null,
     val hint: String? = null,
     val oauthOnly: Boolean = false,
+    /** This build has a Google client ID; without one the button is replaced by an explanation. */
+    val googleAvailable: Boolean = false,
+    val google: GooglePhase = GooglePhase.Idle,
     val imapHost: String = "",
     val imapPort: String = "993",
     val imapSecurity: Security = Security.SSL_TLS,
@@ -135,6 +139,7 @@ data class SetupState(
     val username: String = "",
 ) {
     enum class Step { Credentials, Manual }
+    enum class GooglePhase { Idle, Opening, Waiting, Completing }
 
     val emailValid: Boolean get() = EMAIL.matches(email.trim())
 
@@ -155,7 +160,47 @@ class AddAccountViewModel(
     private val repo: AccountRepository,
     private val strings: ((Int, Array<out Any>) -> String)? = null,
 ) : ViewModel() {
-    private val _state = MutableStateFlow(SetupState())
+    private val _state = MutableStateFlow(SetupState(googleAvailable = repo.oauthAvailability(app.dot.mail.data.model.OAuthProvider.GOOGLE).available))
+    private val _launch = kotlinx.coroutines.channels.Channel<android.content.Intent>(kotlinx.coroutines.channels.Channel.BUFFERED)
+    /** The system-browser sign-in page to open; the screen starts it. */
+    val launch: kotlinx.coroutines.flow.Flow<android.content.Intent> = _launch.receiveAsFlow()
+    private var leftForBrowser = false
+
+    /** "Continue with Google": opens the system browser (PKCE); the result comes back through [OAuthSignIn]. */
+    fun signInWithGoogle() {
+        val s = _state.value
+        if (!s.googleAvailable || !s.emailValid || s.busy) return
+        leftForBrowser = false
+        _state.update { it.copy(busy = true, google = SetupState.GooglePhase.Opening, error = null, status = str(R.string.setup_google_opening, "Opening Google sign-in…")) }
+        viewModelScope.launch {
+            runCatching { repo.beginOAuth(s.email.trim(), app.dot.mail.data.model.OAuthProvider.GOOGLE) }
+                .onSuccess { intent -> OAuthSignIn.waiting(); _launch.send(intent) }
+                .onFailure { e ->
+                    val code = (e as? app.dot.mail.data.model.OAuthException)?.code ?: app.dot.mail.data.model.OAuthError.OTHER
+                    _state.update { it.copy(busy = false, google = SetupState.GooglePhase.Idle, status = null, error = str(oauthErrorRes(code), "Sign-in failed")) }
+                }
+        }
+    }
+
+    /** The browser could not be opened (no browser installed). */
+    fun browserUnavailable() {
+        OAuthSignIn.reset()
+        _state.update { it.copy(busy = false, google = SetupState.GooglePhase.Idle, status = null, error = str(R.string.setup_google_no_browser, "No web browser is available to sign in.")) }
+    }
+
+    fun cancelGoogle() {
+        OAuthSignIn.reset()
+        _state.update { it.copy(busy = false, google = SetupState.GooglePhase.Idle, status = null, error = null) }
+    }
+
+    /** The app went to the background (the browser took over). */
+    fun onPaused() { if (_state.value.google == SetupState.GooglePhase.Waiting) leftForBrowser = true }
+
+    /** Back in front: if the browser flow never came back with a result, treat it as cancelled after a short grace. */
+    fun onResumed() {
+        if (_state.value.google != SetupState.GooglePhase.Waiting || !leftForBrowser) return
+        viewModelScope.launch { kotlinx.coroutines.delay(RETURN_GRACE_MS); OAuthSignIn.cancelIfStillWaiting() }
+    }
     val state: StateFlow<SetupState> = _state.asStateFlow()
     private val _done = MutableStateFlow(false)
     val done: StateFlow<Boolean> = _done.asStateFlow()
@@ -197,7 +242,9 @@ class AddAccountViewModel(
                     _state.update {
                         it.copy(
                             busy = false, status = null, oauthOnly = true,
-                            error = str(
+                            error = if (it.googleAvailable && found.imap.host.contains("gmail", true)) str(
+                                R.string.setup_error_oauth_use_google, "$provider requires browser sign-in: use \"Continue with Google\" above.", provider,
+                            ) else str(
                                 R.string.setup_error_oauth_only,
                                 "$provider requires browser sign-in (OAuth), which isn't available in this version yet.",
                                 provider,
@@ -271,6 +318,23 @@ class AddAccountViewModel(
         }
     }
 
+    init {
+        viewModelScope.launch {
+            OAuthSignIn.status.collect { s ->
+                when (s) {
+                    OAuthSignIn.Status.Idle -> Unit
+                    OAuthSignIn.Status.Waiting -> _state.update { it.copy(google = SetupState.GooglePhase.Waiting, busy = true, error = null, status = str(R.string.setup_google_waiting, "Waiting for Google…")) }
+                    OAuthSignIn.Status.Completing -> _state.update { it.copy(google = SetupState.GooglePhase.Completing, busy = true, error = null, status = str(R.string.setup_status_setting_up, "Setting up your mailbox…")) }
+                    is OAuthSignIn.Status.Done -> { OAuthSignIn.reset(); _state.update { it.copy(google = SetupState.GooglePhase.Idle, busy = false, status = null) }; _done.value = true }
+                    is OAuthSignIn.Status.Failed -> { OAuthSignIn.reset(); _state.update { it.copy(google = SetupState.GooglePhase.Idle, busy = false, status = null, error = str(oauthErrorRes(s.code), "Sign-in failed")) } }
+                    OAuthSignIn.Status.Cancelled -> { OAuthSignIn.reset(); _state.update { it.copy(google = SetupState.GooglePhase.Idle, busy = false, status = str(R.string.setup_google_cancelled, "Google sign-in was cancelled."), error = null) } }
+                }
+            }
+        }
+    }
+
+    private companion object { const val RETURN_GRACE_MS = 1_500L }
+
     private fun SetupState.withConfig(c: AccountConfig) = copy(
         hint = c.providerHint,
         imapHost = c.imap.host, imapPort = c.imap.port.toString(), imapSecurity = c.imap.security,
@@ -291,6 +355,15 @@ fun AddAccountScreen(onBack: () -> Unit, onDone: () -> Unit) {
     }
     val state by vm.state.collectAsStateLifecycle()
     val done by vm.done.collectAsStateLifecycle()
+    val context = LocalContext.current
+    // The system browser page of the Google sign-in; its result comes back through MainActivity.
+    LaunchedEffect(Unit) {
+        vm.launch.collect { intent ->
+            try { context.startActivity(intent) } catch (_: android.content.ActivityNotFoundException) { vm.browserUnavailable() }
+        }
+    }
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_PAUSE) { vm.onPaused() }
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { vm.onResumed() }
     LaunchedEffect(done) { if (done) onDone() }
     val c = Dot.colors
     val passwordFocus = remember { FocusRequester() }
@@ -313,6 +386,7 @@ fun AddAccountScreen(onBack: () -> Unit, onDone: () -> Unit) {
                 keyboardType = KeyboardType.Email, contentType = ContentType.EmailAddress + ContentType.Username,
                 onImeAction = { passwordFocus.requestFocus() }, enabled = !state.busy,
             )
+            if (state.step == SetupState.Step.Credentials) GoogleSignIn(state, vm)
             Spacer(Modifier.height(DotSpacing.l))
             DotTextField(
                 value = state.password, onValueChange = { v -> vm.edit { it.copy(password = v) } },
@@ -368,12 +442,48 @@ fun AddAccountScreen(onBack: () -> Unit, onDone: () -> Unit) {
             Spacer(Modifier.height(DotSpacing.xl))
         }
         DotButton(
-            text = stringResource(if (state.busy) R.string.setup_connecting else R.string.setup_continue),
+            text = stringResource(if (state.busy && state.google == SetupState.GooglePhase.Idle) R.string.setup_connecting else R.string.setup_continue),
             onClick = vm::connect,
-            loading = state.busy,
+            loading = state.busy && state.google == SetupState.GooglePhase.Idle,
+            // With Google available the password route is the quieter, secondary choice.
+            style = if (state.googleAvailable && state.step == SetupState.Step.Credentials) ButtonStyle.Secondary else ButtonStyle.Primary,
             enabled = state.emailValid && state.password.isNotEmpty() && !state.oauthOnly,
             modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(DotSpacing.gutter),
         )
+    }
+}
+
+/**
+ * "Continue with Google" (solid accent: the main way in for a Gmail address) with its loading / cancel states, or, when this
+ * build has no Google client ID, an honest sentence instead of a dead button. Password sign-in stays below as the quieter
+ * alternative, and manual server setup remains its own row.
+ */
+@Composable
+private fun GoogleSignIn(state: SetupState, vm: AddAccountViewModel) {
+    val c = Dot.colors
+    Column(Modifier.padding(top = DotSpacing.l)) {
+        if (!state.googleAvailable) {
+            Text(stringResource(R.string.setup_google_unavailable), style = Dot.type.caption, color = c.textTertiary)
+            return@Column
+        }
+        val active = state.google != SetupState.GooglePhase.Idle
+        DotButton(
+            text = stringResource(R.string.setup_google_continue),
+            onClick = vm::signInWithGoogle,
+            enabled = state.emailValid && !state.busy || active,
+            loading = state.google == SetupState.GooglePhase.Opening || state.google == SetupState.GooglePhase.Completing,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (state.google == SetupState.GooglePhase.Waiting) {
+            DotButton(stringResource(R.string.setup_google_cancel), vm::cancelGoogle, style = ButtonStyle.Ghost, compact = true, modifier = Modifier.padding(top = DotSpacing.xs))
+        } else if (!state.emailValid && !active) {
+            Text(stringResource(R.string.setup_google_hint), style = Dot.type.caption, color = c.textTertiary, modifier = Modifier.padding(top = DotSpacing.xs))
+        }
+        Row(Modifier.fillMaxWidth().padding(top = DotSpacing.l), verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.foundation.layout.Box(Modifier.weight(1f).height(1.dp).background(c.border))
+            Text(stringResource(R.string.setup_or_password), style = Dot.type.caption, color = c.textTertiary, modifier = Modifier.padding(horizontal = DotSpacing.m))
+            androidx.compose.foundation.layout.Box(Modifier.weight(1f).height(1.dp).background(c.border))
+        }
     }
 }
 

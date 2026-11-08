@@ -1027,4 +1027,18 @@
     <string name="compose_pgp_error_failed">OpenPGP n’a pas pu protéger ce message. Il n’a pas été envoyé.</string>
     <string name="compose_pgp_error_cancelled">Envoi annulé. Le message n’a pas été envoyé.</string>
     <string name="compose_pgp_draft_local">Les brouillons chiffrés restent sur cet appareil et ne sont pas envoyés au serveur.</string>
+
+    <!-- Continue with Google -->
+    <string name="setup_google_continue">Continuer avec Google</string>
+    <string name="setup_google_hint">Saisissez votre adresse Gmail ou Google Workspace, puis continuez avec Google.</string>
+    <string name="setup_google_unavailable">La connexion Google n’est pas configurée dans cette version : Gmail nécessite un mot de passe d’application ci-dessous.</string>
+    <string name="setup_google_opening">Ouverture de la connexion Google…</string>
+    <string name="setup_google_waiting">En attente de Google…</string>
+    <string name="setup_google_cancel">Annuler</string>
+    <string name="setup_google_cancelled">La connexion Google a été annulée.</string>
+    <string name="setup_google_no_browser">Aucun navigateur n’est disponible pour se connecter.</string>
+    <string name="setup_or_password">ou connectez-vous avec un mot de passe</string>
+
+    <!-- Continue with Google (2) -->
+    <string name="setup_error_oauth_use_google">%1$s exige une connexion par navigateur : utilisez « Continuer avec Google » ci-dessus.</string>
 </resources>

@@ -1027,4 +1027,18 @@
     <string name="compose_pgp_error_failed">OpenPGP couldn’t protect this message. It was not sent.</string>
     <string name="compose_pgp_error_cancelled">Sending was cancelled. The message was not sent.</string>
     <string name="compose_pgp_draft_local">Encrypted drafts stay on this device and are not uploaded.</string>
+
+    <!-- Continue with Google -->
+    <string name="setup_google_continue">Continue with Google</string>
+    <string name="setup_google_hint">Enter your Gmail or Google Workspace address, then continue with Google.</string>
+    <string name="setup_google_unavailable">Google sign-in isn’t set up in this build, so Gmail needs an app password below.</string>
+    <string name="setup_google_opening">Opening Google sign-in…</string>
+    <string name="setup_google_waiting">Waiting for Google…</string>
+    <string name="setup_google_cancel">Cancel</string>
+    <string name="setup_google_cancelled">Google sign-in was cancelled.</string>
+    <string name="setup_google_no_browser">No web browser is available to sign in.</string>
+    <string name="setup_or_password">or sign in with a password</string>
+
+    <!-- Continue with Google (2) -->
+    <string name="setup_error_oauth_use_google">%1$s requires browser sign-in: use “Continue with Google” above.</string>
 </resources>
