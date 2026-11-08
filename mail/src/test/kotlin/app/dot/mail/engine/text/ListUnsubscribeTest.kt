@@ -160,9 +160,29 @@ class ListUnsubscribeTest {
     }
 
     @Test
-    fun `the web page is the first https or http in header order`() {
+    fun `https is preferred over http when both are offered`() {
+        // http comes first in header order, but webPage must not downgrade
         val o = ListUnsubscribe.parse(mapOf(
             "List-Unsubscribe" to listOf("<http://ex.com/a>, <https://ex.com/b>"),
+        ))
+        assertThat(o).isNotNull()
+        assertThat(o!!.webPage).isEqualTo("https://ex.com/b")
+    }
+
+    @Test
+    fun `first https wins among later https and http entries`() {
+        val o = ListUnsubscribe.parse(mapOf(
+            "List-Unsubscribe" to listOf(
+                "<https://ex.com/first>, <http://ex.com/page>, <https://ex.com/second>"),
+        ))
+        assertThat(o).isNotNull()
+        assertThat(o!!.webPage).isEqualTo("https://ex.com/first")
+    }
+
+    @Test
+    fun `http is used only when no https exists`() {
+        val o = ListUnsubscribe.parse(mapOf(
+            "List-Unsubscribe" to listOf("<http://ex.com/a>"),
         ))
         assertThat(o).isNotNull()
         assertThat(o!!.webPage).isEqualTo("http://ex.com/a")

@@ -16,8 +16,9 @@ data class MailtoTarget(val address: String, val subject: String?, val body: Str
  * - [oneClickHttps] is set ONLY when List-Unsubscribe-Post requests
  *   `List-Unsubscribe=One-Click` (case-insensitive, whitespace tolerant) AND an
  *   https URI is present — http never qualifies for one-click.
- * - [webPage] is the first https or http URI in header order, but only when NOT
- *   in one-click mode.
+ * - [webPage] is the first https URI, falling back to the first http URI only
+ *   when no https exists (never downgraded when both are offered); set only
+ *   when NOT in one-click mode.
  * - [mailto] is the first usable `mailto:` target.
  * - [parse] returns null when nothing usable is found: no mailto target, no
  *   web/one-click URL and no list id.
@@ -54,15 +55,12 @@ object ListUnsubscribe {
     fun parse(headers: Map<String, List<String>>): UnsubscribeOptions? {
         var mailto: MailtoTarget? = null
         var https: String? = null
-        var web: String? = null // first http/https URI in header order
+        var http: String? = null
         for (entry in valuesFor(headers, "List-Unsubscribe").flatMap { cleanEntries(it) }) {
             when {
                 entry.startsWith("mailto:", true) -> if (mailto == null) mailto = parseMailto(entry)
-                entry.startsWith("https://", true) -> if (!entry.hasWhitespace()) {
-                    if (https == null) https = entry
-                    if (web == null) web = entry
-                }
-                entry.startsWith("http://", true) -> if (!entry.hasWhitespace() && web == null) web = entry
+                entry.startsWith("https://", true) -> if (https == null && !entry.hasWhitespace()) https = entry
+                entry.startsWith("http://", true) -> if (http == null && !entry.hasWhitespace()) http = entry
             }
         }
         val oneClick = valuesFor(headers, "List-Unsubscribe-Post").any { isOneClickRequest(it) }
@@ -71,7 +69,7 @@ object ListUnsubscribe {
         return UnsubscribeOptions(
             oneClickHttps = if (oneClick) https else null,
             mailto = mailto,
-            webPage = if (!oneClick) web else null,
+            webPage = if (!oneClick) https ?: http else null,
             listId = listId,
         ).takeIf { it.oneClickHttps != null || it.mailto != null || it.webPage != null || it.listId != null }
     }
