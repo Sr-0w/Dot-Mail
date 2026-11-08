@@ -293,6 +293,11 @@ data class OutboxItem(
     val error: String?,
     val canRetry: Boolean,
     val canDelete: Boolean,
+    /** The saved draft this message was sent from (0 for system messages such as calendar replies). */
+    val draftId: Long = 0,
+    /** Still waiting locally (not claimed for SMTP): it can be reopened in the composer or moved to another time. */
+    val canEdit: Boolean = false,
+    val canReschedule: Boolean = false,
 )
 
 // OAuth client IDs belong to the build maintainer; no project borrows another app's registration.

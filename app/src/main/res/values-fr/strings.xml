@@ -1045,4 +1045,12 @@
     <!-- Tracking-pixel toggle -->
     <string name="settings_block_pixels">Bloquer les pixels espions</string>
     <string name="settings_block_pixels_sub">Supprime les minuscules images qui indiquent à l’expéditeur que vous avez ouvert un message, même si vous chargez les images. La détection est heuristique et ne peut pas tout repérer. Indépendant du chargement des images distantes.</string>
+    <!-- Send later -->
+    <string name="schedule_pick_date_time">Choisir la date et l’heure</string>
+    <string name="schedule_note">Envoyé à l’heure choisie si votre téléphone est en ligne. Android peut le livrer avec quelques minutes de retard.</string>
+    <string name="schedule_error_past">Choisissez une heure au moins une minute plus tard.</string>
+    <string name="outbox_edit">Modifier</string>
+    <string name="outbox_reschedule">Reprogrammer</string>
+    <string name="outbox_reschedule_title">Envoyer à</string>
+    <string name="outbox_edit_unavailable">Il est déjà en cours d’envoi et ne peut plus être modifié.</string>
 </resources>

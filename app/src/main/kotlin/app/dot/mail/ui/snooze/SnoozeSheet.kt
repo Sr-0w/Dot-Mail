@@ -77,7 +77,7 @@ fun SnoozeSheet(onDismiss: () -> Unit, onPick: (Long) -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DateTimeDialog(use24h: Boolean, onDismiss: () -> Unit, onPick: (Long) -> Unit) {
+internal fun DateTimeDialog(use24h: Boolean, onDismiss: () -> Unit, onPick: (Long) -> Unit) {
     val c = Dot.colors
     val zone = remember { ZoneId.systemDefault() }
     val today = remember { LocalDate.now(zone) }

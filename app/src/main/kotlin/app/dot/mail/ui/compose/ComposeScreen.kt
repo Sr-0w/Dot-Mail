@@ -278,11 +278,11 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                         DotMenuItem(stringResource(R.string.compose_schedule_send), Icons.Outlined.Schedule) { menu = false; scheduleMenu = true }
                         DotMenuItem(stringResource(R.string.compose_discard), Icons.Outlined.DeleteOutline, color = c.danger) { menu = false; vm.discard() }
                     }
-                    DotMenu(scheduleMenu, { scheduleMenu = false }) {
-                        scheduleOptions().forEach { (label, at) ->
-                            DotMenuItem(label, null) { scheduleMenu = false; vm.send(scheduledAt = at) }
-                        }
-                    }
+                    if (scheduleMenu) app.dot.mail.ui.schedule.ScheduleSheet(
+                        title = stringResource(R.string.compose_schedule_send),
+                        onDismiss = { scheduleMenu = false },
+                        onPick = { at -> scheduleMenu = false; vm.scheduleSend(at) },
+                    )
                 }
                 SendButton(enabled = state.loaded && !state.sending && state.hasRecipients, onClick = { vm.send() })
             },
@@ -900,18 +900,6 @@ private fun replyTitle(mode: String) = when (mode) {
     "REPLY_ALL" -> stringResource(R.string.compose_reply_all)
     "FORWARD" -> stringResource(R.string.compose_forward)
     else -> stringResource(R.string.compose_reply)
-}
-
-@Composable
-private fun scheduleOptions(): List<Pair<String, Long>> {
-    val zone = ZoneId.systemDefault()
-    val now = java.time.ZonedDateTime.now(zone)
-    val out = mutableListOf<Pair<String, Long>>()
-    if (now.hour < 17) out += stringResource(R.string.compose_schedule_this_evening) to now.toLocalDate().atTime(18, 0).atZone(zone).toInstant().toEpochMilli()
-    out += stringResource(R.string.compose_schedule_tomorrow_morning) to LocalDate.now(zone).plusDays(1).atTime(LocalTime.of(8, 0)).atZone(zone).toInstant().toEpochMilli()
-    val monday = LocalDate.now(zone).with(TemporalAdjusters.next(DayOfWeek.MONDAY))
-    out += stringResource(R.string.compose_schedule_monday_morning) to monday.atTime(8, 0).atZone(zone).toInstant().toEpochMilli()
-    return out
 }
 
 @Composable

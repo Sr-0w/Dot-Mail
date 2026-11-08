@@ -104,8 +104,10 @@ internal class RealMailGraph(
             "UNCERTAIN" -> OutboxState.NEEDS_REVIEW
             else -> OutboxState.QUEUED
         }
+        val editable = row.state == "PENDING" && org.json.JSONObject(row.draft).optString("calendarReply").isBlank()
         OutboxItem(row.id, row.accountId, draft.subject, (draft.to + draft.cc + draft.bcc).distinctBy { it.email }, row.dueAt, state, row.error,
-            row.state in setOf("UNCERTAIN", "APPEND") || (row.state == "PENDING" && row.error != null), row.state in setOf("PENDING", "APPEND", "UNCERTAIN"))
+            row.state in setOf("UNCERTAIN", "APPEND") || (row.state == "PENDING" && row.error != null), row.state in setOf("PENDING", "APPEND", "UNCERTAIN"),
+            draftId = if (editable) draft.localId else 0, canEdit = editable, canReschedule = editable)
     } }.flowOn(Dispatchers.IO)
     internal val foregroundIdle by lazy { ForegroundIdle(this) }
     override val instantNotifications: Flow<Boolean> = AccountSettingsStore.get(context).sync.map { it.instantNotifications }.distinctUntilChanged()
@@ -568,6 +570,13 @@ internal class RealMailGraph(
         id
     }
     override suspend fun sendProtected(draft: Draft, undoWindowMs: Long, protector: PgpProtector): Long = queueProtected(draft, undoWindowMs, protector)
+    override suspend fun rescheduleSend(outboxId: Long, sendAt: Long): Boolean = withContext(Dispatchers.IO) {
+        if (SendSchedule.validate(sendAt, System.currentTimeMillis()) != SendSchedule.Validity.OK) return@withContext false
+        // Only a message nobody has claimed yet: the state check is part of the UPDATE, so it cannot race with delivery.
+        if (dao.outboxDue(outboxId, sendAt) != 1) return@withContext false
+        if (scheduling) WorkScheduling.outbox(context, outboxId, sendAt, replace = true)
+        true
+    }
     override suspend fun cancelSend(outboxId: Long): Boolean = withContext(Dispatchers.IO) {
         val cancelled=database.withTransaction {
             val row=dao.outbox(outboxId) ?: return@withTransaction null
