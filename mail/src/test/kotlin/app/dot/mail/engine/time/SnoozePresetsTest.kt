@@ -104,10 +104,18 @@ class SnoozePresetsTest {
     }
 
     @Test
+    fun `on a sunday next week is not a duplicate of tomorrow`() {
+        // Regression (seen on device, Sun 8 Nov 2026): both showed "Tomorrow 08:00".
+        val p = presets(at(2026, 6, 14, 18, 0)) // Sunday
+        assertThat(p.find { it.id == "tomorrow" }?.at).isEqualTo(at(2026, 6, 15, 8))
+        assertThat(p.find { it.id == "next_week" }?.at).isEqualTo(at(2026, 6, 22, 8))
+    }
+
+    @Test
     fun `custom week start`() {
         val p = presets(at(2026, 6, 10, 9, 0), weekStart = DayOfWeek.THURSDAY)
-        // week of Jun 8 (Mon) starts Thu Jun 4; next start is Jun 11
-        assertThat(p.find { it.id == "next_week" }?.at).isEqualTo(at(2026, 6, 11, 8))
+        // week of Jun 8 (Mon) starts Thu Jun 4; next start is Jun 11 = tomorrow, so the week after (no duplicate of "Tomorrow")
+        assertThat(p.find { it.id == "next_week" }?.at).isEqualTo(at(2026, 6, 18, 8))
     }
 
     // ----------------------------------------------------------------- DST

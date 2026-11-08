@@ -76,7 +76,9 @@ fun presets(
 
     // 4. next_week
     val thisWeekStart = today.with(TemporalAdjusters.previousOrSame(weekStart))
-    out += SnoozeOption("next_week", "Next week", atTime(zone, thisWeekStart.plusWeeks(1), morningHour))
+    // On the last day of the week, next week starts tomorrow: offer the week after instead of a duplicate of "Tomorrow".
+    val nextWeekStart = thisWeekStart.plusWeeks(1).let { if (it <= today.plusDays(1)) it.plusWeeks(1) else it }
+    out += SnoozeOption("next_week", "Next week", atTime(zone, nextWeekStart, morningHour))
 
     return out
 }
