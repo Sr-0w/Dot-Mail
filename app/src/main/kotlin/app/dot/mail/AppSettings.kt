@@ -8,7 +8,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 enum class SwipeAction { ARCHIVE, TRASH, READ_TOGGLE, STAR_TOGGLE, SNOOZE, NONE }
-enum class Density { COMFORTABLE, COMPACT }
+enum class Density { COMFORTABLE, COMPACT, SPACIOUS }
+
+/** Typeface of message text in the reader (plain text, and the default for HTML mail that sets none). */
+enum class ReaderFont { INTER, SYSTEM, SERIF }
 
 /** Format of newly started messages. */
 enum class ComposeFormat { RICH, PLAIN }
@@ -53,6 +56,9 @@ data class UiPrefs(
     val websiteIcons: Boolean = false,
     /** Reading text size in percent, 90..130. */
     val readingTextPercent: Int = 100,
+    val readerFont: ReaderFont = ReaderFont.INTER,
+    /** Reader line height as a percentage of the font size, 120..200. */
+    val readerLineHeightPercent: Int = 155,
 
     // --- Reading
     val quotedExpanded: Boolean = false,
@@ -103,6 +109,8 @@ class AppSettings(context: Context) {
             putBoolean("brandLogos", next.brandLogos)
             putBoolean("websiteIcons", next.websiteIcons)
             putInt("readingTextPercent", next.readingTextPercent)
+            putString("readerFont", next.readerFont.name)
+            putInt("readerLineHeight", next.readerLineHeightPercent)
             putBoolean("quotedExpanded", next.quotedExpanded)
             putBoolean("replyAllByDefault", next.replyAllByDefault)
             putBoolean("swipeBetweenMessages", next.swipeBetweenMessages)
@@ -136,6 +144,8 @@ class AppSettings(context: Context) {
             brandLogos = prefs.getBoolean("brandLogos", d.brandLogos),
             websiteIcons = prefs.getBoolean("websiteIcons", d.websiteIcons),
             readingTextPercent = prefs.getInt("readingTextPercent", d.readingTextPercent).coerceIn(90, 130),
+            readerFont = enumOr(prefs.getString("readerFont", null), d.readerFont),
+            readerLineHeightPercent = prefs.getInt("readerLineHeight", d.readerLineHeightPercent).coerceIn(120, 200),
             quotedExpanded = prefs.getBoolean("quotedExpanded", d.quotedExpanded),
             replyAllByDefault = prefs.getBoolean("replyAllByDefault", d.replyAllByDefault),
             swipeBetweenMessages = prefs.getBoolean("swipeBetweenMessages", d.swipeBetweenMessages),

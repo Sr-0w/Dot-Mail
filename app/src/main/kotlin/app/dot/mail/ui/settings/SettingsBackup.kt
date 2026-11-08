@@ -4,6 +4,7 @@ import app.dot.design.ThemeMode
 import app.dot.mail.AfterAction
 import app.dot.mail.ComposeFormat
 import app.dot.mail.Density
+import app.dot.mail.ReaderFont
 import app.dot.mail.MarkRead
 import app.dot.mail.SwipeAction
 import app.dot.mail.R
@@ -50,7 +51,7 @@ object SettingsBackup {
         put("confirmDelete", p.confirmDelete); put("afterAction", p.afterAction.name); put("markRead", p.markRead.name)
         put("conversationView", p.conversationView); put("avatarColors", p.avatarColors)
         put("gravatar", p.gravatar); put("libravatar", p.libravatar); put("brandLogos", p.brandLogos); put("websiteIcons", p.websiteIcons)
-        put("readingTextPercent", p.readingTextPercent); put("quotedExpanded", p.quotedExpanded)
+        put("readingTextPercent", p.readingTextPercent); put("readerFont", p.readerFont.name); put("readerLineHeightPercent", p.readerLineHeightPercent); put("quotedExpanded", p.quotedExpanded)
         put("replyAllByDefault", p.replyAllByDefault); put("swipeBetweenMessages", p.swipeBetweenMessages)
         put("includeOriginal", p.includeOriginal); put("defaultFormat", p.defaultFormat.name); put("lockAfterMinutes", p.lockAfterMinutes)
     }
@@ -74,7 +75,7 @@ object SettingsBackup {
             markRead = enum("markRead", MarkRead.entries.toTypedArray(), base.markRead),
             conversationView = bool("conversationView", base.conversationView), avatarColors = bool("avatarColors", base.avatarColors),
             gravatar = bool("gravatar", base.gravatar), libravatar = bool("libravatar", base.libravatar), brandLogos = bool("brandLogos", base.brandLogos), websiteIcons = bool("websiteIcons", base.websiteIcons),
-            readingTextPercent = int("readingTextPercent", base.readingTextPercent, 90..130), quotedExpanded = bool("quotedExpanded", base.quotedExpanded),
+            readingTextPercent = int("readingTextPercent", base.readingTextPercent, 90..130), readerFont = enum("readerFont", ReaderFont.entries.toTypedArray(), base.readerFont), readerLineHeightPercent = int("readerLineHeightPercent", base.readerLineHeightPercent, 120..200), quotedExpanded = bool("quotedExpanded", base.quotedExpanded),
             replyAllByDefault = bool("replyAllByDefault", base.replyAllByDefault), swipeBetweenMessages = bool("swipeBetweenMessages", base.swipeBetweenMessages),
             includeOriginal = bool("includeOriginal", base.includeOriginal), defaultFormat = enum("defaultFormat", ComposeFormat.entries.toTypedArray(), base.defaultFormat),
             lockAfterMinutes = int("lockAfterMinutes", base.lockAfterMinutes, 0..60),

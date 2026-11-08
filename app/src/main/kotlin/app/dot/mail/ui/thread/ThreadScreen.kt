@@ -70,6 +70,7 @@ import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.MarkEmailUnread
 import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Report
 import androidx.compose.material.icons.outlined.Shield
@@ -473,6 +474,8 @@ fun ThreadScreen(
                             onAttachment = vm::openAttachment,
                             onSender = { onComposeTo(it.email) },
                             readingScale = prefs.readingTextPercent / 100f,
+                            readerFont = prefs.readerFont,
+                            readerLineHeight = prefs.readerLineHeightPercent,
                             quotedExpanded = prefs.quotedExpanded,
                         )
                         Hairline(Modifier.padding(horizontal = DotSpacing.gutter))
@@ -704,6 +707,8 @@ private fun MessageCard(
     onAttachment: (Attachment, Boolean) -> Unit,
     onSender: (EmailAddress) -> Unit,
     readingScale: Float = 1f,
+    readerFont: app.dot.mail.ReaderFont = app.dot.mail.ReaderFont.INTER,
+    readerLineHeight: Int = 155,
     quotedExpanded: Boolean = false,
 ) {
     val allowRemote = remoteReason != app.dot.mail.ui.settings.LoadReason.NONE
@@ -785,6 +790,8 @@ private fun MessageCard(
                     linkColor = c.accent.toArgb(),
                     onLink = onLink,
                     textZoom = (readingScale * 100).toInt(),
+                    font = readerFont,
+                    lineHeightPercent = readerLineHeight,
                     layoutWidth = clean.layoutWidth,
                     responsive = clean.responsive,
                     // Designed (table/newsletter) mail gets the full width like other clients; plain prose keeps our margins.
@@ -794,7 +801,7 @@ private fun MessageCard(
                     ).pinchToZoom(),
                 )
             } else {
-                PlainTextBody(body.plainText.orEmpty(), onLink, textScale = readingScale, quotedExpanded = quotedExpanded)
+                PlainTextBody(body.plainText.orEmpty(), onLink, textScale = readingScale, quotedExpanded = quotedExpanded, font = readerFont, lineHeightPercent = readerLineHeight)
             }
             if (body.isTruncated) {
                 Text(
@@ -942,18 +949,18 @@ private fun RemoteImagesLoadedRow(reason: app.dot.mail.ui.settings.LoadReason, s
 private val URL = Regex("""(https?://[^\s<>"')\]]+)|([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})""")
 
 @Composable
-private fun PlainTextBody(text: String, onLink: (String) -> Unit, textScale: Float = 1f, quotedExpanded: Boolean = false) {
+private fun PlainTextBody(text: String, onLink: (String) -> Unit, textScale: Float = 1f, quotedExpanded: Boolean = false, font: app.dot.mail.ReaderFont = app.dot.mail.ReaderFont.INTER, lineHeightPercent: Int = 155) {
     val c = Dot.colors
     val split = remember(text) { QuoteSplitter.split(text) }
     var showQuoted by rememberSaveable(text) { mutableStateOf(quotedExpanded) }
-    val bodyStyle = Dot.type.body.let { it.copy(fontSize = it.fontSize * textScale, lineHeight = it.lineHeight * textScale) }
+    val bodyStyle = readerTextStyle(Dot.type.body, textScale, font, lineHeightPercent)
     Column(Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s)) {
         SelectionContainer { Text(linkify(split.visible.trimEnd(), c.accent, onLink), style = bodyStyle, color = c.textPrimary) }
         val quoted = split.quoted
         if (!quoted.isNullOrBlank()) {
             Box(
-                Modifier.padding(top = DotSpacing.s).clip(DotShapes.small).background(c.surface)
-                    .clickable { showQuoted = !showQuoted }.padding(horizontal = 10.dp, vertical = 2.dp),
+                Modifier.padding(top = DotSpacing.s).minimumInteractiveComponentSize().clip(DotShapes.small).background(c.surface)
+                    .clickable(role = androidx.compose.ui.semantics.Role.Button) { showQuoted = !showQuoted }.padding(horizontal = 10.dp, vertical = 2.dp),
             ) { Icon(Icons.Outlined.MoreHoriz, stringResource(if (showQuoted) R.string.compose_hide_quoted else R.string.compose_show_quoted), tint = c.textSecondary) }
             AnimatedVisibility(showQuoted) {
                 SelectionContainer {
@@ -1172,4 +1179,18 @@ private fun BoxScope.ReaderChrome(
     if (reply != null) {
         AnimatedVisibility(visible, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = DotSpacing.m), enter = enter(false), exit = exit(false)) { reply() }
     }
+}
+
+/** The reader's plain-text style: size scale, typeface and line height from Settings. */
+internal fun readerTextStyle(base: androidx.compose.ui.text.TextStyle, scale: Float, font: app.dot.mail.ReaderFont, lineHeightPercent: Int): androidx.compose.ui.text.TextStyle {
+    val size = base.fontSize * scale
+    return base.copy(
+        fontSize = size,
+        lineHeight = size * (lineHeightPercent.coerceIn(120, 200) / 100f),
+        fontFamily = when (font) {
+            app.dot.mail.ReaderFont.INTER -> base.fontFamily
+            app.dot.mail.ReaderFont.SYSTEM -> androidx.compose.ui.text.font.FontFamily.Default
+            app.dot.mail.ReaderFont.SERIF -> androidx.compose.ui.text.font.FontFamily.Serif
+        },
+    )
 }

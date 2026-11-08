@@ -102,6 +102,7 @@ import app.dot.mail.R
 import app.dot.mail.BuildConfig
 import app.dot.mail.ComposeFormat
 import app.dot.mail.Density
+import app.dot.mail.ReaderFont
 import app.dot.mail.LocalMailGraph
 import app.dot.mail.LocalSettings
 import app.dot.mail.MarkRead
@@ -257,10 +258,15 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             ToggleRow(stringResource(R.string.settings_group_conversations), stringResource(R.string.settings_group_conversations_sub), Icons.Outlined.Forum, prefs.conversationView) { v ->
                 settings.update { it.copy(conversationView = v) }
             }
-            SegmentedSetting(stringResource(R.string.settings_density), listOf(Density.COMFORTABLE to stringResource(R.string.settings_density_comfortable), Density.COMPACT to stringResource(R.string.settings_density_compact)), prefs.density) { d ->
+            SegmentedSetting(stringResource(R.string.settings_density), listOf(Density.COMPACT to stringResource(R.string.settings_density_compact), Density.COMFORTABLE to stringResource(R.string.settings_density_comfortable), Density.SPACIOUS to stringResource(R.string.settings_density_spacious)), prefs.density) { d ->
                 settings.update { it.copy(density = d) }
             }
             PercentSlider(stringResource(R.string.settings_reading_size), prefs.readingTextPercent, 90..130, 10) { v -> settings.update { it.copy(readingTextPercent = v) } }
+            ChoiceRow(
+                stringResource(R.string.settings_reader_font), null, prefs.readerFont,
+                listOf(ReaderFont.INTER to stringResource(R.string.settings_reader_font_inter), ReaderFont.SYSTEM to stringResource(R.string.settings_reader_font_system), ReaderFont.SERIF to stringResource(R.string.settings_reader_font_serif)),
+            ) { f -> settings.update { it.copy(readerFont = f) } }
+            PercentSlider(stringResource(R.string.settings_reader_line_height), prefs.readerLineHeightPercent, 120..200, 5) { v -> settings.update { it.copy(readerLineHeightPercent = v) } }
             ToggleRow(stringResource(R.string.settings_avatar_colors), stringResource(R.string.settings_avatar_colors_sub), Icons.Outlined.Palette, prefs.avatarColors) { v ->
                 settings.update { it.copy(avatarColors = v) }
             }
