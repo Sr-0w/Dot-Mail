@@ -1,5 +1,25 @@
 package app.dot.mail.ui.thread
 
+import androidx.compose.foundation.focusable
+
+import androidx.compose.ui.focus.focusRequester
+
+import androidx.compose.ui.input.key.isShiftPressed
+
+import androidx.compose.ui.input.key.isMetaPressed
+
+import androidx.compose.ui.input.key.isAltPressed
+
+import androidx.compose.ui.input.key.isCtrlPressed
+
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+
+import androidx.compose.ui.input.key.type
+
+import androidx.compose.ui.input.key.key
+
+import androidx.compose.ui.input.key.Key
+
 import androidx.compose.foundation.gestures.awaitFirstDown
 
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -323,8 +343,30 @@ fun ThreadScreen(
     val c = Dot.colors
 
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    // Hardware keyboard shortcuts (tablets, Chromebooks, DeX), Gmail-style single keys.
+    val keyFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { keyFocus.requestFocus() } }
     Box(
         Modifier.fillMaxSize().background(c.background)
+            .focusRequester(keyFocus).focusable()
+            .onPreviewKeyEvent { e ->
+                if (e.type != androidx.compose.ui.input.key.KeyEventType.KeyDown || e.isCtrlPressed || e.isAltPressed || e.isMetaPressed) return@onPreviewKeyEvent false
+                val target = last
+                when (e.key) {
+                    Key.R -> { target?.let { onReply(it.id, ReplyMode.REPLY) }; true }
+                    Key.A -> { target?.let { onReply(it.id, ReplyMode.REPLY_ALL) }; true }
+                    Key.F -> { target?.let { onReply(it.id, ReplyMode.FORWARD) }; true }
+                    Key.E -> { vm.act(MessageAction.ARCHIVE); true }
+                    Key.Three -> if (e.isShiftPressed) { vm.act(MessageAction.TRASH); true } else false
+                    Key.Delete -> { vm.act(MessageAction.TRASH); true }
+                    Key.U -> { vm.act(MessageAction.MARK_UNREAD); true }
+                    Key.S -> { vm.act(if (list?.any { it.isStarred } == true) MessageAction.UNSTAR else MessageAction.STAR); true }
+                    Key.J -> { ThreadOrder.after(threadId)?.let(onOpenAdjacent); true }
+                    Key.K -> { ThreadOrder.before(threadId)?.let(onOpenAdjacent); true }
+                    Key.Escape -> { onBack(); true }
+                    else -> false
+                }
+            }
             .swipeBetweenConversations(enabled = prefs.swipeBetweenMessages) { forward ->
                 val target = if (forward) ThreadOrder.after(threadId) else ThreadOrder.before(threadId)
                 if (target != null) {

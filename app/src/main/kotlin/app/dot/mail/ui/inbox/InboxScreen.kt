@@ -1,5 +1,21 @@
 package app.dot.mail.ui.inbox
 
+import androidx.compose.foundation.focusable
+
+import androidx.compose.ui.focus.focusRequester
+
+import androidx.compose.ui.input.key.isMetaPressed
+
+import androidx.compose.ui.input.key.isAltPressed
+
+import androidx.compose.ui.input.key.isCtrlPressed
+
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+
+import androidx.compose.ui.input.key.type
+
+import androidx.compose.ui.input.key.key
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
@@ -176,7 +192,18 @@ fun InboxScreen(
     // Back closes the selection first.
     androidx.activity.compose.BackHandler(enabled = selection.isNotEmpty()) { vm.clearSelection() }
 
+    // Hardware keyboard: c = compose, / = search.
+    val keyFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { keyFocus.requestFocus() } }
     ModalNavigationDrawer(
+        modifier = Modifier.focusRequester(keyFocus).focusable().onPreviewKeyEvent { e ->
+            if (e.type != androidx.compose.ui.input.key.KeyEventType.KeyDown || e.isCtrlPressed || e.isAltPressed || e.isMetaPressed) return@onPreviewKeyEvent false
+            when (e.key) {
+                androidx.compose.ui.input.key.Key.C -> { onCompose(); true }
+                androidx.compose.ui.input.key.Key.Slash -> { onSearch(); true }
+                else -> false
+            }
+        },
         drawerState = drawerState,
         gesturesEnabled = selection.isEmpty(),
         scrimColor = Dot.colors.scrim,
