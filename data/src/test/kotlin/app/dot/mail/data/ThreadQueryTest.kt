@@ -20,6 +20,16 @@ class ThreadQueryTest {
         assertThat(q.text.count { it == '?' }).isEqualTo(q.args.size)
     }
 
+    @Test fun `per-message list gets the same quick filters and sort`(): Unit {
+        // Regression: with conversation grouping off, chips used to change nothing.
+        val q = ThreadQuery.messageFilters(ThreadFilters(unread = true, toMe = true, fromContacts = true), listOf("me@x.org"))!!
+        assertThat(q.text).startsWith("messages.unread=1 AND (lower(messages.recipientSearch) LIKE ?")
+        assertThat(q.text).contains("c.email<>''")
+        assertThat(q.args).containsExactly("%me@x.org%")
+        assertThat(ThreadQuery.messageFilters(ThreadFilters(), emptyList())).isNull()
+        assertThat(ThreadQuery.messageOrderBy(InboxSort.UNREAD_FIRST)).startsWith("unread DESC")
+    }
+
     @Test fun `to me with no identities matches nothing`(): Unit {
         assertThat(ThreadQuery.filters(ThreadFilters(toMe = true), emptyList())!!.text).isEqualTo("0")
     }

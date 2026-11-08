@@ -197,6 +197,7 @@ internal class RealMailGraph(
         return dao.page(SimpleSQLiteQuery("SELECT * FROM ($remote$local) ORDER BY $orderBy", params.toTypedArray()))
     }
     override fun threads(mailbox: Mailbox): Flow<PagingData<ThreadSummary>> = threads(mailbox, ListOptions())
+    internal suspend fun ownEmailsForFilters(): List<String> = ownEmails()
     private suspend fun ownEmails(): List<String> = dao.accounts().flatMap { a -> identityStore.resolve(a.id, a.name, a.email).map { it.email } }
     override fun threads(mailbox: Mailbox, options: ListOptions): Flow<PagingData<ThreadSummary>> = flow {
         val extra = ThreadQuery.filters(options.filters, if (options.filters.toMe) ownEmails() else emptyList())
@@ -370,6 +371,7 @@ internal class RealMailGraph(
     override fun snoozedCount(): Flow<Int> = dao.observeSnoozedCount()
     override fun attachments(kind: AttachmentKind?, query: String): Flow<PagingData<AttachmentItem>> = attachmentsPaging(kind, query)
     override fun messages(mailbox: Mailbox): Flow<PagingData<ThreadSummary>> = messagesPaging(mailbox)
+    override fun messages(mailbox: Mailbox, options: ListOptions): Flow<PagingData<ThreadSummary>> = messagesPaging(mailbox, options)
     override suspend fun createFolder(accountId: Long, parentFolderId: Long?, name: String): Long = createFolderLocal(accountId, parentFolderId, name)
     override suspend fun renameFolder(folderId: Long, newName: String) = relocateFolderLocal(folderId, keepParent = true, newParentId = null, newName = newName)
     override suspend fun moveFolder(folderId: Long, newParentFolderId: Long?) = relocateFolderLocal(folderId, keepParent = false, newParentId = newParentFolderId, newName = null)

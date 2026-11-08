@@ -26,23 +26,27 @@ internal suspend fun RealMailGraph.threadOrMessageRows(threadId: Long): List<Mes
  * One row per message, newest first, for a folder or a role across accounts. Drafts keep their conversation-style list
  * (local drafts are not messages). Rows are ThreadSummaries with a virtual thread id so the list UI is unchanged.
  */
-internal fun RealMailGraph.messagesPaging(mailbox: Mailbox): Flow<PagingData<ThreadSummary>> = flow {
+internal fun RealMailGraph.messagesPaging(mailbox: Mailbox, options: app.dot.mail.data.model.ListOptions = app.dot.mail.data.model.ListOptions()): Flow<PagingData<ThreadSummary>> = flow {
     val (where, args) = when (mailbox) {
-        is Mailbox.Smart -> { emitAll(threads(mailbox)); return@flow }
+        is Mailbox.Smart -> { emitAll(threads(mailbox, options)); return@flow }
         is Mailbox.InFolder -> {
-            if (dao.folder(mailbox.folderId)?.role == "DRAFTS") { emitAll(threads(mailbox)); return@flow }
+            if (dao.folder(mailbox.folderId)?.role == "DRAFTS") { emitAll(threads(mailbox, options)); return@flow }
             "folderId=?" to listOf<Any>(mailbox.folderId)
         }
         is Mailbox.Unified -> {
-            if (mailbox.role == FolderRole.DRAFTS) { emitAll(threads(mailbox)); return@flow }
+            if (mailbox.role == FolderRole.DRAFTS) { emitAll(threads(mailbox, options)); return@flow }
             if (mailbox.role == FolderRole.SNOOZED) { emitAll(snoozedMessagesPaging()); return@flow }
             if(mailbox.role.category()!=null) "id IN (SELECT n.id FROM messages n JOIN folders f ON f.id=n.folderId WHERE ${categoryPredicate("n","f",mailbox.role.category()!!)})" to emptyList<Any>()
             else "folderId IN (SELECT id FROM folders WHERE role=?)" to listOf<Any>(mailbox.role.name)
         }
     }
-    val sql = "SELECT $MESSAGE_META FROM messages WHERE $where AND NOT EXISTS(SELECT 1 FROM snoozed z WHERE z.resurfacedAt IS NULL AND (z.messageId=messages.id OR (z.messageId IS NULL AND z.threadId=messages.threadId))) ORDER BY sentAt DESC,id DESC"
+    // Quick filters and sort apply here too (conversation grouping off), not only to the conversation list.
+    val extra = ThreadQuery.messageFilters(options.filters, if (options.filters.toMe) ownEmailsForFilters() else emptyList())
+    val filter = if (extra == null) "" else " AND (${extra.text})"
+    val sql = "SELECT $MESSAGE_META FROM messages WHERE $where$filter AND NOT EXISTS(SELECT 1 FROM snoozed z WHERE z.resurfacedAt IS NULL AND (z.messageId=messages.id OR (z.messageId IS NULL AND z.threadId=messages.threadId))) ORDER BY ${ThreadQuery.messageOrderBy(options.sort)}"
+    val allArgs = args + (extra?.args ?: emptyList())
     emitAll(
-        Pager(PagingConfig(pageSize = 40)) { dao.pageMessages(SimpleSQLiteQuery(sql, args.toTypedArray())) }
+        Pager(PagingConfig(pageSize = 40)) { dao.pageMessages(SimpleSQLiteQuery(sql, allArgs.toTypedArray())) }
             .flow.map { data -> data.map(::messageSummary) },
     )
 }

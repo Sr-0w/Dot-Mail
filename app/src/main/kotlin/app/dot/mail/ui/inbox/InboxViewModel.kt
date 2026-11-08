@@ -120,7 +120,7 @@ class InboxViewModel(
     @OptIn(ExperimentalCoroutinesApi::class)
     val threads: Flow<PagingData<ThreadSummary>> =
         kotlinx.coroutines.flow.combine(_mailbox, grouped.distinctUntilChanged(), listPrefs.sort, _filters) { box, group, sort, filters -> Triple(box, group, app.dot.mail.data.model.ListOptions(sort, filters)) }
-            .flatMapLatest { (box, group, options) -> if (group) graph.mail.threads(box, options) else graph.mail.messages(box) }.cachedIn(viewModelScope)
+            .flatMapLatest { (box, group, options) -> if (group) graph.mail.threads(box, options) else graph.mail.messages(box, options) }.cachedIn(viewModelScope)
 
 
     fun open(mailbox: Mailbox) {

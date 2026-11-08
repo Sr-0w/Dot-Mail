@@ -96,6 +96,8 @@ interface MailRepository {
      * thread(), apply(), move() affects that single message only.
      */
     fun messages(mailbox: Mailbox): Flow<PagingData<ThreadSummary>> = threads(mailbox)
+    /** Per-message list with the inbox sort and quick filters. */
+    fun messages(mailbox: Mailbox, options: app.dot.mail.data.model.ListOptions): Flow<PagingData<ThreadSummary>> = messages(mailbox)
 
     /** Searches local cache immediately; server search results are merged in as they arrive. */
     fun search(query: String, accountId: Long? = null): Flow<PagingData<ThreadSummary>>

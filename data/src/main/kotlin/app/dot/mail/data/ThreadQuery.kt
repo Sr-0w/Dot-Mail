@@ -32,7 +32,7 @@ internal object ThreadQuery {
             }
         }
         if (filters.fromContacts) {
-            parts += "EXISTS(SELECT 1 FROM messages m JOIN contacts c ON c.accountId=m.accountId AND instr(lower(m.senderSearch), lower(c.email))>0 WHERE m.threadId=t.id)"
+            parts += "EXISTS(SELECT 1 FROM messages m JOIN contacts c ON c.accountId=m.accountId AND c.email<>'' AND instr(lower(m.senderSearch), lower(c.email))>0 WHERE m.threadId=t.id)"
         }
         return if (parts.isEmpty()) null else Sql(parts.joinToString(" AND "), args)
     }
@@ -69,6 +69,34 @@ internal object ThreadQuery {
         InboxSort.UNREAD_FIRST -> "(unread>0) DESC,sortAt DESC,id DESC"
         InboxSort.STARRED_FIRST -> "starred DESC,sortAt DESC,id DESC"
         InboxSort.SENDER -> "lower(participants) ASC,sortAt DESC,id DESC"
+    }
+
+    /** Same quick filters for the per-message list (conversation grouping off), over the `messages` table. */
+    fun messageFilters(filters: ThreadFilters, ownEmails: Collection<String>): Sql? {
+        val parts = mutableListOf<String>()
+        val args = mutableListOf<Any>()
+        if (filters.unread) parts += "messages.unread=1"
+        if (filters.starred) parts += "messages.starred=1"
+        if (filters.attachments) parts += "messages.hasAttachments=1"
+        if (filters.toMe) {
+            val mine = ownEmails.map { it.trim().lowercase() }.filter { it.isNotEmpty() }.distinct()
+            if (mine.isEmpty()) parts += "0" else {
+                parts += "(" + mine.joinToString(" OR ") { "lower(messages.recipientSearch) LIKE ? ESCAPE '!'" } + ")"
+                args.addAll(mine.map { like(it) })
+            }
+        }
+        if (filters.fromContacts) {
+            parts += "EXISTS(SELECT 1 FROM contacts c WHERE c.accountId=messages.accountId AND c.email<>'' AND instr(lower(messages.senderSearch), lower(c.email))>0)"
+        }
+        return if (parts.isEmpty()) null else Sql(parts.joinToString(" AND "), args)
+    }
+
+    /** ORDER BY for the per-message list. */
+    fun messageOrderBy(sort: InboxSort): String = when (sort) {
+        InboxSort.DATE -> "sentAt DESC,id DESC"
+        InboxSort.UNREAD_FIRST -> "unread DESC,sentAt DESC,id DESC"
+        InboxSort.STARRED_FIRST -> "starred DESC,sentAt DESC,id DESC"
+        InboxSort.SENDER -> "lower(senderSearch) ASC,sentAt DESC,id DESC"
     }
 
     /** Combines SQL fragments with AND (null parts are skipped). */
