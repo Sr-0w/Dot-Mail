@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="storage_title">Mail storage and offline</string>
+    <string name="storage_explanation">Choose a policy, then Apply to activate it. Downloads never delete server mail. Drafts, outbox, pending changes and saved messages stay protected; they may exceed a limit. Unlimited is still bounded by available device space.</string>
+    <string name="storage_used">Total local mail storage</string>
+    <string name="storage_database">Shared database and search index</string>
+    <string name="storage_local_work">Outbox and draft attachments</string>
+    <string name="storage_orphans">Temporary and unreferenced mail cache</string>
+    <string name="storage_available">Available device space</string>
+    <string name="storage_approximate">Some protected sizes are estimated.</string>
+    <string name="storage_refresh_usage">Refresh storage usage</string>
+    <string name="storage_global_limit">Total storage limit</string>
+    <string name="storage_unlimited">Unlimited</string>
+    <string name="storage_account">Account</string>
+    <string name="storage_payloads">Downloaded bodies and attachments</string>
+    <string name="storage_protected">Protected cached files</string>
+    <string name="storage_progress">Offline download</string>
+    <string name="storage_messages">Cached messages</string>
+    <string name="storage_counts">%1$d / %2$d</string>
+    <string name="storage_count_unknown">%1$d cached · total not yet known</string>
+    <string name="storage_bodies">Downloaded bodies</string>
+    <string name="storage_attachments">Downloaded attachments</string>
+    <string name="storage_pause">Pause</string>
+    <string name="storage_resume">Resume</string>
+    <string name="storage_retry">Retry download</string>
+    <string name="storage_clear">Clear downloaded mail</string>
+    <string name="storage_clear_sub">Pause downloads and free eligible cached bodies and attachments.</string>
+    <string name="storage_clear_confirm">Clear downloaded mail for this account? Downloads will pause. Headers remain, and protected drafts, outbox, saved messages and pending work are kept. Nothing is deleted on the server.</string>
+    <string name="storage_cancel">Cancel</string>
+    <string name="storage_freed">Freed %1$s</string>
+    <string name="storage_retention">Keep locally</string>
+    <string name="storage_latest">Latest messages</string>
+    <string name="storage_days">Last days</string>
+    <string name="storage_all">All server messages</string>
+    <string name="storage_full_offline">Use unlimited full offline</string>
+    <string name="storage_full_offline_sub">All message bodies, with attachments optional. Apply to start. The total storage limit and available device space still apply.</string>
+    <string name="storage_latest_count">Number of messages</string>
+    <string name="storage_days_count">Number of days</string>
+    <string name="storage_account_limit">Account cache limit (MiB)</string>
+    <string name="storage_zero_unlimited">0 = unlimited. 1024 MiB = 1 GiB. Protected files are kept.</string>
+    <string name="storage_prefetch_bodies">Download bodies automatically</string>
+    <string name="storage_prefetch_attachments">Download attachments automatically</string>
+    <string name="storage_wifi">Wi-Fi only for offline downloads</string>
+    <string name="storage_charging">Only while charging</string>
+    <string name="storage_invalid">Enter a valid message count (1–1,000,000), days (1–36,500) and nonnegative whole MiB limit.</string>
+    <string name="storage_apply">Apply policy</string>
+    <string name="storage_idle">Not started</string>
+    <string name="storage_queued">Waiting to start</string>
+    <string name="storage_downloading">Downloading</string>
+    <string name="storage_paused">Paused</string>
+    <string name="storage_wait_network">Waiting for an allowed network</string>
+    <string name="storage_wait_charging">Waiting for charging</string>
+    <string name="storage_limit_reached">Storage limit reached</string>
+    <string name="storage_device_full">Not enough device space</string>
+    <string name="storage_complete">Download complete</string>
+    <string name="storage_partial">Some messages are not available offline</string>
+    <string name="storage_error">Storage operation failed. Please retry.</string>
+    <string name="storage_keywords">offline download mirror storage space cache limit quota retention bodies attachments charging wifi</string>
+    <plurals name="storage_skipped">
+        <item quantity="one">%1$d message could not be downloaded. Retry to try it again.</item>
+        <item quantity="other">%1$d messages could not be downloaded. Retry to try them again.</item>
+    </plurals>
+</resources>
