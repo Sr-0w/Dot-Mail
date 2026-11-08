@@ -829,4 +829,58 @@
     <string name="inbox_sync_complete">Synchronisation terminée</string>
     <string name="inbox_never_synced">Jamais synchronisé</string>
     <string name="inbox_synced_details">Afficher l’heure de synchronisation par compte</string>
+    <!-- Sorting, filters and smart folders -->
+    <string name="inbox_sort">Trier</string>
+    <string name="inbox_sort_date">Plus récents d’abord</string>
+    <string name="inbox_sort_sender">Expéditeur (A–Z)</string>
+    <string name="inbox_sort_unread">Non lus d’abord</string>
+    <string name="inbox_sort_starred">Favoris d’abord</string>
+    <string name="inbox_filter_unread">Non lus</string>
+    <string name="inbox_filter_starred">Favoris</string>
+    <string name="inbox_filter_attachments">Pièces jointes</string>
+    <string name="inbox_filter_to_me">Pour moi</string>
+    <string name="inbox_filter_contacts">De contacts</string>
+    <string name="inbox_filter_clear">Effacer les filtres</string>
+    <string name="inbox_empty_filtered_title">Aucun résultat</string>
+    <string name="inbox_empty_filtered_body">Rien ne correspond aux filtres choisis.</string>
+    <string name="drawer_smart_folders">Dossiers intelligents</string>
+    <string name="settings_smart_folders">Dossiers intelligents</string>
+    <string name="settings_smart_folders_sub">Recherches enregistrées sur tous vos comptes</string>
+    <string name="smart_title">Dossiers intelligents</string>
+    <string name="smart_intro">Un dossier intelligent est un filtre enregistré qui affiche dans le menu les messages correspondants de n’importe quel compte ou dossier. Rien n’est déplacé ni copié.</string>
+    <string name="smart_empty">Aucun dossier intelligent</string>
+    <string name="smart_add">Nouveau dossier intelligent</string>
+    <string name="smart_edit">Modifier le dossier intelligent</string>
+    <string name="smart_name">Nom</string>
+    <string name="smart_accounts">Comptes</string>
+    <string name="smart_all_accounts">Tous les comptes</string>
+    <string name="smart_roles">Dossiers</string>
+    <string name="smart_all_folders">Tous les dossiers sauf Corbeille, Spam et Brouillons</string>
+    <string name="smart_from">De contient</string>
+    <string name="smart_to">À contient</string>
+    <string name="smart_subject">Objet contient</string>
+    <string name="smart_category">Catégorie</string>
+    <string name="smart_any_category">Toutes</string>
+    <string name="smart_unread_only">Non lus uniquement</string>
+    <string name="smart_starred_only">Favoris uniquement</string>
+    <string name="smart_has_attachment">Avec pièce jointe</string>
+    <string name="smart_after">À partir du</string>
+    <string name="smart_before">Jusqu’au</string>
+    <string name="smart_date_any">Indifférent</string>
+    <string name="smart_date_ok">OK</string>
+    <string name="smart_save">Enregistrer</string>
+    <string name="smart_delete">Supprimer</string>
+    <string name="smart_move_up">Monter</string>
+    <string name="smart_move_down">Descendre</string>
+    <string name="smart_delete_title">Supprimer ce dossier intelligent ?</string>
+    <string name="smart_delete_body">Seul le filtre enregistré est supprimé. Vos messages ne sont pas modifiés.</string>
+    <string name="smart_empty_title">Rien ne correspond pour l’instant</string>
+    <string name="smart_empty_body">Les messages correspondant à ce dossier intelligent apparaîtront ici.</string>
+
+    <!-- Backup: smart folders -->
+    <plurals name="backup_preview_smart">
+        <item quantity="one">%1$d dossier intelligent : ajouté s’il est nouveau.</item>
+        <item quantity="other">%1$d dossiers intelligents : les nouveaux sont ajoutés.</item>
+    </plurals>
+    <string name="backup_done_smart">%1$d dossiers intelligents ajoutés.</string>
 </resources>

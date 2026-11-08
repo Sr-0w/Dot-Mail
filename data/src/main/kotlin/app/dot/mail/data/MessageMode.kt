@@ -28,6 +28,7 @@ internal suspend fun RealMailGraph.threadOrMessageRows(threadId: Long): List<Mes
  */
 internal fun RealMailGraph.messagesPaging(mailbox: Mailbox): Flow<PagingData<ThreadSummary>> = flow {
     val (where, args) = when (mailbox) {
+        is Mailbox.Smart -> { emitAll(threads(mailbox)); return@flow }
         is Mailbox.InFolder -> {
             if (dao.folder(mailbox.folderId)?.role == "DRAFTS") { emitAll(threads(mailbox)); return@flow }
             "folderId=?" to listOf<Any>(mailbox.folderId)

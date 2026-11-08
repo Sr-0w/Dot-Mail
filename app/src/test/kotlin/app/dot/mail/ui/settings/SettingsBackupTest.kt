@@ -72,6 +72,18 @@ class SettingsBackupTest {
         assertThat(droppedHere).isEqualTo(1)
     }
 
+    @Test fun `smart folders are keyed by account address and skip folders whose accounts are gone`() {
+        val a = app.dot.mail.data.model.SmartFolder("a", "All", from = "boss", category = app.dot.mail.engine.text.Category.BILL, roles = setOf(app.dot.mail.data.model.FolderRole.INBOX), afterMillis = 5)
+        val b = app.dot.mail.data.model.SmartFolder("b", "Work only", accountIds = setOf(2))
+        val gone = app.dot.mail.data.model.SmartFolder("c", "Gone", accountIds = setOf(99))
+        val json = SettingsBackup.encodeSmartFolders(listOf(a, b, gone)) { emails[it] }
+        assertThat(json.toString()).doesNotContain("\"Gone\"")
+        val restored = SettingsBackup.decodeSmartFolders(json, mapOf("work@example.org" to 7L)::get)
+        assertThat(restored).containsExactly(a, b.copy(accountIds = setOf(7))).inOrder()
+        assertThat(SettingsBackup.decodeSmartFolders(json) { null }).containsExactly(a)
+        assertThat(SettingsBackup.decodeSmartFolders(Json.parseToJsonElement("[1,{\"id\":\"x\"},{\"name\":\"n\"}]") as JsonArray) { null }).isEmpty()
+    }
+
     @Test fun `hostile rule values are re-validated`() {
         val bad = Json.parseToJsonElement("""[{"type":"domain","value":"com"},{"type":"address","value":"no at sign"},{"type":"domain","value":"a b.org"}]""") as JsonArray
         assertThat(SettingsBackup.decodeRules(bad) { null }.first).isEmpty()

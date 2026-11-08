@@ -19,6 +19,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
 /**
@@ -34,6 +35,7 @@ object SettingsBackup {
     const val APP = "dot-mail"
     private const val MAX_BYTES = 2_000_000
     private const val MAX_TEMPLATES = 200
+    private const val MAX_SMART = 100
 
     /** UiPrefs fields deliberately left out of the file (see above). The unit test keeps this list and the code in step. */
     val EXCLUDED_PREFS = setOf("appLock", "contactPhotos")
@@ -122,16 +124,54 @@ object SettingsBackup {
         return incoming.filter { names.add(it.name.lowercase()) }
     }
 
+    // ---- smart folders ---------------------------------------------------------------------------------------------
+
+    /** Accounts are written as addresses (local ids differ between devices). */
+    fun encodeSmartFolders(folders: List<app.dot.mail.data.model.SmartFolder>, accountEmailOf: (Long) -> String?): JsonArray = buildJsonArray {
+        folders.forEach { f ->
+            val emails = f.accountIds.mapNotNull(accountEmailOf)
+            if (f.accountIds.isNotEmpty() && emails.isEmpty()) return@forEach // only pointed at removed accounts
+            add(buildJsonObject {
+                put("id", f.id); put("name", f.name)
+                put("accounts", buildJsonArray { emails.forEach { add(JsonPrimitive(it)) } })
+                put("roles", buildJsonArray { f.roles.forEach { add(JsonPrimitive(it.name)) } })
+                put("from", f.from); put("to", f.to); put("subject", f.subject); put("category", f.category?.name)
+                put("unread", f.unreadOnly); put("starred", f.starredOnly); put("attachment", f.hasAttachment)
+                put("after", f.afterMillis); put("before", f.beforeMillis)
+            })
+        }
+    }
+
+    fun decodeSmartFolders(a: JsonArray?, accountIdOf: (String) -> Long?): List<app.dot.mail.data.model.SmartFolder> = a.orEmpty().take(MAX_SMART).mapNotNull { el ->
+        val o = el as? JsonObject ?: return@mapNotNull null
+        fun s(k: String) = (o[k] as? JsonPrimitive)?.takeIf { it !is JsonNull }?.contentOrNull
+        fun b(k: String) = (o[k] as? JsonPrimitive)?.booleanOrNull ?: false
+        fun l(k: String) = (o[k] as? JsonPrimitive)?.takeIf { it !is JsonNull }?.longOrNull
+        fun strings(k: String) = (o[k] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+        val id = s("id")?.take(64)?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+        val name = s("name")?.trim()?.take(100)?.takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+        val emails = strings("accounts")
+        val accountIds = emails.mapNotNull(accountIdOf).toSet()
+        if (emails.isNotEmpty() && accountIds.isEmpty()) return@mapNotNull null // none of its accounts exist here
+        app.dot.mail.data.model.SmartFolder(
+            id, name, accountIds,
+            strings("roles").mapNotNull { n -> app.dot.mail.data.model.FolderRole.entries.firstOrNull { it.name == n } }.toSet(),
+            (s("from") ?: "").take(200), (s("to") ?: "").take(200), (s("subject") ?: "").take(200),
+            app.dot.mail.engine.text.Category.entries.firstOrNull { it.name == s("category") },
+            b("unread"), b("starred"), b("attachment"), l("after"), l("before"),
+        )
+    }
+
     // ---- the file --------------------------------------------------------------------------------------------------
 
-    fun build(dataSection: String, prefs: JsonObject, rules: JsonArray, templates: JsonArray, appVersion: String, exportedAt: String): String =
+    fun build(dataSection: String, prefs: JsonObject, rules: JsonArray, templates: JsonArray, appVersion: String, exportedAt: String, smartFolders: JsonArray = JsonArray(emptyList())): String =
         Json { prettyPrint = true }.encodeToString(JsonObject.serializer(), buildJsonObject {
             put("app", APP); put("format", FORMAT); put("appVersion", appVersion); put("exportedAt", exportedAt)
             put("data", Json.parseToJsonElement(dataSection))
-            put("preferences", prefs); put("remoteImageRules", rules); put("templates", templates)
+            put("preferences", prefs); put("remoteImageRules", rules); put("templates", templates); put("smartFolders", smartFolders)
         })
 
-    class Parsed(val dataSection: String, val prefs: JsonObject?, val rules: JsonArray?, val templates: JsonArray?)
+    class Parsed(val dataSection: String, val prefs: JsonObject?, val rules: JsonArray?, val templates: JsonArray?, val smartFolders: JsonArray? = null)
 
     /** Either the sections, or the string resource explaining why the file can't be used. */
     fun parse(text: String): Pair<Parsed?, Int?> {
@@ -144,7 +184,7 @@ object SettingsBackup {
         if (format < 1) return null to R.string.backup_unsupported
         return Parsed(
             dataSection = (root["data"] as? JsonObject)?.toString() ?: "{}",
-            prefs = root["preferences"] as? JsonObject, rules = root["remoteImageRules"] as? JsonArray, templates = root["templates"] as? JsonArray,
+            prefs = root["preferences"] as? JsonObject, rules = root["remoteImageRules"] as? JsonArray, templates = root["templates"] as? JsonArray, smartFolders = root["smartFolders"] as? JsonArray,
         ) to null
     }
 }

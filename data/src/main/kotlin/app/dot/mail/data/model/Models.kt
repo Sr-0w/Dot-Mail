@@ -85,7 +85,49 @@ sealed interface Mailbox {
     /** Same role across every account, e.g. the unified inbox. */
     data class Unified(val role: FolderRole) : Mailbox
     data class InFolder(val folderId: Long) : Mailbox
+    /** A user-defined smart folder ([SmartFolder.id]): a saved filter across accounts and folders. */
+    data class Smart(val id: String) : Mailbox
 }
+
+/** How a conversation list is ordered. */
+enum class InboxSort { DATE, SENDER, UNREAD_FIRST, STARRED_FIRST }
+
+/** Quick filters on top of any list; all selected filters must match. */
+data class ThreadFilters(
+    val unread: Boolean = false,
+    val starred: Boolean = false,
+    val attachments: Boolean = false,
+    /** Addressed to one of my own identities. */
+    val toMe: Boolean = false,
+    /** From someone I already have in my contacts (people I have corresponded with). */
+    val fromContacts: Boolean = false,
+) {
+    val any: Boolean get() = unread || starred || attachments || toMe || fromContacts
+}
+
+/** Sort + quick filters applied to a list by the data layer. */
+data class ListOptions(val sort: InboxSort = InboxSort.DATE, val filters: ThreadFilters = ThreadFilters())
+
+/**
+ * A saved search shown in the drawer. Empty [accountIds] / [roles] mean "all accounts" / "every folder except
+ * Trash, Spam and Drafts". Text conditions match case-insensitively anywhere in the sender, recipients or subject.
+ */
+data class SmartFolder(
+    val id: String,
+    val name: String,
+    val accountIds: Set<Long> = emptySet(),
+    val roles: Set<FolderRole> = emptySet(),
+    val from: String = "",
+    val to: String = "",
+    val subject: String = "",
+    val category: app.dot.mail.engine.text.Category? = null,
+    val unreadOnly: Boolean = false,
+    val starredOnly: Boolean = false,
+    val hasAttachment: Boolean = false,
+    /** Inclusive start / exclusive end of the message date, epoch millis. */
+    val afterMillis: Long? = null,
+    val beforeMillis: Long? = null,
+)
 
 data class EmailAddress(val email: String, val name: String? = null) {
     val displayName: String get() = name?.takeIf { it.isNotBlank() } ?: email

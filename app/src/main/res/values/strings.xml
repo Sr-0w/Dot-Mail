@@ -829,4 +829,58 @@
     <string name="inbox_sync_complete">Sync complete</string>
     <string name="inbox_never_synced">Never synced yet</string>
     <string name="inbox_synced_details">Show sync time per account</string>
+    <!-- Sorting, filters and smart folders -->
+    <string name="inbox_sort">Sort</string>
+    <string name="inbox_sort_date">Newest first</string>
+    <string name="inbox_sort_sender">Sender (A–Z)</string>
+    <string name="inbox_sort_unread">Unread first</string>
+    <string name="inbox_sort_starred">Starred first</string>
+    <string name="inbox_filter_unread">Unread</string>
+    <string name="inbox_filter_starred">Starred</string>
+    <string name="inbox_filter_attachments">Attachments</string>
+    <string name="inbox_filter_to_me">To me</string>
+    <string name="inbox_filter_contacts">From contacts</string>
+    <string name="inbox_filter_clear">Clear filters</string>
+    <string name="inbox_empty_filtered_title">No match</string>
+    <string name="inbox_empty_filtered_body">Nothing here matches the selected filters.</string>
+    <string name="drawer_smart_folders">Smart folders</string>
+    <string name="settings_smart_folders">Smart folders</string>
+    <string name="settings_smart_folders_sub">Saved searches across your accounts</string>
+    <string name="smart_title">Smart folders</string>
+    <string name="smart_intro">A smart folder is a saved filter that shows matching mail from any account and folder in the menu. Nothing is moved or copied.</string>
+    <string name="smart_empty">No smart folders yet</string>
+    <string name="smart_add">New smart folder</string>
+    <string name="smart_edit">Edit smart folder</string>
+    <string name="smart_name">Name</string>
+    <string name="smart_accounts">Accounts</string>
+    <string name="smart_all_accounts">All accounts</string>
+    <string name="smart_roles">Folders</string>
+    <string name="smart_all_folders">Every folder except Trash, Spam and Drafts</string>
+    <string name="smart_from">From contains</string>
+    <string name="smart_to">To contains</string>
+    <string name="smart_subject">Subject contains</string>
+    <string name="smart_category">Category</string>
+    <string name="smart_any_category">Any</string>
+    <string name="smart_unread_only">Unread only</string>
+    <string name="smart_starred_only">Starred only</string>
+    <string name="smart_has_attachment">Has an attachment</string>
+    <string name="smart_after">From date</string>
+    <string name="smart_before">Until date</string>
+    <string name="smart_date_any">Any</string>
+    <string name="smart_date_ok">OK</string>
+    <string name="smart_save">Save</string>
+    <string name="smart_delete">Delete</string>
+    <string name="smart_move_up">Move up</string>
+    <string name="smart_move_down">Move down</string>
+    <string name="smart_delete_title">Delete this smart folder?</string>
+    <string name="smart_delete_body">Only the saved filter is removed. Your mail is not touched.</string>
+    <string name="smart_empty_title">Nothing matches yet</string>
+    <string name="smart_empty_body">Mail that matches this smart folder will appear here.</string>
+
+    <!-- Backup: smart folders -->
+    <plurals name="backup_preview_smart">
+        <item quantity="one">%1$d smart folder: added if its id is new.</item>
+        <item quantity="other">%1$d smart folders: new ones are added.</item>
+    </plurals>
+    <string name="backup_done_smart">%1$d smart folders added.</string>
 </resources>

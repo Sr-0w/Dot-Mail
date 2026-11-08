@@ -87,6 +87,7 @@ interface MailRepository {
     /** Re-applies the user's classification rules to already cached mail (category views update; nothing moves). */
     suspend fun reclassifyAll() {}
 
+    fun threads(mailbox: Mailbox, options: app.dot.mail.data.model.ListOptions): Flow<PagingData<ThreadSummary>> = threads(mailbox)
     fun threads(mailbox: Mailbox): Flow<PagingData<ThreadSummary>>
 
     /**

@@ -17,6 +17,17 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.key
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import app.dot.design.components.DotButton
+import app.dot.design.components.ButtonStyle
+import app.dot.mail.data.model.Mailbox
+import androidx.compose.material.icons.outlined.FilterList
+import androidx.compose.material.icons.outlined.SwapVert
+import androidx.compose.material.icons.outlined.Check
+import app.dot.design.components.DotFilterChip
+import app.dot.mail.data.model.InboxSort
+import app.dot.mail.data.model.ThreadFilters
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -171,8 +182,9 @@ fun InboxScreen(
 ) {
     val graph = LocalMailGraph.current
     val appSettings = LocalSettings.current
-    val appResources = androidx.compose.ui.platform.LocalContext.current.applicationContext.resources
-    val vm: InboxViewModel = viewModel { InboxViewModel(graph, createSavedStateHandle(), appSettings.ui.map { it.conversationView }, resources = appResources) }
+    val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    val appResources = appContext.resources
+    val vm: InboxViewModel = viewModel { InboxViewModel(graph, createSavedStateHandle(), appSettings.ui.map { it.conversationView }, resources = appResources, listPrefs = app.dot.mail.data.ListPrefs.get(appContext), smartFolders = app.dot.mail.data.SmartFolderStore.get(appContext)) }
     val prefs by LocalSettings.current.ui.collectAsStateWithLifecycle()
     val mailbox by vm.mailbox.collectAsStateWithLifecycle()
     val header by vm.header.collectAsStateWithLifecycle()
@@ -324,6 +336,12 @@ fun InboxScreen(
                         exit = androidx.compose.animation.fadeOut(tween(DotMotion.medium)),
                     ) { app.dot.design.components.DotLinearProgress(modifier = Modifier.fillMaxWidth(), showTrack = false) }
                 }
+                if (selection.isEmpty() && header.role != FolderRole.SNOOZED && header.role != FolderRole.DRAFTS) {
+                    val filters by vm.filters.collectAsStateWithLifecycle()
+                    val sort by vm.sort.collectAsStateWithLifecycle()
+                    FilterBar(filters, sort, onFilters = vm::setFilters, onSort = vm::setSort, onClear = vm::clearFilters)
+                }
+                val filtersActive by vm.filters.collectAsStateWithLifecycle()
                 PullToRefreshBox(
                     isRefreshing = refreshing,
                     onRefresh = vm::refresh,
@@ -341,6 +359,8 @@ fun InboxScreen(
                         swipeStart = prefs.swipeStart,
                         swipeEnd = prefs.swipeEnd,
                         role = header.role,
+                        filtered = filtersActive.any,
+                        smart = mailbox is Mailbox.Smart,
                         onOpen = { t ->
                             when {
                                 selection.isNotEmpty() -> vm.toggleSelection(t.threadId)
@@ -415,6 +435,8 @@ private fun ThreadList(
     swipeStart: SwipeAction,
     swipeEnd: SwipeAction,
     role: FolderRole?,
+    filtered: Boolean,
+    smart: Boolean,
     onOpen: (ThreadSummary) -> Unit,
     onToggleSelect: (Long) -> Unit,
     onSwipe: (MessageAction, ThreadSummary) -> Unit,
@@ -429,7 +451,7 @@ private fun ThreadList(
         )
         threads.itemCount == 0 -> LazyColumn(Modifier.fillMaxSize()) {
             // Must be scrollable for pull-to-refresh to work on an empty list.
-            item { EmptyFor(role) }
+            item { EmptyFor(role, filtered, smart) }
         }
         else -> {
             LaunchedEffect(threads.itemSnapshotList.items) { app.dot.mail.ui.thread.ThreadOrder.ids = threads.itemSnapshotList.items.map { it.threadId } }
@@ -475,8 +497,55 @@ private fun ThreadList(
     }
 }
 
+/** Sort menu + quick filter chips, one quiet row under the header. */
 @Composable
-private fun EmptyFor(role: FolderRole?) {
+private fun FilterBar(
+    filters: ThreadFilters,
+    sort: InboxSort,
+    onFilters: ((ThreadFilters) -> ThreadFilters) -> Unit,
+    onSort: (InboxSort) -> Unit,
+    onClear: () -> Unit,
+) {
+    var menu by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = DotSpacing.s), verticalAlignment = Alignment.CenterVertically) {
+        Box {
+            DotIconButton(Icons.Outlined.SwapVert, stringResource(R.string.inbox_sort), onClick = { menu = true })
+            DotMenu(menu, { menu = false }) {
+                listOf(
+                    InboxSort.DATE to R.string.inbox_sort_date, InboxSort.SENDER to R.string.inbox_sort_sender,
+                    InboxSort.UNREAD_FIRST to R.string.inbox_sort_unread, InboxSort.STARRED_FIRST to R.string.inbox_sort_starred,
+                ).forEach { (value, label) ->
+                    DotMenuItem(stringResource(label), if (value == sort) Icons.Outlined.Check else null) { menu = false; onSort(value) }
+                }
+            }
+        }
+        Spacer(Modifier.width(DotSpacing.xs))
+        DotFilterChip(stringResource(R.string.inbox_filter_unread), filters.unread, { onFilters { it.copy(unread = !it.unread) } })
+        Spacer(Modifier.width(DotSpacing.s))
+        DotFilterChip(stringResource(R.string.inbox_filter_starred), filters.starred, { onFilters { it.copy(starred = !it.starred) } })
+        Spacer(Modifier.width(DotSpacing.s))
+        DotFilterChip(stringResource(R.string.inbox_filter_attachments), filters.attachments, { onFilters { it.copy(attachments = !it.attachments) } })
+        Spacer(Modifier.width(DotSpacing.s))
+        DotFilterChip(stringResource(R.string.inbox_filter_to_me), filters.toMe, { onFilters { it.copy(toMe = !it.toMe) } })
+        Spacer(Modifier.width(DotSpacing.s))
+        DotFilterChip(stringResource(R.string.inbox_filter_contacts), filters.fromContacts, { onFilters { it.copy(fromContacts = !it.fromContacts) } })
+        if (filters.any) {
+            Spacer(Modifier.width(DotSpacing.s))
+            DotButton(stringResource(R.string.inbox_filter_clear), onClear, style = ButtonStyle.Ghost, compact = true)
+        }
+    }
+}
+
+@Composable
+private fun EmptyFor(role: FolderRole?, filtered: Boolean = false, smart: Boolean = false) {
+    if (filtered) {
+        EmptyState(Icons.Outlined.FilterList, stringResource(R.string.inbox_empty_filtered_title), stringResource(R.string.inbox_empty_filtered_body))
+        return
+    }
+    if (smart) {
+        EmptyState(Icons.Outlined.FilterList, stringResource(R.string.smart_empty_title), stringResource(R.string.smart_empty_body))
+        return
+    }
     val (title, msg) = when (role) {
         FolderRole.INBOX, null -> R.string.inbox_empty_inbox_title to R.string.inbox_empty_inbox_body
         FolderRole.STARRED -> R.string.inbox_empty_starred_title to R.string.inbox_empty_starred_body

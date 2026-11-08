@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.material.icons.outlined.FilterList
 import app.dot.mail.data.model.category
 import app.dot.mail.data.model.viewRole
 import androidx.compose.runtime.setValue
@@ -138,6 +139,18 @@ fun MailDrawer(
                         app.dot.mail.engine.text.Category.entries.mapNotNull { it.viewRole() }.filter { role -> role.category() in on || current == Mailbox.Unified(role) }.forEach { role ->
                             val box = Mailbox.Unified(role)
                             DrawerItem(Format.roleName(role), Format.roleIcon(role), null, selected = current == box, onClick = { onOpen(box) })
+                        }
+                    }
+                }
+                item {
+                    val appContext2 = androidx.compose.ui.platform.LocalContext.current.applicationContext
+                    val smartStore = remember { app.dot.mail.data.SmartFolderStore.get(appContext2) }
+                    val smart by smartStore.folders.collectAsStateWithLifecycle()
+                    if (smart.isNotEmpty()) Column {
+                        SectionLabel(stringResource(R.string.drawer_smart_folders), Modifier.padding(top = DotSpacing.m))
+                        smart.forEach { sf ->
+                            val box = Mailbox.Smart(sf.id)
+                            DrawerItem(sf.name, androidx.compose.material.icons.Icons.Outlined.FilterList, null, selected = current == box, onClick = { onOpen(box) })
                         }
                     }
                 }

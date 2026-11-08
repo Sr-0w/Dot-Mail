@@ -829,4 +829,58 @@
     <string name="inbox_sync_complete">Synchronisierung abgeschlossen</string>
     <string name="inbox_never_synced">Noch nie synchronisiert</string>
     <string name="inbox_synced_details">Synchronisierungszeit pro Konto anzeigen</string>
+    <!-- Sorting, filters and smart folders -->
+    <string name="inbox_sort">Sortieren</string>
+    <string name="inbox_sort_date">Neueste zuerst</string>
+    <string name="inbox_sort_sender">Absender (A–Z)</string>
+    <string name="inbox_sort_unread">Ungelesene zuerst</string>
+    <string name="inbox_sort_starred">Markierte zuerst</string>
+    <string name="inbox_filter_unread">Ungelesen</string>
+    <string name="inbox_filter_starred">Markiert</string>
+    <string name="inbox_filter_attachments">Anhänge</string>
+    <string name="inbox_filter_to_me">An mich</string>
+    <string name="inbox_filter_contacts">Von Kontakten</string>
+    <string name="inbox_filter_clear">Filter löschen</string>
+    <string name="inbox_empty_filtered_title">Keine Treffer</string>
+    <string name="inbox_empty_filtered_body">Nichts entspricht den gewählten Filtern.</string>
+    <string name="drawer_smart_folders">Intelligente Ordner</string>
+    <string name="settings_smart_folders">Intelligente Ordner</string>
+    <string name="settings_smart_folders_sub">Gespeicherte Suchen über alle Konten</string>
+    <string name="smart_title">Intelligente Ordner</string>
+    <string name="smart_intro">Ein intelligenter Ordner ist ein gespeicherter Filter, der passende Nachrichten aus beliebigen Konten und Ordnern im Menü zeigt. Nichts wird verschoben oder kopiert.</string>
+    <string name="smart_empty">Noch keine intelligenten Ordner</string>
+    <string name="smart_add">Neuer intelligenter Ordner</string>
+    <string name="smart_edit">Intelligenten Ordner bearbeiten</string>
+    <string name="smart_name">Name</string>
+    <string name="smart_accounts">Konten</string>
+    <string name="smart_all_accounts">Alle Konten</string>
+    <string name="smart_roles">Ordner</string>
+    <string name="smart_all_folders">Alle Ordner außer Papierkorb, Spam und Entwürfe</string>
+    <string name="smart_from">Von enthält</string>
+    <string name="smart_to">An enthält</string>
+    <string name="smart_subject">Betreff enthält</string>
+    <string name="smart_category">Kategorie</string>
+    <string name="smart_any_category">Alle</string>
+    <string name="smart_unread_only">Nur ungelesen</string>
+    <string name="smart_starred_only">Nur markierte</string>
+    <string name="smart_has_attachment">Mit Anhang</string>
+    <string name="smart_after">Ab Datum</string>
+    <string name="smart_before">Bis Datum</string>
+    <string name="smart_date_any">Beliebig</string>
+    <string name="smart_date_ok">OK</string>
+    <string name="smart_save">Speichern</string>
+    <string name="smart_delete">Löschen</string>
+    <string name="smart_move_up">Nach oben</string>
+    <string name="smart_move_down">Nach unten</string>
+    <string name="smart_delete_title">Diesen intelligenten Ordner löschen?</string>
+    <string name="smart_delete_body">Nur der gespeicherte Filter wird entfernt. Ihre Nachrichten bleiben unverändert.</string>
+    <string name="smart_empty_title">Noch keine Treffer</string>
+    <string name="smart_empty_body">Passende Nachrichten erscheinen hier.</string>
+
+    <!-- Backup: smart folders -->
+    <plurals name="backup_preview_smart">
+        <item quantity="one">%1$d intelligenter Ordner: wird hinzugefügt, wenn er neu ist.</item>
+        <item quantity="other">%1$d intelligente Ordner: neue werden hinzugefügt.</item>
+    </plurals>
+    <string name="backup_done_smart">%1$d intelligente Ordner hinzugefügt.</string>
 </resources>
