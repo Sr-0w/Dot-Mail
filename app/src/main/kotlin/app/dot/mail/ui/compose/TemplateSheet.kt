@@ -26,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.res.stringResource
+import app.dot.mail.R
 import app.dot.design.Dot
 import app.dot.design.DotShapes
 import app.dot.design.DotSpacing
@@ -56,10 +58,10 @@ fun TemplateSheet(
     var name by remember { mutableStateOf("") }
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = c.surface, shape = DotShapes.sheet) {
         Column(Modifier.navigationBarsPadding().padding(bottom = DotSpacing.m)) {
-            Text("Templates", style = Dot.type.title, color = c.textPrimary, modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s))
+            Text(stringResource(R.string.templates_title), style = Dot.type.title, color = c.textPrimary, modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s))
             if (templates.isEmpty()) {
                 Text(
-                    "No templates yet. Write a message, then save it here to reuse it. You can use {{first_name}}, {{name}}, {{my_name}} and {{date}}.",
+                    stringResource(R.string.templates_empty),
                     style = Dot.type.callout, color = c.textSecondary,
                     modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s),
                 )
@@ -71,13 +73,13 @@ fun TemplateSheet(
                         subtitle = (t.subject?.let { "$it — " } ?: "") + t.bodyText.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty(),
                         icon = Icons.Outlined.Description,
                         onClick = { onInsert(t) },
-                        trailing = { DotIconButton(Icons.Outlined.DeleteOutline, "Delete template", onClick = { store.delete(t.id) }) },
+                        trailing = { DotIconButton(Icons.Outlined.DeleteOutline, stringResource(R.string.templates_delete), onClick = { store.delete(t.id) }) },
                     )
                 }
             }
             val canSave = current.editableText.isNotBlank()
             ListRow(
-                "Save this message as a template",
+                stringResource(R.string.templates_save_this),
                 icon = Icons.Outlined.Add,
                 titleColor = if (canSave) c.textPrimary else c.textTertiary,
                 onClick = if (canSave) ({ saving = true }) else null,
@@ -89,21 +91,21 @@ fun TemplateSheet(
             onDismissRequest = { saving = false },
             containerColor = c.surface,
             shape = DotShapes.large,
-            title = { Text("Save template", style = Dot.type.title, color = c.textPrimary) },
+            title = { Text(stringResource(R.string.templates_save_title), style = Dot.type.title, color = c.textPrimary) },
             text = {
                 Column {
-                    DotTextField(name, { name = it }, label = "Name", modifier = Modifier.fillMaxWidth())
+                    DotTextField(name, { name = it }, label = stringResource(R.string.templates_name), modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(DotSpacing.s))
-                    Text("The subject and body are saved; recipients are not.", style = Dot.type.caption, color = c.textTertiary)
+                    Text(stringResource(R.string.templates_save_note), style = Dot.type.caption, color = c.textTertiary)
                 }
             },
             confirmButton = {
-                DotPrimaryButton("Save", {
+                DotPrimaryButton(stringResource(R.string.compose_save), {
                     store.save(name, current.draft?.subject, current.editableText, current.bodyHtml.takeIf { current.isRichText })
                     saving = false; name = ""
                 }, compact = true)
             },
-            dismissButton = { DotButton("Cancel", { saving = false }, style = ButtonStyle.Ghost, compact = true) },
+            dismissButton = { DotButton(stringResource(R.string.compose_cancel), { saving = false }, style = ButtonStyle.Ghost, compact = true) },
         )
     }
 }

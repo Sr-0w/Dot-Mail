@@ -362,4 +362,102 @@
     <!-- Snooze additions -->
     <string name="snooze_today">Aujourd’hui</string>
     <string name="snooze_this_evening_label">Ce soir</string>
+
+    <!-- Thread -->
+    <string name="thread_error_download">Impossible de télécharger ce message. %1$s</string>
+    <string name="thread_unsub_done">Désabonnement effectué. Des e-mails déjà en route peuvent encore arriver.</string>
+    <string name="thread_unsub_failed">Le service de désabonnement de l’expéditeur est injoignable. Réessayez plus tard.</string>
+    <string name="thread_error_open_attachment">Impossible d’ouvrir %1$s</string>
+    <string name="thread_no_app_to_open">Aucune application ne peut ouvrir %1$s</string>
+    <string name="thread_more">Plus</string>
+    <string name="thread_mute_conversation">Ignorer la conversation</string>
+    <string name="thread_unmute_conversation">Réactiver les notifications</string>
+    <string name="thread_star">Suivre</string>
+    <string name="thread_remove_star">Ne plus suivre</string>
+    <string name="thread_unsubscribe">Se désabonner</string>
+    <string name="thread_unavailable_title">Conversation indisponible</string>
+    <string name="thread_unavailable_body">Elle a peut-être été déplacée ou supprimée.</string>
+    <string name="thread_confirm_trash_title">Déplacer dans la corbeille ?</string>
+    <string name="thread_confirm_delete_title">Supprimer définitivement ?</string>
+    <string name="thread_confirm_delete_body">Cette conversation sera définitivement supprimée du serveur.</string>
+    <string name="thread_unsub_title">Se désabonner ?</string>
+    <string name="thread_unsub_body">Dot Mail enverra une demande de désabonnement en un clic à %1$s. Rien d’autre n’est partagé : ni cookies, ni navigateur.</string>
+    <string name="thread_link_title">Ouvrir le lien ?</string>
+    <string name="thread_link_homograph">Cette adresse mélange des alphabets ou utilise des lettres trompeuses : elle peut imiter un autre site.</string>
+    <string name="thread_link_not_encrypted">Ce lien n’est pas chiffré.</string>
+    <string name="thread_link_strip_tracking">Supprimer les paramètres de suivi</string>
+    <string name="thread_link_open">Ouvrir</string>
+    <string name="thread_starred">Suivi</string>
+    <string name="thread_to_recipients">à %1$s</string>
+    <string name="thread_undisclosed_recipients">destinataires non divulgués</string>
+    <string name="thread_recipients_more">%1$s +%2$d</string>
+    <string name="thread_truncated">Ce message est très long : seul le début est affiché.</string>
+    <string name="thread_header_reply_to">Répondre à</string>
+    <string name="thread_header_date">Date</string>
+    <plurals name="thread_remote_blocked">
+        <item quantity="one">1 image distante bloquée pour protéger votre vie privée</item>
+        <item quantity="other">%1$d images distantes bloquées pour protéger votre vie privée</item>
+    </plurals>
+    <string name="thread_load_images">Charger les images</string>
+    <string name="thread_remote_more">Plus d’options pour les images distantes</string>
+    <string name="thread_always_for">Toujours pour %1$s</string>
+    <string name="thread_remote_confirm_title">Toujours charger les images de %1$s ?</string>
+    <string name="thread_remote_confirm_body">Les expéditeurs peuvent voir quand et où vous ouvrez leurs e-mails. Ne le faites que pour des expéditeurs de confiance. Vous pouvez supprimer cette règle dans Réglages → Confidentialité et sécurité → Images distantes.</string>
+    <string name="thread_remote_confirm_action">Toujours charger</string>
+    <string name="thread_images_loaded">Images chargées · %1$s</string>
+    <string name="thread_images_loaded_always_for">toujours pour %1$s</string>
+    <string name="thread_images_loaded_this_message">ce message</string>
+    <string name="thread_stop">Arrêter</string>
+    <string name="thread_stop_label">Arrêter le chargement des images</string>
+    <string name="thread_error_reply_failed">Impossible d’envoyer votre réponse</string>
+    <string name="thread_reply_sending">Envoi de votre réponse à l’organisateur…</string>
+    <string name="thread_undo">Annuler</string>
+    <string name="thread_reply_too_late">Trop tard : la réponse a déjà été envoyée</string>
+    <string name="thread_open">Ouvrir</string>
+    <string name="thread_share">Partager</string>
+    <string name="thread_reply_to_all">Répondre à tous</string>
+    <string name="thread_reply_to_name">Répondre à %1$s</string>
+
+    <!-- Attachments browser -->
+    <string name="attachments_title">Pièces jointes</string>
+    <string name="attachments_search_placeholder">Rechercher un nom de fichier ou un expéditeur</string>
+    <string name="attachments_filter_all">Tout</string>
+    <string name="attachments_kind_images">Images</string>
+    <string name="attachments_kind_pdfs">PDF</string>
+    <string name="attachments_kind_documents">Documents</string>
+    <string name="attachments_kind_other">Autres</string>
+    <string name="attachments_empty_title">Aucune pièce jointe</string>
+    <string name="attachments_empty_body">Les fichiers reçus apparaissent ici, tous comptes confondus.</string>
+    <string name="attachments_no_match_title">Aucune pièce jointe correspondante</string>
+    <string name="attachments_no_match_body">Essayez un autre type ou une autre recherche.</string>
+    <string name="attachments_downloading">Téléchargement de %1$s…</string>
+    <string name="attachments_download_and_open">Télécharger et ouvrir</string>
+
+    <!-- Calendar invites -->
+    <string name="calendar_event_fallback">Événement de calendrier</string>
+    <string name="calendar_no_subject">(Sans objet)</string>
+    <string name="calendar_add_to_calendar">Ajouter au calendrier</string>
+    <string name="calendar_accept">Accepter</string>
+    <string name="calendar_maybe">Peut-être</string>
+    <string name="calendar_decline">Refuser</string>
+    <string name="calendar_all_day">Toute la journée</string>
+    <string name="calendar_all_day_range">Toute la journée · %1$s – %2$s</string>
+
+    <!-- PDF viewer -->
+    <string name="pdf_open_with">Ouvrir avec…</string>
+    <string name="pdf_unavailable">Ce PDF ne peut pas être affiché ici (il est peut-être protégé ou endommagé). Utilisez « Ouvrir avec… ».</string>
+    <string name="pdf_page">Page %1$d</string>
+
+    <!-- Templates -->
+    <string name="templates_title">Modèles</string>
+    <string name="templates_empty">Aucun modèle pour l’instant. Rédigez un message puis enregistrez-le ici pour le réutiliser. Vous pouvez utiliser {{first_name}}, {{name}}, {{my_name}} et {{date}}.</string>
+    <string name="templates_delete">Supprimer le modèle</string>
+    <string name="templates_save_this">Enregistrer ce message comme modèle</string>
+    <string name="templates_save_title">Enregistrer le modèle</string>
+    <string name="templates_name">Nom</string>
+    <string name="templates_save_note">L’objet et le corps sont enregistrés, pas les destinataires.</string>
+
+    <!-- More thread/calendar -->
+    <string name="calendar_cancelled">Annulé</string>
+    <string name="thread_downloading">Téléchargement</string>
 </resources>

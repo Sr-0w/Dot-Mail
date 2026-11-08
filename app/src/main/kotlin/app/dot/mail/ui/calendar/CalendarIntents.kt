@@ -28,9 +28,9 @@ private const val MAX_DESCRIPTION_CHARS = 2000
  * day, exclusive end (an RFC 5545 all-day `DTEND` is already exclusive, so no
  * adjustment is needed).
  */
-fun insertEventExtras(invite: Ics.CalendarInvite): Map<String, Any> {
+fun insertEventExtras(invite: Ics.CalendarInvite, untitled: String = "Calendar event"): Map<String, Any> {
     val out = LinkedHashMap<String, Any>()
-    out[EXTRA_TITLE] = invite.summary.ifBlank { "Calendar event" }
+    out[EXTRA_TITLE] = invite.summary.ifBlank { untitled }
     if (invite.location.isNotBlank()) {
         out[EXTRA_EVENT_LOCATION] = invite.location
     }
@@ -52,9 +52,9 @@ fun insertEventExtras(invite: Ics.CalendarInvite): Map<String, Any> {
  * No permission is required: the calendar app shows its normal account
  * picker / confirm UI when the intent is fired.
  */
-fun insertEventIntent(invite: Ics.CalendarInvite): Intent {
+fun insertEventIntent(invite: Ics.CalendarInvite, untitled: String = "Calendar event"): Intent {
     val intent = Intent(Intent.ACTION_INSERT, CalendarContract.Events.CONTENT_URI)
-    insertEventExtras(invite).forEach { (key, value) ->
+    insertEventExtras(invite, untitled).forEach { (key, value) ->
         // This SDK has no putExtra(String, Object) overload: dispatch by type.
         when (value) {
             is String -> intent.putExtra(key, value)

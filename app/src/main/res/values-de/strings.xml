@@ -362,4 +362,102 @@
     <!-- Snooze additions -->
     <string name="snooze_today">Heute</string>
     <string name="snooze_this_evening_label">Heute Abend</string>
+
+    <!-- Thread -->
+    <string name="thread_error_download">Diese Nachricht konnte nicht geladen werden. %1$s</string>
+    <string name="thread_unsub_done">Abgemeldet. Bereits unterwegs befindliche Nachrichten können noch eintreffen.</string>
+    <string name="thread_unsub_failed">Der Abmeldedienst des Absenders ist nicht erreichbar. Versuchen Sie es später erneut.</string>
+    <string name="thread_error_open_attachment">%1$s konnte nicht geöffnet werden</string>
+    <string name="thread_no_app_to_open">Keine App kann %1$s öffnen</string>
+    <string name="thread_more">Mehr</string>
+    <string name="thread_mute_conversation">Unterhaltung stummschalten</string>
+    <string name="thread_unmute_conversation">Stummschaltung aufheben</string>
+    <string name="thread_star">Markieren</string>
+    <string name="thread_remove_star">Markierung entfernen</string>
+    <string name="thread_unsubscribe">Abbestellen</string>
+    <string name="thread_unavailable_title">Unterhaltung nicht verfügbar</string>
+    <string name="thread_unavailable_body">Sie wurde möglicherweise verschoben oder gelöscht.</string>
+    <string name="thread_confirm_trash_title">In den Papierkorb verschieben?</string>
+    <string name="thread_confirm_delete_title">Endgültig löschen?</string>
+    <string name="thread_confirm_delete_body">Diese Unterhaltung wird dauerhaft vom Server entfernt.</string>
+    <string name="thread_unsub_title">Abbestellen?</string>
+    <string name="thread_unsub_body">Dot Mail sendet eine Ein-Klick-Abmeldung an %1$s. Es wird sonst nichts weitergegeben – keine Cookies, kein Browser.</string>
+    <string name="thread_link_title">Link öffnen?</string>
+    <string name="thread_link_homograph">Diese Adresse mischt Alphabete oder nutzt ähnlich aussehende Buchstaben – sie könnte eine andere Website nachahmen.</string>
+    <string name="thread_link_not_encrypted">Dieser Link ist nicht verschlüsselt.</string>
+    <string name="thread_link_strip_tracking">Tracking-Parameter entfernen</string>
+    <string name="thread_link_open">Öffnen</string>
+    <string name="thread_starred">Markiert</string>
+    <string name="thread_to_recipients">an %1$s</string>
+    <string name="thread_undisclosed_recipients">verborgene Empfänger</string>
+    <string name="thread_recipients_more">%1$s +%2$d</string>
+    <string name="thread_truncated">Diese Nachricht ist sehr lang – es wird nur der Anfang angezeigt.</string>
+    <string name="thread_header_reply_to">Antwort an</string>
+    <string name="thread_header_date">Datum</string>
+    <plurals name="thread_remote_blocked">
+        <item quantity="one">1 externes Bild blockiert, um Ihre Privatsphäre zu schützen</item>
+        <item quantity="other">%1$d externe Bilder blockiert, um Ihre Privatsphäre zu schützen</item>
+    </plurals>
+    <string name="thread_load_images">Bilder laden</string>
+    <string name="thread_remote_more">Weitere Optionen für externe Bilder</string>
+    <string name="thread_always_for">Immer für %1$s</string>
+    <string name="thread_remote_confirm_title">Bilder von %1$s immer laden?</string>
+    <string name="thread_remote_confirm_body">Absender können sehen, wann und wo Sie ihre Nachrichten öffnen. Tun Sie das nur für vertrauenswürdige Absender. Die Regel lässt sich unter Einstellungen → Datenschutz &amp; Sicherheit → Externe Bilder entfernen.</string>
+    <string name="thread_remote_confirm_action">Immer laden</string>
+    <string name="thread_images_loaded">Bilder geladen · %1$s</string>
+    <string name="thread_images_loaded_always_for">immer für %1$s</string>
+    <string name="thread_images_loaded_this_message">diese Nachricht</string>
+    <string name="thread_stop">Stopp</string>
+    <string name="thread_stop_label">Laden von Bildern beenden</string>
+    <string name="thread_error_reply_failed">Ihre Antwort konnte nicht gesendet werden</string>
+    <string name="thread_reply_sending">Ihre Antwort wird an den Organisator gesendet…</string>
+    <string name="thread_undo">Rückgängig</string>
+    <string name="thread_reply_too_late">Zu spät – die Antwort wurde bereits gesendet</string>
+    <string name="thread_open">Öffnen</string>
+    <string name="thread_share">Teilen</string>
+    <string name="thread_reply_to_all">Allen antworten</string>
+    <string name="thread_reply_to_name">%1$s antworten</string>
+
+    <!-- Attachments browser -->
+    <string name="attachments_title">Anhänge</string>
+    <string name="attachments_search_placeholder">Dateiname oder Absender suchen</string>
+    <string name="attachments_filter_all">Alle</string>
+    <string name="attachments_kind_images">Bilder</string>
+    <string name="attachments_kind_pdfs">PDFs</string>
+    <string name="attachments_kind_documents">Dokumente</string>
+    <string name="attachments_kind_other">Sonstige</string>
+    <string name="attachments_empty_title">Noch keine Anhänge</string>
+    <string name="attachments_empty_body">Empfangene Dateien erscheinen hier, über alle Konten hinweg.</string>
+    <string name="attachments_no_match_title">Keine passenden Anhänge</string>
+    <string name="attachments_no_match_body">Versuchen Sie einen anderen Typ oder eine andere Suche.</string>
+    <string name="attachments_downloading">%1$s wird geladen…</string>
+    <string name="attachments_download_and_open">Herunterladen und öffnen</string>
+
+    <!-- Calendar invites -->
+    <string name="calendar_event_fallback">Kalendertermin</string>
+    <string name="calendar_no_subject">(Kein Betreff)</string>
+    <string name="calendar_add_to_calendar">Zum Kalender hinzufügen</string>
+    <string name="calendar_accept">Zusagen</string>
+    <string name="calendar_maybe">Vielleicht</string>
+    <string name="calendar_decline">Absagen</string>
+    <string name="calendar_all_day">Ganztägig</string>
+    <string name="calendar_all_day_range">Ganztägig · %1$s – %2$s</string>
+
+    <!-- PDF viewer -->
+    <string name="pdf_open_with">Öffnen mit…</string>
+    <string name="pdf_unavailable">Dieses PDF kann hier nicht angezeigt werden (möglicherweise geschützt oder beschädigt). Verwenden Sie „Öffnen mit…“.</string>
+    <string name="pdf_page">Seite %1$d</string>
+
+    <!-- Templates -->
+    <string name="templates_title">Vorlagen</string>
+    <string name="templates_empty">Noch keine Vorlagen. Schreiben Sie eine Nachricht und speichern Sie sie hier zur Wiederverwendung. Möglich sind {{first_name}}, {{name}}, {{my_name}} und {{date}}.</string>
+    <string name="templates_delete">Vorlage löschen</string>
+    <string name="templates_save_this">Diese Nachricht als Vorlage speichern</string>
+    <string name="templates_save_title">Vorlage speichern</string>
+    <string name="templates_name">Name</string>
+    <string name="templates_save_note">Betreff und Text werden gespeichert, Empfänger nicht.</string>
+
+    <!-- More thread/calendar -->
+    <string name="calendar_cancelled">Abgesagt</string>
+    <string name="thread_downloading">Wird geladen</string>
 </resources>
