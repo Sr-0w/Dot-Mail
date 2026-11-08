@@ -43,6 +43,9 @@ data class SearchMatchRow(val queryHash: String, val messageId: Long)
 /** Attachment joined with the few message columns the browser shows. */
 data class AttachmentListRow(val id: Long, val messageId: Long, val partId: String, val name: String, val mime: String, val size: Long, val cid: String?, val inline: Boolean, val localUri: String?, val accountId: Long, val sentAt: Long, val header: String, val subject: String)
 data class BodyChunk(val text: String?, val html: String?)
+/** Compact sync inventory: never hydrate every message's potentially large header JSON. */
+data class FolderMessageState(val id:Long,val uid:Long,val threadId:Long,val unread:Boolean,val starred:Boolean)
+
 internal const val MESSAGE_META = "id,accountId,folderId,threadId,uid,header,subject,sentAt,unread,starred,hasAttachments,snippet,NULL AS text,NULL AS html,bodyLoaded,remoteImages,senderSearch,recipientSearch,snippetFetched,bodyPath,messageIdKey"
 
 @Dao
@@ -132,10 +135,21 @@ interface MailDao {
     /** Local ids of folders whose deletion is queued: hidden from the UI meanwhile. */
     @Query("SELECT uid FROM operations WHERE action='FOLDER_DELETE'") fun observeDeletingFolderIds(): Flow<List<Long>>
     @Update suspend fun updateFolder(row: FolderRow)
+    @RawQuery suspend fun matchingMessageIds(query:SupportSQLiteQuery):List<Long>
     @RawQuery(observedEntities = [ThreadRow::class, MessageRow::class, FolderRow::class, DraftRow::class, OperationRow::class, BodyTextRow::class, SearchMatchRow::class, SnoozeRow::class, ContactRow::class, MessageSenderRow::class, DeviceContactRow::class, DeviceContactStateRow::class]) fun page(query: SupportSQLiteQuery): PagingSource<Int, ThreadRow>
     @Query("SELECT $MESSAGE_META FROM messages WHERE threadId=:id ORDER BY sentAt,id") fun observeThread(id: Long): Flow<List<MessageRow>>
     @Query("SELECT $MESSAGE_META FROM messages WHERE threadId=:id ORDER BY sentAt,id") suspend fun threadMessages(id: Long): List<MessageRow>
     @Query("SELECT $MESSAGE_META FROM messages WHERE folderId=:id") suspend fun folderMessages(id: Long): List<MessageRow>
+    @Query("SELECT id,uid,threadId,unread,starred FROM messages WHERE folderId=:id") suspend fun folderInventory(id:Long):List<FolderMessageState>
+    @Query("SELECT EXISTS(SELECT 1 FROM operations WHERE folderId=:id)") suspend fun hasFolderOperations(id:Long):Boolean
+    @Query("""SELECT EXISTS(SELECT 1 FROM messages WHERE folderId=:id AND uid>0 AND (instr(header,'"category"')=0 OR instr(header,'"attachmentNames"')=0))""") suspend fun folderNeedsMetadata(id:Long):Boolean
+    @Query("""SELECT $MESSAGE_META FROM messages WHERE folderId=:id AND uid>0 AND (instr(header,'"category"')=0 OR instr(header,'"attachmentNames"')=0) ORDER BY uid LIMIT 200""") suspend fun folderMetadataRepairs(id:Long):List<MessageRow>
+    @Query("SELECT $MESSAGE_META FROM messages WHERE folderId=:id ORDER BY sentAt DESC,id DESC LIMIT 200") suspend fun recentFolderMessages(id:Long):List<MessageRow>
+    @Query("SELECT $MESSAGE_META FROM messages WHERE folderId=:id AND bodyLoaded=1 AND snippetFetched=0 ORDER BY sentAt DESC,id DESC LIMIT 200") suspend fun localFolderPreviewRepairs(id:Long):List<MessageRow>
+    @Query("SELECT $MESSAGE_META FROM messages WHERE folderId=:id AND uid>0 AND bodyLoaded=0 AND snippetFetched=0 AND snippet!='' ORDER BY sentAt DESC,id DESC LIMIT 200") suspend fun remoteFolderPreviewRepairs(id:Long):List<MessageRow>
+    @Query("SELECT EXISTS(SELECT 1 FROM messages WHERE folderId=:id AND snippetFetched=0 AND (bodyLoaded=1 OR (uid>0 AND snippet!=''))) OR EXISTS(SELECT 1 FROM (SELECT uid,bodyLoaded,snippetFetched FROM messages WHERE folderId=:id ORDER BY sentAt DESC,id DESC LIMIT 200) WHERE uid>0 AND bodyLoaded=0 AND snippetFetched=0)") suspend fun folderNeedsPreviews(id:Long):Boolean
+    @Query("""SELECT EXISTS(SELECT 1 FROM messages WHERE threadId=:id AND (messageIdKey IS NOT NULL OR instr(header,'"messageId"')>0))""") suspend fun threadHasIdentifiedMessages(id:Long):Boolean
+
     @Query("SELECT $MESSAGE_META FROM messages WHERE id=:id") suspend fun message(id: Long): MessageRow?
     @Query("SELECT $MESSAGE_META FROM messages WHERE id=:id") fun observeMessage(id: Long): Flow<List<MessageRow>>
     /** Single-message list (conversation grouping off). Columns must be MESSAGE_META so bodies stay out of the cursor. */

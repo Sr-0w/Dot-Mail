@@ -39,7 +39,13 @@ internal object ThreadQuery {
 
     /** The WHERE fragment (over `threads t`) selecting the conversations that have a message matching [folder]. */
     fun smartFolder(folder: SmartFolder): Sql {
-        val parts = mutableListOf("m.threadId=t.id")
+        val where=smartMessages(folder)
+        return Sql("EXISTS(SELECT 1 FROM messages m JOIN folders f ON f.id=m.folderId WHERE m.threadId=t.id AND (${where.text}))",where.args)
+    }
+
+    /** The same predicate over messages m/folders f, also used to scope writes from a saved search. */
+    fun smartMessages(folder: SmartFolder): Sql {
+        val parts = mutableListOf<String>()
         val args = mutableListOf<Any>()
         if (folder.accountIds.isNotEmpty()) {
             parts += "m.accountId IN (" + folder.accountIds.joinToString(",") { "?" } + ")"
@@ -60,7 +66,7 @@ internal object ThreadQuery {
         if (folder.hasAttachment) parts += "m.hasAttachments=1"
         folder.afterMillis?.let { parts += "m.sentAt>=?"; args += it }
         folder.beforeMillis?.let { parts += "m.sentAt<?"; args += it }
-        return Sql("EXISTS(SELECT 1 FROM messages m JOIN folders f ON f.id=m.folderId WHERE ${parts.joinToString(" AND ")})", args)
+        return Sql(parts.joinToString(" AND "), args)
     }
 
     /** ORDER BY over the outer query (columns `sortAt`, `unread`, `starred`, `participants`, `id`). */
