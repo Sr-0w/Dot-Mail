@@ -55,7 +55,7 @@ internal class RealMailGraph(
     internal val syncing = MutableStateFlow<Set<Long>>(emptySet())
     override val accounts: Flow<List<Account>> = combine(dao.observeAccounts(), syncing, identityStore.version) { rows, active, _ -> rows.map { row ->
         Account(row.id, row.name, row.email, row.color, identityStore.resolve(row.id, row.name, row.email),
-            if (row.id in active) SyncState.Syncing else row.syncError?.let { SyncState.Error(it, isAuthError = row.authError) } ?: SyncState.Idle)
+            if (row.id in active) SyncState.Syncing else row.syncError?.let { SyncDiagnostics.state(it,row.authError) } ?: SyncState.Idle)
     } }
     override val outbox: Flow<List<OutboxItem>> = dao.observeOutbox().map { rows -> rows.map { row ->
         val draft = Codec.draft(row.draft)
@@ -403,14 +403,35 @@ internal class RealMailGraph(
             messages.map { it.threadId }.distinct().forEach { rebuildThread(it) }
         }; requestSync()
     }
-    override suspend fun refresh(mailbox: Mailbox) {
-        val ids = when(mailbox) { is Mailbox.InFolder -> dao.folder(mailbox.folderId)?.accountId?.let { setOf(it) } ?: throw MailSyncException("Folder is no longer available"); is Mailbox.Unified -> null }
-        try {
-            withTimeout(60_000) { if (!syncAll(ids)) throw MailSyncException("Could not sync mail. Check the account status and connection.") }
-        } catch (_: TimeoutCancellationException) {
-            withContext(NonCancellable) { dao.accounts().filter { ids == null || it.id in ids }.forEach { dao.syncError(it.id, "Sync timed out. Try again shortly.", it.authError) } }
-            throw MailSyncException("Sync timed out. Try again shortly.")
+    override suspend fun refresh(mailbox: Mailbox) = refreshAttempt(mailbox,null)
+    override suspend fun retrySync(accountId:Long) = refreshAttempt(Mailbox.Unified(FolderRole.INBOX),setOf(accountId))
+
+    private suspend fun refreshAttempt(mailbox:Mailbox,accounts:Set<Long>?) {
+        val ids=accounts ?: when(mailbox) {
+            is Mailbox.InFolder -> dao.folder(mailbox.folderId)?.accountId?.let { setOf(it) } ?: throw MailSyncException("Folder is no longer available")
+            is Mailbox.Unified -> dao.accounts().map { it.id }.toSet()
         }
+        val ready=CompletableDeferred<Unit>()
+        val remaining=ids.toMutableSet()
+        val early=when(mailbox) { is Mailbox.InFolder -> true; is Mailbox.Unified -> mailbox.role !in setOf(FolderRole.NEWSLETTERS,FolderRole.SNOOZED) }
+        val progressLock=Mutex()
+        scope.launch {
+            try {
+                val ok=syncAll(ids,primaryMailbox=mailbox) { account,folder,success,reason ->
+                    val matches=when(mailbox) { is Mailbox.InFolder -> dao.folder(mailbox.folderId)?.path==folder.path; is Mailbox.Unified -> mailbox.role.name==folder.role.name }
+                    if(early && matches) progressLock.withLock {
+                        if(!success) ready.completeExceptionally(MailSyncException(reason?.let { SyncDiagnostics.state(it,false).message } ?: "Some message headers could not be synchronized"))
+                        remaining.remove(account)
+                        if(remaining.isEmpty()) ready.complete(Unit)
+                    }
+                }
+                if(ok) ready.complete(Unit)
+                else ready.completeExceptionally(MailSyncException(dao.accounts().firstOrNull { it.id in ids && it.syncError!=null }?.syncError?.let { SyncDiagnostics.state(it,false).message } ?: "Could not sync mail. Please retry."))
+            } catch(e:CancellationException) { ready.cancel(e); throw e }
+            catch(e:Exception) { ready.completeExceptionally(MailSyncException(SyncDiagnostics.reason(e))) }
+        }
+        try { withTimeout(60_000) { ready.await() } }
+        catch(_:TimeoutCancellationException) { throw MailSyncException("Sync timed out. Please retry.") }
     }
     override suspend fun suggestContacts(prefix: String, limit: Int): List<EmailAddress> = withContext(Dispatchers.IO) {
         dao.contacts(prefix.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%", limit.coerceIn(1, 50)).map { EmailAddress(it.email, it.name) }

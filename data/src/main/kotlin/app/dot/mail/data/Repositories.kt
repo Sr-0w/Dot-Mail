@@ -164,6 +164,9 @@ interface MailRepository {
     /** Pull-to-refresh: syncs the given mailbox now. */
     suspend fun refresh(mailbox: Mailbox)
 
+    /** Retry an account's Inbox now; remaining folders continue in the background and report account errors. */
+    suspend fun retrySync(accountId:Long) { refresh(Mailbox.Unified(app.dot.mail.data.model.FolderRole.INBOX)) }
+
     /** Contact suggestions from addresses seen in mail. */
     suspend fun suggestContacts(prefix: String, limit: Int = 8): List<EmailAddress>
 }

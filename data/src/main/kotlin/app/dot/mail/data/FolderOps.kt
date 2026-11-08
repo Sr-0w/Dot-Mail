@@ -188,7 +188,7 @@ internal suspend fun RealMailGraph.runFolderOps(account: AccountRow, config: Acc
             }
         } catch (e: Exception) {
             SyncDiagnostics.warn("Folder operation ${op.action} account=${account.id}", e, setOf(account.email, creds.secret))
-            return FolderSyncOutcome(warning, success = false) // connection trouble: keep it queued, keep the order
+            return FolderSyncOutcome(SyncDiagnostics.stored(e), success = false) // connection trouble: keep it queued, keep the order
         }
     }
     return FolderSyncOutcome(warning, success = true)
@@ -253,7 +253,7 @@ internal suspend fun RealMailGraph.finishFolderDeletes(account: AccountRow, conf
             warning = warning ?: "Couldn't delete folder \"${row.name}\": ${e.message}"
         } catch (e: Exception) {
             SyncDiagnostics.warn("Folder delete account=${account.id}", e, setOf(account.email, creds.secret))
-            return FolderSyncOutcome(warning, success = false)
+            return FolderSyncOutcome(SyncDiagnostics.stored(e), success = false)
         }
     }
     return FolderSyncOutcome(warning, success = true)

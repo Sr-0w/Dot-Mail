@@ -8,7 +8,7 @@ data class Credentials(val secret: String, val oauth2: Boolean = false)
 data class Address(val email: String, val name: String? = null)
 enum class Role { INBOX, SENT, DRAFTS, ARCHIVE, TRASH, SPAM, ALL_MAIL, STARRED, CUSTOM }
 data class RemoteFolder(val path: String, val name: String, val role: Role, val unread: Int, val total: Int, val specialUse: Boolean = false, val separator: Char = '/')
-data class SyncCursor(val uidValidity: Long = 0, val uidNext: Long = 1, val highestModSeq: Long = -1)
+data class SyncCursor(val uidValidity: Long = 0, val uidNext: Long = 1, val highestModSeq: Long = -1, val messageCount: Int = -1)
 enum class MoveOutcome { MOVED, COPIED_AND_MARKED_DELETED }
 data class RemoteFlags(val uid: Long, val seen: Boolean, val starred: Boolean, val deleted: Boolean)
 data class Header(
@@ -22,7 +22,7 @@ data class Header(
     val hasPdfAttachment: Boolean = false,
 )
 data class HeaderFailure(val uid: Long, val error: Exception)
-data class HeaderSync(val cursor: SyncCursor, val reset: Boolean, val headers: List<Header>, val flags: List<RemoteFlags>, val existingUids: Set<Long>, val failures: List<HeaderFailure> = emptyList())
+data class HeaderSync(val cursor: SyncCursor, val reset: Boolean, val headers: List<Header>, val flags: List<RemoteFlags>, val existingUids: Set<Long>, val failures: List<HeaderFailure> = emptyList(), val unchanged: Boolean = false)
 data class MimeAttachment(val partId: String, val name: String, val mimeType: String, val contentId: String?, val inline: Boolean, val bytes: ByteArray)
 data class ParsedBody(val text: String?, val html: String?, val attachments: List<MimeAttachment>)
 data class OutgoingAttachment(val name: String, val mimeType: String, val bytes: ByteArray = byteArrayOf(), val contentId: String? = null, val source: jakarta.activation.DataSource? = null)

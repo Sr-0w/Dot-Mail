@@ -33,7 +33,9 @@ data class Identity(
 sealed interface SyncState {
     data object Idle : SyncState
     data object Syncing : SyncState
-    data class Error(val message: String, val isAuthError: Boolean = false) : SyncState
+    data class Error(val message: String, val isAuthError: Boolean = false, val errorKind: app.dot.mail.engine.ConnectionFailure? = null) : SyncState {
+        val canRetry:Boolean get() = !isAuthError
+    }
 }
 
 enum class FolderRole {

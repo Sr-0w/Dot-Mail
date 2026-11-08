@@ -35,7 +35,10 @@ internal object WorkScheduling {
 class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result = try {
         GraphRegistry.get(applicationContext).resurfaceDue() // safety net if a snooze worker was missed
-        if (GraphRegistry.get(applicationContext).syncAll(scheduled = inputData.getBoolean("scheduled", true))) Result.success() else Result.retry()
+        val graph=GraphRegistry.get(applicationContext)
+        if (graph.syncAll(scheduled = inputData.getBoolean("scheduled", true))) Result.success()
+        else if(graph.dao.accounts().any { row -> row.syncError?.let { SyncDiagnostics.state(it,row.authError).let { state -> !state.isAuthError && state.errorKind?.transient!=false } }==true }) Result.retry()
+        else Result.failure()
     } catch (e: CancellationException) { throw e } catch (e: Exception) { SyncDiagnostics.warn("Sync worker", e); Result.retry() }
 }
 class SnoozeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {

@@ -159,6 +159,27 @@ class RepositoryTest {
         val operation = db.mail().operations(account).single()
         assertEquals(sourceId, operation.folderId); assertEquals(4L, operation.uid)
     }
+    @Test fun moveFromSentBindsTargetUidEvenWhenTargetWasSelectedFirst() = runBlocking {
+        val server=GreenMail(arrayOf(ServerSetup(0,"127.0.0.1","imap"),ServerSetup(0,"127.0.0.1","smtp")))
+        server.start(); server.setUser("alice@example.org","alice","password")
+        try {
+            val local=config.copy(imap=config.imap.copy(host="127.0.0.1",port=server.imap.port),smtp=config.smtp.copy(host="127.0.0.1",port=server.smtp.port))
+            val account=graph.addAccount(local,"password")
+            graph.client.createFolder(local.imap.endpoint(),Credentials("password"),null,"Archive")
+            graph.client.append(local.imap.endpoint(),Credentials("password"),"Sent",Mime.build(OutgoingMail(Address("alice@example.org"),listOf(Address("bob@example.org")),subject="Moved sent",text="Retained body")))
+            assertTrue(graph.syncAll())
+            val folders=db.mail().folders(account)
+            val sent=folders.single { it.role=="SENT" }; val archive=folders.single { it.role=="ARCHIVE" }
+            val message=db.mail().folderMessages(sent.id).single()
+            graph.move(listOf(message.threadId),archive.id,Mailbox.InFolder(sent.id))
+            assertTrue(graph.syncAll(primaryMailbox=Mailbox.InFolder(archive.id)))
+            val moved=db.mail().message(message.id)!!
+            assertEquals(archive.id,moved.folderId); assertTrue(moved.uid>0)
+            assertTrue(db.mail().operations(account).isEmpty())
+            graph.loadBody(moved.id)
+            assertEquals("Retained body",graph.thread(moved.threadId).first().single().body!!.plainText)
+        } finally { server.stop() }
+    }
     @Test fun uidValidityChangeDoesNotApplyQueuedFlagsToReusedUid() = runBlocking {
         val server = GreenMail(arrayOf(ServerSetup(0, "127.0.0.1", "imap"), ServerSetup(0, "127.0.0.1", "smtp")))
         server.start()
