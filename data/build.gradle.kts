@@ -46,6 +46,7 @@ dependencies {
     implementation(libs.work.runtime.ktx)
     implementation(libs.androidx.lifecycle.process)
     testImplementation(libs.junit)
+    testImplementation(libs.paging.testing)
     testImplementation(libs.truth)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)

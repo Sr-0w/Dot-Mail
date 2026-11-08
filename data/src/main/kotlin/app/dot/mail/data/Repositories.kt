@@ -63,6 +63,13 @@ interface MailRepository {
 
     fun threads(mailbox: Mailbox): Flow<PagingData<ThreadSummary>>
 
+    /**
+     * The same list with one row per message (Settings → "Group into conversations" off). Rows are [ThreadSummary]s with
+     * messageCount = 1 whose threadId is a *virtual* id, see [app.dot.mail.data.model.ConversationIds]; passing it to
+     * thread(), apply(), move() affects that single message only.
+     */
+    fun messages(mailbox: Mailbox): Flow<PagingData<ThreadSummary>> = threads(mailbox)
+
     /** Searches local cache immediately; server search results are merged in as they arrive. */
     fun search(query: String, accountId: Long? = null): Flow<PagingData<ThreadSummary>>
 

@@ -30,6 +30,7 @@ import androidx.compose.material.icons.outlined.ContactPage
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.Fingerprint
+import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.FormatQuote
 import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.Image
@@ -202,6 +203,9 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             SectionLabel("Appearance")
             SegmentedSetting("Theme", listOf(ThemeMode.SYSTEM to "System", ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark"), prefs.theme) { m ->
                 settings.update { it.copy(theme = m) }
+            }
+            ToggleRow("Group into conversations", "Show replies together in one row. Off: every message is listed on its own.", Icons.Outlined.Forum, prefs.conversationView) { v ->
+                settings.update { it.copy(conversationView = v) }
             }
             SegmentedSetting("List density", listOf(Density.COMFORTABLE to "Comfortable", Density.COMPACT to "Compact"), prefs.density) { d ->
                 settings.update { it.copy(density = d) }

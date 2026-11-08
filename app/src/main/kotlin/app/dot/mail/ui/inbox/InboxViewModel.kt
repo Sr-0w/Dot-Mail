@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -36,7 +37,12 @@ data class DrawerState(
 
 data class InboxHeader(val title: String, val subtitle: String?, val role: FolderRole?)
 
-class InboxViewModel(private val graph: MailGraph, private val saved: SavedStateHandle) : ViewModel() {
+class InboxViewModel(
+    private val graph: MailGraph,
+    private val saved: SavedStateHandle,
+    /** Settings → "Group into conversations"; false lists single messages. */
+    private val grouped: Flow<Boolean> = kotlinx.coroutines.flow.flowOf(true),
+) : ViewModel() {
 
     private val _mailbox = MutableStateFlow(restoreMailbox())
     val mailbox: StateFlow<Mailbox> = _mailbox.asStateFlow()
@@ -92,7 +98,8 @@ class InboxViewModel(private val graph: MailGraph, private val saved: SavedState
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val threads: Flow<PagingData<ThreadSummary>> =
-        _mailbox.flatMapLatest { graph.mail.threads(it) }.cachedIn(viewModelScope)
+        kotlinx.coroutines.flow.combine(_mailbox, grouped.distinctUntilChanged()) { box, group -> box to group }
+            .flatMapLatest { (box, group) -> if (group) graph.mail.threads(box) else graph.mail.messages(box) }.cachedIn(viewModelScope)
 
     fun open(mailbox: Mailbox) {
         if (mailbox is Mailbox.InFolder) {
