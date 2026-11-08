@@ -28,6 +28,11 @@ data class Identity(
     val replyTo: String? = null,
     /** Rich signature for the HTML composer. */
     val signatureHtml: String? = null,
+    /** File name (in [app.dot.mail.data.SignatureLogos]) of an optional inline logo sent as a `cid:` part. */
+    val signatureLogo: String? = null,
+    /** Insert the signature automatically in new messages / in replies and forwards. */
+    val signatureOnNew: Boolean = true,
+    val signatureOnReply: Boolean = true,
 )
 
 sealed interface SyncState {

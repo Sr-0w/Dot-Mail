@@ -39,7 +39,7 @@ internal suspend fun RealMailGraph.draftMime(account: AccountRow, draft: Draft, 
     }
     return Mime.build(OutgoingMail(Address(identity.email,identity.name.ifBlank { account.name }),draft.to.map { Address(it.email,it.name) },draft.cc.map { Address(it.email,it.name) },draft.bcc.map { Address(it.email,it.name) },draft.subject,
         draft.bodyHtml?.let { draft.bodyText.ifBlank { EmailHtml.toPlainText(it) } } ?: draft.bodyText,
-        draft.bodyHtml?.let { EmailHtml.compose(it) },attachments,draft.inReplyTo,draft.references,messageId,
+        draft.bodyHtml?.let { EmailHtml.compose(it) },attachments + app.dot.mail.data.SignatureLogos.attachmentsFor(context,draft.bodyHtml,identityStore.resolve(account.id,account.name,account.email),identity),draft.inReplyTo,draft.references,messageId,
         replyTo=listOfNotNull(identity.replyTo?.let { Address(it) })))
 }
 

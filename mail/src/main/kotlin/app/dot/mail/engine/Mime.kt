@@ -49,7 +49,7 @@ object Mime {
         mail.inReplyTo?.let { message.setHeader("In-Reply-To", it) }
         if (mail.references.isNotEmpty()) message.setHeader("References", mail.references.joinToString(" "))
         val text = MimeBodyPart().apply { setText(mail.text, "UTF-8") }
-        val body = if (mail.html != null || mail.calendarReply != null) MimeBodyPart().apply {
+        val alternative = if (mail.html != null || mail.calendarReply != null) MimeBodyPart().apply {
             setContent(MimeMultipart("alternative").apply {
                 addBodyPart(text)
                 mail.html?.let { html -> addBodyPart(MimeBodyPart().apply { setContent(html, "text/html; charset=UTF-8"); dataHandler.setCommandMap(handlers) }) }
@@ -59,18 +59,26 @@ object Mime {
                 }) }
             }); dataHandler.setCommandMap(handlers)
         } else text
-        if (mail.attachments.isEmpty()) {
+        fun part(attachment: OutgoingAttachment) = MimeBodyPart().apply {
+            dataHandler = DataHandler(attachment.source ?: ByteArrayDataSource(attachment.bytes, attachment.mimeType)).apply { setCommandMap(handlers) }
+            setHeader("Content-Transfer-Encoding", "base64")
+            fileName = MimeUtility.encodeText(attachment.name, "UTF-8", null)
+            disposition = if (attachment.contentId == null) Part.ATTACHMENT else Part.INLINE
+            attachment.contentId?.let { require('\n' !in it && '\r' !in it); setHeader("Content-ID", "<${it.trim('<', '>')}>") }
+        }
+        // Inline images (cid:) travel with the HTML in multipart/related; real attachments wrap everything in mixed.
+        val inline = if (mail.html != null) mail.attachments.filter { it.contentId != null } else emptyList()
+        val files = mail.attachments - inline.toSet()
+        val body = if (inline.isEmpty()) alternative else MimeBodyPart().apply {
+            setContent(MimeMultipart("related").apply { addBodyPart(alternative); inline.forEach { addBodyPart(part(it)) } })
+            dataHandler.setCommandMap(handlers)
+        }
+        if (files.isEmpty()) {
             message.setDataHandler(body.dataHandler.apply { setCommandMap(handlers) })
         } else {
             message.setContent(MimeMultipart("mixed").apply {
                 addBodyPart(body)
-                mail.attachments.forEach { attachment -> addBodyPart(MimeBodyPart().apply {
-                    dataHandler = DataHandler(attachment.source ?: ByteArrayDataSource(attachment.bytes, attachment.mimeType)).apply { setCommandMap(handlers) }
-                    setHeader("Content-Transfer-Encoding", "base64")
-                    fileName = MimeUtility.encodeText(attachment.name, "UTF-8", null)
-                    disposition = if (attachment.contentId == null) Part.ATTACHMENT else Part.INLINE
-                    attachment.contentId?.let { require('\n' !in it && '\r' !in it); setHeader("Content-ID", "<${it.trim('<', '>')}>") }
-                }) }
+                files.forEach { addBodyPart(part(it)) }
             })
         }
         message.dataHandler.setCommandMap(handlers)

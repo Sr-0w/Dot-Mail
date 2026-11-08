@@ -144,7 +144,7 @@ internal suspend fun RealMailGraph.deliverOutbox(id: Long): Boolean = outboxLock
             // Formatted drafts: text/plain alternative + email-safe HTML (inline styles, sanitised) as multipart/alternative.
             draft.bodyHtml?.let { draft.bodyText.ifBlank { app.dot.mail.engine.text.EmailHtml.toPlainText(it) } } ?: draft.bodyText,
             html = draft.bodyHtml?.let { app.dot.mail.engine.text.EmailHtml.compose(it) },
-            attachments = attachments, inReplyTo = draft.inReplyTo, references = draft.references, replyTo = listOfNotNull(identity.replyTo?.let { Address(it) }), messageId = "<dotmail-$id-${java.util.UUID.randomUUID()}@${account.email.substringAfter('@')}>", date = java.time.Instant.now(), calendarReply = org.json.JSONObject(row.draft).optString("calendarReply").takeIf { it.isNotBlank() }))
+            attachments = attachments + SignatureLogos.attachmentsFor(context, draft.bodyHtml, identityStore.resolve(account.id, account.name, account.email), identity), inReplyTo = draft.inReplyTo, references = draft.references, replyTo = listOfNotNull(identity.replyTo?.let { Address(it) }), messageId = "<dotmail-$id-${java.util.UUID.randomUUID()}@${account.email.substringAfter('@')}>", date = java.time.Instant.now(), calendarReply = org.json.JSONObject(row.draft).optString("calendarReply").takeIf { it.isNotBlank() }))
         val file = File(context.filesDir, "outbox/${account.id}/$id.eml").also { it.parentFile!!.mkdirs() }
         if (saved==null) {
             val temporary=File(file.parentFile,"${file.name}.tmp")

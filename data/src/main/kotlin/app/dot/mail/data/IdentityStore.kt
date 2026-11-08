@@ -51,6 +51,7 @@ class IdentityStore private constructor(context: Context) {
             replyTo = identity.replyTo?.trim()?.ifEmpty { null },
             signature = identity.signature?.ifEmpty { null },
             signatureHtml = identity.signatureHtml?.ifEmpty { null },
+            signatureLogo = identity.signatureLogo?.ifEmpty { null },
         )
         val id = when {
             isPrimary -> identity.id
@@ -93,6 +94,8 @@ class IdentityStore private constructor(context: Context) {
                     id = o.getLong("id"), accountId = accountId, name = o.optString("name"), email = o.optString("email"),
                     signature = o.optString("sig").ifEmpty { null }, replyTo = o.optString("replyTo").ifEmpty { null },
                     signatureHtml = o.optString("sigHtml").ifEmpty { null },
+                    signatureLogo = o.optString("sigLogo").ifEmpty { null },
+                    signatureOnNew = o.optBoolean("sigNew", true), signatureOnReply = o.optBoolean("sigReply", true),
                 )
             }
         }.getOrDefault(emptyList())
@@ -102,7 +105,8 @@ class IdentityStore private constructor(context: Context) {
         val arr = JSONArray()
         list.forEach {
             arr.put(JSONObject().put("id", it.id).put("name", it.name).put("email", it.email)
-                .put("sig", it.signature ?: "").put("replyTo", it.replyTo ?: "").put("sigHtml", it.signatureHtml ?: ""))
+                .put("sig", it.signature ?: "").put("replyTo", it.replyTo ?: "").put("sigHtml", it.signatureHtml ?: "")
+                .put("sigLogo", it.signatureLogo ?: "").put("sigNew", it.signatureOnNew).put("sigReply", it.signatureOnReply))
         }
         prefs.edit { putString("$accountId.list", arr.toString()) }
         _version.value++

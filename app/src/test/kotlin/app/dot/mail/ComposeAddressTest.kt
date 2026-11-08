@@ -174,10 +174,64 @@ class ComposeAddressTest {
             isDefault = true,
         )
         assertEquals("-- \nBest,\nAlice <A&B>", ComposeViewModel.plainSignatureBlock(plainOnly))
-        assertEquals("<p>-- <br>Best,<br>Alice &lt;A&amp;B&gt;</p>", ComposeViewModel.richSignatureBlock(plainOnly))
+        assertEquals("<div data-dot-sig=\"1\"><p>-- <br>Best,<br>Alice &lt;A&amp;B&gt;</p></div>", ComposeViewModel.richSignatureBlock(plainOnly))
 
         val richSender = plainOnly.copy(signatureHtml = "<i> Alice </i>")
-        assertEquals("<p>-- <br><i> Alice </i></p>", ComposeViewModel.richSignatureBlock(richSender))
+        assertEquals("<div data-dot-sig=\"1\"><p>-- <br><i> Alice </i></p></div>", ComposeViewModel.richSignatureBlock(richSender))
+
+        val withLogo = richSender.copy(signatureLogo = "logo.png")
+        assertTrue(ComposeViewModel.richSignatureBlock(withLogo)!!.contains("<img src=\"cid:dotsig-logo\""))
+        assertEquals(null, ComposeViewModel.richSignatureBlock(plainOnly.copy(signature = null)))
+    }
+
+    private val alice = app.dot.mail.ui.compose.Sender(1L, 1L, "Alice", "a@x.org", signatureHtml = "<b>A</b>")
+
+    @Test
+    fun `signature block sits between the editor text and the quote and is recoverable`() {
+        val block = ComposeViewModel.richSignatureBlock(alice)
+        val combined = ComposeViewModel.combineBodyHtml("<p>Hi</p>", "On Mon, B wrote:\n> yo", block)
+        assertTrue(combined.indexOf("Hi") < combined.indexOf("data-dot-sig"))
+        assertTrue(combined.indexOf("data-dot-sig") < combined.indexOf("B wrote"))
+        val editable = ComposeViewModel.extractEditableHtml(combined, "On Mon, B wrote:\n> yo")
+        val (owner, rest) = ComposeViewModel.splitSignature(editable)
+        assertEquals(1L, owner)
+        assertEquals("<p>Hi</p>", rest)
+    }
+
+    @Test
+    fun `splitSignature leaves html without a marker alone and never eats user text`() {
+        val (none, same) = ComposeViewModel.splitSignature("<p>-- <br>Alice</p>")
+        assertEquals(null, none)
+        assertEquals("<p>-- <br>Alice</p>", same)
+        val (owner, rest) = ComposeViewModel.splitSignature("<p>a</p>" + ComposeViewModel.richSignatureBlock(alice) + "<p>after</p>")
+        assertEquals(1L, owner)
+        assertEquals("<p>a</p><p>after</p>", rest)
+    }
+
+    @Test
+    fun `plain body appends the signature before the quote`() {
+        val plain = ComposeViewModel.plainSignatureBlock(alice.copy(signature = "Alice", signatureHtml = null))
+        assertEquals("hello\n\n-- \nAlice\n\n> q", ComposeViewModel.combineBodyText("hello", "> q", plain))
+        assertEquals("\n\n-- \nAlice", ComposeViewModel.combineBodyText("", null, plain))
+    }
+
+    @Test
+    fun `new and reply defaults are independent`() {
+        val s = alice.copy(signatureOnNew = true, signatureOnReply = false)
+        assertTrue(ComposeViewModel.signatureDefault(s, isReply = false))
+        assertFalse(ComposeViewModel.signatureDefault(s, isReply = true))
+        assertFalse(ComposeViewModel.signatureDefault(s.copy(signatureHtml = null), isReply = false)) // nothing to insert
+    }
+
+    @Test
+    fun `an untouched signature does not make an otherwise empty draft worth saving`() {
+        val draft = app.dot.mail.data.model.Draft(accountId = 1L, identityId = 1L, bodyText = "\n\n-- \nAlice")
+        val st = app.dot.mail.ui.compose.ComposeState(loaded = true, draft = draft, senders = listOf(alice), signatureEnabled = true)
+        assertTrue(st.isEmpty)
+        assertEquals(alice, st.signatureSender)
+        assertEquals(null, st.copy(signatureEnabled = false).signatureSender)
+        val other = alice.copy(identityId = 2L, signatureHtml = "<i>O</i>")
+        assertEquals(other, st.copy(senders = listOf(alice, other), signatureSourceKey = 2L).signatureSender)
     }
 
     @Test

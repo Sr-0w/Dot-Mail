@@ -180,11 +180,47 @@ internal fun IdentityEditorPage(account: Account, identityId: Long, onBack: () -
     var name by remember { mutableStateOf(existing?.name ?: account.displayName) }
     var email by remember { mutableStateOf(existing?.email.orEmpty()) }
     var replyTo by remember { mutableStateOf(existing?.replyTo.orEmpty()) }
-    var signature by remember { mutableStateOf(existing?.signature.orEmpty()) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    val sigState = com.mohamedrejeb.richeditor.model.rememberRichTextState()
+    var logo by remember { mutableStateOf(existing?.signatureLogo) }
+    val createdLogos = remember { mutableListOf<String>() }
+    var logoSaved by remember { mutableStateOf(false) }
+    var sigOnNew by remember { mutableStateOf(existing?.signatureOnNew ?: true) }
+    var sigOnReply by remember { mutableStateOf(existing?.signatureOnReply ?: true) }
+    var htmlPicked by remember { mutableStateOf<((String) -> Unit)?>(null) }
+    val logoFailed = stringResource(R.string.identity_signature_logo_failed)
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        val initial = existing?.signatureHtml
+            ?: existing?.signature?.let { app.dot.mail.ui.compose.ComposeViewModel.signatureBodyHtml(app.dot.mail.ui.compose.Sender(0, null, "", "", signature = it)) }.orEmpty()
+        sigState.loadSignature(initial)
+    }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose { if (!logoSaved) createdLogos.forEach { app.dot.mail.data.SignatureLogos.delete(context, it) } }
+    }
+    val pickLogo = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) scope.launch {
+            val name = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }?.takeIf { it.size <= 8 * 1024 * 1024 }
+                    bytes?.let { app.dot.mail.data.SignatureLogos.save(context, it, "${account.id}-$identityId") }
+                }.getOrNull()
+            }
+            if (name != null) { createdLogos += name; logo = name } else error = logoFailed
+        }
+    }
+    val pickHtml = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+        val callback = htmlPicked
+        if (uri != null && callback != null) scope.launch {
+            val text = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { context.contentResolver.openInputStream(uri)?.use { it.bufferedReader(Charsets.UTF_8).use { r -> CharArray(1_000_000).let { buf -> String(buf, 0, r.read(buf).coerceAtLeast(0)) } } } }.getOrNull()
+            }
+            if (text != null) callback(text)
+        }
+    }
     var makeDefault by remember { mutableStateOf(existing?.isDefault == true) }
     var confirmDelete by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
     val saveFailed = stringResource(R.string.identity_save_failed)
 
     val emailOk = isPrimary || IdentityStore.isValidAddress(email)
@@ -214,7 +250,14 @@ internal fun IdentityEditorPage(account: Account, identityId: Long, onBack: () -
                 isError = !replyToOk,
                 supporting = stringResource(if (!replyToOk) R.string.identity_address_invalid else R.string.identity_reply_to_note),
             )
-            DotTextField(signature, { signature = it }, label = stringResource(R.string.identity_signature), singleLine = false, placeholder = stringResource(R.string.identity_signature_placeholder))
+            SignatureSection(
+                state = sigState, logo = logo,
+                onPickLogo = { pickLogo.launch("image/*") },
+                onRemoveLogo = { logo = null },
+                onPickHtmlFile = { cb -> htmlPicked = cb; pickHtml.launch(arrayOf("text/html", "text/plain")) },
+            )
+            ToggleRow(stringResource(R.string.identity_signature_new), null, null, sigOnNew) { sigOnNew = it }
+            ToggleRow(stringResource(R.string.identity_signature_reply), null, null, sigOnReply) { sigOnReply = it }
             ToggleRow(
                 stringResource(R.string.identity_default), stringResource(R.string.identity_default_sub), null, makeDefault,
                 enabled = existing?.isDefault != true, // choose another one to change the default
@@ -234,15 +277,19 @@ internal fun IdentityEditorPage(account: Account, identityId: Long, onBack: () -
                 busy = true; error = null
                 scope.launch {
                     try {
-                        // Editing the plain text invalidates a stored HTML signature; keep it only if untouched.
-                        val htmlStillValid = existing?.signature.orEmpty() == signature
+                        val html = signatureHtmlOf(sigState)
                         val id = graph.accounts.saveIdentity(
                             Identity(
                                 id = identityId, accountId = account.id, name = name, email = email,
-                                signature = signature.ifBlank { null }, replyTo = replyTo.ifBlank { null },
-                                signatureHtml = if (htmlStillValid) existing?.signatureHtml else null,
+                                signature = html.takeIf { it.isNotBlank() }?.let { app.dot.mail.engine.text.EmailHtml.toPlainText(it) },
+                                replyTo = replyTo.ifBlank { null },
+                                signatureHtml = html.ifBlank { null },
+                                signatureLogo = logo, signatureOnNew = sigOnNew, signatureOnReply = sigOnReply,
                             ),
                         )
+                        logoSaved = true
+                        // Drop every logo file that is no longer referenced (replaced or removed).
+                        (createdLogos + listOfNotNull(existing?.signatureLogo)).filter { it != logo }.forEach { app.dot.mail.data.SignatureLogos.delete(context, it) }
                         if (makeDefault && existing?.isDefault != true) graph.accounts.setDefaultIdentity(account.id, id)
                         onBack()
                     } catch (e: IllegalArgumentException) {

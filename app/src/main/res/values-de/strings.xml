@@ -745,4 +745,27 @@
     <string name="pdf_no_text">Kein auswählbarer Text in diesem PDF (vielleicht ein Scan).</string>
     <string name="settings_libravatar">Libravatar</string>
     <string name="settings_libravatar_sub">Die freie, föderierte Alternative zu Gravatar. Sendet einen Hash der Absenderadresse an libravatar.org.</string>
+
+    <!-- Signatures -->
+    <string name="identity_signature_placeholder_rich">Signatur verfassen</string>
+    <string name="identity_signature_preview">Vorschau</string>
+    <string name="identity_signature_import">HTML importieren</string>
+    <string name="identity_signature_import_title">HTML-Signatur importieren</string>
+    <string name="identity_signature_import_hint">HTML hier einfügen. Skripte, Formulare, externe Inhalte und unsichere Elemente werden entfernt.</string>
+    <string name="identity_signature_import_file">Datei wählen</string>
+    <string name="identity_signature_import_confirm">Importieren</string>
+    <string name="identity_signature_import_empty">In diesem HTML wurde nichts Verwendbares gefunden</string>
+    <string name="identity_signature_logo_add">Inline-Logo hinzufügen</string>
+    <string name="identity_signature_logo_replace">Logo ändern</string>
+    <string name="identity_signature_logo_remove">Logo entfernen</string>
+    <string name="identity_signature_logo_note">Nur auf diesem Gerät gespeichert und in der Nachricht mitgesendet.</string>
+    <string name="identity_signature_logo_failed">Diese Datei ist kein verwendbares Bild</string>
+    <string name="identity_signature_logo_desc">Signatur-Logo</string>
+    <string name="identity_signature_new">Zu neuen Nachrichten hinzufügen</string>
+    <string name="identity_signature_reply">Zu Antworten und Weiterleitungen hinzufügen</string>
+    <string name="compose_signature">Signatur</string>
+    <string name="compose_signature_options">Signaturoptionen</string>
+    <string name="compose_signature_remove">Aus dieser Nachricht entfernen</string>
+    <string name="compose_signature_add">Signatur hinzufügen</string>
+    <string name="compose_signature_use">Signatur von %1$s verwenden</string>
 </resources>
