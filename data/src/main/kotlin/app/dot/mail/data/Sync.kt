@@ -111,7 +111,7 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null, schedu
                     }
                 }
                 if (replayed) result = client.sync(config.imap.endpoint(), creds, folder.path, initialCursor, limit = windowLimit, windowDays = accountSettings.syncWindowDays)
-                val notifications = mutableListOf<Pair<Long, String>>()
+                val notifications = mutableListOf<Triple<Long, String, Long>>()
                 database.withTransaction {
                     val old = dao.folderMessages(folder.id)
                     if (result.reset) old.filter { it.uid > 0 }.forEach { dao.deleteMessage(it.id) }
@@ -122,7 +122,7 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null, schedu
                     result.headers.filter { !it.flags.deleted && it.uid !in pending }.forEach { header ->
                         val (thread, fresh) = upsertHeader(folder.copy(validity = result.cursor.uidValidity), header)
                         if (fresh && !result.reset) dao.deleteThreadSnooze(thread) // new mail in a snoozed conversation wakes it
-                        if (fresh && !result.reset && !header.flags.seen && notificationRules.notifyForFolder(folder.id, remote.role.name) && !notificationRules.isMuted(thread)) notifications += thread to header.subject
+                        if (fresh && !result.reset && !header.flags.seen && notificationRules.notifyForFolder(folder.id, remote.role.name) && !notificationRules.isMuted(thread)) notifications += Triple(thread, header.subject, folder.id)
                     }
                     result.flags.filter { it.uid !in pending }.forEach { flag -> dao.byUid(folder.id, flag.uid)?.let { row ->
                         if (row.id !in pendingLocalIds) { if (flag.deleted) dao.deleteMessage(row.id) else dao.updateMessage(row.copy(unread = !flag.seen, starred = flag.starred)) }
@@ -142,7 +142,7 @@ internal suspend fun RealMailGraph.syncAll(accountIds: Set<Long>? = null, schedu
                         previewRows.map { it.threadId }.distinct().forEach { rebuildThread(it) }
                     }
                 }
-                notifications.distinctBy { it.first }.forEach { (id, subject) -> MailNotifications.newMail(context, account, id, subject) }
+                notifications.distinctBy { it.first }.forEach { (id, subject, folderId) -> MailNotifications.newMail(context, account, id, subject, folderId) }
             }
             settingsStore.markWindowApplied(account.id, accountSettings.syncWindowDays)
             settingsStore.markSynced(account.id)

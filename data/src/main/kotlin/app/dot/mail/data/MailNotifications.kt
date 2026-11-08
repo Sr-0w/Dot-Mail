@@ -16,7 +16,8 @@ import app.dot.mail.data.model.MessageAction
 import kotlinx.coroutines.launch
 
 internal object MailNotifications {
-    fun newMail(context: Context, account: AccountRow, threadId: Long, subject: String) {
+    /** [folderId] = folder the new mail arrived in: actions from the notification are scoped to it (never Sent copies). */
+    fun newMail(context: Context, account: AccountRow, threadId: Long, subject: String, folderId: Long = 0) {
         if (!AccountSettingsStore.get(context).current(account.id).notificationsEnabled) return
         if (NotificationRules.get(context).isMuted(threadId)) return // muted conversation: new mail stays unread but silent
         val manager = context.getSystemService(NotificationManager::class.java)
@@ -24,10 +25,10 @@ internal object MailNotifications {
         manager.createNotificationChannel(NotificationChannel(channel, account.email, NotificationManager.IMPORTANCE_DEFAULT))
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val launcher = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
-        launcher.putExtra("dotmail.threadId", threadId).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        launcher.putExtra("dotmail.threadId", threadId).putExtra("dotmail.folderId", folderId).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         launcher.data = android.net.Uri.parse("dotmail://thread/$threadId")
         val open = PendingIntent.getActivity(context, 0, launcher, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        fun action(value: String): PendingIntent = PendingIntent.getBroadcast(context, 0, Intent(context, NotificationActionReceiver::class.java).setAction(value).setData(android.net.Uri.parse("dotmail://thread/$threadId/$value")).putExtra("threadId", threadId), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        fun action(value: String): PendingIntent = PendingIntent.getBroadcast(context, 0, Intent(context, NotificationActionReceiver::class.java).setAction(value).setData(android.net.Uri.parse("dotmail://thread/$threadId/$value")).putExtra("threadId", threadId).putExtra("folderId", folderId), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val builder = NotificationCompat.Builder(context, channel)
             .setSmallIcon(android.R.drawable.ic_dialog_email).setContentTitle(account.name.ifBlank { account.email }).setContentText(subject.ifBlank { "New message" })
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE).setAutoCancel(true).setContentIntent(open)
@@ -54,7 +55,11 @@ class NotificationActionReceiver : BroadcastReceiver() {
         val pending = goAsync()
         val graph = GraphRegistry.get(context)
         graph.scope.launch {
-            try { graph.apply(action, listOf(thread)); context.getSystemService(NotificationManager::class.java).cancel(thread.toString(), 1) }
+            val folder = intent.getLongExtra("folderId", 0)
+            try {
+                if (folder > 0) graph.apply(action, listOf(thread), app.dot.mail.data.model.Mailbox.InFolder(folder))
+                else @Suppress("DEPRECATION") graph.apply(action, listOf(thread))
+                 context.getSystemService(NotificationManager::class.java).cancel(thread.toString(), 1) }
             catch (_: Exception) { /* Keep the notification available when the local action cannot be applied. */ }
             finally { pending.finish() }
         }

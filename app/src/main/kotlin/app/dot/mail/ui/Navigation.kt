@@ -232,7 +232,7 @@ fun DotMailRoot(requests: StateFlow<ExternalRequest?>, onRequestConsumed: () -> 
                     // Reply button of a notification: compose a reply to the newest message; otherwise just open the conversation.
                     val last = if (request.reply) runCatching { graph.mail.thread(request.threadId).first().lastOrNull() }.getOrNull() else null
                     if (last != null) nav.openCompose(ComposeRoute(replyToMessageId = last.id, replyMode = app.dot.mail.data.ReplyMode.REPLY.name))
-                    else nav.navigate(ThreadRoute(request.threadId))
+                    else nav.navigate(ThreadRoute(request.threadId, sourceFolderId = request.folderId))
                 }
                 is ExternalRequest.Compose -> nav.openCompose(
                     ComposeRoute(

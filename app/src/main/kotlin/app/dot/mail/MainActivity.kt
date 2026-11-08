@@ -28,7 +28,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 /** Something an external intent asked us to open. Consumed once by the nav host. */
 sealed interface ExternalRequest {
     /** [reply] = the notification's Reply button: open straight into a reply to the last message. */
-    data class OpenThread(val threadId: Long, val reply: Boolean = false) : ExternalRequest
+    data class OpenThread(val threadId: Long, val reply: Boolean = false, val folderId: Long = 0) : ExternalRequest
     data class Compose(
         val to: List<String> = emptyList(),
         val cc: List<String> = emptyList(),
@@ -126,7 +126,7 @@ class MainActivity : FragmentActivity() {
 
     private fun parse(intent: Intent?): ExternalRequest? {
         intent ?: return null
-        intent.getLongExtra(EXTRA_THREAD_ID, -1L).takeIf { it > 0 }?.let { return ExternalRequest.OpenThread(it, reply = intent.getBooleanExtra(EXTRA_REPLY, false)) }
+        intent.getLongExtra(EXTRA_THREAD_ID, -1L).takeIf { it > 0 }?.let { return ExternalRequest.OpenThread(it, reply = intent.getBooleanExtra(EXTRA_REPLY, false), folderId = intent.getLongExtra("dotmail.folderId", 0)) }
         return when (intent.action) {
             ACTION_COMPOSE -> ExternalRequest.Compose()
             ACTION_SEARCH -> ExternalRequest.Search
