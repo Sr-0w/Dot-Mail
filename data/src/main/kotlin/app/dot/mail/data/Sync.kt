@@ -49,6 +49,7 @@ private suspend fun RealMailGraph.syncAccount(
     var stage="Connect"
     var redactions=setOf(account.email)
     try {
+        prepareSnippetRepair(account.id)
         val config=Codec.config(account.config)
         val credentials=credentials(account)
         redactions=setOf(account.email,credentials.secret)

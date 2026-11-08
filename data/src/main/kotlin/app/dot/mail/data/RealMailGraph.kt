@@ -71,7 +71,7 @@ internal class RealMailGraph(
     internal val foregroundIdle by lazy { ForegroundIdle(this) }
     override val instantNotifications: Flow<Boolean> = AccountSettingsStore.get(context).sync.map { it.instantNotifications }.distinctUntilChanged()
     override suspend fun setInstantNotificationsEnabled(enabled: Boolean): Boolean = changeInstantNotifications(enabled)
-    internal fun start() { if (scheduling) { WorkScheduling.periodic(context); foregroundIdle.start(); scope.launch { recoverOutbox(); dao.accounts().forEach { account -> if(dao.draftMirrors(account.id).isNotEmpty()) WorkScheduling.drafts(context,account.id) } }; scope.launch { resurfaceDue() } } }
+    internal fun start() { if (scheduling) { WorkScheduling.periodic(context); foregroundIdle.start(); scope.launch { recoverOutbox(); dao.accounts().forEach { account -> if(dao.draftMirrors(account.id).isNotEmpty()) WorkScheduling.drafts(context,account.id) } }; scope.launch { resurfaceDue() }; scope.launch { recoverSnippetRepairs() } } }
     internal suspend fun credentials(row: AccountRow): Credentials = withContext(Dispatchers.IO) {
         if (Codec.config(row.config).authType == AuthType.OAUTH2) oauth.credentials(row.id) else try { Credentials(vault.decrypt(row.email, row.secret)) }
         catch(e:java.security.GeneralSecurityException) { dao.syncError(row.id,"Saved credentials are unavailable. Sign in again.",true); throw ReauthenticationRequired(e) }
@@ -254,7 +254,7 @@ internal class RealMailGraph(
         val temporary = message.copy(bodyLoaded=true,bodyPath=directory.absolutePath)
         val preview = bodyStore.read(temporary)
         val remote = preview?.html?.let { HtmlSanitizer.sanitize(it).hasRemoteImages } ?: false
-        val snippet = preview?.plainText?.let { app.dot.mail.engine.text.Snippets.fromPlainText(it) } ?: preview?.html?.let { app.dot.mail.engine.text.Snippets.fromHtml(it) }.orEmpty()
+        val snippet = app.dot.mail.engine.text.Snippets.fromBody(preview?.plainText,preview?.html)
         database.withTransaction {
             val current = dao.message(messageId)
             if(current==null) { directory.deleteRecursively(); return@withTransaction }

@@ -103,6 +103,9 @@ interface MailDao {
     @Insert(onConflict=OnConflictStrategy.REPLACE) suspend fun putBodyText(row: BodyTextRow)
     @Query("DELETE FROM search_matches WHERE queryHash=:hash") suspend fun clearSearchMatches(hash: String)
     @Insert(onConflict=OnConflictStrategy.IGNORE) suspend fun putSearchMatch(row: SearchMatchRow)
+    @Query("UPDATE messages SET snippetFetched=0 WHERE accountId=:accountId") suspend fun resetSnippetRevision(accountId:Long)
+    @Query("UPDATE messages SET snippet=:value,snippetFetched=1 WHERE id=:id") suspend fun setSnippet(id:Long,value:String)
+    @Query("SELECT COUNT(*) FROM messages WHERE accountId=:accountId AND snippetFetched=0 AND ((uid>0 AND snippet!='') OR bodyLoaded=1)") suspend fun pendingSnippetRepairs(accountId:Long):Int
     @Query("DELETE FROM messages WHERE id=:id") suspend fun deleteMessage(id: Long)
     @Query("DELETE FROM messages WHERE folderId=:id") suspend fun clearFolder(id: Long)
     @Insert suspend fun insertThread(row: ThreadRow): Long

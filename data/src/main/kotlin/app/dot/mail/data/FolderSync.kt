@@ -33,7 +33,7 @@ internal suspend fun RealMailGraph.syncOneFolder(account:AccountRow,config:Accou
         val cached=dao.folderMessages(folder.id)
         val pending=dao.operations(account.id).any { it.folderId==folder.id }
         val needsMetadata=cached.any { it.uid>0 && Codec.field(it.header,"category")==null }
-        val needsPreview=cached.sortedByDescending { it.sentAt }.take(200).any { it.uid>0 && !it.snippetFetched && !it.bodyLoaded }
+        val needsPreview=cached.any { !it.snippetFetched && (it.bodyLoaded || (it.uid>0 && it.snippet.isNotBlank())) } || cached.sortedByDescending { it.sentAt }.take(200).any { it.uid>0 && !it.snippetFetched && !it.bodyLoaded }
         if(result.unchanged && !pending && !needsMetadata && !needsPreview) {
             if(folder.name!=remote.name || folder.role!=remote.role.name || folder.unread!=remote.unread || folder.total!=remote.total)
                 dao.updateFolder(folder.copy(name=remote.name,role=remote.role.name,unread=remote.unread,total=remote.total))
@@ -147,19 +147,4 @@ private suspend fun RealMailGraph.applyFolderHeaders(account:AccountRow,folder:F
     }
     client.recordTiming("db",(System.nanoTime()-dbStart)/1_000_000)
     return notifications
-}
-
-private suspend fun RealMailGraph.prefetchFolderPreviews(account:AccountRow,config:AccountConfig,creds:Credentials,folder:FolderRow,remote:RemoteFolder,validity:Long) {
-    val redactions=setOf(account.email,creds.secret)
-    // Only newest cached messages without a preview are fetched, at most 200 × 2 KiB per folder.
-    val previewRows = dao.folderMessages(folder.id).filter { it.uid > 0 }.sortedByDescending { it.sentAt }.take(200).filter { !it.snippetFetched && !it.bodyLoaded }
-    if (previewRows.isNotEmpty()) {
-        val snippets = try { client.snippets(config.imap.endpoint(), creds, folder.path, previewRows.map { it.uid }.toLongArray(), validity) }
-        catch (e: CancellationException) { throw e }
-        catch (e: Exception) { SyncDiagnostics.warn("Snippet prefetch account=${account.id} folderRole=${remote.role}", e, redactions); emptyMap() } // Header/flag sync remains authoritative even when previews fail.
-        database.withTransaction {
-            snippets.forEach { (uid, snippet) -> dao.byUid(folder.id, uid)?.let { dao.updateMessage(it.copy(snippet = snippet, snippetFetched = true)) } }
-            previewRows.map { it.threadId }.distinct().forEach { rebuildThread(it) }
-        }
-    }
 }
