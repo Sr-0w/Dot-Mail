@@ -13,6 +13,7 @@ import app.dot.mail.data.model.Draft
 import app.dot.mail.data.model.EmailAddress
 import app.dot.mail.data.model.Folder
 import app.dot.mail.data.model.FolderException
+import app.dot.mail.data.model.Identity
 import app.dot.mail.data.model.FolderFailure
 import app.dot.mail.data.model.FolderRole
 import app.dot.mail.data.model.Mailbox
@@ -35,7 +36,13 @@ import kotlinx.coroutines.flow.update
 class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
     private val me = EmailAddress("robin@example.org", "Robin")
     private val accountsState = MutableStateFlow(
-        listOf(Account(1, "Robin", me.email, 0), Account(2, "Robin (work)", "robin@studio.example", 1)),
+        listOf(
+            Account(1, "Robin", me.email, 0, identities = listOf(
+                Identity(1, 1, "Robin", me.email, signature = "Robin", isDefault = true),
+                Identity(1_000_001, 1, "Robin (shop)", "shop@example.org", signature = "Robin — Shop orders"),
+            )),
+            Account(2, "Robin (work)", "robin@studio.example", 1, identities = listOf(Identity(2, 2, "Robin (work)", "robin@studio.example", isDefault = true))),
+        ),
     )
     private val foldersState = MutableStateFlow(initialFolders())
     private val folders get() = foldersState.value
@@ -72,6 +79,20 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
             accountsState.update { it + Account(id, config.displayName, config.email, it.size) }
             return id
         }
+        override fun identities(accountId: Long): Flow<List<Identity>> = accountsState.map { l -> l.firstOrNull { it.id == accountId }?.identities.orEmpty() }
+        private fun editIdentities(accountId: Long, f: (List<Identity>) -> List<Identity>) =
+            accountsState.update { l -> l.map { if (it.id == accountId) it.copy(identities = f(it.identities)) else it } }
+        override suspend fun saveIdentity(identity: Identity): Long {
+            require(identity.email.contains('@')) { "Invalid address" }
+            val id = if (identity.id == 0L) 1_000_000L + (accountsState.value.sumOf { it.identities.size }) + 1 else identity.id
+            editIdentities(identity.accountId) { l -> if (l.any { it.id == id }) l.map { if (it.id == id) identity.copy(id = id, isDefault = it.isDefault) else it } else l + identity.copy(id = id, isDefault = false) }
+            return id
+        }
+        override suspend fun deleteIdentity(accountId: Long, identityId: Long) {
+            if (identityId == accountId) return
+            editIdentities(accountId) { l -> val rest = l.filter { it.id != identityId }; if (rest.none { it.isDefault }) rest.map { it.copy(isDefault = it.id == accountId) } else rest }
+        }
+        override suspend fun setDefaultIdentity(accountId: Long, identityId: Long) = editIdentities(accountId) { l -> l.map { it.copy(isDefault = it.id == identityId) } }
         override suspend fun removeAccount(accountId: Long) = accountsState.update { list -> list.filterNot { it.id == accountId } }
     }
 

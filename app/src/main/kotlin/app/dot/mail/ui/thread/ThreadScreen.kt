@@ -13,6 +13,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -116,16 +117,17 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class ThreadViewModel(private val graph: MailGraph, private val threadId: Long) : ViewModel() {
+class ThreadViewModel(
+    private val graph: MailGraph,
+    private val threadId: Long,
+    private val remotePolicy: app.dot.mail.ui.settings.RemoteImagePolicy,
+) : ViewModel() {
     val messages: StateFlow<List<Message>?> =
         graph.mail.thread(threadId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** Explicitly toggled messages; default expansion is computed from unread/last. */
     private val _toggled = MutableStateFlow<Map<Long, Boolean>>(emptMap())
     val toggled: StateFlow<Map<Long, Boolean>> = _toggled
-
-    private val _remoteAllowed = MutableStateFlow<Set<Long>>(emptySet())
-    val remoteAllowed: StateFlow<Set<Long>> = _remoteAllowed
 
     private val loading = mutableSetOf<Long>()
     private var markedRead = false
@@ -172,7 +174,11 @@ class ThreadViewModel(private val graph: MailGraph, private val threadId: Long) 
         }
     }
 
-    fun allowRemote(messageId: Long) = _remoteAllowed.update { it + messageId }
+    // Remote-image permissions are persistent (app.dot.mail.ui.settings.RemoteImagePolicy), keyed by account + Message-ID.
+    fun allowRemote(m: Message) = remotePolicy.approveMessage(m)
+    fun alwaysAllowSender(m: Message) { remotePolicy.addRule(isDomain = false, raw = m.from.email, accountId = m.accountId) }
+    fun alwaysAllowDomain(m: Message) { remotePolicy.addRule(isDomain = true, raw = app.dot.mail.ui.settings.RemoteImageMatching.domainOf(m.from.email), accountId = m.accountId) }
+    fun stopRemote(m: Message, reason: app.dot.mail.ui.settings.LoadReason) = remotePolicy.stop(m, reason)
 
     fun act(action: MessageAction) {
         viewModelScope.launch {
@@ -215,10 +221,13 @@ fun ThreadScreen(
     onOpenAdjacent: (Long) -> Unit = {},
 ) {
     val graph = LocalMailGraph.current
-    val vm: ThreadViewModel = viewModel(key = "thread-$threadId") { ThreadViewModel(graph, threadId) }
+    val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    val vm: ThreadViewModel = viewModel(key = "thread-$threadId") { ThreadViewModel(graph, threadId, app.dot.mail.ui.settings.RemoteImagePolicy.get(appContext)) }
     val messages by vm.messages.collectAsStateWithLifecycle()
     val toggled by vm.toggled.collectAsStateWithLifecycle()
-    val remoteAllowed by vm.remoteAllowed.collectAsStateWithLifecycle()
+    val remotePolicy = remember { app.dot.mail.ui.settings.RemoteImagePolicy.get(appContext) }
+    val approvals by remotePolicy.approvals.collectAsStateWithLifecycle()
+    val remoteRules by remotePolicy.rules.collectAsStateWithLifecycle()
     val prefs by LocalSettings.current.ui.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
@@ -323,9 +332,12 @@ fun ThreadScreen(
                         MessageCard(
                             message = m,
                             expanded = expanded,
-                            allowRemote = prefs.loadRemoteImages || m.id in remoteAllowed,
+                            remoteReason = app.dot.mail.ui.settings.RemoteImageMatching.reason(m, prefs.loadRemoteImages, approvals, remoteRules),
                             onToggle = { vm.toggle(m, list) },
-                            onAllowRemote = { vm.allowRemote(m.id) },
+                            onAllowRemote = { vm.allowRemote(m) },
+                            onAlwaysSender = { vm.alwaysAllowSender(m) },
+                            onAlwaysDomain = { vm.alwaysAllowDomain(m) },
+                            onStopRemote = { reason -> vm.stopRemote(m, reason) },
                             onLink = { url ->
                                 if (url.startsWith("mailto:", ignoreCase = true)) onComposeTo(url)
                                 else if (prefs.confirmLinks) pendingLink = url
@@ -424,15 +436,19 @@ private fun LinkDialog(url: String, onDismiss: () -> Unit, onOpen: () -> Unit) {
 private fun MessageCard(
     message: Message,
     expanded: Boolean,
-    allowRemote: Boolean,
+    remoteReason: app.dot.mail.ui.settings.LoadReason,
     onToggle: () -> Unit,
     onAllowRemote: () -> Unit,
+    onAlwaysSender: () -> Unit,
+    onAlwaysDomain: () -> Unit,
+    onStopRemote: (app.dot.mail.ui.settings.LoadReason) -> Unit,
     onLink: (String) -> Unit,
     onAttachment: (Attachment, Boolean) -> Unit,
     onSender: (EmailAddress) -> Unit,
     readingScale: Float = 1f,
     quotedExpanded: Boolean = false,
 ) {
+    val allowRemote = remoteReason != app.dot.mail.ui.settings.LoadReason.NONE
     val c = Dot.colors
     var details by rememberSaveable(message.id) { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().animateContentSize(tween(220))) {
@@ -492,7 +508,9 @@ private fun MessageCard(
             }
             val clean = sanitized
             if (clean != null && clean.blockedRemoteResources > 0 && !allowRemote) {
-                RemoteContentBanner(clean.blockedRemoteResources, onAllowRemote)
+                RemoteContentBanner(clean.blockedRemoteResources, message.from, onAllowRemote, onAlwaysSender, onAlwaysDomain)
+            } else if (html != null && remoteReason.canStop) {
+                RemoteImagesLoadedRow(remoteReason, message.from) { onStopRemote(remoteReason) }
             }
             if (html != null && clean == null) {
                 Box(Modifier.fillMaxWidth().height(120.dp))
@@ -568,9 +586,22 @@ private fun HeaderDetails(m: Message, onSender: (EmailAddress) -> Unit) {
 
 private fun fmt(a: EmailAddress) = if (a.name.isNullOrBlank()) a.email else "${a.name} <${a.email}>"
 
+private val app.dot.mail.ui.settings.LoadReason.canStop: Boolean
+    get() = this == app.dot.mail.ui.settings.LoadReason.MESSAGE || this == app.dot.mail.ui.settings.LoadReason.SENDER || this == app.dot.mail.ui.settings.LoadReason.DOMAIN
+
 @Composable
-private fun RemoteContentBanner(count: Int, onAllow: () -> Unit) {
+private fun RemoteContentBanner(
+    count: Int,
+    sender: EmailAddress,
+    onAllow: () -> Unit,
+    onAlwaysSender: () -> Unit,
+    onAlwaysDomain: () -> Unit,
+) {
     val c = Dot.colors
+    var menu by remember { mutableStateOf(false) }
+    var confirm by remember { mutableStateOf<Boolean?>(null) } // true = whole domain, false = this address
+    val domain = app.dot.mail.ui.settings.RemoteImageMatching.domainOf(sender.email)
+    val offerDomain = domain.isNotEmpty() && !app.dot.mail.ui.avatar.FreeMail.isFreeMail(domain)
     Row(
         Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s).fillMaxWidth()
             .clip(DotShapes.medium).border(1.dp, c.border, DotShapes.medium)
@@ -583,7 +614,54 @@ private fun RemoteContentBanner(count: Int, onAllow: () -> Unit) {
             if (count == 1) "1 remote image blocked to protect your privacy" else "$count remote images blocked to protect your privacy",
             style = Dot.type.caption, color = c.textSecondary, modifier = Modifier.weight(1f),
         )
-        DotButton("Load", onAllow, style = ButtonStyle.Ghost, compact = true)
+        DotButton("Load images", onAllow, style = ButtonStyle.Ghost, compact = true)
+        Box {
+            DotIconButton(Icons.Outlined.MoreVert, "More options for remote images", onClick = { menu = true })
+            DotMenu(menu, { menu = false }) {
+                app.dot.design.components.DotMenuItem("Always for ${sender.email}", null) { menu = false; confirm = false }
+                if (offerDomain) app.dot.design.components.DotMenuItem("Always for @$domain", null) { menu = false; confirm = true }
+            }
+        }
+    }
+    confirm?.let { wholeDomain ->
+        val target = if (wholeDomain) "@$domain" else sender.email
+        AlertDialog(
+            onDismissRequest = { confirm = null },
+            containerColor = c.surface,
+            shape = DotShapes.large,
+            title = { Text("Always load images from $target?", style = Dot.type.title, color = c.textPrimary) },
+            text = {
+                Text(
+                    "Senders can see when and where you open their mail. Only do this for senders you trust. " +
+                        "You can remove the rule in Settings → Privacy & security → Remote images.",
+                    style = Dot.type.callout, color = c.textSecondary,
+                )
+            },
+            confirmButton = {
+                DotButton("Always load", compact = true, onClick = { confirm = null; if (wholeDomain) onAlwaysDomain() else onAlwaysSender() })
+            },
+            dismissButton = { DotButton("Cancel", { confirm = null }, style = ButtonStyle.Ghost, compact = true) },
+        )
+    }
+}
+
+/** Quiet note while remembered images are showing; "Stop" revokes the message approval or the sender / domain rule. */
+@Composable
+private fun RemoteImagesLoadedRow(reason: app.dot.mail.ui.settings.LoadReason, sender: EmailAddress, onStop: () -> Unit) {
+    val c = Dot.colors
+    val why = when (reason) {
+        app.dot.mail.ui.settings.LoadReason.SENDER -> "always for ${sender.email}"
+        app.dot.mail.ui.settings.LoadReason.DOMAIN -> "always for @${app.dot.mail.ui.settings.RemoteImageMatching.domainOf(sender.email)}"
+        else -> "this message"
+    }
+    Row(
+        Modifier.padding(horizontal = DotSpacing.gutter).fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("Images loaded · $why", style = Dot.type.caption, color = c.textTertiary, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Box(Modifier.defaultMinSize(minHeight = 48.dp).clip(DotShapes.small).clickable(role = androidx.compose.ui.semantics.Role.Button, onClickLabel = "Stop loading images") { onStop() }.padding(horizontal = DotSpacing.m), contentAlignment = Alignment.Center) {
+            Text("Stop", style = Dot.type.label, color = c.textSecondary)
+        }
     }
 }
 
