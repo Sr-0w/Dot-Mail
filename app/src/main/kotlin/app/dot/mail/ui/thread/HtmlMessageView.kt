@@ -87,7 +87,8 @@ fun HtmlMessageView(
                     defaultTextEncodingName = "utf-8"
                 }
                 if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
-                    WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, dark)
+                    // Some WebView builds report the feature but throw when it is used: never let that end the reader.
+                    runCatching { WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, dark) }
                 }
                 webViewClient = SafeClient(allowRemote, inlineUris, ctx.contentResolver, linkHandler, ctx.resources)
                 tag = null
@@ -107,10 +108,23 @@ fun HtmlMessageView(
                 web.loadDataWithBaseURL(null, document, "text/html", "utf-8", null)
             }
         },
-        onRelease = { it.destroy() },
+        onRelease = { releaseWebView(it) },
     )
     }
     }
+}
+
+/**
+ * Tears a message WebView down safely when the reader goes away (Back, next conversation, theme flip): stop any load in
+ * flight and drop the client first so no callback (link handler, request interception) fires into a screen that is
+ * already gone, detach from the parent, then destroy. Every step is guarded; a WebView implementation that complains must
+ * never take the app down on the way out.
+ */
+internal fun releaseWebView(web: WebView) {
+    runCatching { web.stopLoading() }
+    runCatching { web.webViewClient = WebViewClient() }
+    runCatching { (web.parent as? ViewGroup)?.removeView(web) }
+    runCatching { web.destroy() }
 }
 
 /** Breathing room (CSS px) kept around scaled-down fixed-width designs. */
