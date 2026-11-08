@@ -93,7 +93,7 @@ fun TopEdgeFade(
     if (blur) {
         // Neutral page-colour veil only (no accent hue); light enough that the moving blurred content stays visible.
         val veil = androidx.compose.ui.graphics.SolidColor(bg.copy(alpha = if (Dot.colors.isDark) 0.34f else 0.42f))
-        Box(box.backdropBlur(state!!, radius = 28.dp, background = bg, tint = veil, mask = maskBrush(stops, androidx.compose.ui.graphics.Color.White))
+        Box(box.backdropBlur(state!!, background = bg, tint = veil, mask = maskBrush(stops, androidx.compose.ui.graphics.Color.White))
             .edgeScrim(edgeScrim, edgeScrimSolid, bg))
     } else {
         Box(box.background(maskBrush(stops, bg, 0.94f)))

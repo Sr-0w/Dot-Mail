@@ -28,6 +28,7 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import io.github.nadeemiqbal.liquidglass.LiquidGlassQuality
 import io.github.nadeemiqbal.liquidglass.LiquidGlassState
 import io.github.nadeemiqbal.liquidglass.liquidGlass
@@ -60,7 +61,7 @@ fun Modifier.backdropSource(backdrop: Backdrop): Modifier =
     onPlaced { backdrop.sourceInRoot = it.positionInRoot() }.liquidGlassSource(backdrop.glass)
 
 /** The single blur radius of every backdrop surface (see [backdropBlur]). */
-val BackdropRadius = androidx.compose.ui.unit.Dp(28f)
+val BackdropRadius: Dp = 28.dp
 
 /** The surface's own rectangle, expressed in the source's coordinates. */
 private class ShiftedRect(private val shift: () -> Offset) : Shape {
@@ -69,15 +70,15 @@ private class ShiftedRect(private val shift: () -> Offset) : Shape {
 }
 
 /**
- * Draws the backdrop behind this element with liquid-glass: blurred by [radius] over an opaque [background], veiled
+ * Draws the backdrop behind this element with liquid-glass: blurred by [BackdropRadius] over an opaque [background], veiled
  * by [tint], shaped by the alpha [mask] (vertical gradient, white = fully frosted) when given. This element's own
  * content stays sharp on top.
+ *
+ * liquidGlass sets its blur on the one layer shared by every surface of a backdrop, so surfaces with different radii
+ * would overwrite each other within a frame (flicker): every surface uses [BackdropRadius].
  */
-fun Modifier.backdropBlur(backdrop: Backdrop, radius: Dp, background: Color, tint: Brush?, mask: Brush? = null): Modifier =
+fun Modifier.backdropBlur(backdrop: Backdrop, background: Color, tint: Brush?, mask: Brush? = null): Modifier =
     composed {
-        // liquidGlass sets its blur on the one layer shared by every surface of this backdrop: surfaces with different
-        // radii would overwrite each other within a frame. One radius for all of them.
-        @Suppress("UNUSED_PARAMETER") val unused = radius
         val here = remember { mutableStateOf(Offset.Zero) }
         val shift = { here.value - backdrop.sourceInRoot }
         val shape = remember { ShiftedRect(shift) }

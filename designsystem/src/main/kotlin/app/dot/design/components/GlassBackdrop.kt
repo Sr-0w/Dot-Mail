@@ -35,7 +35,7 @@ internal fun Modifier.glassSurface(state: Backdrop?, pressed: Boolean): Modifier
     } else if (state == null || !state.blurEnabled || !androidx.compose.ui.platform.LocalView.current.isHardwareAccelerated) {
         background(frostedSurfaceBrush(pressed), CircleShape)
     } else {
-        backdropBlur(state, radius = 24.dp, background = Dot.colors.background, tint = glassTintBrush(pressed))
+        backdropBlur(state, background = Dot.colors.background, tint = glassTintBrush(pressed))
     }
 
 /**
