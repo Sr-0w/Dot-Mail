@@ -119,8 +119,9 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
     // Sub-pages: 0 = none. identityPage: -1 = account page, 0 = new identity, else editing that identity.
     var accountPage by rememberSaveable { mutableLongStateOf(0L) }
     var identityPage by rememberSaveable { mutableLongStateOf(-1L) }
+    var remoteImagesPage by rememberSaveable { mutableStateOf(false) }
     val pageAccount = accounts.firstOrNull { it.id == accountPage }
-    BackHandler(enabled = accountPage != 0L) { if (identityPage >= 0) identityPage = -1 else accountPage = 0 }
+    BackHandler(enabled = accountPage != 0L || remoteImagesPage) { if (remoteImagesPage) remoteImagesPage = false else if (identityPage >= 0) identityPage = -1 else accountPage = 0 }
     val c = Dot.colors
     val canLock = remember {
         BiometricManager.from(context).canAuthenticate(
@@ -141,7 +142,9 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
     // Permission revoked in system settings while the toggle was on: show it off.
     LaunchedEffect(Unit) { contactsGranted = hasContacts() }
 
-    if (pageAccount != null && identityPage >= 0) {
+    if (remoteImagesPage) {
+        RemoteImagesPage(accounts, onBack = { remoteImagesPage = false })
+    } else if (pageAccount != null && identityPage >= 0) {
         IdentityEditorPage(pageAccount, identityPage, onBack = { identityPage = -1 })
     } else if (pageAccount != null) {
         AccountPage(pageAccount, onBack = { accountPage = 0 }, onEditIdentity = { identityPage = it }, onRemove = { removing = pageAccount })
@@ -236,9 +239,6 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
 
             // ---- Reading
             SectionLabel("Reading")
-            ToggleRow("Load remote images", "Off by default: remote images can reveal when and where you read mail.", Icons.Outlined.Image, prefs.loadRemoteImages) { v ->
-                settings.update { it.copy(loadRemoteImages = v) }
-            }
             ListRow(
                 "Tracking pixels are always blocked", subtitle = "Invisible 1-pixel images that report you opened a message never load.",
                 icon = Icons.Outlined.Block,
@@ -280,6 +280,13 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
 
             // ---- Privacy & security
             SectionLabel("Privacy & security")
+            val imageRules by remember { RemoteImagePolicy.get(context.applicationContext).rules }.collectAsStateWithLifecycle()
+            ListRow(
+                "Remote images",
+                subtitle = (if (prefs.loadRemoteImages) "Always loaded" else "Blocked by default") + if (imageRules.isEmpty()) "" else " · ${imageRules.size} allowed " + if (imageRules.size == 1) "sender" else "senders",
+                icon = Icons.Outlined.Image, onClick = { remoteImagesPage = true },
+                trailing = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = Dot.colors.textTertiary) },
+            )
             ToggleRow(
                 "App lock", if (canLock) "Require fingerprint, face or screen lock to open." else "Set up a screen lock on this device to use this.",
                 Icons.Outlined.Fingerprint, prefs.appLock, enabled = canLock,
