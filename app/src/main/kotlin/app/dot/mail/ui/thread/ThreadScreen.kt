@@ -428,7 +428,7 @@ fun ThreadScreen(
                 list.isEmpty() -> Box(Modifier.weight(1f)) {
                     EmptyState(Icons.Outlined.Description, stringResource(R.string.thread_unavailable_title), stringResource(R.string.thread_unavailable_body))
                 }
-                else -> LazyColumn(
+                else -> androidx.compose.runtime.CompositionLocalProvider(LocalZoomScroll provides listState) { LazyColumn(
                     state = listState,
                     modifier = Modifier.weight(1f),
                     // Room for the floating capsules: the message starts below them and its end is never covered.
@@ -469,7 +469,7 @@ fun ThreadScreen(
                         )
                         Hairline(Modifier.padding(horizontal = DotSpacing.gutter))
                     }
-                }
+                } }
             }
         }
         ReaderChrome(

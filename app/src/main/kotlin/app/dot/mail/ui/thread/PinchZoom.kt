@@ -5,6 +5,8 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.ScrollableState
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -22,6 +24,9 @@ import kotlin.math.roundToInt
 
 private const val MAX_ZOOM = 3f
 
+/** The reader's scroll container, so a pinch can keep the point under the fingers in place vertically too. */
+internal val LocalZoomScroll = staticCompositionLocalOf<ScrollableState?> { null }
+
 /**
  * Two-finger zoom for a message body (1×–3×). The zoomed content really takes more room — the layout height grows with
  * the scale — so the surrounding list keeps scrolling to the end of the message; one finger pans sideways while zoomed.
@@ -31,6 +36,7 @@ internal fun Modifier.pinchToZoom(): Modifier = composed {
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var width by remember { mutableFloatStateOf(0f) }
+    val scroll = LocalZoomScroll.current
     fun clampX(x: Float) = x.coerceIn(-(width * scale - width).coerceAtLeast(0f), 0f)
 
     this
@@ -43,12 +49,16 @@ internal fun Modifier.pinchToZoom(): Modifier = composed {
                     val pressed = event.changes.filter { it.pressed }
                     if (pressed.size >= 2) {
                         val zoom = event.calculateZoom()
-                        val centroidX = event.calculateCentroid(useCurrent = true).x
+                        val centroid = event.calculateCentroid(useCurrent = true)
+                        val pan = event.calculatePan()
                         val newScale = (scale * zoom).coerceIn(1f, MAX_ZOOM)
-                        // Keep the point under the fingers in place horizontally.
-                        val contentX = (centroidX - offsetX) / scale
+                        // Keep the point under the fingers where it is. Horizontally we move the content; vertically the
+                        // message grows downwards from its top, so the list scrolls by however much that point moved.
+                        val contentX = (centroid.x - offsetX) / scale
+                        val grownAbove = centroid.y * (newScale / scale - 1f)
                         scale = newScale
-                        offsetX = clampX(centroidX - contentX * newScale + event.calculatePan().x)
+                        offsetX = clampX(centroid.x - contentX * newScale + pan.x)
+                        scroll?.dispatchRawDelta(grownAbove - pan.y)
                         event.changes.forEach { if (it.positionChanged()) it.consume() }
                     } else if (scale > 1f && pressed.size == 1) {
                         val pan = event.calculatePan()
