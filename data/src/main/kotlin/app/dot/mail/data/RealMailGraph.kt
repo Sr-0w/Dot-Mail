@@ -468,6 +468,8 @@ internal class RealMailGraph(
         Draft(accountId = account.id, identityId = identity?.id ?: account.id, to = to, cc = cc, subject = (if (mode == ReplyMode.FORWARD) "Fwd: " else "Re: ") + Threading.baseSubject(m.subject), bodyText = "\n\n" + bodyStore.read(m)?.let { it.plainText ?: org.jsoup.Jsoup.parse(it.html.orEmpty()).text() }.orEmpty().lineSequence().joinToString("\n") { "> $it" },
             attachmentUris = if (mode == ReplyMode.FORWARD) dao.attachments(m.id).filter { !it.inline }.mapNotNull { it.localUri } else emptyList(), inReplyTo = if (mode == ReplyMode.FORWARD) null else messageHeader, references = if (mode == ReplyMode.FORWARD) emptyList() else (Codec.strings(Codec.field(m.header, "refs") ?: "[]") + listOfNotNull(messageHeader)).distinct())
     }
+    override suspend fun sendCalendarReply(messageId: Long, partstat: app.dot.mail.engine.calendar.Ics.PartStat): Long = queueCalendarReply(messageId,partstat)
+
     override suspend fun send(draft: Draft, undoWindowMs: Long): Long = withContext(Dispatchers.IO) {
         require(draft.to.isNotEmpty() || draft.cc.isNotEmpty() || draft.bcc.isNotEmpty()) { "At least one recipient is required" }
         requireNotNull(dao.account(draft.accountId))
@@ -482,12 +484,15 @@ internal class RealMailGraph(
         val cancelled=database.withTransaction {
             val row=dao.outbox(outboxId) ?: return@withTransaction null
             if(dao.transitionOutbox(outboxId,"PENDING","CANCELLED")!=1) return@withTransaction null
-            val draft=Codec.draft(row.draft)
-            val id = dao.putDraft(DraftRow(draft.localId,row.accountId,row.draft,System.currentTimeMillis()))
-            queueDraftMirror(id,row.accountId); row
+            if(org.json.JSONObject(row.draft).optString("calendarReply").isBlank()) {
+                val draft=Codec.draft(row.draft)
+                val id = dao.putDraft(DraftRow(draft.localId,row.accountId,row.draft,System.currentTimeMillis()))
+                queueDraftMirror(id,row.accountId)
+            }
+            row
         } ?: return@withContext false
         cancelled.mimePath?.let { File(it).delete() }; dao.clearOutboxMime(outboxId)
-        if(scheduling) WorkScheduling.drafts(context,cancelled.accountId)
+        if(scheduling && org.json.JSONObject(cancelled.draft).optString("calendarReply").isBlank()) WorkScheduling.drafts(context,cancelled.accountId)
         true
     }
     override suspend fun retrySend(outboxId: Long, confirmPossibleDuplicate: Boolean): Boolean = withContext(Dispatchers.IO) {

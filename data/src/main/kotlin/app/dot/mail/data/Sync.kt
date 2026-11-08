@@ -187,11 +187,13 @@ internal suspend fun RealMailGraph.deliverOutbox(id: Long): Boolean = outboxLock
         }
         val saved = row.mimePath?.let { File(it) }?.takeIf { it.isFile }
         val identity = identityStore.resolve(account.id, account.name, account.email).let { all -> all.firstOrNull { it.id == draft.identityId } ?: all.first { it.isDefault } }
+        val calendarSender=org.json.JSONObject(row.draft).optString("calendarSender").takeIf { it.isNotBlank() }
+        require(calendarSender==null || calendarSender.equals(identity.email,true)) { "Invited identity is no longer available" }
         val mime = saved?.let { StoredMimeMessage(it) } ?: Mime.build(OutgoingMail(Address(identity.email, identity.name.ifBlank { account.name }), draft.to.map { Address(it.email, it.name) }, draft.cc.map { Address(it.email, it.name) }, draft.bcc.map { Address(it.email, it.name) }, draft.subject,
             // Formatted drafts: text/plain alternative + email-safe HTML (inline styles, sanitised) as multipart/alternative.
             draft.bodyHtml?.let { draft.bodyText.ifBlank { app.dot.mail.engine.text.EmailHtml.toPlainText(it) } } ?: draft.bodyText,
             html = draft.bodyHtml?.let { app.dot.mail.engine.text.EmailHtml.compose(it) },
-            attachments = attachments, inReplyTo = draft.inReplyTo, references = draft.references, replyTo = listOfNotNull(identity.replyTo?.let { Address(it) }), messageId = "<dotmail-$id-${java.util.UUID.randomUUID()}@${account.email.substringAfter('@')}>", date = java.time.Instant.now()))
+            attachments = attachments, inReplyTo = draft.inReplyTo, references = draft.references, replyTo = listOfNotNull(identity.replyTo?.let { Address(it) }), messageId = "<dotmail-$id-${java.util.UUID.randomUUID()}@${account.email.substringAfter('@')}>", date = java.time.Instant.now(), calendarReply = org.json.JSONObject(row.draft).optString("calendarReply").takeIf { it.isNotBlank() }))
         val file = File(context.filesDir, "outbox/${account.id}/$id.eml").also { it.parentFile!!.mkdirs() }
         if (saved==null) {
             val temporary=File(file.parentFile,"${file.name}.tmp")
