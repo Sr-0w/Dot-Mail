@@ -31,6 +31,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AllInbox
+import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Outbox
 import androidx.compose.material.icons.outlined.Settings
@@ -71,6 +72,7 @@ fun MailDrawer(
     outboxCount: Int = 0,
     outboxNeedsAttention: Boolean = false,
     onOutbox: () -> Unit = {},
+    onAttachments: () -> Unit = {},
 ) {
     val c = Dot.colors
     val graph = app.dot.mail.LocalMailGraph.current
@@ -156,6 +158,7 @@ fun MailDrawer(
                     }
                     item { DrawerItem("New folder", Icons.Outlined.CreateNewFolder, null, selected = false, navigation = false, onClick = { folderDialog = FolderDialog.New }) }
                 }
+                item { DrawerItem("Attachments", Icons.Outlined.AttachFile, null, selected = false, navigation = false, onClick = onAttachments) }
                 item {
                     Spacer(Modifier.height(DotSpacing.l))
                     Hairline(Modifier.padding(horizontal = DotSpacing.gutter))

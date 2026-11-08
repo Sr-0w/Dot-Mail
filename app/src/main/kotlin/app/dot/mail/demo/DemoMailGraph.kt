@@ -11,6 +11,8 @@ import app.dot.mail.data.model.AccountConfig
 import app.dot.mail.data.model.Attachment
 import app.dot.mail.data.model.Draft
 import app.dot.mail.data.model.EmailAddress
+import app.dot.mail.data.model.AttachmentItem
+import app.dot.mail.data.model.AttachmentKind
 import app.dot.mail.data.model.ConversationIds
 import app.dot.mail.data.model.Folder
 import app.dot.mail.data.model.FolderException
@@ -200,6 +202,17 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
 
         override suspend fun move(threadIds: Collection<Long>, targetFolderId: Long) =
             messages.update { list -> list.map { if (targets(it, threadIds)) it.copy(folderId = targetFolderId) else it } }
+
+        override fun attachments(kind: AttachmentKind?, query: String): Flow<PagingData<AttachmentItem>> = messages.map { msgs ->
+            val hidden = folders.filter { it.role == FolderRole.TRASH || it.role == FolderRole.SPAM }.map { it.id }.toSet()
+            val q = query.trim().lowercase()
+            PagingData.from(
+                msgs.filter { it.folderId !in hidden }.flatMap { m -> m.attachments.filter { !it.isInline }.map { a -> AttachmentItem(a, m.accountId, m.from, m.subject, m.sentAt) } }
+                    .filter { kind == null || AttachmentKind.of(it.attachment.mimeType) == kind }
+                    .filter { q.isEmpty() || it.attachment.fileName.lowercase().contains(q) || it.from.displayName.lowercase().contains(q) || it.from.email.lowercase().contains(q) }
+                    .sortedByDescending { it.sentAt },
+            )
+        }
 
         // ---- Snooze (in memory): wake-up times by thread id; hidden from lists until due, shown in the Snoozed list.
         private val snoozed = MutableStateFlow<Map<Long, Long>>(emptyMap())

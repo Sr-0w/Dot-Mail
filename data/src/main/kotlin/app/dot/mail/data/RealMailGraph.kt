@@ -363,6 +363,7 @@ internal class RealMailGraph(
     override suspend fun snooze(threadIds: Collection<Long>, untilMillis: Long) = snoozeLocal(threadIds, untilMillis)
     override suspend fun unsnooze(threadIds: Collection<Long>) = unsnoozeLocal(threadIds)
     override fun snoozedCount(): Flow<Int> = dao.observeSnoozedCount()
+    override fun attachments(kind: AttachmentKind?, query: String): Flow<PagingData<AttachmentItem>> = attachmentsPaging(kind, query)
     override fun messages(mailbox: Mailbox): Flow<PagingData<ThreadSummary>> = messagesPaging(mailbox)
     override suspend fun createFolder(accountId: Long, parentFolderId: Long?, name: String): Long = createFolderLocal(accountId, parentFolderId, name)
     override suspend fun renameFolder(folderId: Long, newName: String) = relocateFolderLocal(folderId, keepParent = true, newParentId = null, newName = newName)

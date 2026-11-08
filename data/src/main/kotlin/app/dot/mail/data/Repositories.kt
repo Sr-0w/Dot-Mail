@@ -101,6 +101,14 @@ interface MailRepository {
     /** Move only messages visible in [sourceMailbox]; other copies/replies in the conversation stay put. */
     suspend fun move(threadIds: Collection<Long>, targetFolderId: Long, sourceMailbox: Mailbox) = move(threadIds, targetFolderId)
 
+    /**
+     * Every real (non-inline) attachment of every account, newest message first, for the attachment browser.
+     * [kind] null = all types; [query] matches the file name or the sender. Mail in Trash and Spam is left out.
+     * Listing never downloads anything: [AttachmentItem.isDownloaded] says whether a local copy exists.
+     */
+    fun attachments(kind: app.dot.mail.data.model.AttachmentKind? = null, query: String = ""): Flow<PagingData<app.dot.mail.data.model.AttachmentItem>> =
+        kotlinx.coroutines.flow.flowOf(PagingData.empty())
+
     // ---- Snooze: local only, nothing changes on the server. Ids may be real or virtual (ConversationIds) thread ids. ----
 
     /** Hides the conversations (or single messages) until [untilMillis], then they return to the top of the list, with a notification if the account allows it. */
