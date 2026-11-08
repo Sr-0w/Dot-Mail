@@ -149,4 +149,34 @@ class ComposeAddressTest {
     fun `BUG trailing dot in domain must be rejected`() {
         invalid("a@b.co.")
     }
+
+    // ------------------------------------------------------------- bodyHtml & signatures
+
+    @Test
+    fun `combineBodyHtml and extractEditableHtml round-trip editor html with quoted tail`() {
+        val editor = "<p>Hello <b>world</b></p>"
+        val quote = "On Mon, Alice wrote:\n> hi there"
+        val combined = ComposeViewModel.combineBodyHtml(editor, quote)
+        assertTrue(combined.startsWith(editor))
+        assertTrue(combined.contains("Alice wrote:"))
+        assertEquals(editor, ComposeViewModel.extractEditableHtml(combined, quote))
+    }
+
+    @Test
+    fun `signature blocks format plain and rich signatures`() {
+        val plainOnly = app.dot.mail.ui.compose.Sender(
+            accountId = 1L,
+            identityId = 1L,
+            name = "Alice",
+            email = "alice@example.org",
+            signature = "Best,\nAlice <A&B>",
+            signatureHtml = null,
+            isDefault = true,
+        )
+        assertEquals("-- \nBest,\nAlice <A&B>", ComposeViewModel.plainSignatureBlock(plainOnly))
+        assertEquals("<p>-- <br>Best,<br>Alice &lt;A&amp;B&gt;</p>", ComposeViewModel.richSignatureBlock(plainOnly))
+
+        val richSender = plainOnly.copy(signatureHtml = "<i> Alice </i>")
+        assertEquals("<p>-- <br><i> Alice </i></p>", ComposeViewModel.richSignatureBlock(richSender))
+    }
 }

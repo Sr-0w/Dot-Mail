@@ -37,9 +37,13 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.Implements
+
+@Implements(InetAddress::class)
+class PassthroughInetAddressShadow
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28])
+@Config(sdk = [28], shadows = [PassthroughInetAddressShadow::class])
 class TlsVerifyRegressionTest {
 
     companion object {
@@ -55,13 +59,55 @@ class TlsVerifyRegressionTest {
         private const val WRONGHOST_P12_B64 =
             "MIIEIAIBAzCCA8oGCSqGSIb3DQEHAaCCA7sEggO3MIIDszCCASoGCSqGSIb3DQEHAaCCARsEggEXMIIBEzCCAQ8GCyqGSIb3DQEMCgECoIG9MIG6MGYGCSqGSIb3DQEFDTBZMDgGCSqGSIb3DQEFDDArBBSNpKyDo+mYqSBKC5x4KAGa/CJzsAICJxACASAwDAYIKoZIhvcNAgkFADAdBglghkgBZQMEASoEEPSDJ9EZT1eZ1p4tXcK0gLcEUAWmIGytMlVLQgYWEResPXKvA+nStgHqY9GZjNXlOwpjzmqR5/qEDugHPeghe302BiYjpwJ8Gy3XbTcmN3cWTnSnFSmw32bb7kLkOmS5LV0VMUAwGwYJKoZIhvcNAQkUMQ4eDABzAGUAcgB2AGUAcjAhBgkqhkiG9w0BCRUxFAQSVGltZSAxNzk0MTEwMzIyMzgwMIICgQYJKoZIhvcNAQcGoIICcjCCAm4CAQAwggJnBgkqhkiG9w0BBwEwZgYJKoZIhvcNAQUNMFkwOAYJKoZIhvcNAQUMMCsEFKMn1u6aAtCOJn7NMQPhMSKqkMEBAgInEAIBIDAMBggqhkiG9w0CCQUAMB0GCWCGSAFlAwQBKgQQiHQ6htr7q+YX0p8jS0gD5oCCAfDK6Am0SO+WCqFe5nzs/PIkgeKVlhFyU8NxGFNtzOe9idoqDwA7YrD26jNAoWuulnfbAs58u1v8WrM7vJSyG8DMoCmmrsJKt+wbWC7xU6d6Y2fonAFScgG4s9Pfp24/84gDALV1h5B2LjbJI8IddOeJDswB+101MrOeXFEqIpoWJDQgEVTVlD/uJg/umuBHLxjmmF9PbEFYJzTKig8S2dRsKTcTaiWiwbK4RpKZiQjPH85fgbqxikpJEhZEcJcBqRWo39ZA5d46Hwthqk4LroXiLJ01anWoi+OSLErwkpfXZwxoFj6MNF546R/fo+p3VdKKDNQZwf677HdbDS5L3BTtb6W2OJ3ctIduy24Z1pGIPQzeavdAhVAu/avR+ze2XA2sz++tXTIqhhpg/omwkgLDHzSHiWfUmYPTuKlek85GZrXItT5hHwavTRdbhfEKNtxvMj3q4pbQHAxkPoK0YSO4BDZO20nXqqTYqOCpP11iQbDpkKWTAncCBhfMLsjyk+4YBRrEHUz4SZAdBlwNbPijjDS7sQc2i7KpebARKFCz/PDIHye/UKNhwBhE6HaIByNqQDOg7lgsiYjl0xEfS7SqJChKh/jGmo1bRRESGGQSl6UkaXTFP6PggTV2xGxMaQniUUYWTZRaPoa6VhfkJoPkME0wMTANBglghkgBZQMEAgEFAAQgN20Lah65m0eRiki+UsFZ9/acNo417XbV6gB0zqi1ScMEFHil9mQQT8WQZw79jM5K8quXlviqAgInEA=="
 
+        private val removedProviders = mutableListOf<Pair<java.security.Provider, Int>>()
+
+        private fun removeAndroidSecurityProviders() {
+            java.security.Security.getProviders().forEachIndexed { idx, p ->
+                if (p.name.contains("OpenSSL", ignoreCase = true) ||
+                    p.name.contains("Conscrypt", ignoreCase = true) ||
+                    p.name == "BC"
+                ) {
+                    removedProviders += p to (idx + 1)
+                    java.security.Security.removeProvider(p.name)
+                }
+            }
+        }
+
+        private fun restoreAndroidSecurityProviders() {
+            removedProviders.forEach { (provider, pos) ->
+                runCatching { java.security.Security.insertProviderAt(provider, pos) }
+            }
+            removedProviders.clear()
+        }
+
         private fun sslContextFromP12(base64P12: String): SSLContext {
+            removeAndroidSecurityProviders()
             val ks = KeyStore.getInstance("PKCS12")
             val pass = "changeit".toCharArray()
             ks.load(ByteArrayInputStream(Base64.getDecoder().decode(base64P12)), pass)
-            val kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm()).apply { init(ks, pass) }
-            val tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()).apply { init(ks) }
-            return SSLContext.getInstance("TLS").apply { init(kmf.keyManagers, tmf.trustManagers, null) }
+            val kmf = KeyManagerFactory.getInstance("SunX509", "SunJSSE").apply { init(ks, pass) }
+            val tmf = TrustManagerFactory.getInstance("PKIX", "SunJSSE").apply { init(ks) }
+            return SSLContext.getInstance("TLS", "SunJSSE").apply { init(kmf.keyManagers, tmf.trustManagers, null) }
+        }
+
+        private fun clearCachedFactory() {
+            runCatching {
+                val field = javax.net.ssl.SSLSocketFactory::class.java.getDeclaredField("theFactory")
+                field.isAccessible = true
+                field.set(null, null)
+            }
+        }
+
+        private inline fun withDefaultSslContext(ctx: SSLContext, block: () -> Unit) {
+            val previous = SSLContext.getDefault()
+            SSLContext.setDefault(ctx)
+            clearCachedFactory()
+            try {
+                block()
+            } finally {
+                SSLContext.setDefault(previous)
+                clearCachedFactory()
+            }
         }
     }
 
@@ -86,6 +132,7 @@ class TlsVerifyRegressionTest {
 
     @After
     fun tearDown() {
+        restoreAndroidSecurityProviders()
         graph.scope.cancel()
         db.close()
     }
@@ -96,6 +143,8 @@ class TlsVerifyRegressionTest {
     ) : AutoCloseable {
         val port: Int get() = serverSocket.localPort
         val receivedLines: MutableList<String> = CopyOnWriteArrayList()
+        @Volatile var serverError: Throwable? = null
+        private val closeLatch = java.util.concurrent.CountDownLatch(1)
 
         private val worker = thread(start = true, isDaemon = true) {
             try {
@@ -106,11 +155,18 @@ class TlsVerifyRegressionTest {
                         } catch (_: Exception) {
                             break
                         }
-                        socket.use { s ->
-                            s.soTimeout = 3_000
-                            val reader = BufferedReader(InputStreamReader(s.getInputStream(), StandardCharsets.UTF_8))
-                            val writer = PrintWriter(OutputStreamWriter(s.getOutputStream(), StandardCharsets.UTF_8), true)
-                            handler(s, reader, writer, receivedLines)
+                        thread(start = true, isDaemon = true) {
+                            socket.use { s ->
+                                try {
+                                    s.soTimeout = 3_000
+                                    val reader = BufferedReader(InputStreamReader(s.getInputStream(), StandardCharsets.UTF_8))
+                                    val writer = PrintWriter(OutputStreamWriter(s.getOutputStream(), StandardCharsets.UTF_8), true)
+                                    handler(s, reader, writer, receivedLines)
+                                } catch (t: Throwable) {
+                                    serverError = t
+                                    closeLatch.await(2, java.util.concurrent.TimeUnit.SECONDS)
+                                }
+                            }
                         }
                     }
                 }
@@ -129,6 +185,7 @@ class TlsVerifyRegressionTest {
         }
 
         override fun close() {
+            closeLatch.countDown()
             runCatching { serverSocket.close() }
             worker.join(1_000)
         }
@@ -161,33 +218,45 @@ class TlsVerifyRegressionTest {
 
     @Test
     fun `verify returns CertificateProblem on wrong-hostname certificate even when cert is trusted`() = runBlocking {
-        val previousDefault = SSLContext.getDefault()
         val trustedWrongHostCtx = sslContextFromP12(WRONGHOST_P12_B64)
-        SSLContext.setDefault(trustedWrongHostCtx)
-        try {
-            val sslServer = trustedWrongHostCtx.serverSocketFactory
-                .createServerSocket(0, 5, InetAddress.getByName("127.0.0.1")) as SSLServerSocket
-            FakeTcpServer(sslServer) { socket, reader, writer, received ->
-                (socket as SSLSocket).startHandshake()
-                writer.print("* OK [CAPABILITY IMAP4rev1 AUTH=PLAIN] ready\r\n")
+        withDefaultSslContext(trustedWrongHostCtx) {
+            FakeTcpServer { socket, reader, writer, received ->
+                writer.print("* OK [CAPABILITY IMAP4rev1 STARTTLS AUTH=PLAIN] ready\r\n")
                 writer.flush()
                 while (true) {
                     val line = reader.readLine() ?: break
                     received += line
+                    val tag = line.substringBefore(' ')
+                    val cmd = line.substringAfter(' ').uppercase()
+                    if (cmd.startsWith("CAPABILITY")) {
+                        writer.print("* CAPABILITY IMAP4rev1 STARTTLS AUTH=PLAIN\r\n$tag OK CAPABILITY\r\n")
+                        writer.flush()
+                    } else if (cmd.startsWith("STARTTLS")) {
+                        writer.print("$tag OK Begin TLS negotiation\r\n")
+                        writer.flush()
+                        val sslSocket = trustedWrongHostCtx.socketFactory
+                            .createSocket(socket, "localhost", socket.port, true) as SSLSocket
+                        sslSocket.useClientMode = false
+                        sslSocket.startHandshake()
+                        val tlsReader = BufferedReader(InputStreamReader(sslSocket.inputStream, StandardCharsets.UTF_8))
+                        while (true) {
+                            val tlsLine = tlsReader.readLine() ?: break
+                            received += tlsLine
+                        }
+                        break
+                    }
                 }
             }.use { server ->
                 val cfg = AccountConfig(
                     email = "alice@example.org",
                     displayName = "Alice",
-                    imap = ServerConfig("127.0.0.1", server.port, Security.SSL_TLS, "alice"),
-                    smtp = ServerConfig("127.0.0.1", 1, Security.SSL_TLS, "alice"),
+                    imap = ServerConfig("127.0.0.1", server.port, Security.STARTTLS, "alice"),
+                    smtp = ServerConfig("127.0.0.1", 1, Security.STARTTLS, "alice"),
                 )
                 val result = graph.verify(cfg, SECRET)
                 assertThat(result).isInstanceOf(VerifyResult.CertificateProblem::class.java)
                 server.assertNoCredentialsSent()
             }
-        } finally {
-            SSLContext.setDefault(previousDefault)
         }
     }
 

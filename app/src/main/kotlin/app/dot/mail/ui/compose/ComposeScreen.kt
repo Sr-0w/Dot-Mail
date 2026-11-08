@@ -115,6 +115,7 @@ import app.dot.design.components.DotMenuItem
 import app.dot.design.components.DotTextField
 import app.dot.design.components.DotTopBar
 import app.dot.design.components.Hairline
+import app.dot.mail.ComposeFormat
 import app.dot.mail.LocalMailGraph
 import app.dot.mail.LocalSettings
 import app.dot.mail.data.model.EmailAddress
@@ -139,13 +140,12 @@ private val QuoteParagraphStyle = ParagraphStyle(textIndent = TextIndent(firstLi
 fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
     val graph = LocalMailGraph.current
     val settings = LocalSettings.current
-    // TODO(Sonnet): read settings.ui.value.defaultFormat when UiPrefs.defaultFormat lands in AppSettings.kt
     val vm: ComposeViewModel = viewModel {
         ComposeViewModel(
             graph = graph,
             route = route,
             undoSeconds = { settings.ui.value.undoSendSeconds },
-            defaultRichText = true,
+            defaultRichText = settings.ui.value.defaultFormat == ComposeFormat.RICH,
             defaultAccountId = { settings.ui.value.defaultAccountId },
             includeOriginal = { settings.ui.value.includeOriginal },
         )

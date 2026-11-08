@@ -26,7 +26,15 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /** A sender choice: an account's identity (or the account itself when it has none). */
-data class Sender(val accountId: Long, val identityId: Long?, val name: String, val email: String)
+data class Sender(
+    val accountId: Long,
+    val identityId: Long?,
+    val name: String,
+    val email: String,
+    val signature: String? = null,
+    val signatureHtml: String? = null,
+    val isDefault: Boolean = false,
+)
 
 enum class RecipientField { TO, CC, BCC }
 
@@ -57,8 +65,8 @@ data class ComposeState(
     val hasRecipients: Boolean get() = draft?.let { it.to.isNotEmpty() || it.cc.isNotEmpty() || it.bcc.isNotEmpty() } == true ||
         pending.values.any { it.isNotBlank() }
     val isEmpty: Boolean get() = draft?.let { !hasRecipients && it.subject.isBlank() && it.bodyText.isBlank() && it.attachmentUris.isEmpty() } != false
-    /** Full sanitised outbound HTML document when in rich-text mode, or null in plain-text mode. */
-    val composedHtml: String? get() = if (isRichText) ComposeViewModel.composeFullHtml(bodyHtml, quotedText) else null
+    /** Combined editor HTML (including any quoted tail) when in rich-text mode, or null in plain-text mode. */
+    val composedHtml: String? get() = if (isRichText) ComposeViewModel.combineBodyHtml(bodyHtml, quotedText) else null
 }
 
 /** Hands an in-flight send to the root so the undo snackbar can outlive the compose screen. */
@@ -90,17 +98,21 @@ class ComposeViewModel(
     private val writeLock = Mutex()
     /** Set once send or discard starts: autosave and close must not resurrect the draft. */
     @Volatile private var finished = false
+    /** Exact signature block last inserted automatically (replaced on sender swap if unedited). */
+    private var insertedPlainSig: String? = null
+    private var insertedRichSig: String? = null
+    private var canAutoInsertSignature: Boolean = false
 
     init {
         viewModelScope.launch {
             val accounts = graph.accounts.accounts.first()
             val senders = accounts.flatMap { a ->
-                a.identities.sortedByDescending { it.isDefault }
-                    .ifEmpty { listOf(Identity(0, a.id, a.displayName, a.email, isDefault = true)) }
-                    .map { Sender(a.id, it.id.takeIf { id -> id > 0 }, it.name, it.email) }
+                a.identities.ifEmpty { listOf(Identity(a.id, a.id, a.displayName, a.email, isDefault = true)) }
+                    .map { Sender(a.id, it.id, it.name, it.email, it.signature, it.signatureHtml, it.isDefault) }
             }
+            val isExistingDraft = route.draftId != 0L
             val draft = when {
-                route.draftId > 0 -> graph.compose.loadDraft(route.draftId)
+                isExistingDraft -> graph.compose.loadDraft(route.draftId)
                 route.replyToMessageId > 0 -> graph.compose.prepareReply(
                     route.replyToMessageId,
                     route.replyMode?.let { runCatching { ReplyMode.valueOf(it) }.getOrNull() } ?: ReplyMode.REPLY,
@@ -108,25 +120,71 @@ class ComposeViewModel(
                 else -> null
             } ?: run {
                 val prefAccountId = defaultAccountId()
-                val preferred = senders.firstOrNull { it.accountId == prefAccountId } ?: senders.firstOrNull()
+                val targetAccount = accounts.firstOrNull { it.id == prefAccountId } ?: accounts.firstOrNull()
+                val preferred = senders.firstOrNull { it.accountId == targetAccount?.id && it.isDefault }
+                    ?: senders.firstOrNull { it.accountId == targetAccount?.id }
+                    ?: senders.firstOrNull()
                 Draft(accountId = preferred?.accountId ?: 0, identityId = preferred?.identityId)
             }
+            val activeSender = senders.firstOrNull { it.accountId == draft.accountId && it.identityId == draft.identityId }
+                ?: senders.firstOrNull { it.accountId == draft.accountId && it.isDefault }
+                ?: senders.firstOrNull { it.accountId == draft.accountId }
+
             val (initialEditable, rawQuoted) = splitEditableAndQuoted(draft.bodyText)
             val quoted = if (route.replyToMessageId > 0 && !includeOriginal()) null else rawQuoted
-            val editable = route.body?.let {
+            val baseEditable = route.body?.let {
                 if (initialEditable.isBlank()) it else "$it\n\n$initialEditable"
             } ?: initialEditable
-            // TODO(Codex): once Draft.bodyHtml: String? lands in Models.kt, infer isRich from
-            // `if (route.draftId > 0) draft.bodyHtml != null else defaultRichText` and seed initialHtml.
-            val isRich = defaultRichText
-            val initialHtml = if (isRich && editable.isNotBlank()) EmailHtml.fromPlainText(editable) else ""
+
+            val isRich = if (isExistingDraft) draft.bodyHtml != null else defaultRichText
+
+            val plainSig = if (!isExistingDraft) plainSignatureBlock(activeSender) else null
+            val richSig = if (!isExistingDraft) richSignatureBlock(activeSender) else null
+            canAutoInsertSignature = !isExistingDraft
+            insertedPlainSig = plainSig
+            insertedRichSig = richSig
+
+            val editable: String
+            val initialHtml: String
+            if (isExistingDraft) {
+                initialHtml = if (isRich) {
+                    val savedHtml = draft.bodyHtml.orEmpty()
+                    extractEditableHtml(savedHtml, quoted)
+                } else {
+                    ""
+                }
+                editable = if (isRich && baseEditable.isBlank() && initialHtml.isNotBlank()) {
+                    EmailHtml.toPlainText(initialHtml)
+                } else {
+                    baseEditable
+                }
+            } else if (isRich) {
+                val contentHtml = if (baseEditable.isNotBlank()) EmailHtml.fromPlainText(baseEditable) else ""
+                initialHtml = when {
+                    richSig != null && contentHtml.isBlank() -> "<p><br></p>$richSig"
+                    richSig != null -> "$contentHtml$richSig"
+                    else -> contentHtml
+                }
+                editable = if (initialHtml.isNotBlank()) EmailHtml.toPlainText(initialHtml) else baseEditable
+            } else {
+                editable = when {
+                    plainSig != null && baseEditable.isBlank() -> "\n\n$plainSig"
+                    plainSig != null -> "${baseEditable.trimEnd()}\n\n$plainSig"
+                    else -> baseEditable
+                }
+                initialHtml = ""
+            }
+
             val fullPlain = combineBodyText(editable, quoted)
+            val fullHtml = if (isRich) combineBodyHtml(initialHtml, quoted) else null
             val prefilled = draft.copy(
+                identityId = activeSender?.identityId ?: draft.identityId,
                 to = draft.to + route.to.map(::parseAddress),
                 cc = draft.cc + route.cc.map(::parseAddress),
                 bcc = draft.bcc + route.bcc.map(::parseAddress),
                 subject = route.subject ?: draft.subject,
                 bodyText = fullPlain,
+                bodyHtml = fullHtml,
                 attachmentUris = draft.attachmentUris + route.attachments,
             )
             _state.update {
@@ -158,12 +216,11 @@ class ComposeViewModel(
             if (s.bodyHtml == editorHtml && s.isRichText) return@update s
             val plainEditable = EmailHtml.toPlainText(editorHtml)
             val fullPlain = combineBodyText(plainEditable, s.quotedText)
-            // TODO(Codex): once Draft.bodyHtml lands in Models.kt, also pass
-            // bodyHtml = composeFullHtml(editorHtml, s.quotedText) to d.copy(...)
+            val fullHtml = combineBodyHtml(editorHtml, s.quotedText)
             s.copy(
                 editableText = plainEditable,
                 bodyHtml = editorHtml,
-                draft = d.copy(bodyText = fullPlain),
+                draft = d.copy(bodyText = fullPlain, bodyHtml = fullHtml),
                 error = null,
             )
         }
@@ -175,11 +232,10 @@ class ComposeViewModel(
             val d = s.draft ?: return@update s
             if (s.editableText == plainEditable && !s.isRichText) return@update s
             val fullPlain = combineBodyText(plainEditable, s.quotedText)
-            // TODO(Codex): once Draft.bodyHtml lands in Models.kt, pass bodyHtml = null to d.copy(...)
             s.copy(
                 editableText = plainEditable,
                 bodyHtml = "",
-                draft = d.copy(bodyText = fullPlain),
+                draft = d.copy(bodyText = fullPlain, bodyHtml = null),
                 error = null,
             )
         }
@@ -191,12 +247,11 @@ class ComposeViewModel(
             if (!s.isRichText) return@update s
             val plainEditable = EmailHtml.toPlainText(s.bodyHtml)
             val fullPlain = combineBodyText(plainEditable, s.quotedText)
-            // TODO(Codex): once Draft.bodyHtml lands in Models.kt, pass bodyHtml = null to d.copy(...)
             s.copy(
                 isRichText = false,
                 editableText = plainEditable,
                 bodyHtml = "",
-                draft = s.draft?.copy(bodyText = fullPlain),
+                draft = s.draft?.copy(bodyText = fullPlain, bodyHtml = null),
             )
         }
     }
@@ -207,12 +262,11 @@ class ComposeViewModel(
             if (s.isRichText) return@update s
             val html = EmailHtml.fromPlainText(s.editableText)
             val fullPlain = combineBodyText(s.editableText, s.quotedText)
-            // TODO(Codex): once Draft.bodyHtml lands in Models.kt, pass
-            // bodyHtml = composeFullHtml(html, s.quotedText) to d.copy(...)
+            val fullHtml = combineBodyHtml(html, s.quotedText)
             s.copy(
                 isRichText = true,
                 bodyHtml = html,
-                draft = s.draft?.copy(bodyText = fullPlain),
+                draft = s.draft?.copy(bodyText = fullPlain, bodyHtml = fullHtml),
             )
         }
     }
@@ -221,16 +275,102 @@ class ComposeViewModel(
 
     fun setSender(sender: Sender) {
         val d = _state.value.draft ?: return
-        if (d.accountId == sender.accountId) {
+        swapSignatureForSender(sender)
+        val currentDraft = _state.value.draft ?: d
+        if (currentDraft.accountId == sender.accountId) {
             edit { it.copy(identityId = sender.identityId) }
             return
         }
         // Drafts belong to an account: save a fresh copy under the new one, then drop the old.
-        val oldId = d.localId
+        val oldId = currentDraft.localId
         edit { it.copy(localId = 0, accountId = sender.accountId, identityId = sender.identityId) }
         if (oldId > 0) viewModelScope.launch {
             save()
             writeLock.withLock { runCatching { graph.compose.discardDraft(oldId) } }
+        }
+    }
+
+    /**
+     * Replaces the previously auto-inserted signature block with [newSender]'s signature
+     * only if the user has not edited the previous signature block.
+     */
+    private fun swapSignatureForSender(newSender: Sender) {
+        val newPlainSig = plainSignatureBlock(newSender)
+        val newRichSig = richSignatureBlock(newSender)
+        val oldPlainSig = insertedPlainSig
+        val oldRichSig = insertedRichSig
+
+        _state.update { s ->
+            val d = s.draft ?: return@update s
+            if (s.isRichText) {
+                val currentHtml = s.bodyHtml.trimEnd()
+                val currentPlain = s.editableText.trimEnd()
+                val prefixHtml: String? = when {
+                    oldRichSig != null && currentHtml.endsWith(oldRichSig) ->
+                        currentHtml.removeSuffix(oldRichSig)
+                    oldPlainSig != null && (currentPlain == oldPlainSig || currentPlain.endsWith("\n$oldPlainSig")) -> {
+                        val idx = currentHtml.lastIndexOf("<p>-- ")
+                            .takeIf { it >= 0 }
+                            ?: currentHtml.lastIndexOf("-- ").takeIf { it >= 0 }?.let { dash ->
+                                currentHtml.lastIndexOf("<p", dash).takeIf { it >= 0 } ?: dash
+                            }
+                        idx?.let { currentHtml.substring(0, it) }
+                    }
+                    oldRichSig == null && oldPlainSig == null && canAutoInsertSignature ->
+                        currentHtml
+                    else -> null
+                }
+                if (prefixHtml == null) {
+                    insertedPlainSig = null
+                    insertedRichSig = null
+                    canAutoInsertSignature = false
+                    return@update s
+                }
+                insertedPlainSig = newPlainSig
+                insertedRichSig = newRichSig
+                val nextHtml = when {
+                    newRichSig != null && prefixHtml.isBlank() -> "<p><br></p>$newRichSig"
+                    newRichSig != null -> "$prefixHtml$newRichSig"
+                    prefixHtml == "<p><br></p>" -> ""
+                    else -> prefixHtml
+                }
+                val nextPlain = EmailHtml.toPlainText(nextHtml)
+                val fullPlain = combineBodyText(nextPlain, s.quotedText)
+                val fullHtml = combineBodyHtml(nextHtml, s.quotedText)
+                s.copy(
+                    editableText = nextPlain,
+                    bodyHtml = nextHtml,
+                    draft = d.copy(bodyText = fullPlain, bodyHtml = fullHtml),
+                )
+            } else {
+                val currentPlain = s.editableText.trimEnd()
+                val prefixPlain: String? = when {
+                    oldPlainSig != null && (currentPlain == oldPlainSig || currentPlain.endsWith("\n$oldPlainSig")) ->
+                        currentPlain.removeSuffix(oldPlainSig).trimEnd('\n', '\r')
+                    oldPlainSig == null && oldRichSig == null && canAutoInsertSignature ->
+                        currentPlain
+                    else -> null
+                }
+                if (prefixPlain == null) {
+                    insertedPlainSig = null
+                    insertedRichSig = null
+                    canAutoInsertSignature = false
+                    return@update s
+                }
+                insertedPlainSig = newPlainSig
+                insertedRichSig = newRichSig
+                val nextPlain = when {
+                    newPlainSig != null && prefixPlain.isEmpty() -> "\n\n$newPlainSig"
+                    newPlainSig != null -> "$prefixPlain\n\n$newPlainSig"
+                    else -> prefixPlain
+                }
+                val fullPlain = combineBodyText(nextPlain, s.quotedText)
+                s.copy(
+                    editableText = nextPlain,
+                    bodyHtml = "",
+                    draft = d.copy(bodyText = fullPlain, bodyHtml = null),
+                )
+            }
         }
     }
 
@@ -315,11 +455,14 @@ class ComposeViewModel(
         viewModelScope.launch {
             runCatching {
                 writeLock.withLock {
-                    val current = _state.value.draft ?: d
-                    // TODO(Codex): once Draft.bodyHtml lands in Models.kt, ensure current carries
-                    // bodyHtml = _state.value.composedHtml when in rich-text mode (or null in plain mode).
-                    val saved = graph.compose.saveDraft(current.copy(scheduledAt = scheduledAt))
-                    saved to graph.compose.send(current.copy(localId = saved, scheduledAt = scheduledAt), undoWindowMs = undoSeconds() * 1_000L)
+                    val sNow = _state.value
+                    val base = sNow.draft ?: d
+                    val current = base.copy(
+                        bodyHtml = if (sNow.isRichText) combineBodyHtml(sNow.bodyHtml, sNow.quotedText) else null,
+                        scheduledAt = scheduledAt,
+                    )
+                    val saved = graph.compose.saveDraft(current)
+                    saved to graph.compose.send(current.copy(localId = saved), undoWindowMs = undoSeconds() * 1_000L)
                 }
             }.onSuccess { (draftId, outboxId) ->
                 UndoSendBus.pending.value = UndoSendBus.Pending(outboxId, draftId, scheduledAt)
@@ -355,11 +498,14 @@ class ComposeViewModel(
 
     private suspend fun save(force: Boolean = false) = writeLock.withLock {
         if (finished && !force) return@withLock
-        val d = _state.value.draft ?: return@withLock
+        val sNow = _state.value
+        val d = sNow.draft ?: return@withLock
         if (d.accountId == 0L) return@withLock
-        // TODO(Codex): once Draft.bodyHtml lands in Models.kt, include bodyHtml = _state.value.composedHtml
-        val id = runCatching { graph.compose.saveDraft(d) }.getOrNull() ?: return@withLock
-        _state.update { s -> s.copy(draft = s.draft?.copy(localId = id), savedOnce = true) }
+        val toSave = d.copy(
+            bodyHtml = if (sNow.isRichText) combineBodyHtml(sNow.bodyHtml, sNow.quotedText) else null,
+        )
+        val id = runCatching { graph.compose.saveDraft(toSave) }.getOrNull() ?: return@withLock
+        _state.update { s -> s.copy(draft = s.draft?.copy(localId = id, bodyHtml = toSave.bodyHtml), savedOnce = true) }
     }
 
     companion object {
@@ -402,22 +548,47 @@ class ComposeViewModel(
             else -> "${editableText.trimEnd()}\n\n$quotedText"
         }
 
-        /** Builds a complete outbound HTML document via [EmailHtml.compose], including any [quotedText]. */
-        internal fun composeFullHtml(editorHtml: String, quotedText: String?): String {
-            if (quotedText.isNullOrBlank()) return EmailHtml.compose(editorHtml = editorHtml)
-            val lines = quotedText.split('\n').map { it.removeSuffix("\r") }
-            val first = lines.firstOrNull().orEmpty()
-            return if (!first.startsWith(">") && lines.size > 1) {
-                val stripped = lines.drop(1).joinToString("\n") { it.removePrefix(">").removePrefix(" ") }
-                EmailHtml.compose(
-                    editorHtml = editorHtml,
-                    quote = EmailHtml.Quote(attribution = first, html = EmailHtml.fromPlainText(stripped)),
-                )
+        /** Combines the editor's [editorHtml] fragment with the collapsed [quotedText] tail for `Draft.bodyHtml`. */
+        internal fun combineBodyHtml(editorHtml: String, quotedText: String?): String {
+            if (quotedText.isNullOrBlank()) return editorHtml
+            val quoteHtml = EmailHtml.fromPlainText(quotedText)
+            return if (editorHtml.isBlank()) quoteHtml else "$editorHtml$quoteHtml"
+        }
+
+        /** Extracts the editable HTML portion when reopening a saved rich draft that also has a [quotedText] tail. */
+        internal fun extractEditableHtml(savedHtml: String, quotedText: String?): String {
+            if (savedHtml.isBlank()) return ""
+            if (quotedText.isNullOrBlank()) return savedHtml
+            val quoteHtml = EmailHtml.fromPlainText(quotedText)
+            return if (quoteHtml.isNotEmpty() && savedHtml.endsWith(quoteHtml)) {
+                savedHtml.removeSuffix(quoteHtml)
             } else {
-                val quoteHtml = EmailHtml.fromPlainText(quotedText)
-                val combined = if (editorHtml.isBlank()) quoteHtml else "$editorHtml$quoteHtml"
-                EmailHtml.compose(editorHtml = combined)
+                savedHtml
             }
+        }
+
+        /** Formats [sender]'s plain-text signature block (`"-- \n<sig>"`), or null if none. */
+        internal fun plainSignatureBlock(sender: Sender?): String? {
+            if (sender == null) return null
+            val sig = sender.signature?.trim()?.takeIf { it.isNotEmpty() }
+                ?: sender.signatureHtml?.let { EmailHtml.toPlainText(it).trim() }?.takeIf { it.isNotEmpty() }
+                ?: return null
+            return "-- \n$sig"
+        }
+
+        /** Formats [sender]'s rich-text signature block (`"<p>-- <br>...</p>"`), escaping plain signature when [Sender.signatureHtml] is null. */
+        internal fun richSignatureBlock(sender: Sender?): String? {
+            if (sender == null) return null
+            val rich = sender.signatureHtml?.trim()?.takeIf { it.isNotEmpty() }
+            val body = rich ?: sender.signature?.trim()?.takeIf { it.isNotEmpty() }?.let { plain ->
+                plain.lines().joinToString("<br>") { line ->
+                    line.replace("&", "&amp;")
+                        .replace("<", "&lt;")
+                        .replace(">", "&gt;")
+                        .replace("\"", "&quot;")
+                }
+            } ?: return null
+            return "<p>-- <br>$body</p>"
         }
     }
 }
