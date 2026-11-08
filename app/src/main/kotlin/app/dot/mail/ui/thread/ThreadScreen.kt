@@ -276,8 +276,21 @@ class ThreadViewModel(
 
     fun act(action: MessageAction) {
         viewModelScope.launch {
-            runCatching { if (source != null) graph.mail.apply(action, listOf(threadId), source) else @Suppress("DEPRECATION") graph.mail.apply(action, listOf(threadId)) }
-                .onSuccess {
+            runCatching {
+                if (source != null && action in UNDOABLE) graph.mail.applyUndoable(action, listOf(threadId), source)
+                else if (source != null) { graph.mail.apply(action, listOf(threadId), source); null }
+                else { @Suppress("DEPRECATION") graph.mail.apply(action, listOf(threadId)); null }
+            }
+                .onSuccess { token ->
+                    if (token != null && token.moves.isNotEmpty()) {
+                        val text = when (action) {
+                            MessageAction.ARCHIVE -> resources.getQuantityString(R.plurals.inbox_archived_toast, 1, 1)
+                            MessageAction.TRASH -> resources.getQuantityString(R.plurals.inbox_trashed_toast, 1, 1)
+                            else -> resources.getQuantityString(R.plurals.inbox_spam_toast, 1, 1)
+                        }
+                        _events.send(ThreadEvent.CloseWithUndo(text, token))
+                        return@onSuccess
+                    }
                     when (action) {
                         MessageAction.ARCHIVE, MessageAction.TRASH, MessageAction.SPAM, MessageAction.NOT_SPAM,
                         MessageAction.DELETE_FOREVER, MessageAction.MARK_UNREAD -> _events.send(ThreadEvent.Close)
@@ -297,10 +310,16 @@ class ThreadViewModel(
     }
 
     private fun emptMap() = emptyMap<Long, Boolean>()
+
+    private companion object {
+        val UNDOABLE = setOf(MessageAction.ARCHIVE, MessageAction.TRASH, MessageAction.SPAM)
+    }
 }
 
 sealed interface ThreadEvent {
     data object Close : ThreadEvent
+    /** Close after an undoable move: the inbox shows [text] with an Undo action when the list is what we return to. */
+    data class CloseWithUndo(val text: String, val token: app.dot.mail.data.model.UndoToken) : ThreadEvent
     data class Message(val text: String) : ThreadEvent
     data class OpenUri(val uri: String, val mime: String, val name: String, val share: Boolean) : ThreadEvent
 }
@@ -343,6 +362,16 @@ fun ThreadScreen(
     LaunchedEffect(Unit) {
         vm.events.collect { e ->
             when (e) {
+                is ThreadEvent.CloseWithUndo -> {
+                    val target = when (prefs.afterAction) {
+                        app.dot.mail.AfterAction.NEXT -> ThreadOrder.after(threadId)
+                        app.dot.mail.AfterAction.PREVIOUS -> ThreadOrder.before(threadId)
+                        app.dot.mail.AfterAction.LIST -> null
+                    }
+                    // Back to the list: it shows the same Undo snackbar as a swipe. Jumping to the next/previous
+                    // conversation leaves no list on screen to carry it, so no undo is offered in that case.
+                    if (target != null) onOpenAdjacent(target) else { app.dot.mail.ui.inbox.ReaderUndoBus.post(e.text, e.token); onBack() }
+                }
                 ThreadEvent.Close -> {
                     val target = when (prefs.afterAction) {
                         app.dot.mail.AfterAction.NEXT -> ThreadOrder.after(threadId)

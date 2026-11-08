@@ -75,6 +75,11 @@ class InboxViewModel(
     /** Confirmation text + what to undo, shown as a snackbar with an Undo action. */
     val undoEvents: Flow<Pair<String, app.dot.mail.data.model.UndoToken>> = _undoEvents.receiveAsFlow()
 
+    init {
+        // Archive/delete/spam done in the reader come back to the list with the same Undo snackbar.
+        viewModelScope.launch { ReaderUndoBus.events().collect { _undoEvents.send(it) } }
+    }
+
     fun undo(token: app.dot.mail.data.model.UndoToken) {
         viewModelScope.launch {
             runCatching { graph.mail.undo(token) }
