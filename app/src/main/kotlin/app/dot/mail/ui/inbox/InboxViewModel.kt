@@ -45,6 +45,8 @@ class InboxViewModel(
     private val grouped: Flow<Boolean> = kotlinx.coroutines.flow.flowOf(true),
     /** Application resources: messages built here follow the app language. */
     private val resources: android.content.res.Resources,
+    private val listPrefs: app.dot.mail.data.ListPrefs,
+    private val smartFolders: app.dot.mail.data.SmartFolderStore,
 ) : ViewModel() {
     private fun str(@androidx.annotation.StringRes id: Int, vararg args: Any) = resources.getString(id, *args)
     private fun plural(@androidx.annotation.PluralsRes id: Int, n: Int) = resources.getQuantityString(id, n, n)
@@ -90,6 +92,11 @@ class InboxViewModel(
                 subtitle = if (accts.size > 1) str(R.string.inbox_all_accounts) else accts.firstOrNull()?.email,
                 role = box.role,
             )
+            is Mailbox.Smart -> InboxHeader(
+                title = smartFolders.get(box.id)?.name.orEmpty(),
+                subtitle = str(R.string.drawer_smart_folders),
+                role = null,
+            )
             is Mailbox.InFolder -> {
                 val folder = d.folders.firstOrNull { it.id == box.folderId } ?: opened?.takeIf { it.id == box.folderId }
                 val account = accts.firstOrNull { it.id == folder?.accountId }
@@ -102,20 +109,31 @@ class InboxViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), InboxHeader(str(R.string.inbox_role_inbox), null, FolderRole.INBOX))
 
+    /** Quick filters; they apply to whichever list is open and reset when another list is opened. */
+    private val _filters = MutableStateFlow(app.dot.mail.data.model.ThreadFilters())
+    val filters: StateFlow<app.dot.mail.data.model.ThreadFilters> = _filters.asStateFlow()
+    val sort: StateFlow<app.dot.mail.data.model.InboxSort> = listPrefs.sort
+    fun setSort(sort: app.dot.mail.data.model.InboxSort) = listPrefs.setSort(sort)
+    fun setFilters(transform: (app.dot.mail.data.model.ThreadFilters) -> app.dot.mail.data.model.ThreadFilters) { _filters.update(transform) }
+    fun clearFilters() { _filters.value = app.dot.mail.data.model.ThreadFilters() }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val threads: Flow<PagingData<ThreadSummary>> =
-        kotlinx.coroutines.flow.combine(_mailbox, grouped.distinctUntilChanged()) { box, group -> box to group }
-            .flatMapLatest { (box, group) -> if (group) graph.mail.threads(box) else graph.mail.messages(box) }.cachedIn(viewModelScope)
+        kotlinx.coroutines.flow.combine(_mailbox, grouped.distinctUntilChanged(), listPrefs.sort, _filters) { box, group, sort, filters -> Triple(box, group, app.dot.mail.data.model.ListOptions(sort, filters)) }
+            .flatMapLatest { (box, group, options) -> if (group) graph.mail.threads(box, options) else graph.mail.messages(box) }.cachedIn(viewModelScope)
+
 
     fun open(mailbox: Mailbox) {
         if (mailbox is Mailbox.InFolder) {
             drawer.value.folders.firstOrNull { it.id == mailbox.folderId }?.let { openedFolder.value = it }
         }
         _selection.value = emptySet()
+        if (mailbox != _mailbox.value) _filters.value = app.dot.mail.data.model.ThreadFilters()
         _mailbox.value = mailbox
         when (mailbox) {
-            is Mailbox.Unified -> { saved["mailboxRole"] = mailbox.role.name; saved.remove<Long>("mailboxFolder") }
-            is Mailbox.InFolder -> { saved["mailboxFolder"] = mailbox.folderId; saved.remove<String>("mailboxRole") }
+            is Mailbox.Smart -> { saved["mailboxSmart"] = mailbox.id; saved.remove<Long>("mailboxFolder"); saved.remove<String>("mailboxRole") }
+            is Mailbox.Unified -> { saved["mailboxRole"] = mailbox.role.name; saved.remove<Long>("mailboxFolder"); saved.remove<String>("mailboxSmart") }
+            is Mailbox.InFolder -> { saved["mailboxFolder"] = mailbox.folderId; saved.remove<String>("mailboxRole"); saved.remove<String>("mailboxSmart") }
         }
     }
 
@@ -219,6 +237,7 @@ class InboxViewModel(
     }
 
     private fun restoreMailbox(): Mailbox {
+        saved.get<String>("mailboxSmart")?.let { return Mailbox.Smart(it) }
         saved.get<Long>("mailboxFolder")?.let { return Mailbox.InFolder(it) }
         val role = saved.get<String>("mailboxRole")?.let { runCatching { FolderRole.valueOf(it) }.getOrNull() }
         return Mailbox.Unified(role ?: FolderRole.INBOX)

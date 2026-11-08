@@ -1,5 +1,6 @@
 package app.dot.mail.demo
 
+import androidx.paging.filter
 import androidx.paging.PagingData
 import app.dot.mail.data.AccountRepository
 import app.dot.mail.data.ComposeRepository
@@ -110,6 +111,7 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
 
         override fun threads(mailbox: Mailbox): Flow<PagingData<ThreadSummary>> = combine(messages, accountsState, drafts, snoozed) { msgs, accts, localDrafts, snz ->
             val draftsBox = when (mailbox) {
+                is Mailbox.Smart -> false
                 is Mailbox.Unified -> mailbox.role == FolderRole.DRAFTS
                 is Mailbox.InFolder -> folders.firstOrNull { it.id == mailbox.folderId }?.role == FolderRole.DRAFTS
             }
@@ -122,6 +124,7 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
             }
             val ids = accts.map { it.id }.toSet()
             val inBox = when (mailbox) {
+                is Mailbox.Smart -> msgs
                 is Mailbox.Unified -> {
                     val fIds = folders.filter { it.role == mailbox.role }.map { it.id }.toSet()
                     if (mailbox.role == FolderRole.SNOOZED) msgs.filter { it.threadId in snz.keys }
@@ -131,6 +134,11 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
             }.filter { it.accountId in ids && (isSnoozedBox(mailbox) || it.threadId !in snz.keys) }
             val rows = summaries(inBox)
             PagingData.from(draftRows + if (isSnoozedBox(mailbox)) rows.map { it.copy(snoozedUntil = snz[it.threadId]) }.sortedBy { it.snoozedUntil } else rows)
+        }
+
+        override fun threads(mailbox: Mailbox, options: app.dot.mail.data.model.ListOptions): Flow<PagingData<ThreadSummary>> = threads(mailbox).map { data ->
+            val f = options.filters
+            if (!f.any) data else data.filter { t -> (!f.unread || t.unreadCount > 0) && (!f.starred || t.isStarred) && (!f.attachments || t.hasAttachments) }
         }
 
         override fun search(query: String, accountId: Long?): Flow<PagingData<ThreadSummary>> = messages.map { msgs ->
@@ -152,6 +160,7 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
         override fun messages(mailbox: Mailbox): Flow<PagingData<ThreadSummary>> = combine(messages, accountsState, snoozed) { msgs, accts, snz ->
             val ids = accts.map { it.id }.toSet()
             val inBox = when (mailbox) {
+                is Mailbox.Smart -> msgs
                 is Mailbox.Unified -> if (mailbox.role == FolderRole.SNOOZED) msgs.filter { it.threadId in snz.keys || ConversationIds.ofMessage(it.id) in snz.keys }
                     else { val fIds = folders.filter { it.role == mailbox.role }.map { it.id }.toSet(); msgs.filter { it.folderId in fIds } }
                 is Mailbox.InFolder -> msgs.filter { it.folderId == mailbox.folderId }

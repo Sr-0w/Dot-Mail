@@ -79,6 +79,7 @@ internal fun BackupSettings() {
                     rules = SettingsBackup.encodeRules(RemoteImagePolicy.get(context.applicationContext).rules.value, emailOf),
                     templates = SettingsBackup.encodeTemplates(TemplateStore.get(context.applicationContext).templates.value),
                     appVersion = BuildConfig.VERSION_NAME, exportedAt = Instant.now().toString(),
+                    smartFolders = SettingsBackup.encodeSmartFolders(app.dot.mail.data.SmartFolderStore.get(context.applicationContext).folders.value, emailOf),
                 )
                 withContext(Dispatchers.IO) { context.contentResolver.openOutputStream(uri, "wt")!!.use { it.write(text.toByteArray()) } }
             }
@@ -117,6 +118,7 @@ internal fun BackupSettings() {
                 if (parsed.prefs != null) add(context.getString(R.string.backup_preview_prefs))
                 parsed.rules?.let { add(context.resources.getQuantityString(R.plurals.backup_preview_rules, it.size, it.size)) }
                 parsed.templates?.let { add(context.resources.getQuantityString(R.plurals.backup_preview_templates, it.size, it.size)) }
+                parsed.smartFolders?.let { add(context.resources.getQuantityString(R.plurals.backup_preview_smart, it.size, it.size)) }
                 if (isEmpty()) add(context.getString(R.string.backup_preview_nothing))
             }
             pending = PendingImport(parsed, lines, accountPreview.accountsNeedingSignIn)
@@ -206,6 +208,13 @@ private suspend fun applyImport(
         val fresh = SettingsBackup.newTemplates(store.templates.value, SettingsBackup.decodeTemplates(arr))
         fresh.forEach { store.save(it.name, it.subject, it.bodyText, it.bodyHtml) }
         lines += context.getString(R.string.backup_done_templates, fresh.size)
+    }
+    parsed.smartFolders?.let { arr ->
+        val store = app.dot.mail.data.SmartFolderStore.get(context.applicationContext)
+        val known = store.folders.value.map { it.id }.toSet()
+        val fresh = SettingsBackup.decodeSmartFolders(arr, idOf).filter { it.id !in known }
+        fresh.forEach { store.save(it) }
+        lines += context.getString(R.string.backup_done_smart, fresh.size)
     }
     if (result.accountsNeedingSignIn.isNotEmpty()) lines += context.getString(R.string.backup_done_sign_in, result.accountsNeedingSignIn.joinToString(", "))
     return lines

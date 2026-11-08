@@ -46,6 +46,7 @@ internal class RealMailGraph(
     internal val identityStore = IdentityStore.get(context)
     /** Loads the user's classification rules into [ClassificationRules] before the first sync. */
     internal val categorySettings = CategorySettings.get(context)
+    internal val smartFolders = SmartFolderStore.get(context)
     internal val cacheCleanup = PrivateCacheCleanup(context,dao)
     internal val bodyStore = BodyStore(context, dao)
     internal val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -144,7 +145,7 @@ internal class RealMailGraph(
         result
     }
 
-    override suspend fun removeAccount(accountId: Long) = withContext(Dispatchers.IO) { syncLock.withLock { dao.deleteAccount(accountId); identityStore.forget(accountId); AccountSettingsStore.get(context).forget(accountId); File(context.filesDir, "attachments/$accountId").deleteRecursively(); File(context.filesDir, "outbox/$accountId").deleteRecursively(); Unit } }
+    override suspend fun removeAccount(accountId: Long) = withContext(Dispatchers.IO) { syncLock.withLock { dao.deleteAccount(accountId); identityStore.forget(accountId); smartFolders.forgetAccount(accountId); AccountSettingsStore.get(context).forget(accountId); File(context.filesDir, "attachments/$accountId").deleteRecursively(); File(context.filesDir, "outbox/$accountId").deleteRecursively(); Unit } }
     override fun folders(accountId: Long): Flow<List<app.dot.mail.data.model.Folder>> = combine(dao.observeFolders(accountId), dao.observeDeletingFolderIds()) { rows, deleting -> rows.filter { it.id !in deleting } }.map { rows -> rows.map { app.dot.mail.data.model.Folder(it.id, it.accountId, it.path, it.name, FolderRole.valueOf(it.role), it.unread, it.total) } }
 
     override suspend fun reclassifyAll() {
@@ -175,10 +176,10 @@ internal class RealMailGraph(
         val handle = if (draftView) latest?.let { -it.id } else null
         return ThreadSummary(t.id, t.accountId, t.subject, Codec.addresses(t.participants), t.snippet, t.lastAt, t.count, t.unread, t.starred, t.attachments, draftId = handle, recipients = latest?.let { Codec.addressField(it.header, "to") }.orEmpty(), category=latest?.let(::messageCategory))
     }
-    private fun paging(where: String, args: List<Any>, draftView: Boolean = false, draftAccount: Long? = null): Flow<PagingData<ThreadSummary>> = Pager(PagingConfig(pageSize = 40)) {
-        mailboxSource(where, args, draftView, draftAccount)
+    private fun paging(where: String, args: List<Any>, draftView: Boolean = false, draftAccount: Long? = null, extra: Sql? = null, orderBy: String = ThreadQuery.orderBy(InboxSort.DATE)): Flow<PagingData<ThreadSummary>> = Pager(PagingConfig(pageSize = 40)) {
+        if (extra == null) mailboxSource(where, args, draftView, draftAccount, orderBy) else mailboxSource("($where) AND (${extra.text})", args + extra.args, draftView, draftAccount, orderBy)
     }.flow.map { data -> data.map { summary(it, draftView) } }
-    internal fun mailboxSource(where: String, args: List<Any>, draftView: Boolean, draftAccount: Long?): PagingSource<Int, ThreadRow> {
+    internal fun mailboxSource(where: String, args: List<Any>, draftView: Boolean, draftAccount: Long?, orderBy: String = ThreadQuery.orderBy(InboxSort.DATE)): PagingSource<Int, ThreadRow> {
         val bump = "(SELECT z.resurfacedAt FROM snoozed z WHERE z.threadId=t.id AND z.messageId IS NULL AND z.resurfacedAt IS NOT NULL ORDER BY z.resurfacedAt DESC LIMIT 1)"
         val hidden = " AND NOT EXISTS(SELECT 1 FROM snoozed z WHERE z.threadId=t.id AND z.messageId IS NULL AND z.resurfacedAt IS NULL)"
         val remote = if(draftView) {
@@ -188,15 +189,21 @@ internal class RealMailGraph(
 
         val local = if (draftView) " UNION ALL SELECT -id AS id,accountId,'' AS subject,'[]' AS participants,'' AS snippet,updatedAt AS lastAt,1 AS count,0 AS unread,0 AS starred,0 AS attachments,updatedAt AS sortAt FROM drafts" + if (draftAccount != null) " WHERE accountId=?" else "" else ""
         val params = args + if (draftView && draftAccount != null) listOf(draftAccount) else emptyList()
-        return dao.page(SimpleSQLiteQuery("SELECT * FROM ($remote$local) ORDER BY sortAt DESC,id DESC", params.toTypedArray()))
+        return dao.page(SimpleSQLiteQuery("SELECT * FROM ($remote$local) ORDER BY $orderBy", params.toTypedArray()))
     }
-    override fun threads(mailbox: Mailbox): Flow<PagingData<ThreadSummary>> = flow {
+    override fun threads(mailbox: Mailbox): Flow<PagingData<ThreadSummary>> = threads(mailbox, ListOptions())
+    private suspend fun ownEmails(): List<String> = dao.accounts().flatMap { a -> identityStore.resolve(a.id, a.name, a.email).map { it.email } }
+    override fun threads(mailbox: Mailbox, options: ListOptions): Flow<PagingData<ThreadSummary>> = flow {
+        val extra = ThreadQuery.filters(options.filters, if (options.filters.toMe) ownEmails() else emptyList())
+        val order = ThreadQuery.orderBy(options.sort)
+        fun p(where: String, args: List<Any>, draftView: Boolean = false, draftAccount: Long? = null) = paging(where, args, draftView, draftAccount, extra, order)
         when (mailbox) {
+            is Mailbox.Smart -> smartFolders.get(mailbox.id)?.let { sf -> ThreadQuery.smartFolder(sf).let { q -> emitAll(p(q.text, q.args)) } } ?: emitAll(flowOf(PagingData.empty()))
             is Mailbox.InFolder -> {
                 val folder = dao.folder(mailbox.folderId)
-                emitAll(paging("EXISTS(SELECT 1 FROM messages m WHERE m.threadId=t.id AND m.folderId=?)", listOf(mailbox.folderId), folder?.role == "DRAFTS", folder?.accountId))
+                emitAll(p("EXISTS(SELECT 1 FROM messages m WHERE m.threadId=t.id AND m.folderId=?)", listOf(mailbox.folderId), folder?.role == "DRAFTS", folder?.accountId))
             }
-            is Mailbox.Unified -> if (mailbox.role.category() != null) emitAll(paging("EXISTS(SELECT 1 FROM messages m JOIN folders f ON f.id=m.folderId WHERE m.threadId=t.id AND ${categoryPredicate("m","f",mailbox.role.category()!!)})",emptyList())) else if (mailbox.role == FolderRole.SNOOZED) emitAll(snoozedThreadsPaging()) else emitAll(paging("EXISTS(SELECT 1 FROM messages m JOIN folders f ON f.id=m.folderId WHERE m.threadId=t.id AND f.role=?)", listOf(mailbox.role.name), mailbox.role == FolderRole.DRAFTS))
+            is Mailbox.Unified -> if (mailbox.role.category() != null) emitAll(p("EXISTS(SELECT 1 FROM messages m JOIN folders f ON f.id=m.folderId WHERE m.threadId=t.id AND ${categoryPredicate("m","f",mailbox.role.category()!!)})",emptyList())) else if (mailbox.role == FolderRole.SNOOZED) emitAll(snoozedThreadsPaging()) else emitAll(p("EXISTS(SELECT 1 FROM messages m JOIN folders f ON f.id=m.folderId WHERE m.threadId=t.id AND f.role=?)", listOf(mailbox.role.name), mailbox.role == FolderRole.DRAFTS))
         }
     }
     override fun search(query: String, accountId: Long?): Flow<PagingData<ThreadSummary>> = flow {
@@ -347,6 +354,7 @@ internal class RealMailGraph(
             return rows
         }
         return when (mailbox) {
+            is Mailbox.Smart -> rows
             is Mailbox.InFolder -> rows.filter { it.folderId == mailbox.folderId }
             is Mailbox.Unified -> if(mailbox.role.category()!=null) rows.filter { isInCategory(it,dao.folder(it.folderId)?.role,mailbox.role.category()!!) } else rows.filter { dao.folder(it.folderId)?.role == mailbox.role.name }
         }
@@ -425,16 +433,16 @@ internal class RealMailGraph(
     private suspend fun refreshAttempt(mailbox:Mailbox,accounts:Set<Long>?) {
         val ids=accounts ?: when(mailbox) {
             is Mailbox.InFolder -> dao.folder(mailbox.folderId)?.accountId?.let { setOf(it) } ?: throw MailSyncException("Folder is no longer available")
-            is Mailbox.Unified -> dao.accounts().map { it.id }.toSet()
+            is Mailbox.Unified, is Mailbox.Smart -> dao.accounts().map { it.id }.toSet()
         }
         val ready=CompletableDeferred<Unit>()
         val remaining=ids.toMutableSet()
-        val early=when(mailbox) { is Mailbox.InFolder -> true; is Mailbox.Unified -> mailbox.role.category()==null && mailbox.role != FolderRole.SNOOZED }
+        val early=when(mailbox) { is Mailbox.InFolder -> true; is Mailbox.Smart -> false; is Mailbox.Unified -> mailbox.role.category()==null && mailbox.role != FolderRole.SNOOZED }
         val progressLock=Mutex()
         scope.launch {
             try {
                 val ok=syncAll(ids,primaryMailbox=mailbox) { account,folder,success,reason ->
-                    val matches=when(mailbox) { is Mailbox.InFolder -> dao.folder(mailbox.folderId)?.path==folder.path; is Mailbox.Unified -> mailbox.role.name==folder.role.name }
+                    val matches=when(mailbox) { is Mailbox.Smart -> false; is Mailbox.InFolder -> dao.folder(mailbox.folderId)?.path==folder.path; is Mailbox.Unified -> mailbox.role.name==folder.role.name }
                     if(early && matches) progressLock.withLock {
                         if(!success) ready.completeExceptionally(MailSyncException(reason?.let { SyncDiagnostics.state(it,false).message } ?: "Some message headers could not be synchronized"))
                         remaining.remove(account)

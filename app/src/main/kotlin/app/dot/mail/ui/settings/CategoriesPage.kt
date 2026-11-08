@@ -56,7 +56,7 @@ internal val viewCategories = listOf(Category.NEWSLETTER, Category.PURCHASE, Cat
 private val ruleFields = listOf(Field.FROM_ADDRESS, Field.FROM_DOMAIN, Field.SUBJECT, Field.LIST_ID)
 
 @Composable
-private fun categoryLabel(c: Category): String = when (c) {
+internal fun categoryLabel(c: Category): String = when (c) {
     Category.NEWSLETTER -> stringResource(R.string.inbox_role_newsletters)
     Category.PURCHASE -> stringResource(R.string.inbox_role_purchases)
     Category.BILL -> stringResource(R.string.inbox_role_bills)
