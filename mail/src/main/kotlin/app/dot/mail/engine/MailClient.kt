@@ -16,7 +16,13 @@ import java.util.Properties
 import kotlin.math.max
 
 /** Each operation owns its connection. No shared selected folder or blocking calls on Main. */
-class MailClient(val timeoutMs: Int = 30_000) {
+class MailClient(val timeoutMs: Int = 30_000, private val timing: (String,Long) -> Unit = { _,_ -> }) {
+    fun recordTiming(phase:String, millis:Long) { runCatching { timing(phase,millis) } }
+    internal fun <T> timed(phase:String, block:()->T): T {
+        val start=System.nanoTime()
+        return try { block() } finally { recordTiming(phase,(System.nanoTime()-start)/1_000_000) }
+    }
+    private val connections=ImapConnections { endpoint,credentials -> retryMailRead { connect(endpoint,credentials) } }
     internal fun session(endpoint: Endpoint, credentials: Credentials, smtp: Boolean = false, envelopeFrom: String? = null): Session {
         val protocol = if (smtp) "smtp" else "imap"
         return Session.getInstance(Properties().apply {
@@ -33,6 +39,9 @@ class MailClient(val timeoutMs: Int = 30_000) {
             setProperty("mail.$protocol.ssl.checkserveridentity", "true")
             setProperty("mail.$protocol.auth", "true")
             setProperty("mail.imap.peek", "true")
+            setProperty("mail.imap.connectionpoolsize", "4")
+            setProperty("mail.imap.connectionpooltimeout", "60000")
+            setProperty("mail.imap.separatestoreconnection", "true")
             setProperty("mail.imap.enablecondstore", "true")
             if (credentials.oauth2) setProperty("mail.$protocol.auth.mechanisms", "XOAUTH2")
             // SMTP MAIL FROM. Providers reject envelope senders that are not the logged-in account, so aliases
@@ -40,21 +49,37 @@ class MailClient(val timeoutMs: Int = 30_000) {
             if (smtp && envelopeFrom != null) setProperty("mail.smtp.from", envelopeFrom)
         })
     }
-    private fun connect(endpoint: Endpoint, credentials: Credentials): IMAPStore =
-        EngineImapStore(session(endpoint, credentials)).apply { connect(endpoint.host, endpoint.port, endpoint.username, credentials.secret) }
-    private suspend fun <T> store(endpoint: Endpoint, credentials: Credentials, block: (IMAPStore) -> T): T = withContext(Dispatchers.IO) {
-        connect(endpoint, credentials).use { block(it) }
+    private fun connect(endpoint: Endpoint, credentials: Credentials): IMAPStore = timed("connect_login") {
+        val store=EngineImapStore(session(endpoint,credentials)) { phase,ms -> recordTiming(phase,ms) }
+        try { store.connect(endpoint.host,endpoint.port,endpoint.username,credentials.secret); store }
+        catch(e:Exception) { runCatching { store.close() }; throw e }
     }
+    /** Shares pooled authenticated protocols, including a live IDLE owner, while each folder has its own selection. */
+    suspend fun <T> withImapSession(endpoint:Endpoint,credentials:Credentials,block:suspend ()->T):T {
+        val current=currentCoroutineContext()[ImapScope]
+        if(current!=null && current.endpoint==endpoint && current.credentials==credentials && !current.invalidated) return block()
+        return connections.lease(endpoint,credentials) { store -> withContext(ImapScope(endpoint,credentials,store)) { block() } }
+    }
+    private suspend fun <T> store(endpoint: Endpoint, credentials: Credentials, block: (IMAPStore) -> T): T = withContext(Dispatchers.IO) {
+        val current=currentCoroutineContext()[ImapScope]
+        suspend fun invoke(store:IMAPStore):T = try { block(store) } catch(e:Exception) {
+            if(e is StoreClosedException || e is FolderClosedException || ConnectionFailure.classify(e).transient) { current?.invalidated=true; connections.invalidate(store) }
+            throw e
+        }
+        if(current!=null && current.endpoint==endpoint && current.credentials==credentials && !current.invalidated) invoke(current.store)
+        else connections.lease(endpoint,credentials) { invoke(it) }
+    }
+    private suspend fun <T> readStore(endpoint:Endpoint,credentials:Credentials,block:(IMAPStore)->T):T = retryMailRead { store(endpoint,credentials,block) }
     private fun <T> folder(store: IMAPStore, path: String, write: Boolean = false, block: (IMAPFolder) -> T): T {
         val folder = store.getFolder(path) as IMAPFolder
-        folder.open(if (write) Folder.READ_WRITE else Folder.READ_ONLY)
+        timed("select") { folder.open(if (write) Folder.READ_WRITE else Folder.READ_ONLY) }
         try { return block(folder) } finally { if (folder.isOpen) folder.close(false) }
     }
     suspend fun verify(imap: Endpoint, smtp: Endpoint, credentials: Credentials) {
-        store(imap, credentials) { }
+        withContext(Dispatchers.IO) { connect(imap,credentials).use { } }
         withContext(Dispatchers.IO) { session(smtp, credentials, true).getTransport("smtp").use { it.connect(smtp.host, smtp.port, smtp.username, credentials.secret) } }
     }
-    suspend fun folders(endpoint: Endpoint, credentials: Credentials): List<RemoteFolder> = store(endpoint, credentials) { store ->
+    suspend fun folders(endpoint: Endpoint, credentials: Credentials): List<RemoteFolder> = readStore(endpoint, credentials) { store ->
         uniqueRoles(store.defaultFolder.list("*").filter { it.type and Folder.HOLDS_MESSAGES != 0 }.map { f ->
             RemoteFolder(f.fullName, f.name, role(f.fullName, (f as IMAPFolder).attributes.toList()), f.unreadMessageCount.coerceAtLeast(0), f.messageCount.coerceAtLeast(0), f.attributes.any { it.lowercase() in setOf("\\sent", "\\drafts", "\\archive", "\\trash", "\\junk", "\\all", "\\flagged", "\\inbox") }, f.separator.takeIf { it != 0.toChar() } ?: '/')
         })
@@ -108,27 +133,34 @@ class MailClient(val timeoutMs: Int = 30_000) {
         if (!f.delete(false)) throw FolderOpException(FolderOpException.Kind.REJECTED, "The server refused to delete the folder")
     }
 
-    suspend fun sync(endpoint: Endpoint, credentials: Credentials, path: String, cursor: SyncCursor = SyncCursor(), now: Long = System.currentTimeMillis(), limit: Int = 500, windowDays: Int = 30): HeaderSync = store(endpoint, credentials) { store ->
+    suspend fun sync(endpoint: Endpoint, credentials: Credentials, path: String, cursor: SyncCursor = SyncCursor(), now: Long = System.currentTimeMillis(), limit: Int = 500, windowDays: Int = 30): HeaderSync = readStore(endpoint, credentials) { store ->
         require(limit in 1..5000)
         folder(store, path) { f ->
             val validity = f.uidValidity
             val reset = validity != cursor.uidValidity
             val next = f.uidNext
+            val count=f.messageCount
+            val modSeq=runCatching { f.highestModSeq }.getOrDefault(-1)
+            if(canSkipFolder(cursor,validity,next,count,modSeq)) {
+                recordTiming("unchanged_folder",0)
+                return@folder HeaderSync(SyncCursor(validity,next,modSeq,count),false,emptyList(),emptyList(),emptySet(),unchanged=true)
+            }
             // A UID-only inventory reconciles expunges without downloading bodies or envelopes.
-            val inventory = f.getMessagesByUID(1, UIDFolder.LASTUID).filterNotNull().toTypedArray()
-            f.fetch(inventory, FetchProfile().apply { add(UIDFolder.FetchProfileItem.UID) })
+            val inventory = timed("uid_inventory") {
+                f.getMessagesByUID(1, UIDFolder.LASTUID).filterNotNull().toTypedArray().also { f.fetch(it, FetchProfile().apply { add(UIDFolder.FetchProfileItem.UID) }) }
+            }
             val existing = inventory.map { f.getUID(it) }.toSet()
             val candidates = if (reset) {
                 // windowDays == 0: no date limit (still capped by [limit]).
                 (if (windowDays <= 0) f.messages else f.search(ReceivedDateTerm(ComparisonTerm.GE, Date(now - windowDays * 24L * 60 * 60 * 1000)))).takeLast(limit).toTypedArray()
             } else if (next > cursor.uidNext) f.getMessagesByUID(max(1, cursor.uidNext), UIDFolder.LASTUID).filterNotNull().take(limit).toTypedArray() else emptyArray()
             val failures = mutableListOf<HeaderFailure>()
-            try { fetchHeaders(f, candidates, store.hasCapability("X-GM-EXT-1")) }
+            try { if(candidates.isNotEmpty()) timed("header_fetch") { fetchHeaders(f, candidates, store.hasCapability("X-GM-EXT-1")) } }
             catch (e: MessagingException) { failures += HeaderFailure(0, e) }
             val flagsMessages = if (!reset && cursor.highestModSeq >= 0 && store.hasCapability("CONDSTORE")) {
-                f.getMessagesByUIDChangedSince(1, UIDFolder.LASTUID, cursor.highestModSeq)
+                timed("condstore") { f.getMessagesByUIDChangedSince(1, UIDFolder.LASTUID, cursor.highestModSeq) }
             } else inventory
-            f.fetch(flagsMessages, FetchProfile().apply { add(FetchProfile.Item.FLAGS); add(UIDFolder.FetchProfileItem.UID) })
+            timed("flag_fetch") { f.fetch(flagsMessages, FetchProfile().apply { add(FetchProfile.Item.FLAGS); add(UIDFolder.FetchProfileItem.UID) }) }
             val headers = candidates.mapNotNull { message ->
                 try { header(f, message) }
                 catch (e: Exception) { failures += HeaderFailure(f.getUID(message), e); null }
@@ -137,10 +169,11 @@ class MailClient(val timeoutMs: Int = 30_000) {
             val pageEnd = if (candidates.size == limit && !reset) (headers.maxOfOrNull { it.uid } ?: cursor.uidNext - 1) + 1 else next
             val checkpoint = minOf(pageEnd, failures.map { it.uid }.filter { it > 0 }.minOrNull() ?: pageEnd)
             val flagResults = flagsMessages.mapNotNull { message -> try { flags(f, message) } catch (e: Exception) { failures += HeaderFailure(f.getUID(message), e); null } }
-            HeaderSync(SyncCursor(validity, checkpoint, if (failures.isEmpty()) runCatching { f.highestModSeq }.getOrDefault(-1) else -1), reset, headers, flagResults, existing, failures)
+            HeaderSync(SyncCursor(validity, checkpoint, if (failures.isEmpty()) modSeq else -1,count), reset, headers, flagResults, existing, failures)
         }
     }
     private fun fetchHeaders(f: IMAPFolder, messages: Array<out Message>, gmail: Boolean) {
+        if(messages.isEmpty()) return
         f.fetch(messages, FetchProfile().apply {
             add(FetchProfile.Item.ENVELOPE); add(FetchProfile.Item.FLAGS); add(FetchProfile.Item.CONTENT_INFO); add(UIDFolder.FetchProfileItem.UID)
             (listOf("Message-ID", "References", "In-Reply-To", "List-Unsubscribe", "List-Unsubscribe-Post") + ClassificationHeaders.names).distinct().forEach { add(it) }
@@ -233,7 +266,7 @@ class MailClient(val timeoutMs: Int = 30_000) {
             require(folder.uidValidity == expectedValidity) { "Folder UIDVALIDITY changed" }
             val messages = folder.getMessagesByUID(uids).filterNotNull().toTypedArray()
             folder.fetch(messages, FetchProfile().apply { add(FetchProfile.Item.CONTENT_INFO); add(UIDFolder.FetchProfileItem.UID) })
-            messages.associate { message -> val uid = folder.getUID(message); uid to SnippetFetcher.fetch(folder, message, uid, maxBytes) }
+            timed("snippet_bodies") { messages.associate { message -> val uid = folder.getUID(message); uid to SnippetFetcher.fetch(folder, message, uid, maxBytes) } }
         }
     }
     suspend fun setFlags(endpoint: Endpoint, credentials: Credentials, path: String, uids: LongArray, seen: Boolean? = null, starred: Boolean? = null, delete: Boolean = false) = store(endpoint, credentials) { s -> folder(s, path, true) { f ->
@@ -305,20 +338,23 @@ class MailClient(val timeoutMs: Int = 30_000) {
         fetchHeaders(f, messages, s.hasCapability("X-GM-EXT-1")); messages.map { header(f, it) }.filter { !parsed.needsAttachments || it.hasAttachments }
     } }
     /** Dedicated IDLE socket; cancellation closes it immediately, including while idle blocks. */
-    suspend fun idle(endpoint: Endpoint, credentials: Credentials, path: String = "INBOX", changed: () -> Unit) = coroutineScope {
-        val s = withContext(Dispatchers.IO) { connect(endpoint, credentials) }
+    suspend fun idle(endpoint: Endpoint, credentials: Credentials, path: String = "INBOX", changed: () -> Unit) = withImapSession(endpoint,credentials) { coroutineScope {
+        val s = currentCoroutineContext()[ImapScope]!!.store
         val f = s.getFolder(path) as IMAPFolder
-        val closer = launch(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) { try { awaitCancellation() } finally { runCatching { s.close() } } }
+        val closer = launch(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) { try { awaitCancellation() } finally { runCatching { f.close(false) } } }
         try { withContext(Dispatchers.IO) {
             f.open(Folder.READ_ONLY)
             if (!s.hasCapability("IDLE")) return@withContext false
             f.addMessageCountListener(object : MessageCountAdapter() { override fun messagesAdded(e: MessageCountEvent) { changed() }; override fun messagesRemoved(e: MessageCountEvent) { changed() } })
             f.addMessageChangedListener { changed() }
+            recordTiming("idle_ready",0)
             while (isActive && f.isOpen) f.idle()
             true
-        } } finally { closer.cancel(); withContext(NonCancellable + Dispatchers.IO) { runCatching { s.close() } } }
-    }
+        } } finally { closer.cancel(); withContext(NonCancellable + Dispatchers.IO) { runCatching { if(f.isOpen) f.close(false) } } }
+    } }
     companion object {
+        internal fun canSkipFolder(cursor:SyncCursor,validity:Long,next:Long,count:Int,modSeq:Long):Boolean =
+            cursor.uidValidity==validity && cursor.uidNext==next && cursor.messageCount==count && cursor.highestModSeq>=0 && modSeq>=0 && cursor.highestModSeq==modSeq
         internal fun uniqueRoles(folders: List<RemoteFolder>): List<RemoteFolder> {
             val winners = folders.filter { it.role != Role.CUSTOM }.groupBy { it.role }.mapValues { (_, choices) ->
                 choices.sortedWith(compareByDescending<RemoteFolder> { it.specialUse }.thenByDescending { it.total }.thenBy { it.path }).first().path

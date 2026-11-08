@@ -157,6 +157,6 @@ class DeviceRegressionTest {
         val cleaned = SyncDiagnostics.sanitized(raw)
         val text = java.io.StringWriter().also { cleaned.printStackTrace(java.io.PrintWriter(it)) }.toString()
         assertFalse(text.contains("secret@example.org")); assertFalse(text.contains("do-not-print")); assertFalse(text.contains("body=private"))
-        assertTrue(text.contains("MessagingException")); assertTrue(text.contains("ConnectException")); assertTrue(text.contains("Server unreachable"))
+        assertTrue(text.contains("MessagingException")); assertTrue(text.contains("ConnectException")); assertTrue(text.contains(app.dot.mail.engine.ConnectionFailure.NETWORK.humanMessage))
     }
 }

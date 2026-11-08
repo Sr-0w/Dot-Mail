@@ -15,9 +15,16 @@ internal object GmailThreadFetch {
         override fun parseItem(response: FetchResponse): Any = response.readLong()
     }
 }
-internal class EngineImapStore(private val mailSession: Session) : IMAPStore(mailSession, URLName("imap", null, -1, null, null, null)) {
-    override fun newIMAPProtocol(host: String, port: Int): IMAPProtocol =
-        object : IMAPProtocol("imap", host, port, mailSession.properties, isSSL, logger) {
+internal class EngineImapStore(private val mailSession: Session, private val timing: (String,Long)->Unit = { _,_ -> }) : IMAPStore(mailSession, URLName("imap", null, -1, null, null, null)) {
+    override fun newIMAPProtocol(host: String, port: Int): IMAPProtocol {
+        val start=System.nanoTime()
+        return try { object : IMAPProtocol("imap", host, port, mailSession.properties, isSSL, logger) {
+            private fun <T> auth(block:()->T):T { val start=System.nanoTime(); return try { block() } finally { timing("login",(System.nanoTime()-start)/1_000_000) } }
+            override fun login(user:String,password:String) = auth { super.login(user,password) }
+            override fun authlogin(user:String,password:String) = auth { super.authlogin(user,password) }
+            override fun authplain(authzid:String?,user:String,password:String) = auth { super.authplain(authzid,user,password) }
+            override fun authoauth2(user:String,token:String) = auth { super.authoauth2(user,token) }
             override fun getFetchItems(): Array<FetchItem> = (super.getFetchItems()?.toList().orEmpty() + listOf<FetchItem>(GmailThreadFetch.item)).toTypedArray()
-        }
+        } } finally { timing("connect_tls_greeting",(System.nanoTime()-start)/1_000_000) }
+    }
 }

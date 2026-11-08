@@ -9,6 +9,8 @@ import javax.net.ssl.SSLException
 /** Never pass provider Throwable messages to Log: servers can echo logins, tokens or MIME data. */
 internal object SyncDiagnostics {
     fun reason(error: Throwable): String {
+        val kind=app.dot.mail.engine.ConnectionFailure.classify(error)
+        if(kind!=app.dot.mail.engine.ConnectionFailure.OTHER) return kind.humanMessage
         val chain = chain(error)
         return when {
             chain.any { it is AuthenticationFailedException || it is app.dot.mail.data.oauth.ReauthenticationRequired } -> "Login failed; sign in again"
@@ -25,14 +27,12 @@ internal object SyncDiagnostics {
             else -> "Mail sync failed (${error.javaClass.simpleName})"
         }
     }
-    private fun chain(error: Throwable): List<Throwable> = buildList {
-        var current: Throwable? = error
-        while (size < 8) {
-            val item = current ?: break
-            if (any { it === item }) break
-            add(item); current = item.cause
-        }
+    fun stored(error:Throwable,role:String?=null):String = "[${app.dot.mail.engine.ConnectionFailure.classify(error).name}] " + (role?.let { "Folder $it: " } ?: "") + reason(error)
+    fun state(raw:String,auth:Boolean):app.dot.mail.data.model.SyncState.Error {
+        val kind=raw.takeIf { it.startsWith("[") }?.substringBefore(']')?.removePrefix("[")?.let { name -> app.dot.mail.engine.ConnectionFailure.entries.firstOrNull { it.name==name } }
+        return app.dot.mail.data.model.SyncState.Error(if(kind==null) raw else raw.substringAfter("] "),auth || kind==app.dot.mail.engine.ConnectionFailure.AUTH,kind)
     }
+    private fun chain(error:Throwable):List<Throwable> = app.dot.mail.engine.ConnectionFailure.chain(error)
     internal fun response(error: Throwable, secrets: Collection<String> = emptyList()): String? {
         val raw = error.message ?: return null
         val isProtocol = generateSequence(error.javaClass as Class<*>) { it.superclass }.any { it.name == "org.eclipse.angus.mail.iap.ProtocolException" }
