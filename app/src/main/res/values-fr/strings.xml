@@ -18,6 +18,11 @@
     <string name="compose_formatted_text">Texte enrichi</string>
     <string name="compose_schedule_send">Programmer l\'envoi</string>
     <string name="compose_discard">Supprimer le brouillon</string>
+    <string name="compose_close_title">Enregistrer le brouillon ?</string>
+    <string name="compose_close_body">Gardez-le dans les brouillons pour le terminer plus tard, ou supprimez-le.</string>
+    <string name="compose_save_draft">Enregistrer</string>
+    <string name="compose_discard_short">Supprimer</string>
+    <string name="compose_keep_editing">Continuer</string>
     <string name="compose_send">Envoyer</string>
     <string name="compose_schedule_this_evening">Ce soir, 18:00</string>
     <string name="compose_schedule_tomorrow_morning">Demain matin, 08:00</string>

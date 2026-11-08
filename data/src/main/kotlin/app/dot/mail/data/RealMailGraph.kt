@@ -192,7 +192,7 @@ internal class RealMailGraph(
             "SELECT m.id+${ConversationIds.MESSAGE_BASE} AS id,m.accountId,m.subject,'[]' AS participants,m.snippet,m.sentAt AS lastAt,1 AS count,m.unread,m.starred,m.hasAttachments AS attachments,m.sentAt AS sortAt FROM messages m JOIN folders f ON f.id=m.folderId WHERE ($source) AND NOT EXISTS(SELECT 1 FROM drafts d WHERE d.sourceMessageId=m.id) AND NOT EXISTS(SELECT 1 FROM draft_mirrors dm WHERE dm.folderId=m.folderId AND dm.uid=m.uid AND dm.validity=f.validity)"
         } else "SELECT t.*, MAX(t.lastAt, COALESCE($bump,0)) AS sortAt FROM threads t WHERE t.count>0 AND ($where)$hidden"
 
-        val local = if (draftView) " UNION ALL SELECT -id AS id,accountId,'' AS subject,'[]' AS participants,'' AS snippet,updatedAt AS lastAt,1 AS count,0 AS unread,0 AS starred,0 AS attachments,updatedAt AS sortAt FROM drafts" + if (draftAccount != null) " WHERE accountId=?" else "" else ""
+        val local = if (draftView) " UNION ALL SELECT -id AS id,accountId,'' AS subject,'[]' AS participants,'' AS snippet,updatedAt AS lastAt,1 AS count,0 AS unread,0 AS starred,0 AS attachments,updatedAt AS sortAt  FROM drafts WHERE id NOT IN (SELECT CAST(target AS INTEGER) FROM operations WHERE action='$OP_TRASH_DRAFT')" + if (draftAccount != null) " AND accountId=?" else "" else ""
         val params = args + if (draftView && draftAccount != null) listOf(draftAccount) else emptyList()
         return dao.page(SimpleSQLiteQuery("SELECT * FROM ($remote$local) ORDER BY $orderBy", params.toTypedArray()))
     }
@@ -315,8 +315,9 @@ internal class RealMailGraph(
         val origins = withContext(Dispatchers.IO) {
             threadIds.distinct().filter { it >= 0 }.flatMap { actionRows(it, sourceMailbox, true) }.map { it.id to it.folderId }
         }
+        val drafts = if (action == MessageAction.TRASH) threadIds.filter { it < 0 }.map { -it }.distinct() else emptyList()
         applyScoped(action, threadIds, sourceMailbox)
-        return app.dot.mail.data.model.UndoToken(origins)
+        return app.dot.mail.data.model.UndoToken(origins, drafts)
     }
 
     override suspend fun undo(token: app.dot.mail.data.model.UndoToken): Int = withContext(Dispatchers.IO) {
@@ -330,6 +331,11 @@ internal class RealMailGraph(
                 runCatching { moveMessage(message, folder) }.onSuccess { threads += message.threadId }.onFailure { failed++ }
             }
             threads.forEach { rebuildThread(it) }
+            // A trashed draft waits for sync to move it; cancelling the queued move brings it straight back to Drafts.
+            for (localId in token.drafts) {
+                val op = dao.draft(localId)?.let { d -> dao.operations(d.accountId).firstOrNull { it.action == OP_TRASH_DRAFT && it.target == "$localId" } }
+                if (op == null || op.error == "IN_FLIGHT") failed++ else dao.deleteOperation(op.id)
+            }
         }
         requestSync()
         failed
@@ -352,7 +358,7 @@ internal class RealMailGraph(
     private suspend fun applyScoped(action: MessageAction, threadIds: Collection<Long>, sourceMailbox: Mailbox?) = withContext(Dispatchers.IO) {
         database.withTransaction {
             for (thread in threadIds.distinct()) {
-                if (thread < 0) { if (action in setOf(MessageAction.TRASH, MessageAction.DELETE_FOREVER)) removeDraftAndSource(-thread); continue }
+                if (thread < 0) { when (action) { MessageAction.TRASH -> trashDraft(-thread); MessageAction.DELETE_FOREVER -> removeDraftAndSource(-thread); else -> {} }; continue }
                 val rows = actionRows(thread, sourceMailbox, action in setOf(MessageAction.ARCHIVE, MessageAction.TRASH, MessageAction.SPAM, MessageAction.NOT_SPAM, MessageAction.DELETE_FOREVER))
                 for (message in rows) {
                     val seen = when(action) { MessageAction.MARK_READ -> true; MessageAction.MARK_UNREAD -> false; else -> null }
@@ -491,6 +497,21 @@ internal class RealMailGraph(
             dao.deleteMessage(source.id); rebuildThread(source.threadId)
         }
         dao.deleteDraft(localId)
+    }
+    /**
+     * Trash, not delete: the latest version is uploaded to Drafts (if it is not there yet) and sync then moves that copy to
+     * Trash, where it can be recovered like any message. Until then the draft is hidden locally and Undo can cancel it.
+     * Accounts without a Trash (or Drafts) folder have nowhere to keep it, so the draft is deleted as before.
+     */
+    private suspend fun trashDraft(localId: Long) {
+        val draft = dao.draft(localId) ?: return
+        val folders = dao.folders(draft.accountId)
+        val drafts = folders.firstOrNull { it.role == "DRAFTS" }
+        if (drafts == null || folders.none { it.role == "TRASH" }) { removeDraftAndSource(localId); return }
+        if (dao.draftMirror(localId) == null) queueDraftMirror(localId, draft.accountId)
+        dao.draftMirror(localId)?.let { if (it.revision != it.syncedRevision) dao.putDraftMirror(it.copy(dueAt = 0)) }
+        if (dao.operations(draft.accountId).none { it.action == OP_TRASH_DRAFT && it.target == "$localId" })
+            dao.insertOperation(OperationRow(accountId = draft.accountId, folderId = drafts.id, validity = 0, uid = 0, action = OP_TRASH_DRAFT, target = "$localId"))
     }
     override suspend fun discardDraft(localId: Long) {
         database.withTransaction { removeDraftAndSource(localId) }; requestSync()

@@ -302,10 +302,17 @@ class MailClient(val timeoutMs: Int = 30_000, private val timing: (String,Long) 
         f.fetch(messages, FetchProfile().apply { add(UIDFolder.FetchProfileItem.UID) })
         DraftInventory(f.uidValidity,messages.map { f.getUID(it) }.toSet())
     } }
-    private fun findDraft(f: IMAPFolder, token: String, revision: Long): Message? {
+    /**
+     * Some servers index SEARCH lazily, so a message appended a moment ago may not match HEADER yet. When search finds
+     * nothing, read the two headers of the live messages directly (Drafts folders are small); [sinceUid] narrows that scan.
+     */
+    private fun findDraft(f: IMAPFolder, token: String, revision: Long, sinceUid: Long = 1): Message? {
         val id = "<dotdraft-$token-$revision@dotmail.local>"
-        return f.search(AndTerm(HeaderTerm("Message-ID",id),FlagTerm(Flags(Flags.Flag.DELETED),false)))
-            .firstOrNull { it.getHeader("Message-ID")?.firstOrNull()==id && it.getHeader("X-Dot-Draft-Id")?.firstOrNull()==token }
+        fun Message.isIt() = !isSet(Flags.Flag.DELETED) && getHeader("Message-ID")?.firstOrNull()==id && getHeader("X-Dot-Draft-Id")?.firstOrNull()==token
+        f.search(AndTerm(HeaderTerm("Message-ID",id),FlagTerm(Flags(Flags.Flag.DELETED),false))).firstOrNull { it.isIt() }?.let { return it }
+        val candidates = f.getMessagesByUID(sinceUid.coerceAtLeast(1), UIDFolder.MAXUID)
+        f.fetch(candidates, FetchProfile().apply { add(FetchProfile.Item.FLAGS); add("Message-ID"); add("X-Dot-Draft-Id") })
+        return candidates.lastOrNull { it.isIt() }
     }
     suspend fun findDraftCopy(endpoint: Endpoint, credentials: Credentials, path: String, token: String, revision: Long): DraftCopy? = store(endpoint,credentials) { s -> folder(s,path) { f ->
         findDraft(f,token,revision)?.let { DraftCopy(f.uidValidity,f.getUID(it)) }
@@ -316,10 +323,13 @@ class MailClient(val timeoutMs: Int = 30_000, private val timing: (String,Long) 
         message.setHeader("X-Dot-Draft-Id",token)
         message.setHeader("Message-ID","<dotdraft-$token-$revision@dotmail.local>")
         message.setFlag(Flags.Flag.DRAFT,true)
-        var found = findDraft(f,token,revision)
-        if (found==null) { f.appendMessages(arrayOf(message)); found=findDraft(f,token,revision) }
-        val appended = requireNotNull(found) { "Server did not expose the appended draft" }
-        DraftCopy(f.uidValidity,f.getUID(appended))
+        findDraft(f,token,revision)?.let { return@folder DraftCopy(f.uidValidity,f.getUID(it)) }
+        val before = f.uidNext.takeIf { it>0 } ?: 1
+        // UIDPLUS answers with the new UID directly; otherwise look for it among the UIDs added since.
+        val appended = f.appendUIDMessages(arrayOf(message)).firstOrNull()
+        if (appended != null && appended.uid > 0 && appended.uidvalidity == f.uidValidity) return@folder DraftCopy(f.uidValidity, appended.uid)
+        val found = requireNotNull(findDraft(f,token,revision,before)) { "Server did not expose the appended draft" }
+        DraftCopy(f.uidValidity,f.getUID(found))
     } }
     /** Only the specific known copy. Without UIDPLUS, mark it deleted and leave expunge to the server. */
     suspend fun deleteDraftCopy(endpoint: Endpoint, credentials: Credentials, path: String, copy: DraftCopy) = store(endpoint,credentials) { s -> folder(s,path,true) { f ->

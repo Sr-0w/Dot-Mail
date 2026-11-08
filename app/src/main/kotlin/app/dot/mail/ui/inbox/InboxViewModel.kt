@@ -166,7 +166,7 @@ class InboxViewModel(
                     _selection.value = emptySet()
                     val text = confirmation(action, count)
                     // Archive/trash/spam can be undone from the snackbar (a swipe is easy to trigger by accident).
-                    if (text != null && token != null && token.moves.isNotEmpty()) _undoEvents.send(text to token)
+                    if (text != null && token != null && (token.moves.isNotEmpty() || token.drafts.isNotEmpty())) _undoEvents.send(text to token)
                     else text?.let { _events.send(it) }
                 }
                 .onFailure { _events.send(it.message ?: str(R.string.inbox_error_action_failed)) }

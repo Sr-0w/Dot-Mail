@@ -323,4 +323,4 @@ enum class FolderFailure {
 class FolderException(val reason: FolderFailure, message: String) : Exception(message)
 
 /** Enough to put messages back where an archive/trash/spam action took them from: (message id, original folder id). */
-data class UndoToken(val moves: List<Pair<Long, Long>>)
+data class UndoToken(val moves: List<Pair<Long, Long>>, val drafts: List<Long> = emptyList())

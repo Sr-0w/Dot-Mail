@@ -176,6 +176,8 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
     var scheduleMenu by remember { mutableStateOf(false) }
     var senderMenu by remember { mutableStateOf(false) }
     var confirmPlainDialog by remember { mutableStateOf(false) }
+    var confirmCloseDialog by remember { mutableStateOf(false) }
+    val requestClose: () -> Unit = { if (vm.needsCloseChoice()) confirmCloseDialog = true else vm.close() }
     var showLinkDialog by remember { mutableStateOf(false) }
     var bodyFocused by remember { mutableStateOf(false) }
     val bodyFocus = remember { FocusRequester() }
@@ -227,7 +229,7 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
     }
 
     LaunchedEffect(closed) { if (closed) onClose() }
-    BackHandler { vm.close() }
+    BackHandler { requestClose() }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         uris.forEach { uri ->
@@ -246,7 +248,7 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
             .imePadding(),
     ) {
         DotTopBar(
-            navigation = { DotIconButton(Icons.Outlined.Close, stringResource(R.string.compose_close), onClick = { vm.close() }) },
+            navigation = { DotIconButton(Icons.Outlined.Close, stringResource(R.string.compose_close), onClick = requestClose) },
             title = if (route.replyMode != null) replyTitle(route.replyMode) else stringResource(R.string.compose_new_message),
             actions = {
                 DotIconButton(Icons.Outlined.AttachFile, stringResource(R.string.compose_attach_files), onClick = { picker.launch(arrayOf("*/*")) })
@@ -430,6 +432,13 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
         }
     }
 
+    if (confirmCloseDialog) {
+        ConfirmCloseDialog(
+            onDismiss = { confirmCloseDialog = false },
+            onDiscard = { confirmCloseDialog = false; vm.discard() },
+            onSave = { confirmCloseDialog = false; vm.close() },
+        )
+    }
     if (confirmPlainDialog) {
         ConfirmPlainTextDialog(
             onDismiss = { confirmPlainDialog = false },
@@ -708,6 +717,27 @@ private fun QuotedReplySection(
             }
         }
     }
+}
+
+/** Leaving the composer: keep it as a draft (the default), throw it away, or go back to writing. */
+@Composable
+private fun ConfirmCloseDialog(onDismiss: () -> Unit, onDiscard: () -> Unit, onSave: () -> Unit) {
+    val c = Dot.colors
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.dotSurfaceEnter(),
+        containerColor = c.surface,
+        shape = DotShapes.large,
+        title = { Text(stringResource(R.string.compose_close_title), style = Dot.type.title, color = c.textPrimary) },
+        text = { Text(stringResource(R.string.compose_close_body), style = Dot.type.callout, color = c.textSecondary) },
+        confirmButton = { DotPrimaryButton(stringResource(R.string.compose_save_draft), onClick = onSave, compact = true) },
+        dismissButton = {
+            Row {
+                DotButton(stringResource(R.string.compose_discard_short), onClick = onDiscard, style = ButtonStyle.Ghost, compact = true)
+                DotButton(stringResource(R.string.compose_keep_editing), onClick = onDismiss, style = ButtonStyle.Ghost, compact = true)
+            }
+        },
+    )
 }
 
 @Composable

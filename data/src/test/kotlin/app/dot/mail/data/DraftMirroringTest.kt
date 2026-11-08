@@ -64,6 +64,36 @@ class DraftMirroringTest {
         assertEquals(listOf(id),listDrafts().map { it.draftId })
         assertTrue(graph.syncAll()); assertEquals(1,remote().size)
     }
+    private suspend fun remoteTrash()=graph.client.sync(config.imap.endpoint(),creds,"Trash").headers.filter { !it.flags.deleted }
+    @Test fun trashingADraftMovesItsLatestVersionToTrash() = runBlocking {
+        graph.client.createFolder(config.imap.endpoint(),creds,null,"Trash"); assertTrue(graph.syncAll())
+        val id=graph.saveDraft(draft("Never uploaded")) // still debouncing: only the local copy exists
+        val token=graph.applyUndoable(MessageAction.TRASH,listOf(-id),Mailbox.Unified(FolderRole.DRAFTS))
+        assertEquals(listOf(id),token!!.drafts)
+        assertTrue(listDrafts().isEmpty()) // hidden at once
+        assertTrue(graph.syncAll())
+        assertTrue(remote().isEmpty())
+        val trashed=remoteTrash().single()
+        assertEquals("Never uploaded",graph.client.body(config.imap.endpoint(),creds,"Trash",trashed.uid).text)
+        assertNull(db.mail().draft(id)); assertNull(db.mail().draftMirror(id))
+        assertTrue(db.mail().operations(account).isEmpty())
+        assertEquals(1,graph.undo(token)) // already on the server: nothing left to cancel
+    }
+    @Test fun undoBeforeSyncKeepsTheDraft() = runBlocking {
+        graph.client.createFolder(config.imap.endpoint(),creds,null,"Trash"); assertTrue(graph.syncAll())
+        val id=graph.saveDraft(draft("Keep me")); ready(id); assertTrue(graph.syncAll())
+        val token=graph.applyUndoable(MessageAction.TRASH,listOf(-id),Mailbox.Unified(FolderRole.DRAFTS))!!
+        assertTrue(listDrafts().isEmpty())
+        assertEquals(0,graph.undo(token))
+        assertEquals(listOf(id),listDrafts().map { it.draftId })
+        assertTrue(graph.syncAll())
+        assertEquals(1,remote().size); assertTrue(remoteTrash().isEmpty())
+    }
+    @Test fun withoutATrashFolderTrashingStillDeletes() = runBlocking {
+        val id=graph.saveDraft(draft()); ready(id); assertTrue(graph.syncAll()); assertEquals(1,remote().size)
+        graph.apply(MessageAction.TRASH,listOf(-id),Mailbox.Unified(FolderRole.DRAFTS))
+        assertTrue(graph.syncAll()); assertTrue(remote().isEmpty()); assertNull(db.mail().draft(id))
+    }
     @Test fun uncertainAppendRecoversFromDurableStateWithoutDuplicate() = runBlocking {
         val id=graph.saveDraft(draft()); ready(id)
         val mirror=db.mail().draftMirror(id)!!

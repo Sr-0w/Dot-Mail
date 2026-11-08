@@ -18,6 +18,11 @@
     <string name="compose_formatted_text">Formatted text</string>
     <string name="compose_schedule_send">Schedule send</string>
     <string name="compose_discard">Discard</string>
+    <string name="compose_close_title">Save this draft?</string>
+    <string name="compose_close_body">Keep it in Drafts to finish later, or discard it.</string>
+    <string name="compose_save_draft">Save draft</string>
+    <string name="compose_discard_short">Discard</string>
+    <string name="compose_keep_editing">Keep editing</string>
     <string name="compose_send">Send</string>
     <string name="compose_schedule_this_evening">This evening, 18:00</string>
     <string name="compose_schedule_tomorrow_morning">Tomorrow morning, 08:00</string>

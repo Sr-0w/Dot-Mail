@@ -18,6 +18,11 @@
     <string name="compose_formatted_text">Formatierter Text</string>
     <string name="compose_schedule_send">Senden planen</string>
     <string name="compose_discard">Entwurf verwerfen</string>
+    <string name="compose_close_title">Entwurf speichern?</string>
+    <string name="compose_close_body">Behalte ihn in den Entwürfen, um ihn später fertigzustellen, oder verwirf ihn.</string>
+    <string name="compose_save_draft">Speichern</string>
+    <string name="compose_discard_short">Verwerfen</string>
+    <string name="compose_keep_editing">Weiter bearbeiten</string>
     <string name="compose_send">Senden</string>
     <string name="compose_schedule_this_evening">Heute Abend, 18:00</string>
     <string name="compose_schedule_tomorrow_morning">Morgen früh, 08:00</string>

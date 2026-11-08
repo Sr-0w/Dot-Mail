@@ -89,7 +89,7 @@ interface MailDao {
     /** Local ids of folders whose deletion is queued: hidden from the UI meanwhile. */
     @Query("SELECT uid FROM operations WHERE action='FOLDER_DELETE'") fun observeDeletingFolderIds(): Flow<List<Long>>
     @Update suspend fun updateFolder(row: FolderRow)
-    @RawQuery(observedEntities = [ThreadRow::class, MessageRow::class, FolderRow::class, DraftRow::class, BodyTextRow::class, SearchMatchRow::class, SnoozeRow::class]) fun page(query: SupportSQLiteQuery): PagingSource<Int, ThreadRow>
+    @RawQuery(observedEntities = [ThreadRow::class, MessageRow::class, FolderRow::class, DraftRow::class, OperationRow::class, BodyTextRow::class, SearchMatchRow::class, SnoozeRow::class]) fun page(query: SupportSQLiteQuery): PagingSource<Int, ThreadRow>
     @Query("SELECT $MESSAGE_META FROM messages WHERE threadId=:id ORDER BY sentAt,id") fun observeThread(id: Long): Flow<List<MessageRow>>
     @Query("SELECT $MESSAGE_META FROM messages WHERE threadId=:id ORDER BY sentAt,id") suspend fun threadMessages(id: Long): List<MessageRow>
     @Query("SELECT $MESSAGE_META FROM messages WHERE folderId=:id") suspend fun folderMessages(id: Long): List<MessageRow>

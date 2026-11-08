@@ -82,6 +82,7 @@ private suspend fun RealMailGraph.replayFolderOperations(account:AccountRow,conf
     var replayed = false
     for (queued in dao.operations(account.id).filter { it.folderId == folder.id }) {
         var op = dao.operation(queued.id) ?: continue
+        if (op.action == OP_TRASH_DRAFT) continue // run by draft mirroring, once the latest version is on the server
         if (op.action == "DEFERRED_FLAGS") {
             val row = op.messageLocalId?.let { dao.message(it) }
             if (row == null) { dao.deleteOperation(op.id); continue }

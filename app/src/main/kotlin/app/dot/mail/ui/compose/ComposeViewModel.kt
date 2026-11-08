@@ -525,6 +525,12 @@ class ComposeViewModel(
         }
     }
 
+    /** Leaving with something written asks first (save or discard); an empty composer just closes. */
+    fun needsCloseChoice(): Boolean {
+        commitPending()
+        return !_state.value.isEmpty && !finished
+    }
+
     /** Back/close: keep a draft if there's anything worth keeping. Returns true if a draft was saved. */
     fun close(): Boolean {
         commitPending()
