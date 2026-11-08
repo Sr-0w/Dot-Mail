@@ -278,6 +278,7 @@ fun ThreadScreen(
     val listState = rememberLazyListState()
     var pendingLink by remember { mutableStateOf<String?>(null) }
     var confirmUnsubscribe by remember { mutableStateOf<String?>(null) }
+    var pdfPreview by remember { mutableStateOf<ThreadEvent.OpenUri?>(null) }
     var menu by remember { mutableStateOf(false) }
     var snoozing by remember { mutableStateOf(false) }
     var showMove by remember { mutableStateOf(false) }
@@ -297,7 +298,9 @@ fun ThreadScreen(
                     if (target != null) onOpenAdjacent(target) else onBack()
                 }
                 is ThreadEvent.Message -> snackbar.showSnackbar(e.text)
-                is ThreadEvent.OpenUri -> {
+                is ThreadEvent.OpenUri -> if (!e.share && (e.mime.equals("application/pdf", true) || e.name.endsWith(".pdf", true))) {
+                    pdfPreview = e
+                } else {
                     val uri = Uri.parse(e.uri)
                     val intent = if (e.share) {
                         Intent(Intent.ACTION_SEND).setType(e.mime).putExtra(Intent.EXTRA_STREAM, uri)
@@ -456,6 +459,21 @@ fun ThreadScreen(
         )
     }
     if (snoozing) app.dot.mail.ui.snooze.SnoozeSheet(onDismiss = { snoozing = false }, onPick = { until -> snoozing = false; vm.snooze(until) })
+    pdfPreview?.let { pdf ->
+        fun launch(share: Boolean) {
+            val uri = Uri.parse(pdf.uri)
+            val intent = (if (share) Intent(Intent.ACTION_SEND).setType(pdf.mime).putExtra(Intent.EXTRA_STREAM, uri)
+            else Intent(Intent.ACTION_VIEW).setDataAndType(uri, pdf.mime)).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            try { context.startActivity(Intent.createChooser(intent, pdf.name)) }
+            catch (_: ActivityNotFoundException) { scope.launch { snackbar.showSnackbar("No app can open ${pdf.name}") } }
+        }
+        app.dot.mail.ui.pdf.PdfViewerDialog(
+            uri = pdf.uri, name = pdf.name,
+            onDismiss = { pdfPreview = null },
+            onShare = { launch(share = true) },
+            onOpenExternally = { launch(share = false) },
+        )
+    }
     confirmUnsubscribe?.let { endpoint ->
         AlertDialog(
             onDismissRequest = { confirmUnsubscribe = null },
