@@ -2,6 +2,7 @@ package app.dot.mail.ui.compose
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.dot.mail.R
 import app.dot.mail.data.MailGraph
 import app.dot.mail.data.ReplyMode
 import app.dot.mail.data.model.Draft
@@ -91,7 +92,10 @@ class ComposeViewModel(
     private val defaultRichText: Boolean = true,
     private val defaultAccountId: () -> Long = { 0L },
     private val includeOriginal: () -> Boolean = { true },
+    private val strings: ((Int, Array<out Any>) -> String)? = null,
 ) : ViewModel() {
+    private fun str(resId: Int, fallback: String, vararg args: Any): String =
+        strings?.invoke(resId, args) ?: fallback
     private val _state = MutableStateFlow(ComposeState(isRichText = defaultRichText))
     val state: StateFlow<ComposeState> = _state.asStateFlow()
 
@@ -409,7 +413,15 @@ class ComposeViewModel(
         if (parsed.isEmpty()) return true
         val invalid = parsed.firstOrNull { !isValidEmail(it.email) }
         if (invalid != null) {
-            _state.update { it.copy(error = "“${invalid.email}” isn't a valid address") }
+            _state.update {
+                it.copy(
+                    error = str(
+                        R.string.compose_error_invalid_address,
+                        "“${invalid.email}” isn't a valid address",
+                        invalid.email,
+                    ),
+                )
+            }
             return false
         }
         edit { d ->
@@ -475,8 +487,14 @@ class ComposeViewModel(
         val s = _state.value
         val d = s.draft ?: return
         when {
-            s.senders.isEmpty() -> { _state.update { it.copy(error = "Add an account before sending") }; return }
-            !s.hasRecipients -> { _state.update { it.copy(error = "Add at least one recipient") }; return }
+            s.senders.isEmpty() -> {
+                _state.update { it.copy(error = str(R.string.compose_error_no_account, "Add an account before sending")) }
+                return
+            }
+            !s.hasRecipients -> {
+                _state.update { it.copy(error = str(R.string.compose_error_no_recipients, "Add at least one recipient")) }
+                return
+            }
         }
         _state.update { it.copy(sending = true) }
         finished = true
@@ -497,7 +515,12 @@ class ComposeViewModel(
                 _closed.value = true
             }.onFailure { e ->
                 finished = false
-                _state.update { it.copy(sending = false, error = e.message ?: "Couldn't queue the message") }
+                _state.update {
+                    it.copy(
+                        sending = false,
+                        error = e.message ?: str(R.string.compose_error_send_failed, "Couldn't queue the message"),
+                    )
+                }
             }
         }
     }

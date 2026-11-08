@@ -28,12 +28,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.dot.design.Dot
 import app.dot.design.DotMotion
 import app.dot.design.DotShapes
 import app.dot.design.DotSpacing
+import app.dot.design.R
 import app.dot.design.rememberReducedMotion
 
 /**
@@ -83,7 +85,7 @@ fun DotTopBar(
 
 @Composable
 fun BackButton(onClick: () -> Unit) {
-    DotIconButton(Icons.AutoMirrored.Outlined.ArrowBack, "Back", onClick = onClick)
+    DotIconButton(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.ds_back), onClick = onClick)
 }
 
 /** Inverted snackbar: one line of text and an optional single action ("Undo"). */
