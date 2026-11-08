@@ -714,7 +714,8 @@ private fun MessageCard(
     val allowRemote = remoteReason != app.dot.mail.ui.settings.LoadReason.NONE
     val c = Dot.colors
     var details by rememberSaveable(message.id) { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().animateContentSize(tween(220))) {
+    val reduceMotion = app.dot.design.rememberReducedMotion()
+    Column(Modifier.fillMaxWidth().then(if (reduceMotion) Modifier else Modifier.animateContentSize(tween(220, easing = DotMotion.standard)))) {
         Row(
             Modifier.fillMaxWidth().clickable(onClick = onToggle)
                 .padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.m),
@@ -738,14 +739,16 @@ private fun MessageCard(
                     }
                     Text(Format.listDate(message.sentAt), style = Dot.type.caption, color = c.textTertiary)
                 }
-                if (expanded) {
-                    Text(
-                        stringResource(R.string.thread_to_recipients, recipientsSummary(message)),
-                        style = Dot.type.caption, color = c.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.clickable { details = !details },
-                    )
-                } else {
-                    Text(message.snippet, style = Dot.type.callout, color = c.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                androidx.compose.animation.Crossfade(expanded, animationSpec = if (reduceMotion) androidx.compose.animation.core.snap() else tween(DotMotion.fast), label = "header-line") { open ->
+                    if (open) {
+                        Text(
+                            stringResource(R.string.thread_to_recipients, recipientsSummary(message)),
+                            style = Dot.type.caption, color = c.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.clickable { details = !details },
+                        )
+                    } else {
+                        Text(message.snippet, style = Dot.type.callout, color = c.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                 }
             }
         }

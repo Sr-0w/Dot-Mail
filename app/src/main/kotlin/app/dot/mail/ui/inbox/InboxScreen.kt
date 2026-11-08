@@ -346,10 +346,17 @@ fun InboxScreen(
                     FilterBar(filters, sort, onFilters = vm::setFilters, onSort = vm::setSort, onClear = vm::clearFilters)
                 }
                 val filtersActive by vm.filters.collectAsStateWithLifecycle()
+                // Folder switch: the new list eases in instead of popping (no second list is composed, so no flicker).
+                val listAlpha = remember { androidx.compose.animation.core.Animatable(1f) }
+                var firstFolder by remember { mutableStateOf(true) }
+                androidx.compose.runtime.LaunchedEffect(mailbox) {
+                    if (firstFolder) { firstFolder = false; return@LaunchedEffect }
+                    if (!reducedMotion) { listAlpha.snapTo(0.4f); listAlpha.animateTo(1f, tween(DotMotion.medium, easing = DotMotion.decelerate)) }
+                }
                 PullToRefreshBox(
                     isRefreshing = refreshing,
                     onRefresh = vm::refresh,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).graphicsLayer { alpha = listAlpha.value },
                     state = pullState,
                     indicator = { QuietRefreshIndicator(pullState, refreshing, Modifier.align(Alignment.TopCenter)) },
                 ) {
@@ -609,13 +616,26 @@ private fun SwipeableRow(
             val armed = state.targetValue != SwipeToDismissBoxValue.Settled
             val bg by animateColorAsState(if (armed) Dot.colors.surfaceRaised else Dot.colors.surface, label = "swipe-bg")
             val scale by animateFloatAsState(if (armed) 1.12f else 0.9f, label = "swipe-scale")
+            // The action fades in with the drag and its name appears once release would commit.
+            val reveal = if (dir == SwipeToDismissBoxValue.Settled) 0f else (state.progress / 0.35f).coerceIn(0f, 1f)
             Box(
                 Modifier.fillMaxSize().background(bg).padding(horizontal = 28.dp),
                 contentAlignment = if (dir == SwipeToDismissBoxValue.StartToEnd) Alignment.CenterStart else Alignment.CenterEnd,
             ) {
                 val (icon, label) = swipeVisual(action, thread)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(icon, label, Modifier.size((22 * scale).dp), tint = if (action == SwipeAction.TRASH && armed) Dot.colors.danger else Dot.colors.textPrimary)
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.graphicsLayer { alpha = 0.35f + 0.65f * reveal }) {
+                    val tint = if (action == SwipeAction.TRASH && armed) Dot.colors.danger else Dot.colors.textPrimary
+                    if (dir == SwipeToDismissBoxValue.EndToStart) {
+                        androidx.compose.animation.AnimatedVisibility(armed, enter = fadeIn(tween(DotMotion.fast)), exit = fadeOut(tween(DotMotion.fast))) {
+                            Text(label, style = Dot.type.label, color = tint, modifier = Modifier.padding(end = DotSpacing.s))
+                        }
+                    }
+                    Icon(icon, null, Modifier.size((22 * scale).dp), tint = tint)
+                    if (dir != SwipeToDismissBoxValue.EndToStart) {
+                        androidx.compose.animation.AnimatedVisibility(armed, enter = fadeIn(tween(DotMotion.fast)), exit = fadeOut(tween(DotMotion.fast))) {
+                            Text(label, style = Dot.type.label, color = tint, modifier = Modifier.padding(start = DotSpacing.s))
+                        }
+                    }
                 }
             }
         },
