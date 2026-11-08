@@ -223,7 +223,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
                 val err = a.syncState as? SyncState.Error
                 ListRow(
                     title = a.displayName,
-                    subtitle = if (err != null) "${a.email}\n${err.message}" else a.email,
+                    subtitle = if (err != null) "${a.email}\n${app.dot.mail.ui.common.ErrorText.syncError(err)}" else a.email,
                     subtitleColor = if (err != null) c.danger else c.textSecondary,
                     onClick = { accountPage = a.id; identityPage = -1 },
                     trailing = { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = c.textTertiary) },

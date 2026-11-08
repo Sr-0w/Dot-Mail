@@ -248,7 +248,7 @@ class ThreadViewModel(
         viewModelScope.launch {
             runCatching { if (source != null) graph.mail.move(listOf(threadId), folderId, source) else @Suppress("DEPRECATION") graph.mail.move(listOf(threadId), folderId) }
                 .onSuccess { _events.send(ThreadEvent.Close) }
-                .onFailure { _events.send(ThreadEvent.Message(it.message ?: str(R.string.inbox_error_move_failed))) }
+                .onFailure { _events.send(ThreadEvent.Message(app.dot.mail.ui.common.ErrorText.of(resources, it, R.string.inbox_error_move_failed))) }
         }
     }
 
@@ -262,7 +262,7 @@ class ThreadViewModel(
         viewModelScope.launch {
             runCatching { graph.mail.setMuted(listOf(threadId), muted) }
                 .onSuccess { _events.send(ThreadEvent.Message(str(if (muted) R.string.inbox_muted_toast else R.string.inbox_unmuted_toast))) }
-                .onFailure { _events.send(ThreadEvent.Message(it.message ?: str(R.string.inbox_error_mute_failed))) }
+                .onFailure { _events.send(ThreadEvent.Message(app.dot.mail.ui.common.ErrorText.of(resources, it, R.string.inbox_error_mute_failed))) }
         }
     }
 
@@ -270,7 +270,7 @@ class ThreadViewModel(
         viewModelScope.launch {
             runCatching { graph.mail.snooze(listOf(threadId), untilMillis) }
                 .onSuccess { _events.send(ThreadEvent.Close) }
-                .onFailure { _events.send(ThreadEvent.Message(it.message ?: str(R.string.inbox_error_snooze_failed))) }
+                .onFailure { _events.send(ThreadEvent.Message(app.dot.mail.ui.common.ErrorText.of(resources, it, R.string.inbox_error_snooze_failed))) }
         }
     }
 
@@ -297,7 +297,7 @@ class ThreadViewModel(
                         else -> Unit
                     }
                 }
-                .onFailure { _events.send(ThreadEvent.Message(it.message ?: str(R.string.inbox_error_action_failed))) }
+                .onFailure { _events.send(ThreadEvent.Message(app.dot.mail.ui.common.ErrorText.of(resources, it, R.string.inbox_error_action_failed))) }
         }
     }
 

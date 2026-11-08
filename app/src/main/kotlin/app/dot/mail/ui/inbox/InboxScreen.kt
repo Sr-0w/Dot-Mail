@@ -1097,16 +1097,7 @@ private fun QuietRefreshIndicator(
     }
 }
 
-/** The banner text for a sync error, in the user's language when the kind of failure is known. */
+/** The banner text for a sync error, in the user's language when the cause is known. */
 @Composable
-private fun syncErrorText(err: app.dot.mail.data.model.SyncState.Error?): String = when (err?.errorKind) {
-    null -> err?.message ?: stringResource(R.string.inbox_sync_problem)
-    app.dot.mail.engine.ConnectionFailure.DNS -> stringResource(R.string.sync_error_dns)
-    app.dot.mail.engine.ConnectionFailure.TIMEOUT -> stringResource(R.string.sync_error_timeout)
-    app.dot.mail.engine.ConnectionFailure.TLS -> stringResource(R.string.sync_error_tls)
-    app.dot.mail.engine.ConnectionFailure.AUTH -> stringResource(R.string.sync_error_auth)
-    app.dot.mail.engine.ConnectionFailure.SERVER_CLOSED -> stringResource(R.string.sync_error_server_closed)
-    app.dot.mail.engine.ConnectionFailure.THROTTLED -> stringResource(R.string.sync_error_throttled)
-    app.dot.mail.engine.ConnectionFailure.NETWORK -> stringResource(R.string.sync_error_network)
-    app.dot.mail.engine.ConnectionFailure.OTHER -> stringResource(R.string.sync_error_other)
-}
+private fun syncErrorText(err: app.dot.mail.data.model.SyncState.Error?): String =
+    err?.let { app.dot.mail.ui.common.ErrorText.syncError(it) } ?: stringResource(R.string.inbox_sync_problem)

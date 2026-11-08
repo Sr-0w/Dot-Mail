@@ -1071,4 +1071,24 @@
     <string name="compose_use_alias">Utiliser un alias…</string>
     <string name="compose_aliases_empty">Aucun alias n’est disponible auprès de vos fournisseurs connectés.</string>
     <string name="aliases_reply_to_guidance">Le domaine de cet alias ne correspond pas à vos identités. Adresse copiée ; utilisez-la comme indication pour Répondre à.</string>
+
+    <!-- Typed error texts -->
+    <string name="sync_problem_folder">un dossier est indisponible sur le serveur</string>
+    <string name="sync_problem_parse">la réponse du serveur n’a pas pu être lue</string>
+    <string name="sync_problem_database">la base de messages locale n’a pas pu être mise à jour</string>
+    <string name="sync_problem_unexpected">le serveur a renvoyé des données inattendues</string>
+    <string name="sync_problem_headers">certains en-têtes de messages n’ont pas pu être lus — nouvel essai</string>
+    <string name="inbox_refresh_failed_reason">Actualisation impossible : %1$s</string>
+    <string name="action_error_message_moving">Ce message est en cours de déplacement. Réessayez dans un instant.</string>
+    <string name="action_error_message_folder_gone">Le dossier de ce message n’est plus disponible.</string>
+    <string name="action_error_destination_other_account">Choisissez une destination dans le même compte.</string>
+    <string name="action_error_move_syncing">Ce déplacement est encore en cours de synchronisation. Réessayez dans un instant.</string>
+    <string name="action_error_move_sending">Ce déplacement est en cours d’envoi au serveur. Réessayez dans un instant.</string>
+    <string name="action_error_source_required">Choisissez la boîte source avant de déplacer cette conversation.</string>
+    <string name="action_error_no_role_folder">Ce compte n’a pas de dossier « %1$s ».</string>
+    <string name="action_error_message_syncing">Ce message est encore en cours de synchronisation. Réessayez dans un instant.</string>
+    <string name="action_error_destination_gone">Le dossier de destination n’est plus disponible.</string>
+    <string name="action_error_local_draft_move">Ouvrez ou supprimez un brouillon local au lieu de le déplacer.</string>
+    <string name="action_error_mixed_accounts">Choisissez des conversations et une destination dans le même compte.</string>
+    <string name="action_error_draft_account_change">Commencez un nouveau brouillon pour utiliser un autre compte.</string>
 </resources>

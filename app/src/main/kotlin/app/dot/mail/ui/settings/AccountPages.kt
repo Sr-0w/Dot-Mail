@@ -71,7 +71,7 @@ internal fun AccountPage(account: Account, onBack: () -> Unit, onEditIdentity: (
         DotTopBar(title = account.displayName, subtitle = account.email, elevated = scroll.value > 0, navigation = { BackButton(onBack) })
         Column(Modifier.verticalScroll(scroll).navigationBarsPadding()) {
             (account.syncState as? SyncState.Error)?.let { err ->
-                Text(err.message, style = Dot.type.callout, color = c.danger, modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.m))
+                Text(app.dot.mail.ui.common.ErrorText.syncError(err), style = Dot.type.callout, color = c.danger, modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.m))
             }
             val context = LocalContext.current
             val graph = LocalMailGraph.current

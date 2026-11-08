@@ -1071,4 +1071,24 @@
     <string name="compose_use_alias">Use an alias…</string>
     <string name="compose_aliases_empty">No aliases are available for your connected providers.</string>
     <string name="aliases_reply_to_guidance">This alias domain is not one of your identities. The address was copied; use it as Reply-To guidance.</string>
+
+    <!-- Typed error texts -->
+    <string name="sync_problem_folder">a folder is unavailable on the server</string>
+    <string name="sync_problem_parse">the server’s response couldn’t be read</string>
+    <string name="sync_problem_database">the local mail database couldn’t be updated</string>
+    <string name="sync_problem_unexpected">the server returned unexpected data</string>
+    <string name="sync_problem_headers">some message headers couldn’t be read — retrying</string>
+    <string name="inbox_refresh_failed_reason">Couldn’t refresh: %1$s</string>
+    <string name="action_error_message_moving">This message is moving. Try again shortly.</string>
+    <string name="action_error_message_folder_gone">This message’s folder is no longer available.</string>
+    <string name="action_error_destination_other_account">Choose a destination in the same account.</string>
+    <string name="action_error_move_syncing">This move is still being synchronized. Try again shortly.</string>
+    <string name="action_error_move_sending">This move is being sent to the server. Try again shortly.</string>
+    <string name="action_error_source_required">Choose the source mailbox before moving this conversation.</string>
+    <string name="action_error_no_role_folder">This account has no %1$s folder.</string>
+    <string name="action_error_message_syncing">This message is still being synchronized. Try again shortly.</string>
+    <string name="action_error_destination_gone">The destination folder is no longer available.</string>
+    <string name="action_error_local_draft_move">Open or discard a local draft instead of moving it.</string>
+    <string name="action_error_mixed_accounts">Choose conversations and a destination in the same account.</string>
+    <string name="action_error_draft_account_change">Start a new draft to use another account.</string>
 </resources>

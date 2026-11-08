@@ -1071,4 +1071,24 @@
     <string name="compose_use_alias">Alias verwenden…</string>
     <string name="compose_aliases_empty">Bei Ihren verbundenen Anbietern sind keine Aliase verfügbar.</string>
     <string name="aliases_reply_to_guidance">Diese Alias-Domain gehört nicht zu Ihren Identitäten. Die Adresse wurde kopiert; verwenden Sie sie als Antwort-an-Hinweis.</string>
+
+    <!-- Typed error texts -->
+    <string name="sync_problem_folder">ein Ordner ist auf dem Server nicht verfügbar</string>
+    <string name="sync_problem_parse">die Antwort des Servers konnte nicht gelesen werden</string>
+    <string name="sync_problem_database">die lokale Maildatenbank konnte nicht aktualisiert werden</string>
+    <string name="sync_problem_unexpected">der Server lieferte unerwartete Daten</string>
+    <string name="sync_problem_headers">einige Nachrichtenköpfe konnten nicht gelesen werden – neuer Versuch</string>
+    <string name="inbox_refresh_failed_reason">Aktualisierung fehlgeschlagen: %1$s</string>
+    <string name="action_error_message_moving">Diese Nachricht wird gerade verschoben. Versuchen Sie es gleich noch einmal.</string>
+    <string name="action_error_message_folder_gone">Der Ordner dieser Nachricht ist nicht mehr verfügbar.</string>
+    <string name="action_error_destination_other_account">Wählen Sie ein Ziel im selben Konto.</string>
+    <string name="action_error_move_syncing">Dieses Verschieben wird noch synchronisiert. Versuchen Sie es gleich noch einmal.</string>
+    <string name="action_error_move_sending">Dieses Verschieben wird an den Server gesendet. Versuchen Sie es gleich noch einmal.</string>
+    <string name="action_error_source_required">Wählen Sie das Quellpostfach, bevor Sie diese Unterhaltung verschieben.</string>
+    <string name="action_error_no_role_folder">Dieses Konto hat keinen Ordner „%1$s“.</string>
+    <string name="action_error_message_syncing">Diese Nachricht wird noch synchronisiert. Versuchen Sie es gleich noch einmal.</string>
+    <string name="action_error_destination_gone">Der Zielordner ist nicht mehr verfügbar.</string>
+    <string name="action_error_local_draft_move">Öffnen oder verwerfen Sie einen lokalen Entwurf, statt ihn zu verschieben.</string>
+    <string name="action_error_mixed_accounts">Wählen Sie Unterhaltungen und ein Ziel im selben Konto.</string>
+    <string name="action_error_draft_account_change">Beginnen Sie einen neuen Entwurf, um ein anderes Konto zu verwenden.</string>
 </resources>
