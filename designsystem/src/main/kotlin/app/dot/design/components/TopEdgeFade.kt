@@ -12,16 +12,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.dot.design.Dot
 import app.dot.design.rememberReducedMotion
-import dev.chrisbanes.haze.HazeProgressive
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
@@ -67,28 +63,28 @@ fun TopEdgeFade(
     progress: Float,
     modifier: Modifier = Modifier,
     height: Dp = 32.dp,
+    fadeStart:Float=0.6f,
 ) {
     val reduced = rememberReducedMotion()
     val p = if (reduced) (if (progress > 0.001f) 1f else 0f) else progress.coerceIn(0f, 1f)
     if (p <= 0.001f) return
     val bg = Dot.colors.background
-    val blur = state != null && state.blurEnabled && !reduced
+    val blur = state != null && state.blurEnabled && !reduced && androidx.compose.ui.platform.LocalView.current.isHardwareAccelerated
+    val fadeMask=remember(fadeStart) { Brush.verticalGradient(
+        0f to androidx.compose.ui.graphics.Color.White,
+        fadeStart.coerceIn(0f,0.85f) to androidx.compose.ui.graphics.Color.White,
+        (fadeStart.coerceIn(0f,0.85f)+1f)/2f to androidx.compose.ui.graphics.Color.White.copy(alpha=0.35f),
+        1f to androidx.compose.ui.graphics.Color.Transparent,
+    ) }
     val effect = if (blur) Modifier.hazeEffect(
         state!!,
-        HazeStyle(backgroundColor = bg, tints = listOf(HazeTint(bg.copy(alpha = 0.35f))), blurRadius = 14.dp, noiseFactor = 0f),
-    ) { progressive = HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0f) } else Modifier
+        HazeStyle(backgroundColor = bg, tints = listOf(HazeTint(bg.copy(alpha = 0.24f))), blurRadius = 30.dp, noiseFactor = 0f),
+    ) {
+        mask=fadeMask
+        inputScale=dev.chrisbanes.haze.HazeInputScale.Fixed(0.5f)
+    } else Modifier
     Box(
-        modifier.fillMaxWidth().height(height).graphicsLayer {
-            alpha = p
-            compositingStrategy = CompositingStrategy.Offscreen
-        }.drawWithContent {
-            drawContent()
-            // Fade the complete blur+tint, not only its background. No hard seam at the bottom.
-            drawRect(Brush.verticalGradient(0f to androidx.compose.ui.graphics.Color.White,
-                0.35f to androidx.compose.ui.graphics.Color.White,
-                0.72f to androidx.compose.ui.graphics.Color.White.copy(alpha=0.45f),
-                1f to androidx.compose.ui.graphics.Color.Transparent),blendMode=BlendMode.DstIn)
-        }.then(effect)
-            .background(Brush.verticalGradient(listOf(bg.copy(alpha = if (blur) 0.72f else 0.94f), bg.copy(alpha = 0f)))),
+        modifier.fillMaxWidth().height(height).graphicsLayer { alpha=p }.then(effect)
+            .background(Brush.verticalGradient(listOf(bg.copy(alpha = if (blur) 0.64f else 0.94f), bg.copy(alpha = 0f)))),
     )
 }

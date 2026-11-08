@@ -1,5 +1,6 @@
 package app.dot.mail.ui.pdf
 
+import dev.chrisbanes.haze.hazeSource
 import app.dot.mail.data.PdfText
 import android.graphics.Bitmap
 import android.graphics.Color as AColor
@@ -14,6 +15,8 @@ import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
@@ -78,8 +81,8 @@ fun PdfViewerDialog(
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         val c = Dot.colors
         var showText by remember { mutableStateOf(false) }
-        Column(Modifier.fillMaxSize().background(c.background)) {
-            DotTopBar(
+        val frostedSource=app.dot.design.components.rememberGlassBackdrop()
+        app.dot.design.components.FrostedHeaderLayout(backdrop=frostedSource,modifier=Modifier.fillMaxSize().background(c.background),header={ DotTopBar(
                 title = name,
                 navigation = { DotIconButton(Icons.Outlined.Close, stringResource(R.string.compose_close), onClick = onDismiss) },
                 actions = {
@@ -93,9 +96,9 @@ fun PdfViewerDialog(
                     DotIconButton(Icons.Outlined.Share, stringResource(R.string.thread_share), onClick = onShare)
                     DotIconButton(Icons.AutoMirrored.Outlined.OpenInNew, stringResource(R.string.pdf_open_with), onClick = onOpenExternally)
                 },
-            )
-            if (showText) PdfTextView(uri, Modifier.weight(1f))
-            else PdfPages(uri, onFailed = onOpenExternally, modifier = Modifier.weight(1f))
+            ) }) { headerPadding ->
+            if(showText) PdfTextView(uri,Modifier.fillMaxSize().hazeSource(frostedSource),headerPadding)
+            else PdfPages(uri,onFailed=onOpenExternally,modifier=Modifier.fillMaxSize().hazeSource(frostedSource),headerPadding=headerPadding)
         }
     }
 }
@@ -106,7 +109,7 @@ private class PdfDocument(val fd: ParcelFileDescriptor, val renderer: PdfRendere
 }
 
 @Composable
-private fun PdfPages(uri: String, onFailed: () -> Unit, modifier: Modifier = Modifier) {
+private fun PdfPages(uri: String, onFailed: () -> Unit, modifier: Modifier = Modifier, headerPadding: androidx.compose.foundation.layout.PaddingValues = androidx.compose.foundation.layout.PaddingValues()) {
     val context = LocalContext.current
     val c = Dot.colors
     val doc by produceState<Result<PdfDocument>?>(null, uri) {
@@ -144,7 +147,7 @@ private fun PdfPages(uri: String, onFailed: () -> Unit, modifier: Modifier = Mod
                 LazyColumn(
                     state = rememberLazyListState(),
                     userScrollEnabled = scale == 1f,
-                    contentPadding = PaddingValues(DotSpacing.m),
+                    contentPadding = PaddingValues(start=DotSpacing.m,end=DotSpacing.m,top=headerPadding.calculateTopPadding()+DotSpacing.m,bottom=DotSpacing.m),
                     verticalArrangement = Arrangement.spacedBy(DotSpacing.m),
                     modifier = Modifier.fillMaxSize().graphicsLayer {
                         scaleX = scale; scaleY = scale; translationX = offset.x; translationY = offset.y
@@ -190,7 +193,7 @@ private fun PdfPage(pdf: PdfDocument, index: Int, widthPx: Int) {
 
 
 @Composable
-private fun PdfTextView(uri: String, modifier: Modifier = Modifier) {
+private fun PdfTextView(uri: String, modifier: Modifier = Modifier, headerPadding: androidx.compose.foundation.layout.PaddingValues = androidx.compose.foundation.layout.PaddingValues()) {
     val context = LocalContext.current
     val c = Dot.colors
     val text by produceState<String?>(null, uri) { value = withContext(Dispatchers.IO) { PdfText.extract(context, uri) ?: "" } }
@@ -201,10 +204,10 @@ private fun PdfTextView(uri: String, modifier: Modifier = Modifier) {
             Text(stringResource(R.string.pdf_no_text), style = Dot.type.callout, color = c.textSecondary)
         }
         else -> androidx.compose.foundation.text.selection.SelectionContainer(modifier.fillMaxSize()) {
-            Text(
-                t, style = Dot.type.body, color = c.textPrimary,
-                modifier = Modifier.fillMaxSize().verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(DotSpacing.gutter),
-            )
+            Column(Modifier.fillMaxSize().verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(horizontal=DotSpacing.gutter)) {
+                Spacer(Modifier.height(headerPadding.calculateTopPadding()))
+                Text(t,style=Dot.type.body,color=c.textPrimary)
+            }
         }
     }
 }

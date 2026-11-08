@@ -249,14 +249,15 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
     }
 
     val draft = state.draft
-    Column(
-        Modifier
+    val edgeState=app.dot.design.components.rememberGlassBackdrop()
+    val bodyScroll=rememberScrollState()
+    app.dot.design.components.FrostedHeaderLayout(
+        backdrop=edgeState,modifier=Modifier
             .fillMaxSize()
             .background(c.background)
             .windowInsetsPadding(WindowInsets.navigationBars)
             .imePadding(),
-    ) {
-        DotTopBar(
+        header={ DotTopBar(
             navigation = { DotIconButton(Icons.Outlined.Close, stringResource(R.string.compose_close), onClick = requestClose) },
             title = if (route.replyMode != null) replyTitle(route.replyMode) else stringResource(R.string.compose_new_message),
             actions = {
@@ -287,12 +288,11 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                 }
                 SendButton(enabled = state.loaded && !state.sending && state.hasRecipients, onClick = { vm.send() })
             },
-        )
-        if (draft == null) return@Column
-        val edgeState = app.dot.design.components.rememberGlassBackdrop()
-        val bodyScroll = rememberScrollState()
-        Box(Modifier.weight(1f)) {
-        Column(Modifier.fillMaxSize().hazeSource(edgeState).verticalScroll(bodyScroll)) {
+        ) },
+    ) { headerPadding ->
+        if(draft!=null) {
+        Column(Modifier.fillMaxSize().hazeSource(edgeState).verticalScroll(bodyScroll)) { Spacer(Modifier.height(headerPadding.calculateTopPadding()))
+
             // From
             if (state.senders.size > 1) {
                 Box {
@@ -429,21 +429,8 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                     onToggle = vm::toggleQuoteExpanded,
                 )
             }
+
         }
-            app.dot.design.components.TopEdgeFade(edgeState, app.dot.design.components.rememberTopEdgeProgress(bodyScroll), Modifier.align(Alignment.TopCenter))
-        }
-        if (state.savedOnce) {
-            Text(
-                stringResource(R.string.compose_draft_saved), style = Dot.type.caption, color = c.textTertiary,
-                modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s),
-            )
-        }
-        if (state.isRichText && bodyFocused) {
-            Hairline()
-            FormattingToolbar(
-                richTextState = richTextState,
-                onLinkClick = { showLinkDialog = true },
-            )
         }
     }
 

@@ -1,5 +1,6 @@
 package app.dot.mail.ui.settings
 
+import dev.chrisbanes.haze.hazeSource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -115,9 +116,14 @@ internal fun CategoriesPage(onBack: () -> Unit) {
         scope.launch { runCatching { graph.mail.reclassifyAll() } }
     }
 
-    Column(Modifier.fillMaxSize().background(c.background)) {
-        DotTopBar(title = stringResource(R.string.categories_title), elevated = scroll.value > 0, navigation = { BackButton(onBack) })
-        Column(Modifier.verticalScroll(scroll).navigationBarsPadding()) {
+    val frostedSource=app.dot.design.components.rememberGlassBackdrop()
+    app.dot.design.components.FrostedHeaderLayout(
+        backdrop=frostedSource,modifier=Modifier.fillMaxSize().background(c.background),
+        header={ DotTopBar(title = stringResource(R.string.categories_title), elevated = scroll.value > 0, navigation = { BackButton(onBack) }) },
+    ) { topPadding ->
+        Column(Modifier.fillMaxSize().hazeSource(frostedSource).verticalScroll(scroll).navigationBarsPadding()) {
+            androidx.compose.foundation.layout.Spacer(Modifier.height(topPadding.calculateTopPadding()))
+
             Text(
                 stringResource(R.string.categories_intro), style = Dot.type.callout, color = c.textSecondary,
                 modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s),
@@ -153,6 +159,7 @@ internal fun CategoriesPage(onBack: () -> Unit) {
                 onClick = { editing = Rule(UUID.randomUUID().toString(), Field.FROM_ADDRESS, null, Op.CONTAINS, "", Category.NEWSLETTER, true) },
             )
             Spacer(Modifier.height(DotSpacing.xl))
+
         }
     }
 

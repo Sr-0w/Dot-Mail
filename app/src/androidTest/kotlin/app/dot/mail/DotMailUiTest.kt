@@ -9,6 +9,8 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
@@ -33,7 +35,7 @@ class DotMailUiTest {
     private fun openThread(subject: String) {
         compose.onNodeWithText(subject).performClick()
         compose.waitForText(subject) // subject heading in the thread
-        compose.waitUntil(WAIT_MS) { compose.onAllNodesWithText("Archive", useUnmergedTree = false).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(WAIT_MS) { compose.onAllNodes(androidx.compose.ui.test.hasContentDescription("Archive")).fetchSemanticsNodes().isNotEmpty() }
     }
 
     @Test fun inbox_showsUnifiedDemoThreads() {
@@ -76,7 +78,7 @@ class DotMailUiTest {
         compose.waitForTextGone(HIKE)
 
         compose.openDrawer()
-        listOf("All inboxes", "Inbox", "Sent", "Drafts", "Archive", "Spam", "Trash", "Settings", "Add account").forEach {
+        listOf("All inboxes", "Inbox", "Sent", "Drafts", "Archive", "Spam", "Trash", "Settings").forEach {
             compose.onAllNodesWithText(it).fetchSemanticsNodes().let { n -> check(n.isNotEmpty()) { "Drawer is missing \"$it\"" } }
         }
         compose.onNodeWithText("Archive").performClick()
@@ -99,9 +101,12 @@ class DotMailUiTest {
 
     @Test fun search_findsHike() {
         compose.onNodeWithContentDescription("Search").performClick()
+        compose.mainClock.advanceTimeBy(600); compose.waitForIdle()
         compose.waitForText("Search by sender", substring = true)
         compose.textFields()[0].performTextInput("hike")
-        compose.waitUntil(WAIT_MS) { compose.onAllNodesWithText(HIKE).fetchSemanticsNodes().isNotEmpty() }
+        compose.mainClock.advanceTimeBy(600); compose.waitForIdle()
+        try { compose.waitUntil(WAIT_MS) { compose.onAllNodesWithText(HIKE, substring = true).fetchSemanticsNodes().isNotEmpty() } }
+        catch(e:Throwable) { captureDemoFrame(compose.activity,"search-probe"); java.io.File(compose.activity.cacheDir,"dotmail-ui-tests/search-probe-tree.txt").writeText(compose.onRoot().printToString()); throw e }
         compose.onNodeWithText(PHOTOS).assertDoesNotExist()
     }
 

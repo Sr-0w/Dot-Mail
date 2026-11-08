@@ -1,5 +1,6 @@
 package app.dot.mail.ui.search
 
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -170,7 +171,14 @@ fun SearchScreen(onBack: () -> Unit, onOpenThread: (Long) -> Unit, folderId: Lon
     val c = Dot.colors
     LaunchedEffect(Unit) { focus.requestFocus() }
 
-    Column(Modifier.fillMaxSize().background(c.background).imePadding()) {
+    val listState=androidx.compose.foundation.lazy.rememberLazyListState()
+    val headerControls=app.dot.design.components.rememberHeaderControls()
+    val reduced=app.dot.design.rememberReducedMotion()
+    LaunchedEffect(query) { headerControls.show() }
+    val edgeState=app.dot.design.components.rememberGlassBackdrop()
+    val q=query.trim()
+    app.dot.design.components.FrostedHeaderLayout(backdrop=edgeState,reserveExpandedHeight=true,modifier=Modifier.fillMaxSize().background(c.background).imePadding(),header={ Column {
+
         Row(
             Modifier.windowInsetsPadding(WindowInsets.statusBars).padding(start = 4.dp, end = DotSpacing.l, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -185,12 +193,19 @@ fun SearchScreen(onBack: () -> Unit, onOpenThread: (Long) -> Unit, folderId: Lon
                 onSearch = { keyboard?.hide() },
             )
         }
+        androidx.compose.animation.AnimatedVisibility(
+            visible=headerControls.expanded || !listState.canScrollBackward,
+            enter=if(reduced) androidx.compose.animation.EnterTransition.None else androidx.compose.animation.expandVertically()+androidx.compose.animation.fadeIn(),
+            exit=if(reduced) androidx.compose.animation.ExitTransition.None else androidx.compose.animation.shrinkVertically()+androidx.compose.animation.fadeOut(),
+        ) {
         ScopeBar(
             mode = mode, sort = sort, server = server, hasFolder = ctx != null, hasAccount = ctx?.accountId != null,
             onMode = { vm.mode.value = it }, onSort = { vm.sort.value = it }, onServer = { vm.includeServer.value = it },
         )
-        val q = query.trim()
+        }
         if (q.length >= 2) ProgressLines(progress)
+    } }) { headerPadding ->
+        Box(Modifier.fillMaxSize().then(if(results.itemCount>0) Modifier else Modifier.padding(headerPadding))) {
         when (searchDisplayState(q, results.itemCount, results.loadState.refresh, progress, queryPending)) {
             SearchDisplayState.IDLE -> SearchHints()
             SearchDisplayState.SEARCHING ->
@@ -208,9 +223,10 @@ fun SearchScreen(onBack: () -> Unit, onOpenThread: (Long) -> Unit, folderId: Lon
                     stringResource(if (unavailable) R.string.search_partial_title else R.string.search_error_title),
                     stringResource(if (unavailable) R.string.search_partial_body else R.string.search_server_error),
                 )
-            } else ResultsList(results, onOpenThread)
-            SearchDisplayState.RESULTS -> ResultsList(results, onOpenThread)
+            } else ResultsList(results, onOpenThread, edgeState, headerPadding, listState, headerControls)
+            SearchDisplayState.RESULTS -> ResultsList(results, onOpenThread, edgeState, headerPadding, listState, headerControls)
         }
+            }
     }
 }
 
@@ -232,17 +248,14 @@ internal fun searchDisplayState(query: String, count: Int, refresh: LoadState, p
 }
 
 @Composable
-private fun ResultsList(results: androidx.paging.compose.LazyPagingItems<SearchResult>, onOpenThread: (Long) -> Unit) {
-    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-    val edgeState = app.dot.design.components.rememberGlassBackdrop()
+private fun ResultsList(results: androidx.paging.compose.LazyPagingItems<SearchResult>, onOpenThread: (Long) -> Unit, edgeState: dev.chrisbanes.haze.HazeState, headerPadding: androidx.compose.foundation.layout.PaddingValues, listState: androidx.compose.foundation.lazy.LazyListState, headerControls: app.dot.design.components.HeaderControlsState) {
     Box(Modifier.fillMaxSize()) {
-        LazyColumn(state = listState, modifier = Modifier.fillMaxSize().hazeSource(edgeState).navigationBarsPadding()) {
+        LazyColumn(state = listState, contentPadding=headerPadding, modifier = Modifier.fillMaxSize().nestedScroll(headerControls.connection).hazeSource(edgeState).navigationBarsPadding()) {
             items(results.itemCount, key = results.itemKey { it.messageId }) { i ->
                 val result = results[i] ?: return@items
                 SearchResultRow(result, onClick = { onOpenThread(result.thread.threadId) })
             }
         }
-        app.dot.design.components.TopEdgeFade(edgeState, app.dot.design.components.rememberTopEdgeProgress(listState), Modifier.align(Alignment.TopCenter))
     }
 }
 

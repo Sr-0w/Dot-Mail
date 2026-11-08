@@ -426,8 +426,12 @@ fun ThreadScreen(
     // Hardware keyboard shortcuts (tablets, Chromebooks, DeX), Gmail-style single keys.
     val keyFocus = remember { androidx.compose.ui.focus.FocusRequester() }
     LaunchedEffect(Unit) { runCatching { keyFocus.requestFocus() } }
-    // The message scrolls under the floating capsules; they blur exactly what passes behind them.
-    val glass = app.dot.design.components.rememberGlassBackdrop()
+    // Haze records its entire source into a graphics layer. Recording an Android WebView's
+    // hardware draw functor can flash blank tiles and crash RenderThread when that retained
+    // layer outlives WebView.destroy() during Back. HTML (and still-loading bodies) must stay
+    // outside the capture path; capsules keep their neutral frosted fallback and edge gradient.
+    val readerBackdrop = app.dot.design.components.rememberGlassBackdrop()
+    val glass = readerBackdrop.takeIf { list != null && list.all { message -> message.body?.let { it.html.isNullOrBlank() } == true } }
     Box(
         Modifier.fillMaxSize().background(c.background)
             .focusRequester(keyFocus).focusable()
@@ -1218,7 +1222,7 @@ private fun BoxScope.ReaderChrome(
     )
     // Scrims only make sense while the capsules are there; they are plain gradients of the page colour.
     AnimatedVisibility(visible, Modifier.align(Alignment.TopCenter), enter = androidx.compose.animation.fadeIn(), exit = androidx.compose.animation.fadeOut()) {
-        app.dot.design.components.TopEdgeFade(backdrop, 1f, Modifier, height = topScrim - 8.dp)
+        app.dot.design.components.TopEdgeFade(backdrop, 1f, Modifier, height = topScrim + 56.dp)
     }
     AnimatedVisibility(visible, Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = DotSpacing.s, top = DotSpacing.xs), enter = enter(true), exit = exit(true)) { back() }
     AnimatedVisibility(visible, Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = DotSpacing.s, top = DotSpacing.xs), enter = enter(true), exit = exit(true)) { actions() }

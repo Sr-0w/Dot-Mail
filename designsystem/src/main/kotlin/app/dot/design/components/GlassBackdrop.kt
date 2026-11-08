@@ -34,7 +34,7 @@ fun Modifier.glassBackdropSource(state: HazeState?): Modifier = if (state == nul
 /** Surface of a glass control: blurred backdrop + tint when [state] can blur, otherwise the opaque frosted gradient. */
 @Composable
 internal fun Modifier.glassSurface(state: HazeState?, pressed: Boolean): Modifier =
-    if (state == null || !state.blurEnabled) {
+    if (state == null || !state.blurEnabled || !androidx.compose.ui.platform.LocalView.current.isHardwareAccelerated) {
         background(frostedSurfaceBrush(pressed), CircleShape)
     } else {
         hazeEffect(

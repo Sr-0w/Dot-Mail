@@ -141,13 +141,14 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
     val pageAccount = accounts.firstOrNull { it.id == accountPage }
     // Settings search: a field on top of the page; while it has text, matching settings replace the sections.
     var query by rememberSaveable { mutableStateOf("") }
+    var headerInsetPx by remember { mutableIntStateOf(0) }
     var pendingSection by remember { mutableStateOf<SettingsSection?>(null) }
     val anchors = remember { androidx.compose.runtime.mutableStateMapOf<SettingsSection, Int>() }
     fun Modifier.anchor(section: SettingsSection) = onGloballyPositioned { anchors[section] = it.positionInParent().y.toInt() }
     LaunchedEffect(pendingSection) {
         val section = pendingSection ?: return@LaunchedEffect
         val y = androidx.compose.runtime.snapshotFlow { anchors[section] }.filterNotNull().first()
-        scroll.animateScrollTo((y - 8).coerceAtLeast(0))
+        scroll.animateScrollTo((y - headerInsetPx - 8).coerceAtLeast(0))
         pendingSection = null
     }
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
@@ -194,11 +195,12 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
         IdentityEditorPage(pageAccount, identityPage, onBack = { identityPage = -1 })
     } else if (pageAccount != null) {
         AccountPage(pageAccount, onBack = { accountPage = 0 }, onEditIdentity = { identityPage = it }, onRemove = { removing = pageAccount })
-    } else Column(Modifier.fillMaxSize().background(c.background)) {
-        DotTopBar(title = stringResource(R.string.settings_title), elevated = scroll.value > 0, navigation = { BackButton(onBack) })
-        val edgeState = app.dot.design.components.rememberGlassBackdrop()
-        Box(Modifier.weight(1f)) {
-        Column(Modifier.fillMaxSize().hazeSource(edgeState).verticalScroll(scroll)) {
+    } else { val edgeState=app.dot.design.components.rememberGlassBackdrop()
+        app.dot.design.components.FrostedHeaderLayout(backdrop=edgeState,modifier=Modifier.fillMaxSize().background(c.background),header={ DotTopBar(title = stringResource(R.string.settings_title), elevated = scroll.value > 0, navigation = { BackButton(onBack) }) }) { headerPadding ->
+        val headerInset=with(androidx.compose.ui.platform.LocalDensity.current) { headerPadding.calculateTopPadding().roundToPx() }
+        androidx.compose.runtime.SideEffect { headerInsetPx=headerInset }
+        Column(Modifier.fillMaxSize().hazeSource(edgeState).verticalScroll(scroll)) { Spacer(Modifier.height(headerPadding.calculateTopPadding()))
+
             app.dot.design.components.SearchField(
                 value = query,
                 onValueChange = { query = it },
@@ -451,8 +453,8 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             }
             Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
             Spacer(Modifier.height(DotSpacing.xl))
+
         }
-            app.dot.design.components.TopEdgeFade(edgeState, app.dot.design.components.rememberTopEdgeProgress(scroll), Modifier.align(androidx.compose.ui.Alignment.TopCenter))
         }
     }
 

@@ -22,18 +22,24 @@ internal val LocalHeaderGlass=staticCompositionLocalOf<HeaderGlass?> { null }
 fun FrostedHeaderLayout(
     backdrop:HazeState?,
     modifier:Modifier=Modifier,
+    reserveExpandedHeight:Boolean=false,
     header:@Composable ()->Unit,
     content:@Composable (contentPadding:PaddingValues)->Unit,
 ) {
     val density=LocalDensity.current
     val initial=with(density) { WindowInsets.statusBars.getTop(this).toDp() }+64.dp
-    var headerHeight by remember(density) { mutableStateOf(initial) }
+    val width=androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
+    var headerHeight by remember(density,width) { mutableStateOf(initial) }
+    var expandedHeight by remember(density,width) { mutableStateOf(initial) }
     Box(modifier.fillMaxSize()) {
-        content(PaddingValues(top=headerHeight))
-        TopEdgeFade(backdrop,1f,Modifier.align(Alignment.TopCenter),height=headerHeight+56.dp)
-        CompositionLocalProvider(LocalHeaderGlass provides HeaderGlass(backdrop)) {
+        content(PaddingValues(top=if(reserveExpandedHeight) expandedHeight else headerHeight))
+        TopEdgeFade(backdrop,1f,Modifier.align(Alignment.TopCenter),height=expandedHeight+72.dp,fadeStart=(expandedHeight/(expandedHeight+72.dp)).coerceIn(0.4f,0.85f))
+        CompositionLocalProvider(LocalHeaderGlass provides HeaderGlass(null)) {
             Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().onSizeChanged { size ->
-                with(density) { size.height.toDp() }.let { if(headerHeight!=it) headerHeight=it }
+                with(density) { size.height.toDp() }.let {
+                    if(headerHeight!=it) headerHeight=it
+                    if(it>expandedHeight) expandedHeight=it
+                }
             }) { header() }
         }
     }
