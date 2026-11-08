@@ -404,6 +404,7 @@ private fun ThreadList(
     onSwipe: (MessageAction, ThreadSummary) -> Unit,
     onSnooze: (ThreadSummary) -> Unit,
 ) {
+    val listReducedMotion = rememberReducedMotion()
     val refresh = threads.loadState.refresh
     when {
         threads.itemCount == 0 && refresh is LoadState.Loading -> SkeletonList()
@@ -424,10 +425,11 @@ private fun ThreadList(
             items(threads.itemCount, key = threads.itemKey { it.threadId }, contentType = { "thread" }) { index ->
                 val t = threads[index] ?: return@items
                 // Archive/delete/arrivals animate instead of popping (fade + slide of neighbours).
+                // With animations turned off system-wide the rows simply change (null specs disable the animation).
                 Box(Modifier.animateItem(
-                    fadeInSpec = tween(DotMotion.medium),
-                    placementSpec = androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow, visibilityThreshold = androidx.compose.ui.unit.IntOffset.VisibilityThreshold),
-                    fadeOutSpec = tween(DotMotion.fast),
+                    fadeInSpec = if (listReducedMotion) null else tween(DotMotion.medium),
+                    placementSpec = if (listReducedMotion) null else androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow, visibilityThreshold = androidx.compose.ui.unit.IntOffset.VisibilityThreshold),
+                    fadeOutSpec = if (listReducedMotion) null else tween(DotMotion.fast),
                 )) {
                 SwipeableRow(
                     thread = t,

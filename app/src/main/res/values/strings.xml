@@ -395,14 +395,14 @@
     <string name="thread_header_reply_to">Reply to</string>
     <string name="thread_header_date">Date</string>
     <plurals name="thread_remote_blocked">
-        <item quantity="one">1 remote image blocked to protect your privacy</item>
-        <item quantity="other">%1$d remote images blocked to protect your privacy</item>
+        <item quantity="one">1 remote image blocked: it could tell the sender you opened this message</item>
+        <item quantity="other">%1$d remote images blocked: they could tell the sender you opened this message</item>
     </plurals>
     <string name="thread_load_images">Load images</string>
     <string name="thread_remote_more">More options for remote images</string>
     <string name="thread_always_for">Always for %1$s</string>
     <string name="thread_remote_confirm_title">Always load images from %1$s?</string>
-    <string name="thread_remote_confirm_body">Senders can see when and where you open their mail. Only do this for senders you trust. You can remove the rule in Settings → Privacy &amp; security → Remote images.</string>
+    <string name="thread_remote_confirm_body">Loading images tells this sender every time you open their mail, plus roughly where you are and which device you use. Only do this for senders you trust. You can remove the rule in Settings → Privacy &amp; security → Remote images.</string>
     <string name="thread_remote_confirm_action">Always load</string>
     <string name="thread_images_loaded">Images loaded · %1$s</string>
     <string name="thread_images_loaded_always_for">always for %1$s</string>
@@ -507,8 +507,8 @@
     <string name="settings_website_icons">Website icons</string>
     <string name="settings_website_icons_sub">Downloads the icon of the sender\'s website (not for Gmail, Outlook and similar).</string>
     <string name="settings_section_reading">Reading</string>
-    <string name="settings_tracking_blocked">Tracking pixels are always blocked</string>
-    <string name="settings_tracking_blocked_sub">Invisible 1-pixel images that report you opened a message never load.</string>
+    <string name="settings_tracking_blocked">Tracking is blocked</string>
+    <string name="settings_tracking_blocked_sub">Invisible tracking pixels and remote images never load unless you allow them. Senders can\'t tell if, when or where you read their mail.</string>
     <string name="settings_confirm_links">Confirm links</string>
     <string name="settings_confirm_links_sub">Show the real address before opening a link.</string>
     <string name="settings_show_quoted">Show quoted text</string>
@@ -640,9 +640,9 @@
 
     <!-- Remote images settings -->
     <string name="remote_images_title">Remote images</string>
-    <string name="remote_images_intro">Remote images are blocked by default. Senders can use them to see when, where and on what device you open a message.</string>
+    <string name="remote_images_intro">Remote images are blocked by default. Senders use them as tracking pixels to learn whether you opened a message, when, roughly where (from your IP address) and on which device.</string>
     <string name="remote_images_always">Always load remote images</string>
-    <string name="remote_images_always_sub">Everyone can then see that you read their mail. Prefer allowing individual senders below.</string>
+    <string name="remote_images_always_sub">Every sender will then be able to track when and where you read their mail. Prefer allowing individual senders below.</string>
     <string name="remote_images_section_rules">Always load for</string>
     <string name="remote_images_no_rules">No senders or domains yet. Open a message and choose “Always for …” from its image banner.</string>
     <string name="remote_images_all_accounts">All accounts</string>
