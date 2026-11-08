@@ -14,6 +14,7 @@ import app.dot.design.DotTheme
 import app.dot.design.ThemeMode
 import app.dot.design.components.TopEdgeFade
 import app.dot.design.components.edgeProgress
+import app.dot.design.components.edgeMaskStops
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
@@ -76,5 +77,20 @@ class TopEdgeFadeTest {
         } finally {
             android.provider.Settings.Global.putFloat(context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
         }
+    }
+
+    @Test fun `the edge mask is solid over the header, then eases out monotonically with no early dark strip`(): Unit {
+        val stops = edgeMaskStops(solidUntil = 0.5f, fadeLength = 0.4f)
+        assertThat(stops.first()).isEqualTo(0f to 1f)
+        assertThat(stops.filter { it.first <= 0.5f }.map { it.second }.distinct()).containsExactly(1f) // nothing fades above the header bottom
+        assertThat(stops.last()).isEqualTo(0.9f to 0f)
+        stops.toList().zipWithNext().forEach { (a, b) -> assertThat(b.first).isGreaterThan(a.first); assertThat(b.second).isAtMost(a.second) }
+    }
+
+    @Test fun `a collapsed header moves the solid band up instead of leaving it at the expanded size`(): Unit {
+        val expanded = edgeMaskStops(solidUntil = 0.7f, fadeLength = 0.3f)
+        val collapsed = edgeMaskStops(solidUntil = 0.45f, fadeLength = 0.3f)
+        assertThat(collapsed.last().first).isWithin(1e-6f).of(0.75f)
+        assertThat(collapsed.last().first).isLessThan(expanded.last().first)
     }
 }

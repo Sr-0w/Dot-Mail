@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 
 internal data class HeaderGlass(val backdrop:HazeState?)
+private val FADE=72.dp
 internal val LocalHeaderGlass=staticCompositionLocalOf<HeaderGlass?> { null }
 
 /**
@@ -33,7 +34,11 @@ fun FrostedHeaderLayout(
     var expandedHeight by remember(density,width) { mutableStateOf(initial) }
     Box(modifier.fillMaxSize()) {
         content(PaddingValues(top=if(reserveExpandedHeight) expandedHeight else headerHeight))
-        TopEdgeFade(backdrop,1f,Modifier.align(Alignment.TopCenter),height=expandedHeight+72.dp,fadeStart=(expandedHeight/(expandedHeight+72.dp)).coerceIn(0.4f,0.85f))
+        // The overlay keeps the expanded size (a stable blur texture: no reallocation, no flicker); only its mask follows
+        // the header actually on screen, so collapsing filters shrink the strong band smoothly instead of leaving it stale.
+        val total=expandedHeight+FADE
+        val visible by androidx.compose.animation.core.animateDpAsState(headerHeight,androidx.compose.animation.core.tween(if(app.dot.design.rememberReducedMotion()) 0 else 220),label="headerBlur")
+        TopEdgeFade(backdrop,1f,Modifier.align(Alignment.TopCenter),height=total,solidUntil=(visible/total).coerceIn(0f,1f),fadeLength=FADE/total)
         CompositionLocalProvider(LocalHeaderGlass provides HeaderGlass(null)) {
             Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().onSizeChanged { size ->
                 with(density) { size.height.toDp() }.let {

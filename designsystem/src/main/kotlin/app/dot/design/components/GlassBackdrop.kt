@@ -34,7 +34,11 @@ fun Modifier.glassBackdropSource(state: HazeState?): Modifier = if (state == nul
 /** Surface of a glass control: blurred backdrop + tint when [state] can blur, otherwise the opaque frosted gradient. */
 @Composable
 internal fun Modifier.glassSurface(state: HazeState?, pressed: Boolean): Modifier =
-    if (state == null || !state.blurEnabled || !androidx.compose.ui.platform.LocalView.current.isHardwareAccelerated) {
+    if (LocalHeaderGlass.current != null) {
+        // On the frosted header the band behind is already blurred: a light neutral veil reads as glass; a second live
+        // blur per button would only cost frames, and the opaque fallback looked like a solid disc.
+        background(headerGlassFill(pressed), CircleShape)
+    } else if (state == null || !state.blurEnabled || !androidx.compose.ui.platform.LocalView.current.isHardwareAccelerated) {
         background(frostedSurfaceBrush(pressed), CircleShape)
     } else {
         hazeEffect(
@@ -42,18 +46,26 @@ internal fun Modifier.glassSurface(state: HazeState?, pressed: Boolean): Modifie
             HazeStyle(
                 backgroundColor = Dot.colors.background,
                 tints = listOf(HazeTint(glassTintBrush(pressed))),
-                blurRadius = 18.dp,
-                noiseFactor = 0.04f,
+                blurRadius = 24.dp,
+                noiseFactor = 0f,
             ),
         )
     }
 
-/** Same hues as [frostedSurfaceBrush] but translucent enough for the blurred content to read through. */
+/**
+ * Neutral veil over the blurred backdrop: graphite in dark themes, white in light, no hue. Light enough that the moving
+ * blurred content is what gives the glass its character, dark/light enough to keep icons legible on any mail.
+ */
 @Composable
 private fun glassTintBrush(pressed: Boolean): Brush = if (Dot.colors.isDark) {
-    val a = if (pressed) 0.82f else 0.62f
-    Brush.verticalGradient(listOf(Color(0xFF2A2A30).copy(alpha = a), Color(0xFF1C1C21).copy(alpha = a)))
+    val a = if (pressed) 0.50f else 0.34f
+    Brush.verticalGradient(listOf(Color(0xFF1E1E1E).copy(alpha = a), Color(0xFF121212).copy(alpha = a)))
 } else {
-    val a = if (pressed) 0.84f else 0.66f
-    Brush.verticalGradient(listOf(Color(0xFFF5F5F8).copy(alpha = a), Color(0xFFE8E8EE).copy(alpha = a)))
+    val a = if (pressed) 0.62f else 0.46f
+    Brush.verticalGradient(listOf(Color.White.copy(alpha = a), Color(0xFFF2F2F2).copy(alpha = a)))
 }
+
+/** Glass on the frosted header (no blur of its own: the header band underneath is the blur). */
+@Composable
+internal fun headerGlassFill(pressed: Boolean): Color =
+    if (Dot.colors.isDark) Color.White.copy(alpha = if (pressed) 0.16f else 0.09f) else Color.Black.copy(alpha = if (pressed) 0.10f else 0.05f)

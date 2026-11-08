@@ -513,18 +513,18 @@ fun ListRow(
 /** Translucent graphite (dark) / pearl (light) gradient shared by every floating surface: compose pill, snackbars. */
 @Composable
 internal fun frostedSurfaceBrush(pressed: Boolean): Brush = if (Dot.colors.isDark) {
-    val top = if (pressed) Color(0xEB313138) else Color(0xE02A2A30)
-    val bottom = if (pressed) Color(0xEB232328) else Color(0xE01C1C21)
+    val top = if (pressed) Color(0xEB323232) else Color(0xE02A2A2A)
+    val bottom = if (pressed) Color(0xEB242424) else Color(0xE01D1D1D)
     Brush.verticalGradient(listOf(top, bottom))
 } else {
-    val top = if (pressed) Color(0xEDEAEAEF) else Color(0xEBF5F5F8)
-    val bottom = if (pressed) Color(0xEDDFDFE6) else Color(0xEBE8E8EE)
+    val top = if (pressed) Color(0xEDEBEBEB) else Color(0xEBF6F6F6)
+    val bottom = if (pressed) Color(0xEDE0E0E0) else Color(0xEBEAEAEA)
     Brush.verticalGradient(listOf(top, bottom))
 }
 
 @Composable
 internal fun frostedBorderBrush(): Brush = if (Dot.colors.isDark) {
-    Brush.verticalGradient(listOf(Color(0xFF42424A), Color(0xFF2B2B31)))
+    Brush.verticalGradient(listOf(Color(0xFF444444), Color(0xFF2C2C2C)))
 } else {
-    Brush.verticalGradient(listOf(Color(0xFFFFFFFF), Color(0xFFD2D2DA)))
+    Brush.verticalGradient(listOf(Color(0xFFFFFFFF), Color(0xFFD4D4D4)))
 }
