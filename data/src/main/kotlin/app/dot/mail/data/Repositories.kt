@@ -164,6 +164,10 @@ interface MailRepository {
 }
 
 interface ComposeRepository {
+    /** Queues an attendee reply to the organizer using the invited account identity; returns undo-capable outbox id. */
+    suspend fun sendCalendarReply(messageId: Long, partstat: app.dot.mail.engine.calendar.Ics.PartStat): Long =
+        throw UnsupportedOperationException("Calendar replies are not available")
+
     val outbox: Flow<List<OutboxItem>>
 
     /**

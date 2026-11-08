@@ -49,10 +49,14 @@ object Mime {
         mail.inReplyTo?.let { message.setHeader("In-Reply-To", it) }
         if (mail.references.isNotEmpty()) message.setHeader("References", mail.references.joinToString(" "))
         val text = MimeBodyPart().apply { setText(mail.text, "UTF-8") }
-        val body = if (mail.html != null) MimeBodyPart().apply {
+        val body = if (mail.html != null || mail.calendarReply != null) MimeBodyPart().apply {
             setContent(MimeMultipart("alternative").apply {
                 addBodyPart(text)
-                addBodyPart(MimeBodyPart().apply { setContent(mail.html, "text/html; charset=UTF-8"); dataHandler.setCommandMap(handlers) })
+                mail.html?.let { html -> addBodyPart(MimeBodyPart().apply { setContent(html, "text/html; charset=UTF-8"); dataHandler.setCommandMap(handlers) }) }
+                mail.calendarReply?.let { calendar -> addBodyPart(MimeBodyPart().apply {
+                    dataHandler = DataHandler(ByteArrayDataSource(calendar, "text/calendar; charset=UTF-8; method=REPLY")).apply { setCommandMap(handlers) }
+                    setHeader("Content-Transfer-Encoding", "base64")
+                }) }
             }); dataHandler.setCommandMap(handlers)
         } else text
         if (mail.attachments.isEmpty()) {
