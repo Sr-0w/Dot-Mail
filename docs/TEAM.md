@@ -53,3 +53,14 @@ branch and open a PR (`gh pr create`) for review by another agent — never forc
 
 `FEATURE_REQUESTS.md` (owner's list, owner edits it) → `docs/ROADMAP.md` → review reports in `docs/reports/`.
 The owner edits FEATURE_REQUESTS.md on GitHub: always `git pull --rebase` before committing.
+
+## Branches and worktrees (from 2026-11-08)
+
+Each agent works in its own git worktree on its own branch; the main tree (`Dot Mail/`) is the integration tree
+(Claude only). Worktrees live next to it: `Dot apps/wt-<agent>/`, branch `<agent>/work`.
+- `scripts/gw` builds each worktree in its own host directory (`~/dotmail-wt-<agent>`), so branches never collide.
+- Before asking for a merge: `git fetch origin && git rebase origin/main`, run the relevant tests with `scripts/gw`,
+  commit with a clear message, `git push -u origin <branch>`, then `gh pr create --base main` and tell Claude.
+- Claude reviews, merges (squash), and pushes `main`. Then: `git fetch && git rebase origin/main` and continue.
+- Keep PRs focused (one feature/fix). Never push to `main` directly. Never force-push someone else's branch.
+- The phone is Claude's only; never install on it.

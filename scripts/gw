@@ -7,22 +7,26 @@
 set -uo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 HOST=${BUILD_HOST:-srobin@192.168.0.232}
+# Each worktree builds in its own directory on the host (main tree → ~/dotmail, worktree "sonnet" → ~/dotmail-sonnet),
+# so agents on different branches never overwrite each other's sources; one build per worktree at a time.
+WT=$(basename "$ROOT" | tr -c 'A-Za-z0-9_-\n' '-')
+if [ "$WT" = "Dot-Mail" ]; then RDIR=dotmail; else RDIR="dotmail-$WT"; fi
 LIVE_OPT_IN=0
 if [ "${DOTMAIL_LIVE:-0}" = 1 ]; then LIVE_OPT_IN=1; fi
 ARGS=$(printf ' %q' "$@")
-exec 9>/tmp/dotmail-gradle.lock
+exec 9>"/tmp/dotmail-gradle-$RDIR.lock"
 flock 9
 if [ "${DOTMAIL_LOCAL:-0}" = 1 ]; then cd "$ROOT" && ./gradlew "$@"; exit $?; fi
 rsync -az --delete --exclude .gradle --exclude build --exclude .kotlin --exclude local.properties \
-  --exclude build-out --exclude .git "$ROOT/" "$HOST:dotmail/"
-ssh "$HOST" "source ~/.bashrc; cd dotmail && echo sdk.dir=\$ANDROID_HOME > local.properties && DOTMAIL_LIVE=$LIVE_OPT_IN ./gradlew --console=plain$ARGS"
+  --exclude build-out --exclude .git "$ROOT/" "$HOST:$RDIR/"
+ssh "$HOST" "source ~/.bashrc; mkdir -p $RDIR; cd $RDIR && echo sdk.dir=\$ANDROID_HOME > local.properties && DOTMAIL_LIVE=$LIVE_OPT_IN ./gradlew --console=plain$ARGS"
 rc=$?
 mkdir -p "$ROOT/build-out/apk" "$ROOT/build-out/reports"
-rsync -az --delete "$HOST:dotmail/app/build/outputs/apk/" "$ROOT/build-out/apk/" 2>/dev/null
+rsync -az --delete "$HOST:$RDIR/app/build/outputs/apk/" "$ROOT/build-out/apk/" 2>/dev/null
 for m in app mail data designsystem; do
-  rsync -az --delete "$HOST:dotmail/$m/build/reports/" "$ROOT/build-out/reports/$m/" 2>/dev/null
+  rsync -az --delete "$HOST:$RDIR/$m/build/reports/" "$ROOT/build-out/reports/$m/" 2>/dev/null
 done
 # Room exports schemas into the source tree; retain them locally before the next source sync.
 mkdir -p "$ROOT/data/schemas"
-rsync -az "$HOST:dotmail/data/schemas/" "$ROOT/data/schemas/" 2>/dev/null
+rsync -az "$HOST:$RDIR/data/schemas/" "$ROOT/data/schemas/" 2>/dev/null
 exit $rc
