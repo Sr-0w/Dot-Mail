@@ -141,12 +141,14 @@ internal suspend fun RealMailGraph.deliverOutbox(id: Long): Boolean = outboxLock
         val identity = identityStore.resolve(account.id, account.name, account.email).let { all -> all.firstOrNull { it.id == draft.identityId } ?: all.first { it.isDefault } }
         val calendarSender=org.json.JSONObject(row.draft).optString("calendarSender").takeIf { it.isNotBlank() }
         require(calendarSender==null || calendarSender.equals(identity.email,true)) { "Invited identity is no longer available" }
+        // A signed/encrypted message exists only as the already protected file; never rebuild it in plain form.
+        require(!(draft.pgpSign || draft.pgpEncrypt) || saved != null) { "Protected message file is missing" }
         val mime = saved?.let { StoredMimeMessage(it) } ?: Mime.build(OutgoingMail(Address(identity.email, identity.name.ifBlank { account.name }), draft.to.map { Address(it.email, it.name) }, draft.cc.map { Address(it.email, it.name) }, draft.bcc.map { Address(it.email, it.name) }, draft.subject,
             // Formatted drafts: text/plain alternative + email-safe HTML (inline styles, sanitised) as multipart/alternative.
             draft.bodyHtml?.let { draft.bodyText.ifBlank { app.dot.mail.engine.text.EmailHtml.toPlainText(it) } } ?: draft.bodyText,
             html = draft.bodyHtml?.let { app.dot.mail.engine.text.EmailHtml.compose(it) },
             attachments = attachments + SignatureLogos.attachmentsFor(context, draft.bodyHtml, identityStore.resolve(account.id, account.name, account.email), identity), inReplyTo = draft.inReplyTo, references = draft.references, replyTo = listOfNotNull(identity.replyTo?.let { Address(it) }), messageId = "<dotmail-$id-${java.util.UUID.randomUUID()}@${account.email.substringAfter('@')}>", date = java.time.Instant.now(), calendarReply = org.json.JSONObject(row.draft).optString("calendarReply").takeIf { it.isNotBlank() }))
-        val file = File(context.filesDir, "outbox/${account.id}/$id.eml").also { it.parentFile!!.mkdirs() }
+        val file = saved ?: File(context.filesDir, "outbox/${account.id}/$id.eml").also { it.parentFile!!.mkdirs() }
         if (saved==null) {
             val temporary=File(file.parentFile,"${file.name}.tmp")
             try { temporary.outputStream().use { mime.writeTo(it) }; check(temporary.renameTo(file)) { "Could not persist queued MIME" } } finally { temporary.delete() }

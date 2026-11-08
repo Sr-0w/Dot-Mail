@@ -167,8 +167,16 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
             defaultAccountId = { settings.ui.value.defaultAccountId },
             includeOriginal = { settings.ui.value.includeOriginal },
             strings = { id, args -> appContext.getString(id, *args) },
+            pgp = app.dot.mail.ui.pgp.OpenKeychainService(appContext),
+            pgpDefaults = { id -> app.dot.mail.data.AccountSettingsStore.get(appContext).current(id).let { it.pgpSignDefault to it.pgpEncryptDefault } },
         )
     }
+    // OpenKeychain's own screens (passphrase, key choice) during an encrypted/signed send.
+    val pgpPrompt by vm.pgpPrompt.collectAsStateWithLifecycle()
+    val pgpLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { res ->
+        vm.pgpResult(if (res.resultCode == android.app.Activity.RESULT_OK) res.data ?: Intent() else null)
+    }
+    LaunchedEffect(pgpPrompt) { pgpPrompt?.let { pgpLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(it.intentSender).build()) } }
     val state by vm.state.collectAsStateWithLifecycle()
     val closed by vm.closed.collectAsStateWithLifecycle()
     val c = Dot.colors
@@ -380,6 +388,7 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                 )
             }
             Hairline()
+            if (state.pgpAvailable) PgpRow(state, vm)
             state.error?.let {
                 Text(it, style = Dot.type.caption, color = c.danger, modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s))
             }
@@ -1181,6 +1190,40 @@ private fun SignatureRow(state: ComposeState, vm: ComposeViewModel) {
             others.forEach { o ->
                 DotMenuItem(stringResource(R.string.compose_signature_use, o.email), null) { menu = false; vm.useSignatureOf(o) }
             }
+        }
+    }
+}
+
+/** Sign / Encrypt for this message (shown only when OpenKeychain is installed), with the recipient-key warnings inline. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PgpRow(state: ComposeState, vm: ComposeViewModel) {
+    val c = Dot.colors
+    val draft = state.draft ?: return
+    Column(Modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter)) {
+        Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(DotSpacing.s), verticalAlignment = Alignment.CenterVertically) {
+            app.dot.design.components.DotFilterChip(stringResource(R.string.compose_pgp_sign), draft.pgpSign, { vm.setPgp(sign = !draft.pgpSign) })
+            app.dot.design.components.DotFilterChip(stringResource(R.string.compose_pgp_encrypt), draft.pgpEncrypt, { vm.setPgp(encrypt = !draft.pgpEncrypt) })
+        }
+        if (draft.pgpEncrypt) {
+            val own = state.sender?.email.orEmpty()
+            when {
+                state.pgpMissing.isNotEmpty() -> {
+                    Text(
+                        stringResource(R.string.compose_pgp_missing, state.pgpMissing.joinToString(", ")),
+                        style = Dot.type.caption, color = c.danger, modifier = Modifier.padding(bottom = DotSpacing.xs),
+                    )
+                    Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(DotSpacing.s)) {
+                        DotButton(stringResource(R.string.compose_pgp_send_unencrypted), { vm.sendUnencrypted() }, style = ButtonStyle.Ghost, compact = true)
+                        DotButton(stringResource(R.string.compose_pgp_remove_recipients), { vm.removeRecipientsWithoutKey() }, style = ButtonStyle.Ghost, compact = true)
+                    }
+                }
+                state.pgpChecking -> Text(stringResource(R.string.compose_pgp_checking), style = Dot.type.caption, color = c.textTertiary)
+            }
+            if (state.pgpOwnKeyMissing && own.isNotEmpty()) {
+                Text(stringResource(R.string.compose_pgp_no_own_key, own), style = Dot.type.caption, color = c.textTertiary)
+            }
+            Text(stringResource(R.string.compose_pgp_draft_local), style = Dot.type.caption, color = c.textTertiary, modifier = Modifier.padding(bottom = DotSpacing.xs))
         }
     }
 }

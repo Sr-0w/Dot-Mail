@@ -1007,4 +1007,21 @@
 
     <!-- OLED theme -->
     <string name="settings_theme_oled">OLED</string>
+    <!-- OpenPGP compose -->
+    <string name="account_section_pgp">OpenPGP</string>
+    <string name="account_pgp_sign">Neue Nachrichten signieren</string>
+    <string name="account_pgp_sign_sub">Neue Nachrichten dieses Kontos werden standardmäßig signiert (OpenKeychain).</string>
+    <string name="account_pgp_encrypt">Neue Nachrichten verschlüsseln</string>
+    <string name="account_pgp_encrypt_sub">Neue Nachrichten dieses Kontos werden standardmäßig verschlüsselt. Pro Nachricht abschaltbar.</string>
+    <string name="compose_pgp_sign">Signieren</string>
+    <string name="compose_pgp_encrypt">Verschlüsseln</string>
+    <string name="compose_pgp_checking">Schlüssel der Empfänger werden geprüft…</string>
+    <string name="compose_pgp_missing">Kein OpenPGP-Schlüssel für %1$s. Diese Person könnte eine verschlüsselte Nachricht nicht lesen.</string>
+    <string name="compose_pgp_send_unencrypted">Unverschlüsselt senden</string>
+    <string name="compose_pgp_remove_recipients">Entfernen</string>
+    <string name="compose_pgp_no_own_key">Sie haben keinen Schlüssel für %1$s und können diese Nachricht später nicht in „Gesendet“ lesen.</string>
+    <string name="compose_pgp_error_missing_keys">Einigen Empfängern fehlt ein Schlüssel. Entfernen Sie sie oder senden Sie unverschlüsselt.</string>
+    <string name="compose_pgp_error_failed">OpenPGP konnte diese Nachricht nicht schützen. Sie wurde nicht gesendet.</string>
+    <string name="compose_pgp_error_cancelled">Senden abgebrochen. Die Nachricht wurde nicht gesendet.</string>
+    <string name="compose_pgp_draft_local">Verschlüsselte Entwürfe bleiben auf diesem Gerät und werden nicht hochgeladen.</string>
 </resources>

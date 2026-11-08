@@ -74,6 +74,12 @@ data class ComposeState(
     val signatureSourceKey: Long? = null,
     /** True for replies and forwards (they use the "replies" default of the signature). */
     val isReplyContext: Boolean = false,
+    /** OpenKeychain is installed: Sign/Encrypt are offered. */
+    val pgpAvailable: Boolean = false,
+    /** While encrypting: recipients without a public key, and whether the sender's own key is missing. */
+    val pgpMissing: List<String> = emptyList(),
+    val pgpOwnKeyMissing: Boolean = false,
+    val pgpChecking: Boolean = false,
 ) {
     /** The sender whose signature is currently attached to this message, or null when none. */
     val signatureSender: Sender? get() = if (!signatureEnabled) null else
@@ -90,6 +96,9 @@ data class ComposeState(
     /** Combined editor HTML (including any quoted tail) when in rich-text mode, or null in plain-text mode. */
     val composedHtml: String? get() = if (isRichText) ComposeViewModel.combineBodyHtml(bodyHtml, quotedText, ComposeViewModel.richSignatureBlock(signatureSender)) else null
 }
+
+/** The send was stopped before anything was queued (e.g. a recipient has no key). */
+private class PgpBlocked(message: String) : Exception(message)
 
 /** Hands an in-flight send to the root so the undo snackbar can outlive the compose screen. */
 object UndoSendBus {
@@ -109,6 +118,10 @@ class ComposeViewModel(
     private val defaultAccountId: () -> Long = { 0L },
     private val includeOriginal: () -> Boolean = { true },
     private val strings: ((Int, Array<out Any>) -> String)? = null,
+    /** OpenPGP via OpenKeychain; null or unavailable hides Sign/Encrypt. */
+    private val pgp: app.dot.mail.ui.pgp.PgpService? = null,
+    /** (sign, encrypt) defaults of an account's settings for new messages. */
+    private val pgpDefaults: (Long) -> Pair<Boolean, Boolean> = { false to false },
 ) : ViewModel() {
     private fun str(resId: Int, fallback: String, vararg args: Any): String =
         strings?.invoke(resId, args) ?: fallback
@@ -125,6 +138,8 @@ class ComposeViewModel(
     @Volatile private var finished = false
     /** Once the user removed/changed the signature by hand, From changes no longer re-apply the defaults. */
     private var signatureTouched = false
+    private var pgpTouched = false
+    private val keyCache = HashMap<String, Boolean>()
 
     init {
         viewModelScope.launch {
@@ -202,9 +217,14 @@ class ComposeViewModel(
             val base = ComposeState(
                 loaded = true, senders = senders, isRichText = isRich, editableText = editable, bodyHtml = initialHtml,
                 quotedText = quoted, signatureEnabled = sigEnabled, signatureSourceKey = sigSource, isReplyContext = isReply,
+                pgpAvailable = pgp?.available() == true,
                 draft = draft.copy(identityId = activeSender?.identityId ?: draft.identityId),
             )
+            val pgpOn = base.pgpAvailable && !isExistingDraft
+            val pgpDefault = if (pgpOn) pgpDefaults(draft.accountId) else false to false
+            if (isExistingDraft) pgpTouched = true
             val prefilled = base.draft!!.copy(
+                pgpSign = if (pgpOn) pgpDefault.first else draft.pgpSign, pgpEncrypt = if (pgpOn) pgpDefault.second else draft.pgpEncrypt,
                 to = draft.to + route.to.map(::parseAddress),
                 cc = draft.cc + route.cc.map(::parseAddress),
                 bcc = draft.bcc + route.bcc.map(::parseAddress),
@@ -226,8 +246,10 @@ class ComposeViewModel(
                     signatureEnabled = sigEnabled,
                     signatureSourceKey = sigSource,
                     isReplyContext = isReply,
+                    pgpAvailable = pgp?.available() == true,
                 )
             }
+            watchPgpKeys()
             // Autosave, debounced: a crash or process death never loses more than ~1.5 s of typing.
             _state.map { it.draft to it.bodyHtml }.distinctUntilChanged().drop(1).debounce(1_500).collect {
                 val s = _state.value
@@ -347,6 +369,14 @@ class ComposeViewModel(
                 writeLock.withLock { runCatching { graph.compose.discardDraft(oldId) } }
             }
         }
+        if (!pgpTouched && _state.value.pgpAvailable && d.accountId != sender.accountId) {
+            val (sign, encrypt) = pgpDefaults(sender.accountId)
+            edit { it.copy(pgpSign = sign, pgpEncrypt = encrypt) }
+        }
+        if (!pgpTouched && _state.value.pgpAvailable && d.accountId != sender.accountId) {
+            val (sign, encrypt) = pgpDefaults(sender.accountId)
+            edit { it.copy(pgpSign = sign, pgpEncrypt = encrypt) }
+        }
         // The signature lives outside the editor text, so the swap can never touch what the user wrote.
         _state.update { s ->
             val enabled = if (signatureTouched) s.signatureEnabled else signatureDefault(sender, s.isReplyContext)
@@ -382,6 +412,56 @@ class ComposeViewModel(
 
     private fun htmlBody(s: ComposeState, editorHtml: String) =
         combineBodyHtml(editorHtml, s.quotedText, richSignatureBlock(s.signatureSender))
+
+    // ---- OpenPGP -------------------------------------------------------------------------------------------------------
+
+    private val _pgpPrompt = MutableStateFlow<android.app.PendingIntent?>(null)
+    /** An OpenKeychain screen (passphrase, key choice) the UI must launch; answer with [pgpResult]. */
+    val pgpPrompt: StateFlow<android.app.PendingIntent?> = _pgpPrompt.asStateFlow()
+    private var pgpAnswer: kotlinx.coroutines.CompletableDeferred<android.content.Intent?>? = null
+
+    private suspend fun interact(p: android.app.PendingIntent): android.content.Intent? {
+        val answer = kotlinx.coroutines.CompletableDeferred<android.content.Intent?>()
+        pgpAnswer = answer
+        _pgpPrompt.value = p
+        return try { answer.await() } finally { _pgpPrompt.value = null; pgpAnswer = null }
+    }
+
+    /** The result of the launched OpenKeychain screen; null = the user backed out. */
+    fun pgpResult(data: android.content.Intent?) { pgpAnswer?.complete(data) }
+
+    fun setPgp(sign: Boolean? = null, encrypt: Boolean? = null) {
+        pgpTouched = true
+        edit { it.copy(pgpSign = sign ?: it.pgpSign, pgpEncrypt = encrypt ?: it.pgpEncrypt) }
+    }
+
+    private fun recipientsOf(d: Draft) = (d.to + d.cc + d.bcc).map { it.email }.distinctBy { it.lowercase() }
+
+    private suspend fun hasKey(email: String): Boolean = keyCache.getOrPut(email.lowercase()) { pgp?.hasKey(email) == true }
+
+    /** While encrypting, keeps [ComposeState.pgpMissing] in step with the recipients (cached lookups, debounced). */
+    private fun watchPgpKeys() {
+        if (pgp == null || !pgp.available()) return
+        viewModelScope.launch {
+            _state.map { s -> Triple(s.draft?.pgpEncrypt == true, s.draft?.let(::recipientsOf).orEmpty(), s.sender?.email) }
+                .distinctUntilChanged().debounce(350).collect { (encrypt, recipients, own) ->
+                    if (!encrypt) { _state.update { it.copy(pgpMissing = emptyList(), pgpOwnKeyMissing = false, pgpChecking = false) }; return@collect }
+                    _state.update { it.copy(pgpChecking = true) }
+                    val missing = recipients.filterNot { hasKey(it) }
+                    val ownMissing = own != null && !hasKey(own)
+                    _state.update { it.copy(pgpMissing = missing, pgpOwnKeyMissing = ownMissing, pgpChecking = false) }
+                }
+        }
+    }
+
+    /** Drops To/Cc/Bcc entries that have no public key (the inline warning's "Remove them"). */
+    fun removeRecipientsWithoutKey() {
+        val missing = _state.value.pgpMissing.map { it.lowercase() }.toSet()
+        edit { d -> d.copy(to = d.to.filterNot { it.email.lowercase() in missing }, cc = d.cc.filterNot { it.email.lowercase() in missing }, bcc = d.bcc.filterNot { it.email.lowercase() in missing }) }
+    }
+
+    /** The inline warning's "Send unencrypted": turns encryption off for this message and sends it. */
+    fun sendUnencrypted() { setPgp(encrypt = false); send() }
 
     fun showCcBcc() = _state.update { it.copy(showCcBcc = true) }
 
@@ -508,7 +588,19 @@ class ComposeViewModel(
                         scheduledAt = scheduledAt,
                     )
                     val saved = graph.compose.saveDraft(current)
-                    saved to graph.compose.send(current.copy(localId = saved), undoWindowMs = undoSeconds() * 1_000L)
+                    val queued = if (current.pgpSign || current.pgpEncrypt) {
+                        val service = requireNotNull(pgp) { "OpenPGP is not available" }
+                        if (current.pgpEncrypt) {
+                            val missing = recipientsOf(current).filterNot { hasKey(it) }
+                            if (missing.isNotEmpty()) {
+                                _state.update { it.copy(pgpMissing = missing) }
+                                throw PgpBlocked(str(R.string.compose_pgp_error_missing_keys, "Some recipients have no key"))
+                            }
+                        }
+                        val own = sNow.sender?.email ?: current.to.firstOrNull()?.email.orEmpty()
+                        graph.compose.sendProtected(current.copy(localId = saved), undoSeconds() * 1_000L, service.protector(own, ::interact))
+                    } else graph.compose.send(current.copy(localId = saved), undoWindowMs = undoSeconds() * 1_000L)
+                    saved to queued
                 }
             }.onSuccess { (draftId, outboxId) ->
                 UndoSendBus.pending.value = UndoSendBus.Pending(outboxId, draftId, scheduledAt)
@@ -518,7 +610,12 @@ class ComposeViewModel(
                 _state.update {
                     it.copy(
                         sending = false,
-                        error = e.message ?: str(R.string.compose_error_send_failed, "Couldn't queue the message"),
+                        error = when {
+                            e is PgpBlocked -> e.message
+                            e is app.dot.mail.ui.pgp.OpenKeychain.PgpException && e.cancelled -> str(R.string.compose_pgp_error_cancelled, "Sending was cancelled")
+                            e is app.dot.mail.ui.pgp.OpenKeychain.PgpException -> str(R.string.compose_pgp_error_failed, "OpenPGP couldn't protect this message")
+                            else -> e.message ?: str(R.string.compose_error_send_failed, "Couldn't queue the message")
+                        },
                     )
                 }
             }

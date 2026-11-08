@@ -106,6 +106,12 @@ internal fun AccountPage(account: Account, onBack: () -> Unit, onEditIdentity: (
                 style = Dot.type.caption, color = c.textSecondary, modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.xs),
             )
 
+            if (remember { app.dot.mail.ui.pgp.OpenKeychain.installed(context) }) {
+                SectionLabel(stringResource(R.string.account_section_pgp))
+                ToggleRow(stringResource(R.string.account_pgp_sign), stringResource(R.string.account_pgp_sign_sub), Icons.Outlined.Key, cfg.pgpSignDefault) { v -> store.update(account.id) { it.copy(pgpSignDefault = v) } }
+                ToggleRow(stringResource(R.string.account_pgp_encrypt), stringResource(R.string.account_pgp_encrypt_sub), Icons.Outlined.Key, cfg.pgpEncryptDefault) { v -> store.update(account.id) { it.copy(pgpEncryptDefault = v) } }
+            }
+
             SectionLabel(stringResource(R.string.account_section_notifications))
             ToggleRow(stringResource(R.string.account_notify), stringResource(R.string.account_notify_for, account.email), Icons.Outlined.Notifications, cfg.notificationsEnabled) { v ->
                 store.update(account.id) { it.copy(notificationsEnabled = v) }

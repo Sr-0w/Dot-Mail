@@ -223,6 +223,13 @@ interface ComposeRepository {
      */
     suspend fun send(draft: Draft, undoWindowMs: Long = 5_000): Long
 
+    /**
+     * Sends with OpenPGP: [protector] signs/encrypts the message (it may wait for the user) and the protected MIME is what
+     * the outbox stores and delivers. Requires [Draft.pgpSign] or [Draft.pgpEncrypt].
+     */
+    suspend fun sendProtected(draft: Draft, undoWindowMs: Long = 5_000, protector: PgpProtector): Long =
+        throw UnsupportedOperationException("OpenPGP is not available")
+
     /** True if it was cancelled in time; the draft is restored. */
     suspend fun cancelSend(outboxId: Long): Boolean
 }
