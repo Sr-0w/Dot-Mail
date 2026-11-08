@@ -166,6 +166,8 @@ fun InboxScreen(
     var showMove by remember { mutableStateOf(false) }
     // Conversations waiting for a snooze time (from the selection bar, or a swipe).
     var snoozeTargets by remember { mutableStateOf<List<Long>?>(null) }
+    // Account whose password the user is re-entering (from the sync-error banner).
+    var signInAccount by remember { mutableStateOf<app.dot.mail.data.model.Account?>(null) }
     var pendingTrash by remember { mutableStateOf<List<Long>?>(null) }
     val pullState = rememberPullToRefreshState()
 
@@ -238,10 +240,15 @@ fun InboxScreen(
                 val failing = accountsNow.filter { it.syncState is app.dot.mail.data.model.SyncState.Error }
                 androidx.compose.animation.AnimatedVisibility(failing.isNotEmpty() && selection.isEmpty()) {
                     val err = failing.firstOrNull()?.syncState as? app.dot.mail.data.model.SyncState.Error
+                    // Sign-in problems take priority: tapping the banner opens the password dialog for that account.
+                    val authFailing = failing.firstOrNull { (it.syncState as? app.dot.mail.data.model.SyncState.Error)?.isAuthError == true }
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.xs)
                             .clip(DotShapes.medium).background(Dot.colors.surface)
-                            .combinedClickable(onClick = onSettings).padding(horizontal = DotSpacing.m, vertical = 10.dp),
+                            .combinedClickable(
+                                onClickLabel = if (authFailing != null) "Sign in again" else "Open settings",
+                                onClick = { if (authFailing != null) signInAccount = authFailing else onSettings() },
+                            ).padding(horizontal = DotSpacing.m, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(Icons.Outlined.WifiOff, null, Modifier.size(18.dp), tint = Dot.colors.danger)
@@ -313,6 +320,10 @@ fun InboxScreen(
             dismissButton = { app.dot.design.components.DotButton("Cancel", { pendingTrash = null }, style = app.dot.design.components.ButtonStyle.Ghost, compact = true) },
         )
     }
+    signInAccount?.let { account ->
+        app.dot.mail.ui.account.UpdatePasswordDialog(account, onDismiss = { signInAccount = null }, onSuccess = { vm.refresh() })
+    }
+
     snoozeTargets?.let { targets ->
         app.dot.mail.ui.snooze.SnoozeSheet(onDismiss = { snoozeTargets = null }, onPick = { until -> snoozeTargets = null; vm.snooze(targets, until) })
     }
@@ -598,7 +609,17 @@ fun ThreadRow(
                     Icon(Icons.Outlined.Attachment, null, Modifier.size(15.dp), tint = c.textTertiary)
                     Spacer(Modifier.width(6.dp))
                 }
-                Text(
+                if (thread.snoozedUntil != null) {
+                    // Snoozed list: when it comes back matters more than when it arrived.
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    Text(
+                        "Until " + app.dot.mail.engine.time.describe(
+                            java.time.Instant.ofEpochMilli(thread.snoozedUntil!!).atZone(java.time.ZoneId.systemDefault()), java.time.ZonedDateTime.now(),
+                            java.util.Locale.getDefault(), android.text.format.DateFormat.is24HourFormat(context),
+                        ),
+                        style = Dot.type.caption.copy(fontWeight = FontWeight.Medium), color = c.accent,
+                    )
+                } else Text(
                     Format.listDate(thread.lastMessageAt),
                     style = Dot.type.caption.copy(fontWeight = if (unread) FontWeight.Medium else FontWeight.Normal),
                     color = if (unread) c.textPrimary else c.textTertiary,

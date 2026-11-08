@@ -94,6 +94,9 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
             editIdentities(accountId) { l -> val rest = l.filter { it.id != identityId }; if (rest.none { it.isDefault }) rest.map { it.copy(isDefault = it.id == accountId) } else rest }
         }
         override suspend fun setDefaultIdentity(accountId: Long, identityId: Long) = editIdentities(accountId) { l -> l.map { it.copy(isDefault = it.id == identityId) } }
+        override suspend fun updatePassword(accountId: Long, password: String): VerifyResult =
+            if (password.length >= 4) VerifyResult.Ok else VerifyResult.AuthFailed("The server rejected this password (demo: use at least 4 characters).")
+
         override suspend fun renameAccount(accountId: Long, displayName: String) = accountsState.update { l -> l.map { if (it.id == accountId && displayName.isNotBlank()) it.copy(displayName = displayName.trim()) else it } }
         override suspend fun removeAccount(accountId: Long) = accountsState.update { list -> list.filterNot { it.id == accountId } }
     }
@@ -125,7 +128,7 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
                 is Mailbox.InFolder -> msgs.filter { it.folderId == mailbox.folderId }
             }.filter { it.accountId in ids && (isSnoozedBox(mailbox) || it.threadId !in snz.keys) }
             val rows = summaries(inBox)
-            PagingData.from(draftRows + if (isSnoozedBox(mailbox)) rows.sortedBy { snz[it.threadId] } else rows)
+            PagingData.from(draftRows + if (isSnoozedBox(mailbox)) rows.map { it.copy(snoozedUntil = snz[it.threadId]) }.sortedBy { it.snoozedUntil } else rows)
         }
 
         override fun search(query: String, accountId: Long?): Flow<PagingData<ThreadSummary>> = messages.map { msgs ->

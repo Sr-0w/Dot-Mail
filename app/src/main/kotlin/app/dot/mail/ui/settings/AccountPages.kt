@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Schedule
@@ -74,9 +75,11 @@ internal fun AccountPage(account: Account, onBack: () -> Unit, onEditIdentity: (
             val store = remember { AccountSettingsStore.get(context.applicationContext) }
             val cfg by store.settings(account.id).collectAsStateWithLifecycle()
             var renaming by remember { mutableStateOf(false) }
+            var signingIn by remember { mutableStateOf(false) }
 
             SectionLabel("Account", Modifier.padding(top = DotSpacing.s))
             ListRow("Name", subtitle = account.displayName, icon = Icons.Outlined.Edit, onClick = { renaming = true })
+            ListRow("Update password", subtitle = "Sign in again with a new password or app password", icon = Icons.Outlined.Key, onClick = { signingIn = true })
             ListRow(
                 "Signature", subtitle = account.identities.firstOrNull { it.id == account.id }?.signature?.lineSequence()?.firstOrNull { it.isNotBlank() } ?: "None",
                 icon = Icons.Outlined.Edit, onClick = { onEditIdentity(account.id) },
@@ -115,6 +118,7 @@ internal fun AccountPage(account: Account, onBack: () -> Unit, onEditIdentity: (
                 },
             )
             if (renaming) RenameAccountDialog(account) { renaming = false }
+            if (signingIn) app.dot.mail.ui.account.UpdatePasswordDialog(account, onDismiss = { signingIn = false }, onSuccess = {})
             SectionLabel("Sender identities", Modifier.padding(top = DotSpacing.m))
             Text(
                 "Addresses you can send from. Replies use the identity the original message was sent to.",

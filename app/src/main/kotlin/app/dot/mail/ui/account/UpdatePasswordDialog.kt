@@ -1,0 +1,83 @@
+package app.dot.mail.ui.account
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.text.input.ImeAction
+import app.dot.design.Dot
+import app.dot.design.DotShapes
+import app.dot.design.DotSpacing
+import app.dot.design.components.ButtonStyle
+import app.dot.design.components.DotButton
+import app.dot.design.components.DotTextField
+import app.dot.mail.LocalMailGraph
+import app.dot.mail.data.model.Account
+import app.dot.mail.data.model.VerifyResult
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
+
+/**
+ * "Sign in again" / "Update password": asks for a new password or app password, verifies IMAP and SMTP with it
+ * (nothing is stored unless both log in), and only then closes. A refusal is shown inline.
+ * Autofill-friendly: the field is a password field with the Password content type, with show / hide.
+ */
+@Composable
+fun UpdatePasswordDialog(account: Account, onDismiss: () -> Unit, onSuccess: () -> Unit) {
+    val c = Dot.colors
+    val graph = LocalMailGraph.current
+    val scope = rememberCoroutineScope()
+    var password by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    fun submit() {
+        if (password.isEmpty() || busy) return
+        busy = true; error = null
+        scope.launch {
+            try {
+                when (val r = graph.accounts.updatePassword(account.id, password)) {
+                    VerifyResult.Ok -> { onSuccess(); onDismiss() }
+                    is VerifyResult.AuthFailed -> error = r.message
+                    is VerifyResult.ConnectionFailed -> error = r.message
+                    is VerifyResult.CertificateProblem -> error = r.message
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                error = e.message ?: "Couldn't update the password."
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        containerColor = c.surface,
+        shape = DotShapes.large,
+        title = { Text("Sign in again", style = Dot.type.title, color = c.textPrimary) },
+        text = {
+            Column {
+                Text(account.email, style = Dot.type.callout, color = c.textSecondary, modifier = Modifier.padding(bottom = DotSpacing.m))
+                DotTextField(
+                    value = password, onValueChange = { password = it; error = null },
+                    label = "Password", password = true, contentType = ContentType.Password,
+                    imeAction = ImeAction.Done, onImeAction = ::submit, enabled = !busy,
+                    isError = error != null,
+                    supporting = error ?: "Checked with your mail server before it is saved. Use an app password if your provider requires one.",
+                )
+            }
+        },
+        confirmButton = { DotButton("Sign in", enabled = password.isNotEmpty() && !busy, loading = busy, compact = true, onClick = ::submit) },
+        dismissButton = { DotButton("Cancel", onDismiss, style = ButtonStyle.Ghost, compact = true, enabled = !busy) },
+    )
+}

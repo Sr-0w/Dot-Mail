@@ -86,7 +86,7 @@ internal fun RealMailGraph.snoozedThreadsPaging(): Flow<PagingData<ThreadSummary
         "SELECT t.* FROM threads t WHERE t.count>0 AND EXISTS(SELECT 1 FROM snoozed z WHERE z.threadId=t.id AND $STILL_SNOOZED) " +
             "ORDER BY (SELECT MIN(z.until) FROM snoozed z WHERE z.threadId=t.id AND $STILL_SNOOZED),t.id",
     ))
-}.flow.map { data -> data.map { summary(it, false) } }
+}.flow.map { data -> data.map { summary(it, false).copy(snoozedUntil = dao.snoozedUntilOfThread(it.id)) } }
 
 /** Single messages with an active snooze (their own, or their thread's), soonest wake-up first. */
 internal fun RealMailGraph.snoozedMessagesPaging(): Flow<PagingData<ThreadSummary>> = Pager(PagingConfig(pageSize = 40)) {
@@ -95,4 +95,4 @@ internal fun RealMailGraph.snoozedMessagesPaging(): Flow<PagingData<ThreadSummar
         "SELECT $MESSAGE_META FROM messages WHERE EXISTS(SELECT 1 FROM snoozed z WHERE $match) " +
             "ORDER BY (SELECT MIN(z.until) FROM snoozed z WHERE $match),id",
     ))
-}.flow.map { data -> data.map(::messageSummary) }
+}.flow.map { data -> data.map { messageSummary(it).copy(snoozedUntil = dao.snoozedUntilOfMessage(it.id, it.threadId)) } }
