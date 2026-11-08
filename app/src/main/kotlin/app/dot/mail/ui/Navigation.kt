@@ -1,5 +1,12 @@
 package app.dot.mail.ui
 
+import androidx.compose.material.icons.outlined.MailOutline
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.Row
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -107,15 +114,55 @@ fun DotMailRoot(requests: StateFlow<ExternalRequest?>, onRequestConsumed: () -> 
                 )
             }
             composable<InboxRoute> {
-                InboxScreen(
-                    onOpenThread = { nav.navigate(ThreadRoute(it)) },
-                    onCompose = { nav.openCompose() },
-                    onSearch = { nav.navigate(SearchRoute) },
-                    onSettings = { nav.navigate(SettingsRoute) },
-                    onAddAccount = { nav.navigate(AddAccountRoute(firstAccount = false)) },
-                    onOpenDraft = { nav.openCompose(ComposeRoute(draftId = it)) },
-                    onOutbox = { nav.navigate(OutboxRoute) },
-                )
+                val composeTo: (String) -> Unit = { target ->
+                    val m = if (target.startsWith("mailto:", true)) app.dot.mail.MailtoParser.parse(target) else ExternalRequest.Compose(to = listOf(target))
+                    nav.openCompose(ComposeRoute(to = m.to, cc = m.cc, bcc = m.bcc, subject = m.subject, body = m.body))
+                }
+                // Wide windows (tablets, unfolded foldables, phones in landscape): list and conversation side by side.
+                androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+                    val twoPane = maxWidth >= TWO_PANE_MIN_WIDTH
+                    var selected by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<Long?>(null) }
+                    val inbox = @Composable { mod: Modifier ->
+                        Box(mod) {
+                            InboxScreen(
+                                onOpenThread = { if (twoPane) selected = it else nav.navigate(ThreadRoute(it)) },
+                                onCompose = { nav.openCompose() },
+                                onSearch = { nav.navigate(SearchRoute) },
+                                onSettings = { nav.navigate(SettingsRoute) },
+                                onAddAccount = { nav.navigate(AddAccountRoute(firstAccount = false)) },
+                                onOpenDraft = { nav.openCompose(ComposeRoute(draftId = it)) },
+                                onOutbox = { nav.navigate(OutboxRoute) },
+                            )
+                        }
+                    }
+                    if (!twoPane) {
+                        inbox(Modifier.fillMaxSize())
+                    } else {
+                        Row(Modifier.fillMaxSize()) {
+                            inbox(Modifier.weight(0.42f).widthIn(min = 340.dp).fillMaxHeight())
+                            Box(Modifier.width(1.dp).fillMaxHeight().background(app.dot.design.Dot.colors.border))
+                            Box(Modifier.weight(0.58f).fillMaxHeight()) {
+                                val id = selected
+                                if (id == null) {
+                                    app.dot.design.components.EmptyState(
+                                        androidx.compose.material.icons.Icons.Outlined.MailOutline,
+                                        "No conversation selected", "Pick one from the list.",
+                                    )
+                                } else {
+                                    androidx.compose.runtime.key(id) {
+                                        ThreadScreen(
+                                            threadId = id,
+                                            onBack = { selected = null },
+                                            onOpenAdjacent = { next -> selected = next },
+                                            onReply = { messageId, mode -> nav.openCompose(ComposeRoute(replyToMessageId = messageId, replyMode = mode.name)) },
+                                            onComposeTo = composeTo,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
             composable<ThreadRoute> { entry ->
                 ThreadScreen(
@@ -241,3 +288,6 @@ private fun UndoSendHost(onRestored: (Long) -> Unit, modifier: Modifier = Modifi
     }
     SnackbarHost(host, modifier.navigationBarsPadding().padding(bottom = 8.dp)) { DotSnackbar(it) }
 }
+
+/** Window width from which the inbox shows the conversation next to the list. */
+private val TWO_PANE_MIN_WIDTH = 840.dp
