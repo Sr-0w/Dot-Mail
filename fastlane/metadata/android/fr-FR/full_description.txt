@@ -13,7 +13,7 @@ chez nous, sans serveur intermédiaire, sans publicité, sans suivi. Un logiciel
 <li>Recherche locale et sur le serveur, sur tous les comptes, avec opérateurs : from:, to:, subject:, has:attachment, is:unread, is:starred</li>
 <li>Une file d'envoi fiable : annulation de l'envoi, envoi programmé, et jamais de doublon silencieux — si la connexion tombe pendant l'envoi, Dot Mail vous demande avant de réessayer</li>
 <li>E-mails en texte brut et HTML, pièces jointes (ouvrir ou partager avec n'importe quelle app), citations repliées</li>
-<li>Détection automatique des fournisseurs majeurs (Gmail, Yahoo, iCloud, Infomaniak, Fastmail, GMX, Posteo, Zoho, …) et tout serveur IMAP/SMTP standard, configurable à la main</li>
+<li>Détection automatique des fournisseurs majeurs (Gmail, Outlook, Yahoo, iCloud, Infomaniak, Fastmail, GMX, Posteo, Zoho, …) et tout serveur IMAP/SMTP standard, configurable à la main</li>
 <li>Sert d'application e-mail par défaut (liens mailto:), et reçoit les fichiers partagés depuis les autres apps</li>
 </ul>
 

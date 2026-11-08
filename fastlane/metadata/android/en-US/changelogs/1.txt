@@ -1,4 +1,4 @@
-First public release of Dot Mail.
+First release of Dot Mail.
 
 - IMAP/SMTP with password and app passwords; automatic server detection for major providers
 - Unified inbox, conversation threads, folders, local and server search

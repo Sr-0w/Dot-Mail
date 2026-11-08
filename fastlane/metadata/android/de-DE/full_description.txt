@@ -1,0 +1,31 @@
+<p>Ihre E-Mails. Nichts anderes.</p>
+
+<p><strong>Dot Mail</strong> ist eine ruhige, schnelle, vollständig native E-Mail-App für Android, die direkt mit Ihrem E-Mail-Provider spricht — kein Konto bei uns, keine Server dazwischen, keine Werbung, kein Tracking. Freie Software (GPL-3.0-or-later), für immer.</p>
+
+<h3>Was die App kann</h3>
+<ul>
+<li>Mehrere Konten mit einheitlichem Posteingang und Gesprächsfäden</li>
+<li>Lesen, Sternchen, Archivieren, Löschen, Als Spam markieren und Verschieben — an einer oder vielen Nachrichten, mit anpassbaren Wischgesten</li>
+<li>Offline-first: Alles, was synchronisiert ist, lässt sich ohne Verbindung lesen; Aktionen werden in eine Warteschlange gestellt und nachgespielt</li>
+<li>Suche über alle Konten — lokal und auf dem Server — mit Operatoren: from:, to:, subject:, has:attachment, is:unread, is:starred</li>
+<li>Eine Outbox, der Sie vertrauen können: Versand rückgängig machen, geplanter Versand und keine stillen Duplikate — bricht die Verbindung beim Senden ab, fragt Dot Mail vor dem erneuten Versuch</li>
+<li>Nur-Text- und HTML-Mails, Anhänge (öffnen oder mit beliebiger App teilen), zitierte Antworten werden eingeklappt</li>
+<li>Automatische Erkennung der großen Provider (Gmail, Outlook, Yahoo, iCloud, Infomaniak, Fastmail, GMX, Posteo, Zoho, …) und jeder Standard-IMAP/SMTP-Server manuell</li>
+<li>Funktioniert als Standard-E-Mail-App (mailto:-Links); Dateien aus anderen Apps in Dot Mail teilen</li>
+</ul>
+
+<h3>Datenschutz per Konstruktion</h3>
+<ul>
+<li>Kein Vermittler: Dot Mail verbindet sich direkt per TLS mit Ihrem Server. Es gibt keinen Dot-Mail-Server.</li>
+<li>Keine Analysen, keine Crash-Reporter, keine Werbung, keine Google Play-Dienste. Nicht „optional deaktivierbar" — schlicht nicht vorhanden.</li>
+<li>Ferne Bilder und Tracking-Pixel sind standardmäßig blockiert; je Nachricht können Sie sie laden.</li>
+<li>Das HTML der Mails wird bereinigt und dann gerendert — mit deaktiviertem JavaScript, ohne Datei- und Netzszugriff.</li>
+<li>Bevor Sie die App über einen Link verlassen, sehen Sie, wohin er wirklich führt.</li>
+<li>Passwörter werden mit einem Schlüssel verschlüsselt, der im Android-Keystore liegt; App-Daten sind von der Cloud-Sicherung ausgeschlossen.</li>
+<li>Optionale App-Sperre (Fingerabdruck / Gesicht / PIN) und „Inhalte in der App-Übersicht verbergen".</li>
+</ul>
+
+<h3>Status</h3>
+<p>Dot Mail ist jung: verwendbar und getestet, aber noch nicht auf Tausenden von Postfächern abgehärtet. Die Anmeldung mit Passwort und App-Passwort funktioniert heute; die OAuth-Anmeldung (nötig für Outlook/Hotmail-Personalkonten) ist noch nicht implementiert, ebenso wenig OpenPGP/S-MIME oder mehrere Absender-Aliase pro Konto. Die Synchronisierung im Hintergrund läuft alle 15 Minuten, dazu Live-Updates (IDLE), während die App geöffnet ist.</p>
+
+<p>100&nbsp;% Kotlin und Jetpack Compose, ohne plattformübergreifende Schicht. Dot Mail ist die erste einer geplanten Familie unabhängiger, die Privatsphäre respektierender „Dot"-Apps mit gemeinsamem Design.</p>
