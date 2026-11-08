@@ -9,8 +9,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
-import dev.chrisbanes.haze.HazeFeatureFlags
 import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.HazePerformanceMode
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.blur.HazeBlurStyle
 import dev.chrisbanes.haze.blur.HazeColorEffect
@@ -21,9 +21,9 @@ import dev.chrisbanes.haze.rememberHazeState
 /**
  * Dot's backdrop blur: one small API over Haze 2, so screens never depend on the blur engine directly.
  *
- * Effects read [HazeInput.Backdrop]: on Android 17+ the platform blurs the window behind the surface natively (no
- * captured copy, so nothing lags behind a scrolling list and nothing flickers); elsewhere Haze falls back to the
- * content marked with [backdropSource]. Call [enablePlatformBackdrop] once at startup, before any surface attaches.
+ * Effects read the content marked with [backdropSource] ([HazeInput.Sources]) at full resolution
+ * ([HazePerformanceMode.Quality]). The default Balanced mode downsamples the captured list, and a downsampled moving
+ * list shimmers from frame to frame: that was the header flicker. A little noise hides banding in large flat blurs.
  *
  * Usage: `val backdrop = rememberBackdrop()`, `Modifier.backdropSource(backdrop)` on the scrolling content (a sibling
  * of the blur surfaces, never their ancestor), `Modifier.backdropBlur(backdrop, …)` on the surfaces. Blur needs
@@ -33,9 +33,6 @@ import dev.chrisbanes.haze.rememberHazeState
 class Backdrop internal constructor(internal val haze: HazeState) {
     val blurEnabled: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 }
-
-/** Lets Android 17+ blur the window backdrop natively. Must run before the first blur surface attaches. */
-fun enablePlatformBackdrop() { HazeFeatureFlags.isPlatformBackdropEnabled = true }
 
 @Composable
 fun rememberBackdrop(): Backdrop {
@@ -62,11 +59,11 @@ fun Modifier.backdropBlur(backdrop: Backdrop, radius: Dp, background: Color, tin
         HazeBlurStyle {
             blurRadius(r.value)
             backgroundColor(bg.value)
-            noiseFactor(0f)
+            noiseFactor(0.05f)
             colorEffects(t.value?.let { listOf(HazeColorEffect.tint(it)) } ?: emptyList())
             mask(m.value)
         }
     }
-    val input = remember(backdrop) { HazeInput.Backdrop(backdrop.haze) }
-    return hazeBlur(input = input, style = style)
+    val input = remember(backdrop) { HazeInput.Sources(backdrop.haze) }
+    return hazeBlur(input = input, style = style, performanceMode = HazePerformanceMode.Quality)
 }
