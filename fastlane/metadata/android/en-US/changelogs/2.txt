@@ -1,0 +1,8 @@
+• HTML mail fits the screen (responsive styles kept, safely)
+• Remote images: remember per message, sender or domain
+• Folders: create, rename, delete; drafts sync to the server
+• Snooze, Newsletters view, one-click unsubscribe
+• Calendar invites: accept / maybe / decline, add to calendar
+• Attachments browser and in-app PDF preview
+• Templates, contact picker, notification rules, settings backup
+• Two-pane layout on tablets, swipe and keyboard navigation

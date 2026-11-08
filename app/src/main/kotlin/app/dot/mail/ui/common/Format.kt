@@ -1,5 +1,6 @@
 package app.dot.mail.ui.common
 
+import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Snooze
@@ -84,6 +85,7 @@ object Format {
         FolderRole.STARRED -> R.string.inbox_role_starred
         FolderRole.CUSTOM -> R.string.inbox_role_custom
         FolderRole.SNOOZED -> R.string.inbox_role_snoozed
+        FolderRole.NEWSLETTERS -> R.string.inbox_role_newsletters
     }
 
     /** Name of a system folder role in the current language. */
@@ -104,6 +106,7 @@ object Format {
         FolderRole.STARRED -> Icons.Outlined.StarOutline
         FolderRole.CUSTOM -> Icons.Outlined.Folder
         FolderRole.SNOOZED -> Icons.Outlined.Snooze
+        FolderRole.NEWSLETTERS -> Icons.Outlined.Email
     }
 
     /** Display order of system folders in the drawer. */

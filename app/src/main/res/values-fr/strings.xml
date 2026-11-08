@@ -725,4 +725,10 @@
     <string name="signin_confirm">Se connecter</string>
     <string name="signin_cancel">Annuler</string>
     <string name="signin_failed">Impossible de mettre à jour le mot de passe.</string>
+    <string name="inbox_role_newsletters">Newsletters</string>
+    <string name="inbox_empty_newsletters_title">Aucune newsletter</string>
+    <string name="inbox_empty_newsletters_body">Les listes de diffusion et newsletters apparaissent ici.</string>
+    <string name="settings_instant_title">Notifications instantanées</string>
+    <string name="settings_instant_body">Garde une connexion directe à votre boîte de réception pour recevoir les nouveaux e-mails en quelques secondes, sans service de push Google. Consomme plus de batterie et affiche une notification permanente. Désactivé : les vérifications suivent l\'intervalle de synchronisation.</string>
+    <string name="settings_instant_failed">Impossible de démarrer les notifications instantanées sur cet appareil.</string>
 </resources>

@@ -1,0 +1,8 @@
+• HTML-Mails passen auf den Bildschirm (responsive Stile, gefiltert)
+• Externe Bilder: pro Nachricht, Absender oder Domain merken
+• Ordner anlegen, umbenennen, löschen; Entwürfe auf dem Server
+• Zurückstellen, Newsletter-Ansicht, Abmelden mit einem Klick
+• Einladungen: zusagen / vielleicht / absagen, in Kalender
+• Anhänge-Übersicht und PDF-Vorschau in der App
+• Vorlagen, Kontaktauswahl, Benachrichtigungsregeln, Backup
+• Zwei Spalten auf Tablets, Wischen und Tastaturkürzel

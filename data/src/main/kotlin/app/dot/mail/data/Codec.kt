@@ -19,7 +19,10 @@ internal object Codec {
     fun draft(raw: String): Draft = JSONObject(raw).let { Draft(it.getLong("id"), it.getLong("account"), if (it.isNull("identity")) null else it.getLong("identity"), addresses(it.getString("to")), addresses(it.getString("cc")), addresses(it.getString("bcc")), it.getString("subject"), it.getString("text"), strings(it.getString("attachments")), it.nullString("reply"), strings(it.getString("refs")), if (it.isNull("scheduled")) null else it.getLong("scheduled"), bodyHtml = it.nullString("html")) }
     fun header(h: Header): String {
         fun convert(a: List<app.dot.mail.engine.Address>) = addresses(a.map { EmailAddress(it.email, it.name) })
-        return JSONObject().put("from", convert(h.from)).put("to", convert(h.to)).put("cc", convert(h.cc)).put("bcc", convert(h.bcc)).put("replyTo", convert(h.replyTo)).put("messageId", h.messageId).put("refs", strings(h.references)).put("unsubscribe", h.unsubscribe).put("unsubOneClick", h.unsubscribeOneClick).toString()
+        val signals=h.classificationHeaders.toMutableMap()
+        h.unsubscribe?.let { unsubscribe -> if(signals.keys.none { it.equals("List-Unsubscribe",true) }) signals["List-Unsubscribe"]=listOf(unsubscribe) }
+        val category=app.dot.mail.engine.text.Classifier.classify(app.dot.mail.engine.text.ClassifierInput(h.from.firstOrNull()?.email.orEmpty(),h.from.firstOrNull()?.name.orEmpty(),h.subject,"",signals,h.hasPdfAttachment)).category
+        return JSONObject().put("category",category.name).put("listId",signals.entries.firstOrNull { it.key.equals("List-Id",true) }?.value?.firstOrNull()).put("from", convert(h.from)).put("to", convert(h.to)).put("cc", convert(h.cc)).put("bcc", convert(h.bcc)).put("replyTo", convert(h.replyTo)).put("messageId", h.messageId).put("refs", strings(h.references)).put("unsubscribe", h.unsubscribe).put("unsubOneClick", h.unsubscribeOneClick).toString()
     }
     fun field(raw: String, name: String): String? = JSONObject(raw).nullString(name)
     fun addressField(raw: String, name: String): List<EmailAddress> = addresses(JSONObject(raw).getString(name))

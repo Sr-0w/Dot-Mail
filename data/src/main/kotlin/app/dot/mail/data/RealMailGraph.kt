@@ -68,7 +68,10 @@ internal class RealMailGraph(
         OutboxItem(row.id, row.accountId, draft.subject, (draft.to + draft.cc + draft.bcc).distinctBy { it.email }, row.dueAt, state, row.error,
             row.state in setOf("UNCERTAIN", "APPEND") || (row.state == "PENDING" && row.error != null), row.state in setOf("PENDING", "APPEND", "UNCERTAIN"))
     } }.flowOn(Dispatchers.IO)
-    internal fun start() { if (scheduling) { WorkScheduling.periodic(context); ForegroundIdle(this).start(); scope.launch { recoverOutbox(); dao.accounts().forEach { account -> if(dao.draftMirrors(account.id).isNotEmpty()) WorkScheduling.drafts(context,account.id) } }; scope.launch { resurfaceDue() } } }
+    internal val foregroundIdle by lazy { ForegroundIdle(this) }
+    override val instantNotifications: Flow<Boolean> = AccountSettingsStore.get(context).sync.map { it.instantNotifications }.distinctUntilChanged()
+    override suspend fun setInstantNotificationsEnabled(enabled: Boolean): Boolean = changeInstantNotifications(enabled)
+    internal fun start() { if (scheduling) { WorkScheduling.periodic(context); foregroundIdle.start(); scope.launch { recoverOutbox(); dao.accounts().forEach { account -> if(dao.draftMirrors(account.id).isNotEmpty()) WorkScheduling.drafts(context,account.id) } }; scope.launch { resurfaceDue() } } }
     internal suspend fun credentials(row: AccountRow): Credentials = withContext(Dispatchers.IO) {
         if (Codec.config(row.config).authType == AuthType.OAUTH2) oauth.credentials(row.id) else try { Credentials(vault.decrypt(row.email, row.secret)) }
         catch(e:java.security.GeneralSecurityException) { dao.syncError(row.id,"Saved credentials are unavailable. Sign in again.",true); throw ReauthenticationRequired(e) }
@@ -154,7 +157,7 @@ internal class RealMailGraph(
         val drafts = if (draftView) dao.folders(t.accountId).filter { it.role == "DRAFTS" }.map { it.id }.toSet() else emptySet()
         val latest = (if (draftView) messages.filter { it.folderId in drafts } else messages).lastOrNull()
         val handle = if (draftView) latest?.let { -it.id } else null
-        return ThreadSummary(t.id, t.accountId, t.subject, Codec.addresses(t.participants), t.snippet, t.lastAt, t.count, t.unread, t.starred, t.attachments, draftId = handle, recipients = latest?.let { Codec.addressField(it.header, "to") }.orEmpty())
+        return ThreadSummary(t.id, t.accountId, t.subject, Codec.addresses(t.participants), t.snippet, t.lastAt, t.count, t.unread, t.starred, t.attachments, draftId = handle, recipients = latest?.let { Codec.addressField(it.header, "to") }.orEmpty(), category=latest?.let(::messageCategory))
     }
     private fun paging(where: String, args: List<Any>, draftView: Boolean = false, draftAccount: Long? = null): Flow<PagingData<ThreadSummary>> = Pager(PagingConfig(pageSize = 40)) {
         mailboxSource(where, args, draftView, draftAccount)
@@ -177,7 +180,7 @@ internal class RealMailGraph(
                 val folder = dao.folder(mailbox.folderId)
                 emitAll(paging("EXISTS(SELECT 1 FROM messages m WHERE m.threadId=t.id AND m.folderId=?)", listOf(mailbox.folderId), folder?.role == "DRAFTS", folder?.accountId))
             }
-            is Mailbox.Unified -> if (mailbox.role == FolderRole.SNOOZED) emitAll(snoozedThreadsPaging()) else emitAll(paging("EXISTS(SELECT 1 FROM messages m JOIN folders f ON f.id=m.folderId WHERE m.threadId=t.id AND f.role=?)", listOf(mailbox.role.name), mailbox.role == FolderRole.DRAFTS))
+            is Mailbox.Unified -> if (mailbox.role == FolderRole.NEWSLETTERS) emitAll(paging("EXISTS(SELECT 1 FROM messages m JOIN folders f ON f.id=m.folderId WHERE m.threadId=t.id AND ${newsletterPredicate("m","f")})",emptyList())) else if (mailbox.role == FolderRole.SNOOZED) emitAll(snoozedThreadsPaging()) else emitAll(paging("EXISTS(SELECT 1 FROM messages m JOIN folders f ON f.id=m.folderId WHERE m.threadId=t.id AND f.role=?)", listOf(mailbox.role.name), mailbox.role == FolderRole.DRAFTS))
         }
     }
     override fun search(query: String, accountId: Long?): Flow<PagingData<ThreadSummary>> = flow {
@@ -228,7 +231,7 @@ internal class RealMailGraph(
         val attachments = dao.attachmentsFor(rows.map { it.id }).groupBy { it.messageId }
         rows.map { row ->
         app.dot.mail.data.model.Message(row.id, row.accountId, row.folderId, row.threadId, Codec.addressField(row.header, "from").firstOrNull() ?: EmailAddress(""), Codec.addressField(row.header, "to"), Codec.addressField(row.header, "cc"), Codec.addressField(row.header, "bcc"), Codec.addressField(row.header, "replyTo"), row.subject, row.sentAt, row.snippet, row.unread, row.starred,
-            bodyStore.read(row), attachments[row.id].orEmpty().map(::attachment), Codec.field(row.header, "messageId"), Codec.strings(Codec.field(row.header, "refs") ?: "[]"), Codec.field(row.header, "unsubscribe"), Codec.field(row.header, "unsubOneClick"))
+            bodyStore.read(row), attachments[row.id].orEmpty().map(::attachment), Codec.field(row.header, "messageId"), Codec.strings(Codec.field(row.header, "refs") ?: "[]"), Codec.field(row.header, "unsubscribe"), Codec.field(row.header, "unsubOneClick"),listId=Codec.field(row.header,"listId"),category=messageCategory(row))
     } }.flowOn(Dispatchers.IO)
     private fun attachment(a: AttachmentRow) = Attachment(a.id, a.messageId, a.name, a.mime, a.size, a.cid, a.inline, a.localUri)
     private fun attachmentFile(accountId: Long, name: String = UUID.randomUUID().toString()): File = File(context.filesDir, "attachments/$accountId/$name").also { it.parentFile!!.mkdirs() }
@@ -269,7 +272,7 @@ internal class RealMailGraph(
         if (old != null) {
             // Pending optimistic changes win until replay completes.
             val pending = dao.operations(folder.accountId).any { it.messageLocalId == old.id || (it.folderId == folder.id && it.uid == header.uid && it.validity == folder.validity) }
-            dao.updateMessage(old.copy(uid = header.uid, messageIdKey=header.messageId, unread = if (pending) old.unread else !header.flags.seen, starred = if (pending) old.starred else header.flags.starred))
+            dao.updateMessage(old.copy(uid = header.uid, header=Codec.header(header), messageIdKey=header.messageId, unread = if (pending) old.unread else !header.flags.seen, starred = if (pending) old.starred else header.flags.starred))
             rebuildThread(old.threadId); return old.threadId to false
         }
         val keys = Threading.keys(header)
@@ -329,7 +332,7 @@ internal class RealMailGraph(
         }
         return when (mailbox) {
             is Mailbox.InFolder -> rows.filter { it.folderId == mailbox.folderId }
-            is Mailbox.Unified -> rows.filter { dao.folder(it.folderId)?.role == mailbox.role.name }
+            is Mailbox.Unified -> if(mailbox.role==FolderRole.NEWSLETTERS) rows.filter { isNewsletter(it,dao.folder(it.folderId)?.role) } else rows.filter { dao.folder(it.folderId)?.role == mailbox.role.name }
         }
     }
 

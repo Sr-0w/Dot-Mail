@@ -725,4 +725,10 @@
     <string name="signin_confirm">Sign in</string>
     <string name="signin_cancel">Cancel</string>
     <string name="signin_failed">Couldn\'t update the password.</string>
+    <string name="inbox_role_newsletters">Newsletters</string>
+    <string name="inbox_empty_newsletters_title">No newsletters</string>
+    <string name="inbox_empty_newsletters_body">Mailing lists and newsletters appear here.</string>
+    <string name="settings_instant_title">Instant notifications</string>
+    <string name="settings_instant_body">Keeps a direct connection to your inbox open so new mail arrives within seconds, with no Google push service. Uses more battery and shows a permanent notification. Off: checks follow the sync interval.</string>
+    <string name="settings_instant_failed">Instant notifications couldn\'t be started on this device.</string>
 </resources>

@@ -725,4 +725,10 @@
     <string name="signin_confirm">Anmelden</string>
     <string name="signin_cancel">Abbrechen</string>
     <string name="signin_failed">Das Passwort konnte nicht aktualisiert werden.</string>
+    <string name="inbox_role_newsletters">Newsletter</string>
+    <string name="inbox_empty_newsletters_title">Keine Newsletter</string>
+    <string name="inbox_empty_newsletters_body">Mailinglisten und Newsletter erscheinen hier.</string>
+    <string name="settings_instant_title">Sofortbenachrichtigungen</string>
+    <string name="settings_instant_body">Hält eine direkte Verbindung zum Posteingang offen, damit neue Mails innerhalb von Sekunden ankommen – ohne Google-Push-Dienst. Verbraucht mehr Akku und zeigt eine dauerhafte Benachrichtigung. Aus: Abrufe folgen dem Sync-Intervall.</string>
+    <string name="settings_instant_failed">Sofortbenachrichtigungen konnten auf diesem Gerät nicht gestartet werden.</string>
 </resources>

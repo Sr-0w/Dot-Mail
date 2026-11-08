@@ -466,6 +466,7 @@ private fun EmptyFor(role: FolderRole?) {
         FolderRole.SENT -> R.string.inbox_empty_sent_title to R.string.inbox_empty_sent_body
         FolderRole.SPAM -> R.string.inbox_empty_spam_title to R.string.inbox_empty_spam_body
         FolderRole.TRASH -> R.string.inbox_empty_trash_title to R.string.inbox_empty_trash_body
+        FolderRole.NEWSLETTERS -> R.string.inbox_empty_newsletters_title to R.string.inbox_empty_newsletters_body
         FolderRole.SNOOZED -> R.string.inbox_empty_snoozed_title to R.string.inbox_empty_snoozed_body
         else -> R.string.inbox_empty_folder_title to R.string.inbox_empty_folder_body
     }

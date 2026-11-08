@@ -143,13 +143,14 @@ class MailClient(val timeoutMs: Int = 30_000) {
     private fun fetchHeaders(f: IMAPFolder, messages: Array<out Message>, gmail: Boolean) {
         f.fetch(messages, FetchProfile().apply {
             add(FetchProfile.Item.ENVELOPE); add(FetchProfile.Item.FLAGS); add(FetchProfile.Item.CONTENT_INFO); add(UIDFolder.FetchProfileItem.UID)
-            listOf("Message-ID", "References", "In-Reply-To", "List-Unsubscribe", "List-Unsubscribe-Post").forEach { add(it) }
+            (listOf("Message-ID", "References", "In-Reply-To", "List-Unsubscribe", "List-Unsubscribe-Post") + ClassificationHeaders.names).distinct().forEach { add(it) }
             if (gmail) add(GmailThreadFetch.profile)
         })
     }
     private fun flags(f: IMAPFolder, m: Message) = RemoteFlags(f.getUID(m), m.isSet(Flags.Flag.SEEN), m.isSet(Flags.Flag.FLAGGED), m.isSet(Flags.Flag.DELETED))
     private fun addresses(list: Array<out jakarta.mail.Address>?): List<Address> = list.orEmpty().filterIsInstance<InternetAddress>().map { Address(it.address, it.personal) }
-    internal fun header(f: IMAPFolder, message: Message): Header = try { envelopeHeader(f, message) }
+    internal fun header(f: IMAPFolder, message: Message): Header {
+        val basic = try { envelopeHeader(f, message) }
     catch (failure: MessagingException) {
         // Some servers/clients fail ENVELOPE parsing while RFC header fields are still available.
         fun raw(name: String) = message.getHeader(name)?.firstOrNull()
@@ -163,6 +164,16 @@ class MailClient(val timeoutMs: Int = 30_000) {
             flags(f,message), runCatching { hasAttachments(message) }.getOrDefault(false),
             if ((f.store as IMAPStore).hasCapability("X-GM-EXT-1")) (message as IMAPMessage).getItem(GmailThreadFetch.item) as? Long else null)
     }
+        return basic.copy(classificationHeaders=ClassificationHeaders.read(message),hasPdfAttachment=runCatching { hasPdf(message) }.getOrDefault(false))
+    }
+    /** Bounded metadata backfill for cached messages written by builds predating classification. */
+    suspend fun headers(endpoint: Endpoint, credentials: Credentials, path: String, uids: LongArray, expectedValidity: Long): List<Header> = store(endpoint,credentials) { s -> folder(s,path) { f ->
+        require(uids.size<=200 && uids.all { it>0 })
+        require(f.uidValidity==expectedValidity) { "Folder UIDVALIDITY changed" }
+        val messages=f.getMessagesByUID(uids).filterNotNull().toTypedArray()
+        fetchHeaders(f,messages,s.hasCapability("X-GM-EXT-1"))
+        messages.mapNotNull { runCatching { header(f,it) }.getOrNull() }
+    } }
     private fun envelopeHeader(f: IMAPFolder, m: Message): Header = Header(
         f.getUID(m), m.getHeader("Message-ID")?.firstOrNull(), Threading.ids(m.getHeader("References")?.joinToString(" ")), Threading.ids(m.getHeader("In-Reply-To")?.firstOrNull()).firstOrNull(),
         addresses(m.from), addresses(m.getRecipients(Message.RecipientType.TO)), addresses(m.getRecipients(Message.RecipientType.CC)), addresses(m.getRecipients(Message.RecipientType.BCC)), addresses(m.replyTo),
@@ -176,6 +187,13 @@ class MailClient(val timeoutMs: Int = 30_000) {
         val post = m.getHeader("List-Unsubscribe-Post")?.toList() ?: return null
         app.dot.mail.engine.text.ListUnsubscribe.parse(mapOf("List-Unsubscribe" to list, "List-Unsubscribe-Post" to post))?.oneClickHttps
     }.getOrNull()
+    private fun hasPdf(part: Part, depth: Int = 0): Boolean {
+        if(depth>=40) return false
+        if(part.isMimeType("application/pdf")) return true
+        if(!part.isMimeType("multipart/*")) return false
+        val source=part.dataHandler.dataSource as? MultipartDataSource ?: return false
+        return (0 until source.count).any { hasPdf(source.getBodyPart(it),depth+1) }
+    }
     private fun hasAttachments(part: Part, depth: Int = 0): Boolean {
         if (depth >= 40) return false
         if (part.disposition.equals(Part.ATTACHMENT, true) || (part.fileName != null && !part.disposition.equals(Part.INLINE, true))) return true
@@ -293,10 +311,11 @@ class MailClient(val timeoutMs: Int = 30_000) {
         val closer = launch(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) { try { awaitCancellation() } finally { runCatching { s.close() } } }
         try { withContext(Dispatchers.IO) {
             f.open(Folder.READ_ONLY)
-            if (!s.hasCapability("IDLE")) return@withContext
+            if (!s.hasCapability("IDLE")) return@withContext false
             f.addMessageCountListener(object : MessageCountAdapter() { override fun messagesAdded(e: MessageCountEvent) { changed() }; override fun messagesRemoved(e: MessageCountEvent) { changed() } })
             f.addMessageChangedListener { changed() }
             while (isActive && f.isOpen) f.idle()
+            true
         } } finally { closer.cancel(); withContext(NonCancellable + Dispatchers.IO) { runCatching { s.close() } } }
     }
     companion object {

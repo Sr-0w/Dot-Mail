@@ -287,6 +287,18 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
                     )
                 },
             )
+            val instant by graph.mail.instantNotifications.collectAsStateWithLifecycle(false)
+            ToggleRow(
+                stringResource(R.string.settings_instant_title),
+                stringResource(R.string.settings_instant_body),
+                Icons.Outlined.Notifications, instant,
+            ) { v ->
+                scope.launch {
+                    if (!graph.mail.setInstantNotificationsEnabled(v) && v) {
+                        android.widget.Toast.makeText(context, context.getString(R.string.settings_instant_failed), android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
             val rules = remember { app.dot.mail.data.NotificationRules.get(context.applicationContext) }
             val buttons by rules.actions.collectAsStateWithLifecycle()
             val actionOptions = listOf(
