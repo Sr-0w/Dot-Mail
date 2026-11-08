@@ -17,8 +17,8 @@ data class SanitizedHtml(
     val hasRemoteImages: Boolean get() = blockedRemoteResources > 0
 }
 object HtmlSanitizer {
-    fun sanitize(html: String, allowRemoteImages: Boolean = false, cidUris: Map<String, String> = emptyMap()): SanitizedHtml {
-        val result = app.dot.mail.engine.HtmlSanitizer.sanitize(html, allowRemoteImages, cidUris)
+    fun sanitize(html: String, allowRemoteImages: Boolean = false, cidUris: Map<String, String> = emptyMap(), blockTrackers: Boolean = true): SanitizedHtml {
+        val result = app.dot.mail.engine.HtmlSanitizer.sanitize(html, allowRemoteImages, cidUris, blockTrackers)
         return SanitizedHtml(result.html, result.blockedRemoteResources, result.layoutWidth, result.responsive, result.trackersBlocked, result.suspiciousLinks)
     }
 }

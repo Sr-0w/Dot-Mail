@@ -59,6 +59,8 @@ data class UiPrefs(
     val readerFont: ReaderFont = ReaderFont.INTER,
     /** Reader line height as a percentage of the font size, 120..200. */
     val readerLineHeightPercent: Int = 155,
+    /** Remove email-open tracking pixels even when remote images are allowed. Independent of [loadRemoteImages]. */
+    val blockTrackingPixels: Boolean = true,
 
     // --- Reading
     val quotedExpanded: Boolean = false,
@@ -111,6 +113,7 @@ class AppSettings(context: Context) {
             putInt("readingTextPercent", next.readingTextPercent)
             putString("readerFont", next.readerFont.name)
             putInt("readerLineHeight", next.readerLineHeightPercent)
+            putBoolean("blockTrackingPixels", next.blockTrackingPixels)
             putBoolean("quotedExpanded", next.quotedExpanded)
             putBoolean("replyAllByDefault", next.replyAllByDefault)
             putBoolean("swipeBetweenMessages", next.swipeBetweenMessages)
@@ -146,6 +149,7 @@ class AppSettings(context: Context) {
             readingTextPercent = prefs.getInt("readingTextPercent", d.readingTextPercent).coerceIn(90, 130),
             readerFont = enumOr(prefs.getString("readerFont", null), d.readerFont),
             readerLineHeightPercent = prefs.getInt("readerLineHeight", d.readerLineHeightPercent).coerceIn(120, 200),
+            blockTrackingPixels = prefs.getBoolean("blockTrackingPixels", d.blockTrackingPixels),
             quotedExpanded = prefs.getBoolean("quotedExpanded", d.quotedExpanded),
             replyAllByDefault = prefs.getBoolean("replyAllByDefault", d.replyAllByDefault),
             swipeBetweenMessages = prefs.getBoolean("swipeBetweenMessages", d.swipeBetweenMessages),

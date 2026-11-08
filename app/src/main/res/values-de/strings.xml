@@ -1041,4 +1041,8 @@
 
     <!-- Continue with Google (2) -->
     <string name="setup_error_oauth_use_google">%1$s erfordert eine Browser-Anmeldung: Nutzen Sie oben „Weiter mit Google“.</string>
+
+    <!-- Tracking-pixel toggle -->
+    <string name="settings_block_pixels">Tracking-Pixel blockieren</string>
+    <string name="settings_block_pixels_sub">Entfernt die winzigen Bilder, mit denen Absender erfahren, dass Sie eine Nachricht geöffnet haben – auch wenn Sie Bilder laden. Die Erkennung ist heuristisch und nicht lückenlos. Unabhängig vom Laden externer Bilder.</string>
 </resources>

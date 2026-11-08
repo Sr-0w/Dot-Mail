@@ -80,6 +80,7 @@ internal object SettingsIndex {
         SettingsEntry(R.string.settings_smart_folders, R.string.settings_smart_folders_sub, SettingsSection.NOTIFICATIONS, SettingsTarget.SmartFolders, R.string.settings_kw_folders),
         SettingsEntry(R.string.settings_categories, R.string.settings_categories_sub, SettingsSection.NOTIFICATIONS, SettingsTarget.Categories, R.string.settings_kw_folders),
         SettingsEntry(R.string.settings_remote_images, section = SettingsSection.PRIVACY, target = SettingsTarget.RemoteImages, keywords = R.string.settings_kw_privacy),
+        SettingsEntry(R.string.settings_block_pixels, R.string.settings_block_pixels_sub, SettingsSection.PRIVACY, keywords = R.string.settings_kw_privacy),
         SettingsEntry(R.string.settings_app_lock, R.string.settings_app_lock_sub, SettingsSection.PRIVACY, keywords = R.string.settings_kw_lock),
         SettingsEntry(R.string.settings_lock_after, section = SettingsSection.PRIVACY, keywords = R.string.settings_kw_lock),
         SettingsEntry(R.string.settings_hide_recents, R.string.settings_hide_recents_sub, SettingsSection.PRIVACY, keywords = R.string.settings_kw_privacy),

@@ -290,4 +290,39 @@ class HtmlSanitizerTest {
         assertEquals(1, res.trackersBlocked)
         assertTrue(res.suspiciousLinks.isEmpty())
     }
+
+    private val pixel = "<p>Hi</p><img src='https://t.example/o.gif' width='1' height='1'>"
+    private val photo = "<p>Hi</p><img src='https://cdn.example/photo.jpg' width='600' height='400'>"
+    private val trackedBackground = "<table><tr><td background='https://t.example/track/open'>x</td></tr></table>"
+
+    @Test fun trackingPixelsAreRemovedEvenWhenImagesAreAllowedByDefault() {
+        val res = HtmlSanitizer.sanitize(pixel, allowRemoteImages = true)
+        assertEquals(1, res.trackersBlocked)
+        assertFalse(res.html.contains("t.example"))
+    }
+
+    @Test fun withPixelBlockingOffAPixelFollowsTheRemoteImagePolicy() {
+        val allowed = HtmlSanitizer.sanitize(pixel, allowRemoteImages = true, blockTrackers = false)
+        assertEquals(0, allowed.trackersBlocked)
+        assertTrue(allowed.html.contains("https://t.example/o.gif")) // loads only because remote images are allowed
+        val blocked = HtmlSanitizer.sanitize(pixel, allowRemoteImages = false, blockTrackers = false)
+        assertEquals(0, blocked.trackersBlocked)
+        assertFalse(blocked.html.contains("t.example")) // still blocked by the separate remote-image policy
+        assertEquals(1, blocked.blockedRemoteResources)
+    }
+
+    @Test fun trackedBackgroundsFollowTheSameToggle() {
+        assertEquals(1, HtmlSanitizer.sanitize(trackedBackground, allowRemoteImages = true).trackersBlocked)
+        val off = HtmlSanitizer.sanitize(trackedBackground, allowRemoteImages = true, blockTrackers = false)
+        assertEquals(0, off.trackersBlocked)
+        assertTrue(off.html.contains("background-image"))
+    }
+
+    @Test fun ordinaryImagesAreNeverTreatedAsTrackersWhateverTheToggle() {
+        for (block in listOf(true, false)) {
+            val res = HtmlSanitizer.sanitize(photo, allowRemoteImages = true, blockTrackers = block)
+            assertEquals(0, res.trackersBlocked)
+            assertTrue(res.html.contains("photo.jpg"))
+        }
+    }
 }

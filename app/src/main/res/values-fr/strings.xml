@@ -1041,4 +1041,8 @@
 
     <!-- Continue with Google (2) -->
     <string name="setup_error_oauth_use_google">%1$s exige une connexion par navigateur : utilisez « Continuer avec Google » ci-dessus.</string>
+
+    <!-- Tracking-pixel toggle -->
+    <string name="settings_block_pixels">Bloquer les pixels espions</string>
+    <string name="settings_block_pixels_sub">Supprime les minuscules images qui indiquent à l’expéditeur que vous avez ouvert un message, même si vous chargez les images. La détection est heuristique et ne peut pas tout repérer. Indépendant du chargement des images distantes.</string>
 </resources>
