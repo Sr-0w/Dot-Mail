@@ -1,6 +1,6 @@
 package app.dot.mail
 
-import app.dot.design.initials
+import app.dot.design.components.initials
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

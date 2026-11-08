@@ -61,6 +61,7 @@ object Mime {
                 addBodyPart(body)
                 mail.attachments.forEach { attachment -> addBodyPart(MimeBodyPart().apply {
                     dataHandler = DataHandler(ByteArrayDataSource(attachment.bytes, attachment.mimeType)).apply { setCommandMap(handlers) }
+                    setHeader("Content-Transfer-Encoding", "base64")
                     fileName = MimeUtility.encodeText(attachment.name, "UTF-8", null)
                     disposition = if (attachment.contentId == null) Part.ATTACHMENT else Part.INLINE
                     attachment.contentId?.let { require('\n' !in it && '\r' !in it); setHeader("Content-ID", "<${it.trim('<', '>')}>") }

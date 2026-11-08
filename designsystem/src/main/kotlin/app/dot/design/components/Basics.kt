@@ -173,7 +173,9 @@ fun Avatar(name: String, seed: String, modifier: Modifier = Modifier, size: Dp =
 }
 
 fun initials(name: String): String {
-    val cleaned = name.substringBefore('@').replace(Regex("[^\\p{L}\\p{N} ._-]"), " ").trim()
+    // "Alice Smith <a@b.co>" → use the display part; a bare address → its local part.
+    val display = name.substringBefore('<').trim().ifEmpty { name.trim().trim('<', '>') }
+    val cleaned = (if ('@' in display) display.substringBefore('@') else display).replace(Regex("[^\\p{L}\\p{N} ._-]"), " ").trim()
     val parts = cleaned.split(' ', '.', '_', '-').filter { it.isNotBlank() }
     return when {
         parts.isEmpty() -> "·"

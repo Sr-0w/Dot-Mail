@@ -216,7 +216,8 @@ class ComposeViewModel(private val graph: MailGraph, private val route: ComposeR
     }
 
     companion object {
-        private val EMAIL = Regex("^[^@\\s<>]+@[^@\\s<>]+\\.[^@\\s<>]{2,}$")
+        // local@label(.label)+ : no empty labels (no "..", no trailing dot), TLD ≥ 2 chars.
+        private val EMAIL = Regex("^[^@\\s<>]+@[^@\\s<>.]+(\\.[^@\\s<>.]+)*\\.[^@\\s<>.]{2,}$")
         fun isValidEmail(s: String) = EMAIL.matches(s.trim())
 
         /** Accepts "Name <a@b.c>" or "a@b.c". */

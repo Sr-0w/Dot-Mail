@@ -152,7 +152,7 @@ class MainActivity : FragmentActivity() {
 /** RFC 6068 mailto: parsing. */
 object MailtoParser {
     fun parse(mailto: String): ExternalRequest.Compose {
-        val raw = mailto.removePrefix("mailto:").removePrefix("MAILTO:")
+        val raw = if (mailto.startsWith("mailto:", ignoreCase = true)) mailto.substring(7) else mailto
         val addrPart = raw.substringBefore('?')
         val query = raw.substringAfter('?', "")
         fun dec(s: String) = runCatching { java.net.URLDecoder.decode(s.replace("+", "%2B"), "UTF-8") }.getOrDefault(s)

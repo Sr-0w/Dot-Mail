@@ -43,6 +43,19 @@ class LiveInfomaniakTest {
                 fetchedBody = true
                 println("LIVE body fetch: OK (contents withheld)")
             }
+            // Recover only our interrupted test runs, identified by exact self-addresses, ID format and known fixture body.
+            phase = "clean up generated mail from interrupted test runs"
+            val interrupted = client.search(imap, credentials, inbox, "subject:\"Dot Mail interoperability\"", limit = 50).filter { h ->
+                h.messageId?.matches(Regex("<dotmail-live-[0-9a-f-]{36}@dotmail[.]invalid>")) == true && h.from.any { it.email == email } && h.to.any { it.email == email }
+            }
+            var cleaned = 0
+            interrupted.forEach { header ->
+                val body = client.body(imap, credentials, inbox, header.uid)
+                if (body.text?.startsWith("Opt-in Dot Mail interoperability test. This message will be moved to Trash by the test.") == true && body.attachments.any { it.name == "dotmail-interop.txt" }) {
+                    client.move(imap, credentials, inbox, longArrayOf(header.uid), trash); cleaned++
+                }
+            }
+            if (cleaned > 0) println("LIVE interrupted test messages moved to Trash: $cleaned")
             for ((port, security) in listOf(587 to TransportSecurity.STARTTLS, 465 to TransportSecurity.SSL_TLS)) {
                 val marker = "Dot Mail interoperability ${UUID.randomUUID()}"
                 val id = "<dotmail-live-${UUID.randomUUID()}@dotmail.invalid>"
@@ -60,15 +73,27 @@ class LiveInfomaniakTest {
                     }
                 }
                 val header = requireNotNull(found) { "Self-mail did not arrive before timeout" }
-                phase = "generated body/attachment verification for SMTP $port"
-                val body = client.body(imap, credentials, inbox, header.uid)
-                assertArrayEquals(payload, body.attachments.single { it.name == "dotmail-interop.txt" }.bytes)
-                fetchedBody = true
-                println("LIVE IMAP search and attachment round trip $port: OK")
-                phase = "move generated SMTP $port message to existing Trash"
-                assertEquals(MoveOutcome.MOVED, client.move(imap, credentials, inbox, longArrayOf(header.uid), trash))
-                assertTrue(client.search(imap, credentials, trash, "subject:\"$marker\"", limit = 20).any { it.messageId == id })
-                println("LIVE generated message moved to Trash $port: OK")
+                try {
+                    phase = "generated body/attachment verification for SMTP $port"
+                    val body = client.body(imap, credentials, inbox, header.uid)
+                    assertArrayEquals(payload, body.attachments.single { it.name == "dotmail-interop.txt" }.bytes)
+                    fetchedBody = true
+                    println("LIVE IMAP search and attachment round trip $port: OK")
+                } finally {
+                    // Even a failed assertion must not leave this uniquely identified test mail in INBOX.
+                    phase = "verify move of generated SMTP $port message"
+                    val outcome = client.move(imap, credentials, inbox, longArrayOf(header.uid), trash)
+                    var inTrash = false
+                    repeat(10) {
+                        if (!inTrash) {
+                            inTrash = client.search(imap, credentials, trash, "subject:\"$marker\"", limit = 20).any { it.messageId == id }
+                            if (!inTrash) delay(1_000)
+                        }
+                    }
+                    println("LIVE MOVE $port: outcome=$outcome; exact test message in Trash=$inTrash")
+                    assertTrue(inTrash)
+                    println("LIVE generated message moved to Trash $port: OK")
+                }
             }
             assertTrue(fetchedBody)
         } catch (e: Throwable) {

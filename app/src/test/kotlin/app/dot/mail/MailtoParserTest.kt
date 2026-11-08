@@ -70,7 +70,7 @@ class MailtoParserTest {
     @Test
     fun `cc with multiple addresses and empty address part`() {
         val c = p("mailto:?cc=a@x.com,b@y.com")
-        assertEquals(emptyList(), c.to)
+        assertEquals(emptyList<String>(), c.to)
         assertEquals(listOf("a@x.com", "b@y.com"), c.cc)
     }
 
