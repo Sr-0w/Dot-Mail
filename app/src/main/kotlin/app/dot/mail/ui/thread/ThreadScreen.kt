@@ -885,8 +885,8 @@ private fun linkify(text: String, color: androidx.compose.ui.graphics.Color, onL
 
 /**
  * Calendar invitations carried as text/calendar parts (or .ics files): parsed locally and shown as a card with
- * "Add to calendar" (system Calendar insert intent, no permission). Replying to the organiser (iTIP REPLY) needs
- * data-layer support and is not offered yet.
+ * "Add to calendar" (system Calendar insert intent, no permission) and, when one of my addresses is invited,
+ * Accept / Maybe / Decline (iTIP REPLY to the organiser only, 5 s undo).
  */
 @Composable
 private fun CalendarInvites(message: Message) {
@@ -908,11 +908,36 @@ private fun CalendarInvites(message: Message) {
         }
     }
     val use24h = remember { android.text.format.DateFormat.is24HourFormat(context) }
+    // Which of my addresses (account + aliases) the invitation is addressed to: only then can I answer it.
+    val accounts by graph.accounts.accounts.collectAsStateWithLifecycle(emptyList())
+    val mine = remember(accounts, message.accountId) {
+        accounts.firstOrNull { it.id == message.accountId }?.let { a -> (a.identities.map { it.email } + a.email).map { it.lowercase() }.toSet() }.orEmpty()
+    }
+    val scope = rememberCoroutineScope()
+    var responding by remember(message.id) { mutableStateOf(false) }
+    var answered by remember(message.id) { mutableStateOf<app.dot.mail.engine.calendar.Ics.PartStat?>(null) }
+    var undoable by remember(message.id) { mutableStateOf<Long?>(null) }
+    var error by remember(message.id) { mutableStateOf<String?>(null) }
     invites.forEach { invite ->
+        val myEmail = invite.attendees.firstOrNull { it.email.lowercase() in mine }?.email
         app.dot.mail.ui.calendar.InviteCard(
             invite = invite,
-            myEmail = null,
-            onRespond = {},
+            myEmail = myEmail,
+            responding = responding,
+            myResponse = answered,
+            onRespond = { partstat ->
+                responding = true; error = null
+                scope.launch {
+                    runCatching { graph.compose.sendCalendarReply(message.id, partstat) }
+                        .onSuccess { outboxId ->
+                            answered = partstat; undoable = outboxId
+                            kotlinx.coroutines.delay(5_000)
+                            if (undoable == outboxId) undoable = null
+                        }
+                        .onFailure { error = it.message ?: "Couldn't send your reply" }
+                    responding = false
+                }
+            },
             onAddToCalendar = {
                 try { context.startActivity(app.dot.mail.ui.calendar.insertEventIntent(invite)) }
                 catch (_: ActivityNotFoundException) { }
@@ -921,6 +946,16 @@ private fun CalendarInvites(message: Message) {
             modifier = Modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s),
         )
     }
+    val c = Dot.colors
+    undoable?.let { outboxId ->
+        Row(Modifier.padding(horizontal = DotSpacing.gutter), verticalAlignment = Alignment.CenterVertically) {
+            Text("Sending your reply to the organiser…", style = Dot.type.caption, color = c.textTertiary, modifier = Modifier.weight(1f))
+            DotButton("Undo", {
+                scope.launch { if (graph.compose.cancelSend(outboxId)) { answered = null } else error = "Too late — the reply was already sent"; undoable = null }
+            }, style = ButtonStyle.Ghost, compact = true)
+        }
+    }
+    error?.let { Text(it, style = Dot.type.caption, color = c.danger, modifier = Modifier.padding(horizontal = DotSpacing.gutter)) }
 }
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
