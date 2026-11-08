@@ -1,115 +1,297 @@
 # Feature requests
 
-The owner's feature backlog. Add requests under **Open**; move them to **In progress** when work starts.
-Use **Done only for the fully delivered and verified scope**, not for partial implementations,
-untested changes, or a merged PR alone. If something in Done is incomplete or regresses,
-move it back to In progress/Open and document what's missing. Keep each entry concise,
-include acceptance criteria where useful, and link PRs/commits instead of accumulating
-lengthy inline progress diaries. Never lose a user requirement during cleanup.
-**Re-audit the complete backlog regularly as the project evolves** (after significant PRs,
-before each release, and whenever a regression is reported). Re-check implemented behavior
-against every acceptance criterion, not just old comments, screenshots or test results.
-Reopen any Done item whose functionality is broken, missing, only partially delivered or
-no longer compatible with newer changes; document what regressed and link evidence.
+The owner's backlog and the team's tracker. The owner edits this file on GitHub: `git pull --rebase` before committing.
 
-Priority: `P1` = next / blocking · `P2` = soon · `P3` = nice to have.
+## How this file works
+
+- **Where things live**: `Open` (not started, or work not active) → `In progress` (active, or merged but not fully verified) →
+  `Done` (every scoped acceptance criterion implemented **and** verified). Within each, items are grouped by feature area.
+- **Done means verified.** A merged PR alone is not Done. Each Done item names its evidence (PR/commit, tests, device check).
+  Anything not proven stays In progress with the exact gap. Never claim a device check that nobody did.
+- **Reopen** a Done item when it regresses or turns out incomplete; say what is missing and link the evidence.
+- **Format** of an item (keep it this short, no inline diaries; put long detail in a PR, an issue or `docs/reports/`):
+
+  ```
+  - **FR-nn · P1 · Title** — one-line goal.
+    - [x] / [ ] acceptance criteria (only when useful)
+    - Evidence: PR #n, tests. Device: checked / pending. Gaps: …
+  ```
+
+- **IDs** (`FR-nn`) are stable: never renumber, never reuse. New requests take the next free number.
+- **Priority**: `P1` next/blocking · `P2` soon · `P3` nice to have. **PR numbers** are
+  `https://github.com/Sr-0w/Dot-Mail/pull/N`. **Device** = the owner's Galaxy S25 Ultra unless stated.
+- **Re-audit** the whole file regularly (after significant merges, before each release, after any regression report) —
+  see FR-76. Never lose a user requirement during cleanup.
+
+Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR list; no device was used for this audit —
+"Device: pending" lines are things someone still has to check on a phone).
+
+---
 
 ## Open
 
-- P1 · **Housekeeping and full Done audit of FEATURE_REQUESTS.md (owner request):** Refactor this growing backlog into a concise, readable, consistently formatted Markdown tracker, grouped logically by feature area and actual status, with short titles, explicit acceptance criteria, checkboxes/subtasks only when useful, and links to issues/PRs/commits for implementation details instead of multi-paragraph single-line bullets. Deduplicate overlapping requests, merge related entries, eliminate contradictory inline `[done]`/`[in progress]` annotations, keep important requirements and history traceable, and make it easy for agents to add/update tasks without turning the file back into a wall of text. **Audit every existing Done entry against current code, tests and relevant real-device behavior; never assume a merged PR or a checked-off note means the full user request was delivered.** If any requirement is missing, broken, untested or only partly implemented, move the item to **In progress** (work active) or **Open** (work not active), noting the exact gaps. Mark Done only when all scoped acceptance criteria are implemented and verified, with evidence (PR/commit and test/device-check when applicable); do not claim verification that has not happened. Preserve genuinely completed features and do not silently discard user requests. Perform the audit and cleanup, not merely rewrite the status labels.
+### Reading and HTML mail
 
+- **FR-21 · P1 · Severe HTML email flicker / blanking while scrolling** — real-device regression (S25 Ultra, image-heavy
+  mail such as AliExpress): large areas disappear to black/blank and reappear while header and floating buttons stay.
+  Photosensitivity and usability issue, not cosmetic.
+  - [ ] No flicker, disappearing content, layout jumps or unstable rendering while scrolling, including with floating
+    headers and the top blur
+  - [ ] Verified on device with long image-heavy mails, fast/slow and repeated scrolling (not from screenshots or unit tests)
+  - Evidence: none yet. Related: FR-54 (top blur flicker).
+- **FR-22 · P1 · Android system Back crashes when leaving an open email** — repro on S25 Ultra: open a message, press
+  Back/gesture; the app crashes instead of returning.
+  - [ ] Real stack trace/logcat captured and inspected; root cause fixed
+  - [ ] Back returns to the previous screen in every case: after HTML scrolling/loading, attachment views,
+    swipe-between-conversations, with keyboard or a modal open; in-app Back arrow too
+  - [ ] Regression tests for the navigation/lifecycle/WebView-disposal paths, then device verification
+  - Evidence: none (`0196e79` only fixes Back closing the drawer, which is unrelated).
 
-- P2 · **Polish animations across most meaningful user actions** [in progress: screen transitions, selection mode, menus/dialogs, Cc/Bcc reveal, reduced-motion lists, Outbox removal done — Gemini, Sonnet #32; reader capsules next] in Dot Mail, using subtle, fast, consistent Quiet UI motion: navigation and screen transitions; mail row insertion/removal on archive, delete, restore and refresh; swipe feedback; selection and contextual-action transitions; conversation expand/collapse; buttons, sheets, menus, dialogs and loading states. **Specifically animate the Cc and Bcc recipient fields in Compose when the user taps “Cc/Bcc”**: smoothly reveal and collapse the rows with coordinated height/opacity/position changes, reflow surrounding content without jumps, and keep keyboard focus and accessibility correct. Prefer native Jetpack Compose animations, smooth 60/120 Hz behavior and reduced-motion accessibility settings; avoid excessive motion, delays, flashy effects or animations on every trivial interaction.
-- P2 · [done: contact photos, Gravatar, Libravatar (new), BIMI brand logos, website icons (more locations) — all opt-in, cached, no WebView — Claude] Sender profile pictures from other sources if possible (see avatar work in progress for what's covered).
+### Sending
 
+- **FR-11 · P2 · Complete delayed / scheduled sending ("Send later")** — only three presets exist today
+  (this evening / tomorrow morning / Monday morning).
+  - [ ] Custom future date and time picker; show the scheduled time and timezone
+  - [ ] Queued messages can be viewed, edited, rescheduled and cancelled before SMTP submission (the Outbox lists them;
+    edit/reschedule is missing)
+  - [ ] Robust across restart, connectivity changes, background limits, clock/timezone/DST changes, retries, no duplicate send
+  - [ ] Honest about Android not guaranteeing second-exact delivery; separate from the Undo-send grace period
+  - [ ] End-to-end device verification
+  - Evidence: presets + outbox due times exist (`WorkScheduling`); custom picker not implemented.
 
-- P2 · [done: classifier in sync, Newsletters/Purchases/Bills/Notifications/Social views, Settings page, user rules with reclassification — Codex #27, Sol #39, Claude] Optional rules-based classification of personal mail, newsletters, purchases, receipts/bills and notifications; user-editable rules and no external processing.
-- P2 · [done: link text/destination mismatch warning, Copy/Share link with tracking parameters stripped, "N trackers blocked" note (verified on device) — Sonnet #40; link dialog shows the real host in Unicode, warns on look-alike domains, removes tracking parameters by default (toggle); stronger wording in Settings, image banner — Claude, Qwen, Sonnet #32] Strengthen anti-tracking and phishing protections beyond the remote-image preference controls: **add a clear Settings → Privacy toggle to enable/disable tracking-pixel blocking independently from remote-image loading**, enabled by default. When enabled, continue to filter recognizable email-open tracking pixels even if the user explicitly loads images or trusts the sender/domain; when disabled, permit them subject to the separate remote-image policy. Do not block ordinary inline/remote images merely because they are small; acknowledge that pixel detection is heuristic and cannot guarantee perfect prevention. Keep other unsolicited remote resources blocked by default, show real link destinations, optionally remove known tracking parameters with user control, and clearly explain that allowing remote images may reveal message opens to third parties.
-- P2 · [done: in-app PDF preview with pinch zoom, Share to any app (Paperless-ngx), local text view (selectable/copyable, Android 15+) verified on device — Claude; PDF text into full-content search with Sol's index] PDF/document attachment preview with local text extraction where practical; convenient Android share-to-Paperless-ngx workflow, with any direct integration strictly optional.
-- P2 · [done: one-click RFC 8058 unsubscribe with confirmation, Newsletters view in the menu — Claude, Qwen, Codex #27] Dedicated newsletter/mailing-list view, with safe RFC 2369/RFC 8058 List-Unsubscribe handling, confirmation and transparent behavior.
-- P2 · [in progress — Sonnet] Adjustable message-list density, reading typography and accessibility; retain Quiet UI with responsive gestures, subtle haptics and smooth transitions.
+### Appearance
 
-- P3 · [in progress — Luna] Optional integration with SimpleLogin and Addy.io for alias discovery/selection/management without dependence on either service.
-- P3 · **S/MIME + OpenPGP: user-owned keys, signing and encryption in Compose.** Let users import/manage their own S/MIME certificate + private key (e.g. PKCS#12/PFX or Android KeyChain) and OpenPGP private/public keys, securely protected with Android Keystore/appropriate key handling, with account/From-identity mapping and certificate/key validity information. In the composer offer clear independent **Sign** and **Encrypt** controls, supporting all four states: neither, **sign only**, **encrypt only**, and **sign + encrypt simultaneously**, for new mail, replies and forwards (including attachments) using standards-compliant MIME. Add configurable defaults **Sign all outgoing emails** (globally and ideally per account/identity) and default encryption policy, both overridable per message; indicate the active modes before Send and preserve them across drafts/scheduled sending. For encryption, discover/select and validate public keys/certificates for **every recipient** (To/Cc/Bcc), include the sender's decryption key where appropriate, show actionable warnings if any key is missing/invalid, and **never silently send unencrypted or unsigned** after the user selected those modes. Provide secure key import/export/replacement/revocation UX, sensible passphrase prompting, clear crypto errors, and interoperability tests with real S/MIME/OpenPGP clients. Differentiate cryptographic signing from ordinary HTML/text signature footers; coordinate with the signed/encrypted status badges, and use established audited libraries rather than implementing cryptography from scratch.
-- P3 · [planned after storage — Sol] Optional JMAP support alongside IMAP/SMTP for compatible providers, without making JMAP mandatory.
+- **FR-55 · P2 · Fully rounded Quiet UI shapes** — pill/capsule controls, chips and grouped actions must have true
+  semicircular ends; icon-only controls truly circular; dialogs/sheets consistently and generously rounded.
+  - [ ] Audit every pill/capsule/chip/floating control; one centralized shape token set (today `DotShapes` is
+    8/12/18 dp rounded rectangles; `DotFilterChip` uses the 8 dp one)
+  - [ ] Matching clip/border/background in all states; Light/Dark/OLED, font scaling and animations checked on device
+  - [ ] Primary actions stay solid electric blue; glass controls stay neutral and blurred
+  - Evidence: none yet.
 
-- P2 · [done: solid Accent Blue primary buttons everywhere, frosted Compose pill and snackbars — Gemini, Sonnet #32; verified on device] Establish a restrained Quiet UI button hierarchy inspired by ChatGPT/Grok: **Primary/confirmatory actions** (Send, Save, Confirm) use a solid Accent Blue fill with clear contrast and rounded geometry, **not glass**; **floating actions** (especially the oversized Compose/New email button, and only a few contextual floating controls) use a compact fully rounded **Soft Frosted Pill** with a translucent graphite surface, very soft highlight, delicate low-contrast border, minimal elevation and no neon/glow; **secondary/navigation actions** (Archive, Reply, Forward, toolbar icons, settings, menus, list rows) remain flat or subtly surfaced. Keep Compose small without sacrificing discoverability, one-handed access or >=48dp touch targets. Use glass sparingly as a floating/elevation accent, never as the universal button style; do not combine Accent Blue and glass by default. **Glass communicates elevation; blue communicates priority.**
+### Account and platform
 
+- **FR-14 · P3 · Optional JMAP support** next to IMAP/SMTP for compatible providers, never mandatory. Planned after storage
+  (Sol).
+- **FR-44b · P3 · S/MIME** — user-owned certificate/key (PKCS#12 or Android KeyChain), sign/encrypt/both for new mail,
+  replies and forwards, per-account defaults, per-recipient certificate validation, no silent downgrade, validity info,
+  interoperability tests with real S/MIME clients, audited libraries only. Evidence: none; OpenPGP is FR-44a.
 
-- P2 · [done: two-finger zoom 1–3× on the HTML body, layout grows so scrolling still reaches the end, sideways pan, link taps unaffected — Claude; checked on device for scroll/links] Add **native-feeling pinch-to-zoom for HTML emails** in the message reader: smooth two-finger scaling in and out, panning when zoomed, double-tap zoom/reset if feasible, and a sensible maximum/minimum scale. Default rendering must still **fit the available screen width** without clipping; zoom is an optional reading aid, not a workaround for broken HTML layout. Ensure zoom gestures coexist correctly with vertical scrolling, optional horizontal swipes between messages, text selection, attachments and Android edge-back gestures. Make zoom behavior configurable in Settings if appropriate, and verify on a real device against Gmail/Samsung Email.
-
-
-- P1 · [Claude: on-device audit light/dark · Sonnet: fixes] **Full-app visual design audit and Quiet UI consistency pass:** Review **every screen, state and interaction** (inbox, reader, composer, account setup, settings, search, folders, dialogs, menus, bottom sheets, notifications-facing UI, empty/loading/error states) on a real Android device in both light and dark modes. Identify and replace any **visually obvious default Material Design / Material You elements** that clash with Dot Mail's custom ChatGPT/Grok-inspired Quiet UI: generic FABs and oversized buttons, default Material3 cards/switches/segmented controls/text fields, ripples, menus/dialogs/snackbars, progress indicators, elevation/shadows, color palettes, icon weights, typography, corner radii and inconsistent spacing. Apply the established button hierarchy (solid accent-blue for primary confirmation, selective subtle Soft Frosted Pill only for floating actions, understated flat secondary controls); **do not spread glass or pill styling everywhere**. Harmonize component states, animations and layouts with the existing design system. Inspect the actual rendered UI, not just whether Material libraries are imported; Compose/Material internals can remain where useful as long as the visible result is custom and coherent. Preserve native behavior, accessibility, contrast, touch targets and performance; document before/after screenshots and remaining exceptions. Avoid redesigning well-fitting elements just for the sake of change.
-
-- P2 · [done: Back bubble + grouped top capsule + grouped reply capsule, hide on scroll, status-bar scrim — Sonnet #33/#35; checked on device] **Reader floating action layout — grouped Quiet UI bubbles, not a cockpit of separate pills:** Replace the open-email reader's bottom Reply/Reply all/Forward panel and standard top toolbar treatment with a few discreet Soft Frosted floating controls layered over the message. **Merge adjacent/touching actions into a single shared rounded capsule** with distinct touch targets and subtle internal separators rather than giving every icon its own detached bubble. Suggested hierarchy: a separate compact Back bubble at top left; one compact grouped top-right capsule for Archive, Delete, Mark unread and More (vertical ellipsis); and one grouped bottom capsule for Reply, Reply all and Forward (or expose less-frequent actions from More if space is tight). Keep groups visually balanced, unobtrusive and limited in number; no oversized action tray, excessive glass, or scattered floating controls. Ensure the message stays readable and its ending is not covered (safe insets/content padding), allow sensible collapsing/scroll behavior, preserve accessibility labels, minimum touch targets, contrast and one-handed use. Follow the custom Quiet UI design system, not default Material toolbars.
-
-- P1 · [in progress: storage policy, offline download, usage, Room v9 — Sol] **Configurable on-device mail download and storage limits, including a full-offline mode:** Let users choose per-account (and optionally global) policies for how many messages to retain/download locally (e.g. latest N), a maximum total disk usage (MB/GB), age-based retention, and whether to cache headers only, bodies and/or attachments; show current storage usage and a breakdown by account/cache. Provide a clear **Unlimited / Download everything for offline use** option to mirror all server-accessible messages and, optionally, attachments locally, with visible progress, pause/resume and Wi-Fi/charging preferences for the potentially large initial download. Apply bounded incremental downloads, keep cached mail fully readable/searchable offline, and avoid re-downloading already cached data. When limits are hit, evict only eligible local cache entries (prefer least-recently-used/oldest; respect pinned/offline-saved items), **never delete server messages**, and make clean-up/clear-cache and policy changes explicit and safe. Handle IMAP folders, deletions, re-sync and device storage pressure gracefully; explain that full-offline storage is bounded by available device space.
-
-
-
-- P1 · **Severe HTML email flicker / flashing during scrolling**: Real-device regression in the email reader (reported on Galaxy S25 Ultra): scrolling a complex HTML email (e.g., image-heavy AliExpress promotional message) triggers extreme, rapid visual flickering/flashing. Large areas of the email suddenly disappear into black/blank space and reappear while the reader header and floating action buttons remain visible; screenshots show the same section rendered normally and partially blank. Treat as a high-priority **photosensitivity/accessibility and usability issue**, not a cosmetic animation defect. Eliminate the flicker, disappearing content, layout jumps and unstable rendering during scrolling, including with fixed/floating headers and the top blur effect. Test on device with long, image-heavy HTML messages and fast/slow repeated scrolling; ensure the content stays visually stable at all times. Do not mark fixed from static screenshots or unit tests alone.
-
-- P1 · **Critical navigation crash: Android system Back crashes the app when exiting an open email.** Repro on Galaxy S25 Ultra: open a message from the inbox, then press the Android Back button / invoke the system Back gesture to return to the previous screen; instead of returning to the inbox/previous mailbox, Dot Mail crashes. Fix the crash and restore normal navigation semantics for the hardware/system Back action and in-app Back arrow, including after HTML scrolling/loading, attachment views, swipe-between-messages, and when the keyboard or a modal is open. Capture and inspect the real crash stack trace/logcat, cover Compose navigation/lifecycle/WebView disposal paths with regression tests, and verify on a physical device. Do not consider the issue fixed until Android Back consistently returns to the previous screen without exiting/crashing the app.
-
-- P1 · **Search displays “No matches” prematurely while results are still loading.** When submitting a mail search, Dot Mail initially reports an empty/no-match result even though the query is still running; matching emails appear only when the search finishes. Treat idle/empty-query, actively searching (local index and/or IMAP server), results found, genuinely zero results, partial results and failures as distinct UI states. Show a subtle Quiet UI loading/progress indicator during searches; only display **“No matches” after all relevant search sources have finished successfully and the final result set is empty**. If local results arrive before remote results, show them promptly while clearly indicating that server search continues; avoid transient empty-state flashes, stale results from earlier queries, unnecessary layout jumps and race conditions on rapid typing/cancellation. Verify on a physical Android device with queries that take several seconds.
-
-
-- P2 · **Distinct signed and encrypted email badges (S/MIME / OpenPGP):** Show small, tasteful Quiet UI indicators where useful (message reader sender/header and expanded details; optionally inbox and search results where unambiguous). **Signed** status and **encrypted** status must be two distinct indicators (e.g. signature/check vs lock), and both must appear when a message is signed **and** encrypted. For cryptographic signatures, distinguish verified / unverifiable / invalid / untrusted or expired, verifying message integrity, signer identity and certificate/key trust before displaying a reassuring **Verified** status. For encrypted email, show an appropriate lock/encryption badge only when the MIME cryptographic format and its actual encryption state are confirmed; distinguish **encrypted and successfully decrypted**, **encrypted but locked/cannot decrypt**, **unsupported encryption**, and **decryption failure**, with honest accessible labels and an explanation on tap. Never imply that IMAP/SMTP TLS alone makes a stored message end-to-end encrypted, or that encryption authenticates the sender; never display green/verified-style security claims without validation. Support S/MIME and OpenPGP when implemented, coordinate with the existing P3 crypto request, and avoid misleading badges if cryptographic parsing is not yet available. Keep badges subtle, readable, and consistent in light/dark themes.
-
-- P2 · **Complete delayed/scheduled sending (Send later)**: From Compose, allow users to choose a **custom future date and time** (not only existing quick presets such as tonight/tomorrow/Monday) to send an email later. Clearly display the scheduled time and timezone, keep the message safely queued locally while offline, and provide a dedicated way to **view, edit, reschedule or cancel** queued messages before SMTP submission. Handle restart, connectivity changes, Android background execution limits, clock/timezone and DST changes, retries and duplicate-send prevention; be transparent that Android may not guarantee exact-to-the-second delivery without a server-side scheduler. Retain the existing configurable short **Undo Send** grace period as a separate feature, and ensure its behavior is not confused with scheduling. Audit the current partial scheduled-send implementation and only mark Done after on-device end-to-end verification.
-
-- P1 · **Replace the light lavender/purple accent with a vivid electric blue everywhere in Dot Mail.** Make electric blue the single consistent Quiet UI accent in both dark and light themes, replacing the current pale violet/periwinkle tint across all uses: primary buttons (Send/Confirm), active navigation, selected filters/chips, switches, checkboxes, radio controls, focus outlines/cursors, links, indicators, badges, highlights, progress/loading states, icons and any remaining hard-coded accent colors. Update the centralized design-system color tokens and eliminate old lavender variants rather than applying local overrides; audit every screen, dialog, component and state (including pressed/disabled/hover states) for consistency. The new blue should be clearly **saturated/electric, not pastel, purple or lilac**, but still tasteful and restrained with accessible contrast on dark/light backgrounds. Preserve semantic warning/success/error colors and **keep Soft Frosted Glass controls neutral graphite**, not blue-tinted by default. Verify visually on a real device in both themes with before/after screenshots; do not mark Done while lavender accents remain.
-
-- P2 · **Add a true-black OLED/AMOLED appearance option alongside Light and Dark.** In Settings → Appearance, offer a distinct **OLED / Pure Black** theme that uses actual `#000000` for all major app/page backgrounds (including inbox, reader, composer, search, settings, empty/loading screens, and system status/navigation bar backgrounds where possible), rather than the current charcoal/grey Dark background. Keep existing Light, Dark and Follow system behavior intact; persist the selection and apply it consistently without flash-of-grey on navigation or app launch. Use nuanced, accessible slightly lifted dark surfaces/dividers only where needed to distinguish cards, input fields, sheets and floating controls—do not turn every UI surface into an indistinguishable flat black slab. Preserve electric-blue accent, readable contrast and neutral Soft Frosted Glass treatment; verify that overlays, scroll-top blur, HTML email rendering/WebView backgrounds, dialogs, keyboard insets and navigation bars respect OLED mode without grey bands, flicker or visual glitches. Validate in real use on an OLED phone in all appearance modes before marking Done.
-
-- P2 · **Recurring feature-request and regression review (ongoing process):** Reassess **Open, In progress and Done** at regular milestones (e.g. after substantial merges, before each alpha/release and after user bug reports). Compare requests with the latest code and real app behavior, update priorities/dependencies and acceptance criteria as architecture/UI evolves, identify conflicts, stale assumptions, duplicate tasks and regressions introduced by new work. Re-test previously Done features affected by those changes; move incomplete or broken work back to **Open/In progress**, with exact outstanding items and evidence, rather than leaving premature Done labels. Confirm fully finished items remain correct and usable; keep the backlog concise and current. This review should recur throughout development, not be considered completed after one cleanup.
-
-- P1 · **Add a prominent “Continue with Google” OAuth button directly on the Add account screen.** Users adding Gmail/Google Workspace accounts should be able to choose Google sign-in **directly from the first Add account view**, without manually entering IMAP/SMTP settings, generating an app password, or digging into advanced setup. Tap opens the secure system-browser OAuth2 authorization flow (PKCE), then automatically configures the Gmail account, stores/refreshes tokens securely and returns to the account list with clear loading/cancel/error states. Keep generic IMAP/manual setup as a separate option, and retain the Quiet UI button hierarchy. Verify that the app's actual Google OAuth client ID/consent configuration is usable for this build; if missing or unapproved, surface a clear actionable setup/status message rather than presenting a misleading nonfunctional button. Link to the existing OAuth2 sign-in work and test adding a real Gmail account end to end on Android before marking Done.
-
-- P2 · **Consistently fully rounded Quiet UI shapes (not merely slightly rounded rectangles).** Audit all intended pill/capsule buttons, floating controls, chips and grouped actions: their ends must be **true semicircles** (corner radius = half the control height, e.g. `CircleShape`/`RoundedCornerShape(50%)`), with no squarish corners, mismatched clip/border/background, or asymmetric shapes across states and screens. Icon-only circular controls should be truly circular. Dialogs, sheets, popovers and larger surfaces should also use **generously, consistently rounded corners** suited to their size (not necessarily an impractical full-pill silhouette), with matching clipping, shadows, borders and backdrop blur. Centralize shape tokens in the Quiet UI design system; check Light/Dark/OLED, all sizes, accessibility scaling and animations on a real device. Preserve the solid electric-blue appearance of primary actions and the neutral transparent/blurred treatment of glass controls.
+---
 
 ## In progress
-- P1 · **Top-edge scroll backdrop blur / fade across scrollable screens (separate from glass buttons):** Fix and finish the existing soft, premium Quiet UI frosted blur at the **top screen/header edge when content scrolls underneath**, inspired by the supplied Grok screenshot. Apply consistently to the inbox, message reader (including HTML/WebView), search, settings, composer and other relevant scrollable screens, respecting status-bar insets and floating header controls. Smoothly interpolate the effect with scroll position (not a harsh on/off), using a continuous real-backdrop-blur strength gradient with at most a very subtle neutral contrast scrim *within the blurred region*, not a separate dark fade ahead of it; leave titles, status icons and buttons crisp. Avoid flicker, blank frames, banding, layout jumps, WebView redraw artifacts and excessive GPU load; use a graceful fallback on unsupported devices and honor reduced-motion settings. **Reported real-device regressions:** (1) the top-edge blur **flickers/visibly flashes while scrolling**; fix its composition, clipping, animation, frame stability and scroll-driven redraws so it remains completely steady; (2) when the inbox **filter pills/chips collapse or disappear on scroll**, the height/coverage and position of the **stronger blur band do not update** to follow the new header geometry, leaving an incorrect oversized or misplaced blurry area. The blur extent/gradient/strength must dynamically track the *actual visible header and filter-row bounds* in both expanded and collapsed states, with seamless interpolation and no stale measurements, blank frames or jumping. (3) **An obvious black fade before the blur** makes the top edge darken first, then suddenly turn blurry, breaking the intended seamless frosted effect. Remove the independent black/opaque fade or scrim ahead of the blur; content should transition smoothly from sharp to progressively more blurred, without an intermediate dark strip, opacity jump or visible seam. Any subtle neutral darkening required for readability must be integrated with the blurred area, not appear before it. Test slow/fast scroll, reverse scroll, expand/collapse, changes to selected filters, and light/dark/OLED modes on the Galaxy S25 Ultra. **This is distinct from the completed glass-button backdrop blur.** Do not mark Done until all three bugs are fixed and visually verified on device.
 
-- P1 · **Fix opaque controls that should use Soft Frosted Glass (reopened after owner-reported visual regression):** Some buttons/capsules intended to be translucent with a real live backdrop blur currently look entirely opaque, despite the previous `Done` note for **Real backdrop blur for Quiet UI glass controls**. Audit all explicitly glass-styled elements, including the Compose floating pill, email-reader Back bubble, grouped top actions, grouped bottom reply actions and any other intentional glass controls, in light and dark modes. Ensure the **background actually remains perceptible through each rounded surface and is blurred in real time while content scrolls behind it**: correct surface alpha, blur layering, clip, backdrop sampling, z-order and state variants; avoid solid fallback fills where blur is supported. **Remove all colored/blue/purple accent tint from glass surfaces and overlays**: the actual moving backdrop blur should be clearly visible, with only a subtle neutral translucent black/graphite darkening layer for icon/text contrast (adapt neutrally in Light theme), not a milky opaque or tinted fill. Keep borders/highlights restrained, and ensure that the real blurred content—not a faux static gradient—is what gives the effect its character. Keep icon/text sharp, contrast accessible, and performance stable with no flashing, dark/blank artifacts or flicker; use a tasteful tinted fallback only on genuinely unsupported devices. **Do not turn solid Accent Blue primary actions (Send/Confirm) or regular flat secondary controls into glass.** Verify each eligible control with real-device before/after screenshots and scrolling on the Galaxy S25 Ultra, and only return this item to `Done` when the complete intended set is correct. Previous implementation: Haze RenderEffect for glass capsules/Compose; originally marked done, but owner reports opaque appearances.
+### Accounts and sync
 
-- P1 · [refresh: 18 s → ~3 s (≈1.6 s for Inbox), 30 → 4 logins, ~2 s on device — Sol #34 · errors: classified, explained in EN/FR/DE with Retry — Sol #34 + Claude · HTML fit: Fnac, Recharge, AliExpress (cell-background product grid) and GitHub tables render like Gmail on device; tracking pixels never load — Claude] **Real-device regressions: slow refresh, inconsistent HTML fit, and connection errors.** Manual mail refresh/synchronization takes far too long even when there are no new messages or changes; improve perceived and actual completion time without hiding genuine errors. Some HTML emails correctly fit the phone screen while others still render oversized or clipped; ensure reliable fit-to-width across different senders and email templates, matching Samsung Email/Gmail where possible. An intermittent **connection error** has also occurred during use; investigate and make connection failures clearly explained and recoverable. Reproduce each issue with real accounts/messages on device, add regression tests, and verify fixes. Do not mark these resolved solely on the basis of unit tests or offline rendering.
+- **FR-01 · P1 · "Continue with Google" on the first Add account screen** — Google sign-in without IMAP settings or app
+  passwords; system browser + PKCE; clear loading/cancel/error states; manual IMAP stays a separate option.
+  - [x] Button, states, redirect handling, translated errors, honest message instead of a dead button when the build has
+    no Google client ID (PR #57, merged; VM tests)
+  - [ ] End-to-end with a real Gmail account on the phone (consent screen is in Testing mode: listed test users only,
+    grants expire after 7 days)
+- **FR-02 · P1 · OAuth2 sign-in and token refresh for Google and Microsoft, no Google Play Services** — PKCE, system
+  browser, encrypted tokens, refresh, XOAUTH2 are implemented (Codex).
+  - [x] Google client IDs registered, per-build-type (release/debug) client (`af45ecf`, `docs/OAUTH.md`)
+  - [ ] Microsoft client ID not registered (maintainer decision, `docs/OAUTH.md`); Outlook/Hotmail cannot sign in meanwhile
+  - [ ] Real-account verification (see FR-01); Google restricted-scope verification for a public release
+- **FR-04 · P1 · Harden IMAP sync and message operations** — threading collisions, cross-folder archive/move, large-body
+  storage, IDLE reconnect loops, global sync-lock contention, plus network-failure tests.
+  - Evidence: scoped moves PR #16, shared sessions PR #34, file-backed bodies / IDLE / threading work per
+    `docs/reports/codex-*.md`. No single consolidated verification of all five points; keep open until a review confirms each.
+- **FR-05 · P1 · Real-device regressions: slow refresh, inconsistent HTML fit, connection errors**
+  - [x] Refresh 18 s → ~3 s (Inbox ~1.6 s), logins 30 → 4 (PR #34), measured on device
+  - [x] Connection errors classified and explained in EN/FR/DE with Retry (PR #34 + `de22513`)
+  - [x] HTML fit verified on device (Infomaniak, Fnac, Recharge, AliExpress, GitHub) — see FR-20
+  - [ ] The *intermittent* connection error was never reproduced or root-caused; keep until it stays away in daily use
+- **FR-06 · P1 · Mirror drafts with the server Drafts folder** (Codex, PR #24) — revisions, offline retry, external-edit
+  conflicts kept side by side. Follow-ups: trashed drafts stay local for the Undo window (`47dc95d`), encrypted drafts are
+  never uploaded (OpenPGP, `777c498`). Device: pending (multi-device edit + conflict).
+- **FR-07 · P1 · Opt-in instant notifications** (IMAP IDLE in a foreground service, off by default, battery trade-off
+  explained) — PR #30. Device: physical Doze/battery test pending.
+- **FR-08 · P1 · Configurable on-device mail download and storage limits, incl. a full-offline mode**
+  - [x] Engine: per-account retention, payload caching, disk budgets, LRU eviction that never deletes server mail,
+    resumable full-offline download, Wi-Fi/charging constraints, pause/resume, usage breakdown (PR #55, Room v9;
+    `docs/reports/codex-storage-offline.md`)
+  - [ ] Settings UI for policies, usage breakdown, offline progress, pause/resume (API exists, UI "remains for Claude")
+  - [ ] Real-device checks (storage pressure, WorkManager constraints, large first download)
+- **FR-12 · P2 · Native Android Contacts integration** — partly done: system contact picker needs no permission; contact
+  photos are an opt-in avatar source; "From contacts" filter uses Sent/outbox correspondents or the permission-gated
+  address book (PR #55). Gaps: recipient autocomplete uses mail history only, not the address book.
+- **FR-13 · P3 · SimpleLogin / addy.io alias discovery and management** — PR #47 open (Luna); independent of either service.
 
-- P1 · Harden IMAP synchronization and message operations before daily-driver release: fix subject-only threading collisions, cross-folder archive/move behavior, large-body storage/performance, IDLE reconnect loops and global sync lock contention; add regression and network-failure tests. — Codex (file-backed bodies, IDLE churn, lock contention, threading — from Gemini's review)
-- P1 · Complete OAuth2 account sign-in and token refresh for Google and Microsoft, without mandatory Google Play Services. — Codex (implemented and code-complete: PKCE, system browser, encrypted tokens, refresh, XOAUTH2). **Needs the maintainer to register client IDs** (Microsoft ~10 min, free; Google optional, restricted scope needs verification) — step-by-step in docs/OAUTH.md.
-- P1 · [done: rich editor (bold/italic/underline/links/lists), Import HTML (sanitized), inline logo as cid: in multipart/related, new vs reply defaults per identity, marker-based swap, survives drafts — Sonnet #36; editor checked on device; toolbar overflow + discard prompt follow-up] **Complete per-account and per-identity HTML signatures:** Support separate, independently configurable signatures for each email account and, where applicable, each sender identity/alias, alongside plain-text signatures. Provide a convenient HTML/rich-text signature editor with formatting, clickable links, optional inline logos/images and live preview; allow using/importing existing HTML where safe. Automatically insert the correct signature for the selected From account/identity, update it correctly when switching identity during composition, offer different defaults for new messages vs replies/forwards, and allow disabling/changing it per message. Preserve formatting in sent HTML email (multipart/alternative with a suitable plain-text fallback), avoid duplicate insertion, and keep signatures intact across draft save/reopen and account changes. Sanitise unsafe HTML and verify with real mail clients. — Existing data/settings and composer sender/signature insert/swap work by Sonnet/Gemini; verify completeness and on-device behavior.
-- P1 · Ship properly signed release APKs with reproducible build guidance and end-to-end real-device validation before public distribution. — v0.1.0-alpha.1 published; scripts/reprotest.sh shows two clean builds are byte-identical; release.sh now builds from a clean clone of the tag so published APKs can be reproduced (docs/RELEASES.md)
-- P2 · Native calendar invitation support for text/calendar and .ics: view event details, accept/tentatively accept/decline where supported, and add events via Android Calendar intents; prepare for future Dot Calendar integration. — done: invitations show as cards with Add to calendar and Accept/Maybe/Decline (iTIP reply to the organiser, 5 s undo) — Qwen, Codex, Claude
+### Reading and HTML mail
+
+- **FR-25 · P2 · Swipe between conversations in the reader** (setting, off by default; ignores Back-gesture edges, pinch,
+  vertical scroll; haptic tick). Evidence: implemented in v0.1. Device: pending.
+- **FR-28 · P2 · Adjustable list density, reading typography, accessibility** — PR #45.
+  - [x] Compact / comfortable / spacious row metrics; reader typeface (Inter/System/Serif) and line height (plain text via
+    style, HTML via CSS variables); TalkBack custom actions on rows; 48 dp quote toggle; font scale 2× tested
+  - [ ] Device: Inter loading in the WebView through the `dotfont://` scheme, TalkBack menu, spacious look
+- **FR-29 · P1 · Persistent, configurable remote-image permissions** — per-message approval remembered by account +
+  Message-ID, sender/domain allowlists with account scope, Settings → Privacy → Remote images, "Images loaded · Stop"
+  (PR #6). Device: pending.
+- **FR-30 · P2 · Anti-tracking and phishing protections**
+  - [x] Link dialog: real host in Unicode, look-alike-domain warning, text↔href mismatch warning, tracking parameters
+    removed by default (toggle), Copy/Share link stripped (PR #3, #32, #40); "N trackers blocked" note; email-open
+    pixels are always filtered, even when images are allowed
+  - [ ] **Settings → Privacy toggle for tracking-pixel blocking, independent of remote-image loading** (default on) —
+    not implemented: the sanitizer always blocks pixels, there is no preference
+  - [x] Settings → Remote images explains that remote images/pixels reveal when, roughly where and on which device a
+    message was opened
+- **FR-33 · P2 · Optional rules-based classification** (personal, newsletters, purchases, bills, notifications, social):
+  classifier in sync, Newsletters/Purchases/Bills/Notifications/Social views, Settings page, user rules re-applied to
+  cached mail, no external processing, nothing hidden from the Inbox (PR #8, #27, #39). Device: pending.
+- **FR-34 · P2 · Calendar invitations** — cards with Add to calendar and Accept/Maybe/Decline (iTIP reply from the invited
+  identity through the outbox, 5 s undo) (PR #1, #10, #26). Device: pending; Dot Calendar integration is future work.
+- **FR-35 · P2 · Attachment browser across accounts** (PR #22, #49) — done: type filters, search by name/sender, month
+  groups, PDF preview, share. Gaps: date and sender filters (only search/grouping), attachment-content search in the
+  browser (PDF text is indexed for mail search, FR-67), export.
+- **FR-45 · P2 · Distinct signed / encrypted badges (OpenPGP now, S/MIME later)** — the reader shows one status line
+  (encrypted, decrypted, signed by X verified / unconfirmed / key missing / expired / invalid; install link without
+  OpenKeychain), commit `4fd674d`.
+  - [ ] Signed **and** encrypted should show two distinct indicators (today one combined line)
+  - [ ] "Unsupported encryption" state and an explanation on tap; indicators in list/search where unambiguous
+  - [ ] S/MIME (FR-44b); light/dark consistency check on device
+
+### Composing
+
+- **FR-40 · P1 · Per-account and per-identity HTML signatures** (PR #36, #40) — done: rich editor (bold/italic/underline/
+  links/lists), sanitized Import HTML, inline logo as `cid:` in multipart/related, new vs reply defaults, no duplicates,
+  per-message remove/change, survives drafts, plain-text fallback; editor checked on device.
+  - [ ] Verify the sent mail in real clients (Gmail, Apple Mail, Thunderbird): inline logo, formatting, plain-text part
+- **FR-44a · P3 · OpenPGP sign/encrypt via OpenKeychain** (key management is OpenKeychain's, by design) — PR #50 +
+  `777c498`: Sign/Encrypt chips (only with OpenKeychain), per-account defaults, key required for every recipient,
+  RFC 3156 builder with engine round-trip tests, protected MIME stored in the outbox (fail-closed), encrypted drafts never
+  uploaded. Gaps: no global default (per-account only), no per-identity default, no protected headers (Subject visible),
+  no key import/export UI of our own, no interoperability test with real clients. Device: pending (real OpenKeychain).
+
+### Appearance and UI
+
+- **FR-50 · P1 · Electric-blue accent instead of lavender** — PR #56 open (tokens, primary-action fill, launcher mark,
+  contrast tests). Dark-mode accent text/link colour was `#7C9CFF` (pale) before it; owner reviews visually; before/after
+  screenshots on device required before Done.
+- **FR-51 · P2 · OLED / Pure Black theme** — PR #52 merged: `#000000` background, lifted surfaces/hairlines, window and
+  nav-bar handling, AA-contrast and pixel tests.
+  - [ ] Device validation in all four modes; known limits: one charcoal frame at cold start (static starting window),
+    WebView algorithmic darkening leaves dark grey for mails with their own white background
+- **FR-53 · P1 · Glass controls must be real, translucent, blurred** (reopened after the owner saw opaque controls) —
+  Haze backdrop blur exists (`0992640`) for the Compose pill, reader capsules and snackbars.
+  - [ ] Audit every intended glass control in light/dark/OLED on device: background perceptible and blurred live while
+    scrolling, neutral graphite tint (no blue/purple), no solid fallback where blur is supported
+  - [ ] Primary blue buttons and flat secondary controls stay non-glass
+- **FR-54 · P1 · Top-edge scroll blur/fade** (separate from glass capsules) — PR #54 open (progressive Haze blur +
+  gradient, scroll-interpolated, reduced-motion fallback, inbox/search/settings/compose/reader scrim). Owner-reported bugs
+  that must be verified fixed on device:
+  - [ ] Blur flickers/flashes while scrolling
+  - [ ] Band height/position does not follow the inbox filter row when it collapses/expands (must track the real header
+    bounds)
+  - [ ] No separate dark fade before the blur (content goes sharp → progressively blurred, no dark strip or seam)
+  - [ ] Slow/fast/reverse scroll, filter changes, light/dark/OLED, WebView redraw artefacts, GPU cost
+- **FR-56 · P1 · Full-app Quiet UI visual audit (light + dark)** — PR #35, #48, #49 reviewed Demo renders of categories,
+  smart folders, search, composer, account setup, attachments, outbox; fixes applied.
+  - [ ] Not auditable on the JVM: snooze sheet, dialogs, menus, bottom sheets → device pass
+  - [ ] Remaining Material remnants (e.g. `CircularProgressIndicator` in the search loading state); Quiet spinners/dots/
+    shimmer are used in most screens but the rollout is not complete
+  - [ ] Before/after screenshots and a list of intended exceptions
+- **FR-58 · P2 · Polish animations across meaningful actions** — done: screen transitions, selection mode, menus/dialogs,
+  Cc/Bcc reveal, reduced-motion lists, Outbox removal, reader capsules (PR #33), shared haptics (PR #37), folder-switch
+  ease-in, search open/close, expand/collapse polish, swipe reveal (PR #46). Device: feel/timing pending; reduced-motion
+  on device pending.
+- **FR-65 · P2 · Full localization (FR/DE), plurals, RTL, locale formats** — all screens EN/FR/DE with plurals, verify/OAuth
+  errors, recurrence text, locale-aware sizes, auto-mirrored icons, Compose RTL tests (PR #28, #43).
+  - [ ] Data-layer fallback texts still English when no connection kind is known ("Folder unavailable", sync fallbacks,
+    some `MailSyncException`/`MailActionException` messages)
+  - [ ] Numbered-list editor icon has no mirrored variant; RTL never verified on a device in an RTL locale (swipe
+    directions, drawer, pinch)
+- **FR-68 · P1 · Search must not show "No matches" while still searching** — PR #53 (explicit idle/searching/results/
+  confirmed-empty/partial/error states, no stale results on edits). Device: pending, with queries that take seconds.
+- **FR-69 · P2 · Adaptive tablet/foldable layouts and keyboard shortcuts** — done: two-pane list + conversation from 840 dp.
+  Shortcuts: inbox `c`, `/`; reader `e`, `#`/Delete, `u`, `s`, `j`/`k`. Gaps: list navigation/open/select shortcuts in the
+  inbox, foldable posture handling, device check on a tablet/DeX.
+- **FR-72 · P1 · Properly signed release APKs and real-device validation before public distribution** — v0.1.0-alpha.1
+  published, `scripts/reprotest.sh` shows byte-identical builds, `release.sh` builds from a clean clone
+  (`docs/RELEASES.md`). Gap: end-to-end validation on the real device of the release build.
+- **FR-75 · P1 · Housekeeping and full Done audit of this file** — this rewrite (this PR). Next audits: FR-76.
+
+---
 
 ## Done
-- P1 · [done: FTS4 index of bodies/attachment names/PDF text, scoped search with bounded server fallback (Sol #42); highlighted results, scope chips, server progress, On server tags (Sonnet #44); verified on device with a body-only word] **Upgrade mail search to full-content search:** Search message **body text**, not only sender, subject and headers, including plain text and meaningful text extracted from HTML; optionally include attachment filenames and indexed extractable attachment content. Support fast, relevant results across all accounts/folders with snippets, highlighted matches, useful filters/operators (from/to/date/folder/attachments/read/unread), sensible sorting and responsive results UI. Search all locally cached content **offline**, and when online optionally query the IMAP server (e.g. BODY/TEXT SEARCH where supported) to find older/not-downloaded messages without requiring the entire mailbox to be cached; combine and deduplicate local/server results, show availability/progress/errors clearly, and fetch result bodies on demand. Use an incremental, bounded local full-text index (e.g. Room FTS), keep it in sync with edits/deletions and cache eviction, and avoid excessive memory/storage usage or background work.
-- P2 · [done: field on top of Settings, accent/case-insensitive, translated synonyms, accounts, jumps to the section or page — Claude; verified on device] **Search within Settings:** Add a fast, native Quiet UI search field/action in Settings that matches setting names, descriptions and useful keywords/synonyms (including translated labels), shows relevant results grouped by section, highlights matching terms and opens/scolls directly to the actual control. Include account-specific settings in results where applicable, with good empty-state and keyboard behavior.
-- P2 · [done: all screens EN/FR/DE with plurals, verify/OAuth errors and recurrence text translated, locale-aware sizes, RTL mirroring with Compose RTL tests — Gemini, Sonnet #28/#43] [was: done for UI: all screens EN/FR/DE with plurals (611 strings) — Gemini, Sonnet #28; data-layer error texts still English; RTL not yet] Complete localization (especially French and German), with proper plural forms, RTL support and locale-specific formats.
-- P2 · [done: 4 sorts, Unread/Starred/Attachments/To me/From contacts chips (also in per-message mode), user-defined smart folders in the drawer with Settings page and backup — Sonnet #41, Claude; verified on device] Advanced inbox sorting, filters and configurable smart folders across accounts.
-- P2 · [done: "Synced HH:mm" in the inbox subtitle (system 12/24 h, persisted, only advanced by clean syncs; unified inbox shows the oldest account and lists each on tap) and a brief reduced-motion-aware checkmark — verified on device, Claude] **Positive sync-completion feedback and “Last synced” timestamp:** When a manual pull-to-refresh or background mail sync finishes **successfully**, animate a small, restrained **checkmark** close to the existing thin header sync-progress line; smoothly fade/scale it in and out without covering or shifting the message list, changing the existing spinner, or copying Samsung Email's animation. Afterward, show an unobtrusive **“Last synced HH:mm”** label (localized, system 12/24-hour format) in an appropriate inbox header/status location, with optional tap for per-account details in the unified inbox. Use the timestamp of the **last confirmed successful sync**, persist it across restarts, and never show a success checkmark or advance that timestamp on a failed/partial sync; distinguish offline, syncing, partial and error states with accessible feedback. Keep Quiet UI styling, animations brief, and honor reduced-motion preferences.
-- P1 · **HTML email viewport fit and rendering parity (high priority):** On the Galaxy S25 Ultra, the same Infomaniak device-update email fits completely within Samsung Email's screen, but Dot Mail renders it at an oversized fixed width, clipping its logo, text, table and CTA off the right edge. Fix **fit-to-screen by default** so complete HTML emails are visible within the available message viewport (including newsletters, fixed-width/table-based layouts and inline images) without involuntary horizontal scrolling or clipping. Preserve the email's intended proportions, typography and responsive CSS rather than simply truncating content or globally shrinking text; allow accessible zoom when needed. Investigate the WebView viewport, HTML/CSS sanitization, nested tables, fixed pixel dimensions, scaling/dark-mode behavior and rendering container constraints. **Compare identical real emails side-by-side on-device with Samsung Email and Gmail**, use before/after screenshots and regression fixtures, and target equivalent visual fidelity while keeping scripts blocked, remote content opt-in and other security protections intact. — sanitised stylesheets (incl. @media) are now kept, fixed-width designs are scaled to fit like Gmail/Samsung Email; leftover wide fixed widths in responsive mails become fluid; verified on the S25 Ultra: the Infomaniak device-update mail now fits fully like Samsung Email, Fnac/Recharge/AliExpress/GitHub too, with tracking pixels removed and remote content still opt-in (0.1, Claude)
-- P1 · Enforce secure TLS during account discovery and credential verification (no silent plaintext fallback), and cover account setup with security regression tests. — Gemini: discovery never falls back to plaintext silently, plaintext-only providers need explicit confirmation, 15 regression tests; TLS 1.2+ pinning in the engine pending (Codex) Engine TLS 1.2+ enforced with certificate-failure reporting (Codex #17). Done.
-- P1 · **Polish pull-to-refresh without obstructing the inbox** — Claude, Codex. Keep the **current Quiet UI spinner exactly as it is visually**: show it briefly as immediate confirmation that the downward swipe was recognized and refresh started; do **not** replace, redesign or remove it. Once the gesture completes, gracefully dismiss the large spinner/overlay so it cannot sit over messages for the entire potentially slow IMAP synchronization. While sync is actually running, transition to a **separate, very discreet, non-blocking progress indication** near the inbox header or list edge (Samsung Email's subtle progress line is only a behavioral reference, **not** a request to copy its particular animation). The user must still be able to read, scroll and interact with messages. Animate the handoff and completion smoothly, avoid fake percentage progress when unknown, and reflect real sync state, success and errors. Add **one subtle optional haptic tick** when the pull threshold is crossed/refresh is triggered (not continuous vibration), respecting Android haptic/accessibility settings. Existing stuck-arrow fix is implemented in UI; verify the full refresh lifecycle on a real device. → Implemented (spinner leaves after ≤0.9 s, 2dp header progress line follows real sync, threshold haptic tick); on-device check pending. Verified on the S25 Ultra 2026-11-08: spinner ~1 s, then the header line while sync runs, done in ~2 s after Sol #34. Done.
-- P1 · Opt-in instant notifications (IMAP IDLE in a foreground service, no Google push; off by default, battery trade-off explained in Settings → Notifications). — Codex #30 + Claude; physical-device Doze test pending.
 
-- P1 · [in progress — Codex] Mirror drafts with the server's Drafts folder so edits are available across devices; handle offline edits and conflicts safely. — drafts are mirrored to the server Drafts folder with revisions, offline retry, external-edit conflicts kept side by side (0.1, Codex)
-- P2 · Per-account and per-folder notification rules, including muting conversations and configurable notification actions. — mute conversations, per-folder "Notify for new mail", choose the notification buttons (0.1, Sonnet)
-- P2 · Backup, export, import and restore application settings/account configuration without exporting plaintext credentials by default. — Settings → Export / Import settings (JSON via the system file picker), never any password; preview before import (0.1, Sonnet)
-- P2 · [in progress — Sonnet] Dedicated attachment browser across accounts, with type/date/sender filters, full attachment search, preview, export and Android sharing. — drawer → Attachments: all accounts, type filters, search, month groups, PDF preview (0.1, Sonnet, Claude)
-- P2 · Optional native Android Contacts integration (contact picker/autocomplete/photos without requiring blanket contacts access). — partly: the composer can pick recipients from the system contact picker without any contacts permission; contact photos are an opt-in avatar source (Claude, Sonnet)
-- P2 · Snooze/remind-later for individual messages: temporarily hide them and restore them at a selected time with optional local notification. — local-only snooze with presets / date & time, Snoozed list with wake time, resurfaces on top with a notification, new mail un-snoozes (0.1, Sonnet, Qwen)
-- P2 · Reusable email templates and quick insertion in the native composer. — Compose → ⋯ → Templates: save the current message, insert with {{first_name}} {{name}} {{my_name}} {{date}}; stored on the device (0.1, Claude, Qwen)
-- P2 · Polished adaptive native layouts for tablets and foldables, including optional two-pane reading and hardware keyboard shortcuts. — partly: two-pane list + conversation from 840dp (tablets, foldables, landscape); hardware keyboard shortcuts still to do (Claude)
-- "Sign in again" after a password change: tap the sync-error banner or Settings → account → Update password; both servers are verified before saving (0.1, Codex, Sonnet)
-- P2 · Allow users to disable conversation/threaded view and display individual emails as separate entries in the message list (configurable in Settings; preserve the choice across sessions). — Settings → General → "Group into conversations"; off lists single messages with all actions (0.1, Sonnet)
-- P2 · Add an **optional horizontal swipe gesture inside the opened email reader** to navigate to the next or previous message/conversation in the current mailbox, without returning to the inbox. Provide a clear Settings toggle (off/on) and configurable swipe direction if appropriate; preserve reading position and offer a subtle transition/haptic feedback. Do not interfere with Android's system Back gesture, horizontal scrolling of HTML content, carousels, text selection, or attachment interactions. Keep the existing previous/next controls available. — Settings → Reading → "Swipe between conversations" (off by default); ignores Back-gesture edges, pinch and vertical scrolls; haptic tick; on-device check pending (0.1, Claude)
-- Formatted (rich-text) emails with a plain-text option and a default in Settings; sent as multipart/alternative; drafts keep their formatting (0.1, Gemini, Qwen, Claude)
-- Signed release APK published: v0.1.0-alpha.1 on GitHub Releases with certificate fingerprint and SHA-256 (0.1)
-- P1 · **Persistent, configurable remote image permissions:** Clicking **Load images** for an individual email must remember that permission for that exact message (including after closing/reopening the message and restarting the app), so the user never has to click Load again for the same email. Add configurable opt-in **allowlists for specific sender email addresses and sender domains** to automatically load remote images for matching mail; support adding a sender/domain from the message and reviewing, editing, removing or resetting rules in Settings (ideally with account-specific overrides). Preserve **block images by default** for all other messages, offer a global choice if desired, and allow revoking a single message's permission. Persist permissions against a stable account-scoped message identity so sync, refresh and folder moves do not reset them. Handle sender matching conservatively and explain the privacy/tracking trade-off; do not weaken HTML/WebView sandboxing. — per-message approval remembered by account + Message-ID, sender/domain allowlists with account scope, Settings → Privacy → Remote images, "Images loaded · Stop" to revoke (0.1, Sonnet) — on-device check pending
-- P1 · Complete IMAP folder management: create, rename, delete and nest folders; reliably reconcile folders and flags across clients. — create, rename, move/nest, delete from the sidebar (long-press) with queued offline ops and server-wins reconciliation; replay verified live on Infomaniak (0.1, Sonnet)
-- Configurable post-action navigation (e.g. after archiving/deleting an open message: next message, previous message or inbox). → Settings → General: after archive/delete go to next, previous or the list
-- Complete settings screen (general, appearance, reading, composing, privacy, storage, about); per-account sync options pending data support (0.1)
-- Colourful sender avatars + opt-in pictures: contact photos, Gravatar, brand logos (BIMI), website icons (0.1)
-- Stylish Quiet spinners, dots loader, hairline progress, shimmer — design-system components; rolling out across screens (0.1)
-- Dates in the message list were misaligned → pinned to the right edge, 24-hour clock follows the system setting (0.1)
-- README that makes people want to try it, docs, regular commits on GitHub (0.1)
+Each entry: evidence in brackets. "Device ✓" = checked on the owner's phone and recorded in the PR or commit.
+
+### Mail core
+- **FR-03 · P1 · Secure TLS in discovery and verification** — no silent plaintext fallback; plaintext-only providers need
+  explicit confirmation; TLS 1.2+ with certificate-failure reporting [PR #2, #17; regression tests].
+- **FR-09 · P1 · IMAP folder management** — create, rename, nest, delete; queued offline ops, server-wins reconciliation
+  [PR #4; replay verified live on Infomaniak].
+- **FR-10 · P2 · "Sign in again" after a password change** — banner or Settings → account; both servers verified before saving
+  [PR #19, #21].
+- **FR-36 · P2 · Conversation view toggle** — Settings → "Group into conversations"; per-message list keeps all actions,
+  sort and filters [PR #13, `66269da`].
+- **FR-26 · P2 · Post-action navigation** — after archive/delete go to next, previous or the list [Settings → General].
+- **FR-70 · P2 · Notification rules** — mute conversations, per-folder notify, choose notification buttons [PR #23].
+- **FR-71 · P2 · Settings backup/restore without credentials** — JSON via the system picker, preview before import; includes
+  preferences, remote-image rules, templates, smart folders [PR #25, #41]. Not in the file yet: category rules.
+
+### Reading
+- **FR-20 · P1 · HTML viewport fit and rendering parity** — sanitized stylesheets and `@media` kept, fixed-width designs
+  scaled to fit, leftover wide widths in responsive mails made fluid, remote content still opt-in, pixels never load
+  [`a861cdc`, `1a16c3d`; Device ✓: Infomaniak device-update mail, Fnac, Recharge, AliExpress, GitHub vs Samsung Email/Gmail].
+- **FR-23 · P2 · Pinch-to-zoom for HTML mail** — 1–3×, layout grows so scrolling reaches the end, sideways pan, links
+  unaffected [PR `25be49f`, `4845905`; Device ✓ scroll/links]. Not done (the request said "if feasible/appropriate"):
+  double-tap zoom/reset, a Settings toggle.
+- **FR-24 · P2 · Reader floating actions** — Back bubble + grouped top capsule + grouped reply capsule, hide on scroll,
+  status-bar scrim [PR #33, #35; Device ✓].
+- **FR-31 · P2 · PDF/document preview and share** — in-app preview with pinch zoom, share to any app (Paperless-ngx), local
+  text view (Android 15+), PDF text feeds the search index [`ac9a0b9`; Device ✓].
+- **FR-32 · P2 · Newsletter view with safe unsubscribe** — RFC 2369/8058 one-click with confirmation [PR #5, #27].
+
+### Search, lists and sync feedback
+- **FR-67 · P1 · Full-content search** — FTS4 index of bodies, attachment names and PDF text; operators; scoped search;
+  bounded server fallback; highlighted results, scope chips, server progress, "On server" tags [PR #42, `41b23d4`;
+  Device ✓ with a body-only word].
+- **FR-64 · P2 · Search within Settings** — titles, descriptions, translated synonyms, accounts, jumps to the control
+  [`c2130d2`; Device ✓].
+- **FR-66 · P2 · Sorting, quick filters, smart folders** — 4 sorts; Unread/Starred/Attachments/To me/From contacts chips;
+  smart folders in the drawer with Settings page and backup [PR #41, `66269da`; Device ✓].
+- **FR-60 · P1 · Pull-to-refresh polish** — spinner leaves after ≤0.9 s, 2 dp header progress follows real sync, threshold
+  haptic [Device ✓ 2026-11-08].
+- **FR-61 · P2 · "Synced HH:mm" and success checkmark** — persisted, only advanced by clean syncs [`8f187da`; Device ✓].
+- **FR-62 · P2 · Message-list dates** pinned to the right edge, 24-hour follows the system [v0.1].
+
+### Compose and organisation
+- **FR-41 · P2 · Rich-text email** with a plain-text option and default; multipart/alternative; drafts keep formatting
+  [PR #2, #7].
+- **FR-42 · P2 · Email templates** — Compose → ⋯ → Templates with `{{first_name}}`, `{{name}}`, `{{my_name}}`, `{{date}}`
+  [PR #9].
+- **FR-43 · P2 · Snooze / remind later** — presets and date/time, Snoozed list, resurfaces with a notification
+  [PR #9, #18, `fc1c78d`].
+
+### Appearance
+- **FR-52 · P2 · Quiet UI button hierarchy** — solid accent-blue primaries, frosted floating pill and snackbars, flat
+  secondaries [PR #7, #32; Device ✓].
+- **FR-59 · P2 · Sender avatars and optional pictures** — colourful avatars; opt-in contact photos, Gravatar, Libravatar,
+  BIMI brand logos, website icons; cached, no WebView [`0743bda`, `701d7b3`, PR #36 for inset logos].
+- **FR-63 · P2 · Complete Settings screen** — general, appearance, reading, composing, privacy, storage, about; per-account
+  sync options [PR #14, v0.1].
+
+### Project
+- **FR-73 · P1 · First signed release APK** — v0.1.0-alpha.1 on GitHub Releases with certificate fingerprint and SHA-256.
+- **FR-74 · P2 · README, docs and regular commits** [v0.1].
+
+---
+
+## Process
+
+- **FR-76 · P2 · Recurring backlog and regression review (ongoing)** — reassess Open / In progress / Done after substantial
+  merges, before each alpha/release and after bug reports: compare with the code and real behaviour, update priorities and
+  acceptance criteria, find duplicates, conflicts and regressions, re-test affected Done features and reopen with exact gaps.
+  Never "finished" after one cleanup.
+
+## Needs a device check (collected from the entries above)
+
+FR-01 real Gmail end to end · FR-06 multi-device drafts · FR-07 Doze/battery · FR-08 storage UI + WorkManager · FR-21 flicker ·
+FR-22 Back crash · FR-25 reader swipe · FR-28 Inter in WebView + TalkBack · FR-29 remote images · FR-33 categories UI ·
+FR-34 invitations · FR-40 sent signatures in real clients · FR-44a real OpenKeychain round trips · FR-50 accent (before/after) ·
+FR-51 OLED in all modes · FR-53 glass blur audit · FR-54 top-edge blur (3 reported bugs) · FR-56 snooze sheet/dialogs ·
+FR-58 motion feel + reduced motion · FR-65 RTL locale · FR-68 slow-search states · FR-69 tablet/DeX · FR-72 release build.
