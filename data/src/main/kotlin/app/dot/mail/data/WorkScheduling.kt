@@ -11,6 +11,21 @@ internal object WorkScheduling {
         WorkManager.getInstance(context).enqueueUniqueWork("dotmail.search-index",ExistingWorkPolicy.KEEP,
             OneTimeWorkRequestBuilder<SearchIndexWorker>().setBackoffCriteria(BackoffPolicy.EXPONENTIAL,10,TimeUnit.SECONDS).build())
     }
+    fun localStorage(context:Context,id:Long,append:Boolean=false,replace:Boolean=false) {
+        WorkManager.getInstance(context).enqueueUniqueWork("dotmail.storage.$id",if(replace) ExistingWorkPolicy.REPLACE else if(append) ExistingWorkPolicy.APPEND_OR_REPLACE else ExistingWorkPolicy.KEEP,
+            OneTimeWorkRequestBuilder<StorageCleanupWorker>().setInputData(workDataOf("accountId" to id)).build())
+    }
+    internal fun offlineRequest(id:Long,policy:app.dot.mail.data.model.StoragePolicy,pinnedOnly:Boolean=false):OneTimeWorkRequest {
+        val constraints=Constraints.Builder().setRequiredNetworkType(if(policy.wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED).setRequiresCharging(policy.chargingOnly).build()
+        return OneTimeWorkRequestBuilder<OfflineWorker>().setInputData(workDataOf("accountId" to id,"pinnedOnly" to pinnedOnly)).setConstraints(constraints).setBackoffCriteria(BackoffPolicy.EXPONENTIAL,10,TimeUnit.SECONDS).build()
+    }
+    fun offline(context:Context,id:Long,policy:app.dot.mail.data.model.StoragePolicy,replace:Boolean=false,append:Boolean=false) {
+        WorkManager.getInstance(context).enqueueUniqueWork("dotmail.offline.$id",if(replace) ExistingWorkPolicy.REPLACE else if(append) ExistingWorkPolicy.APPEND_OR_REPLACE else ExistingWorkPolicy.KEEP,offlineRequest(id,policy))
+    }
+    fun pinned(context:Context,id:Long,policy:app.dot.mail.data.model.StoragePolicy,append:Boolean=false) {
+        WorkManager.getInstance(context).enqueueUniqueWork("dotmail.pinned.$id",if(append) ExistingWorkPolicy.APPEND_OR_REPLACE else ExistingWorkPolicy.KEEP,offlineRequest(id,policy,pinnedOnly=true))
+    }
+    fun cancelOffline(context:Context,id:Long) { WorkManager.getInstance(context).cancelUniqueWork("dotmail.offline.$id"); WorkManager.getInstance(context).cancelUniqueWork("dotmail.pinned.$id") }
     fun periodic(context: Context) {
         WorkManager.getInstance(context).enqueueUniquePeriodicWork("dotmail.periodic", ExistingPeriodicWorkPolicy.KEEP,
             PeriodicWorkRequestBuilder<SyncWorker>(15, TimeUnit.MINUTES).setConstraints(network).setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS).build())

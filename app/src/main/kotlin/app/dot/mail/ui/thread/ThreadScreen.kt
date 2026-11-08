@@ -1042,7 +1042,12 @@ private fun CalendarInvites(message: Message) {
             parts.flatMap { a ->
                 runCatching {
                     val uri = Uri.parse(graph.mail.openAttachment(a))
-                    val text = context.contentResolver.openInputStream(uri)?.use { it.readBytes().take(512 * 1024).toByteArray().decodeToString() }.orEmpty()
+                    val text = context.contentResolver.openInputStream(uri)?.use { input ->
+                        val bytes=ByteArray(512*1024+1); var count=0
+                        while(count<bytes.size) { val n=input.read(bytes,count,bytes.size-count); if(n<0) break; count+=n }
+                        require(count<=512*1024) { "Invitation is too large" }
+                        bytes.decodeToString(0,count)
+                    }.orEmpty()
                     app.dot.mail.engine.calendar.Ics.parse(text)
                 }.getOrDefault(emptyList())
             }.distinctBy { it.uid to it.sequence }

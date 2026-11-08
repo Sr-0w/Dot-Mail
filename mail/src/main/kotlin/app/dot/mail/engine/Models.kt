@@ -40,7 +40,9 @@ data class OutgoingMail(
 )
 
 data class CachedPart(val partId: String, val name: String, val mimeType: String, val contentId: String?, val inline: Boolean, val file: java.io.File)
-data class CachedBody(val text: java.io.File?, val html: java.io.File?, val attachments: List<CachedPart>)
+data class RemotePart(val partId:String,val name:String,val mimeType:String,val contentId:String?,val inline:Boolean,val size:Long)
+data class CachedBody(val text: java.io.File?, val html: java.io.File?, val attachments: List<CachedPart>,val parts:List<RemotePart> = emptyList())
+data class HeaderPage(val validity:Long,val uidNext:Long,val headers:List<Header>,val nextBeforeUid:Long,val hasMore:Boolean,val failures:List<HeaderFailure> = emptyList())
 
 data class DraftInventory(val validity: Long, val activeUids: Set<Long>)
 data class DraftCopy(val validity: Long, val uid: Long)

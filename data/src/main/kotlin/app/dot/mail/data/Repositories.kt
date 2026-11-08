@@ -77,6 +77,26 @@ interface AccountRepository {
 }
 
 interface MailRepository {
+    /** Re-check READ_CONTACTS after its permission result; data stays exclusively in the local cache. */
+    suspend fun refreshKnownContacts() {}
+
+    /** Total app mail files + shared database cap; 0 = unlimited. Protected drafts/outbox/pins may exceed it. */
+    val globalStorageLimit:Flow<Long> get() = kotlinx.coroutines.flow.flowOf(0L)
+    suspend fun setGlobalStorageLimit(bytes:Long) {}
+
+    fun storagePolicy(accountId:Long):Flow<app.dot.mail.data.model.StoragePolicy> = kotlinx.coroutines.flow.flowOf(app.dot.mail.data.model.StoragePolicy())
+    /** Saves policy and schedules bounded local cleanup/downloads. maxBytes=0 is limited only by device space. */
+    suspend fun setStoragePolicy(accountId:Long,policy:app.dot.mail.data.model.StoragePolicy) { throw UnsupportedOperationException() }
+    fun offlineProgress(accountId:Long):Flow<app.dot.mail.data.model.OfflineProgress> = kotlinx.coroutines.flow.flowOf(app.dot.mail.data.model.OfflineProgress(accountId))
+    suspend fun pauseOfflineDownload(accountId:Long) {}
+    suspend fun resumeOfflineDownload(accountId:Long) {}
+    /** Bypasses automatic LRU eviction for the selected messages. Pending writes and drafts are always protected. */
+    suspend fun setOfflineSaved(messageIds:Collection<Long>,saved:Boolean) {}
+    fun offlineSavedMessages():Flow<Set<Long>> = kotlinx.coroutines.flow.flowOf(emptySet())
+    suspend fun storageUsage():app.dot.mail.data.model.StorageUsage = app.dot.mail.data.model.StorageUsage()
+    /** Local files only. Keeps pinned messages, drafts, outbox and pending changes; never issues an IMAP delete. */
+    suspend fun clearCachedMail(accountId:Long):app.dot.mail.data.model.CacheCleanupResult = app.dot.mail.data.model.CacheCleanupResult(0,0)
+
     /** Opt-in persistent Inbox connections. Keeps a foreground notification and can use more battery. */
     val instantNotifications: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(false)
     /** Enable from a visible app with an account. False if unavailable or the platform refuses service startup. */

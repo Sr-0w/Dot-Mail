@@ -32,7 +32,7 @@ internal object ThreadQuery {
             }
         }
         if (filters.fromContacts) {
-            parts += "EXISTS(SELECT 1 FROM messages m JOIN contacts c ON c.accountId=m.accountId AND c.email<>'' AND instr(lower(m.senderSearch), lower(c.email))>0 WHERE m.threadId=t.id)"
+            parts += "EXISTS(SELECT 1 FROM messages m JOIN message_senders ms ON ms.messageId=m.id WHERE m.threadId=t.id AND ms.email<>'' AND (EXISTS(SELECT 1 FROM contacts c WHERE c.accountId=m.accountId AND c.email=ms.email AND c.email<>'' AND c.corresponded=1) OR EXISTS(SELECT 1 FROM device_contacts dc JOIN device_contact_state ds ON ds.id=1 AND ds.allowed=1 AND ds.generation=dc.generation WHERE dc.email=ms.email)))"
         }
         return if (parts.isEmpty()) null else Sql(parts.joinToString(" AND "), args)
     }
@@ -86,7 +86,7 @@ internal object ThreadQuery {
             }
         }
         if (filters.fromContacts) {
-            parts += "EXISTS(SELECT 1 FROM contacts c WHERE c.accountId=messages.accountId AND c.email<>'' AND instr(lower(messages.senderSearch), lower(c.email))>0)"
+            parts += "EXISTS(SELECT 1 FROM message_senders ms WHERE ms.messageId=messages.id AND ms.email<>'' AND (EXISTS(SELECT 1 FROM contacts c WHERE c.accountId=messages.accountId AND c.email=ms.email AND c.email<>'' AND c.corresponded=1) OR EXISTS(SELECT 1 FROM device_contacts dc JOIN device_contact_state ds ON ds.id=1 AND ds.allowed=1 AND ds.generation=dc.generation WHERE dc.email=ms.email)))"
         }
         return if (parts.isEmpty()) null else Sql(parts.joinToString(" AND "), args)
     }

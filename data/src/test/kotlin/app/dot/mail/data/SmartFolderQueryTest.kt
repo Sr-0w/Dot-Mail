@@ -48,6 +48,73 @@ class SmartFolderQueryTest {
 
     private suspend fun list(mailbox: Mailbox, options: ListOptions): List<Long> = graph.threads(mailbox, options).asSnapshot().map { s: ThreadSummary -> s.threadId }
 
+    @Test fun emptyContactNeverMatchesAllSendersInEitherListMode() = runBlocking<Unit> {
+        val ids=seed()
+        val account=db.mail().accounts().single().id
+        db.openHelper.writableDatabase.execSQL("DELETE FROM contacts")
+        db.mail().putContact(ContactRow(account,"",null,0,corresponded=true))
+        val mailbox=Mailbox.Unified(FolderRole.INBOX)
+        val options=ListOptions(filters=ThreadFilters(fromContacts=true))
+        assertTrue(list(mailbox,options).isEmpty())
+        assertTrue(graph.messages(mailbox,options).asSnapshot().isEmpty())
+        db.mail().putContact(ContactRow(account,"amy@x.org","Amy",1,corresponded=true))
+        assertEquals(listOf(ids["amy"]),list(mailbox,options))
+        val expected=db.mail().threadMessages(ids["amy"]!!).single().id
+        assertEquals(listOf(expected),graph.messages(mailbox,options).asSnapshot().map { ConversationIds.messageIdOf(it.threadId) })
+    }
+
+    @Test fun fromContactsMeansCorrespondentsAndDeviceContactsNotEverySeenSenderOrDisplayName() = runBlocking<Unit> {
+        val ids=seed(); val account=db.mail().accounts().single().id
+        val mailbox=Mailbox.Unified(FolderRole.INBOX); val options=ListOptions(filters=ThreadFilters(fromContacts=true))
+        suspend fun both(expected:Set<Long>) {
+            assertEquals(expected,list(mailbox,options).toSet())
+            val expectedMessages=expected.map { db.mail().threadMessages(it).single().id }.toSet()
+            assertEquals(expectedMessages,graph.messages(mailbox,options).asSnapshot().map { ConversationIds.messageIdOf(it.threadId) }.toSet())
+        }
+        graph.addressBook.hasPermission={false}; both(emptySet())
+        val sent=db.mail().insertFolder(FolderRow(accountId=account,path="Sent",name="Sent",role="SENT",validity=1)).let { db.mail().folder(it)!! }
+        graph.upsertHeader(sent,header(10,"alice@example.org","Sent fixture",to="amy@x.org").copy(cc=listOf(Address("zed@x.org"))))
+        both(setOf(ids["amy"]!!,ids["zed"]!!))
+        graph.send(Draft(accountId=account,identityId=account,to=listOf(EmailAddress("bob@x.org")),bodyText="Queued"),60000)
+        both(setOf(ids["amy"]!!,ids["zed"]!!,ids["bob"]!!))
+        // Seeing a newer incoming message must not clear a prior correspondence marker.
+        val inbox=db.mail().folders(account).single { it.role=="INBOX" }
+        graph.upsertHeader(inbox,header(11,"bob@x.org","Incoming after send"))
+        assertTrue(db.mail().contacts("bob%",10).single().corresponded)
+        val spoof=graph.upsertHeader(inbox,header(12,"attacker@evil.invalid","Spoof name").copy(from=listOf(Address("attacker@evil.invalid","amy@x.org")))).first
+        assertFalse(spoof in list(mailbox,options))
+    }
+
+    @Test fun addressBookPermissionGrantRefreshAndRevocationStayLocalAndInvalidateBothModes() = runBlocking<Unit> {
+        val ids=seed(); val mailbox=Mailbox.Unified(FolderRole.INBOX); val options=ListOptions(filters=ThreadFilters(fromContacts=true))
+        var permitted=false; var emails=listOf(" BOB@X.ORG ","", "bob@x.org"); var reads=0
+        graph.addressBook.hasPermission={permitted}
+        graph.addressBook.reader=DeviceContactReader { consume -> reads++; emails.forEach { consume(it) } }
+        graph.refreshKnownContacts(); assertEquals(0,reads); assertTrue(list(mailbox,options).isEmpty())
+        permitted=true; graph.refreshKnownContacts()
+        assertEquals(listOf("bob@x.org"),db.mail().deviceContactEmails())
+        assertEquals(listOf(ids["bob"]),list(mailbox,options))
+        val bob=db.mail().threadMessages(ids["bob"]!!).single().id
+        assertEquals(listOf(bob),graph.messages(mailbox,options).asSnapshot().map { ConversationIds.messageIdOf(it.threadId) })
+        emails=listOf("amy@x.org"); graph.refreshKnownContacts()
+        assertEquals(listOf(ids["amy"]),list(mailbox,options))
+        permitted=false; graph.refreshKnownContacts()
+        assertEquals(2,reads); assertTrue(db.mail().deviceContactEmails().isEmpty())
+        assertTrue(list(mailbox,options).isEmpty()); assertTrue(graph.messages(mailbox,options).asSnapshot().isEmpty())
+    }
+
+    @Test fun correspondenceChangesInvalidateBothPagingSources()=runBlocking<Unit> {
+        seed(); val account=db.mail().accounts().single().id
+        val filters=ThreadFilters(fromContacts=true)
+        val threads=db.mail().page(androidx.sqlite.db.SimpleSQLiteQuery("SELECT t.* FROM threads t WHERE "+ThreadQuery.filters(filters,emptyList())!!.text))
+        val messages=db.mail().pageMessages(androidx.sqlite.db.SimpleSQLiteQuery("SELECT $MESSAGE_META FROM messages WHERE "+ThreadQuery.messageFilters(filters,emptyList())!!.text))
+        threads.load(androidx.paging.PagingSource.LoadParams.Refresh(null,40,false))
+        messages.load(androidx.paging.PagingSource.LoadParams.Refresh(null,40,false))
+        graph.markCorresponded(account,listOf(EmailAddress("amy@x.org")))
+        withTimeout(5000) { while(!threads.invalid || !messages.invalid) kotlinx.coroutines.delay(10) }
+        assertTrue(threads.invalid); assertTrue(messages.invalid)
+    }
+
     @Test fun sortsAndQuickFilters() = runBlocking<Unit> {
         val ids = seed()
         val inbox = Mailbox.Unified(FolderRole.INBOX)

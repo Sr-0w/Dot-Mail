@@ -7,9 +7,9 @@ import java.io.File
 
 /** Reference-based orphan cleanup with a grace period for in-flight downloads and MIME preparation. */
 internal class PrivateCacheCleanup(private val context: Context, private val dao: MailDao) {
-    suspend fun run(now: Long = System.currentTimeMillis(), force: Boolean = false) {
+    suspend fun run(now: Long = System.currentTimeMillis(), force: Boolean = false):Boolean {
         val prefs=context.getSharedPreferences("dotmail.cache.maintenance",Context.MODE_PRIVATE)
-        if(!force && now-prefs.getLong("last",0)<3_600_000) return
+        if(!force && now-prefs.getLong("last",0)<3_600_000) return false
         val retained=hashSetOf<String>()
         val attachmentRoot=File(context.filesDir,"attachments").canonicalFile
         fun retainUri(raw:String) {
@@ -36,5 +36,6 @@ internal class PrivateCacheCleanup(private val context: Context, private val dao
             if(directory.isDirectory && directory.canonicalPath !in bodyDirs && directory.lastModified()<cutoff) directory.deleteRecursively()
         }
         prefs.edit().putLong("last",now).apply()
+        return true
     }
 }
