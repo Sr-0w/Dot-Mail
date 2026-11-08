@@ -50,6 +50,9 @@ class InboxViewModel(private val graph: MailGraph, private val saved: SavedState
 
     private val _refreshing = MutableStateFlow(false)
     val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
+    private val _syncing = MutableStateFlow(false)
+    /** A user-requested sync is still running (after the pull spinner handed off to the discreet progress line). */
+    val syncing: StateFlow<Boolean> = _syncing.asStateFlow()
 
     private val _events = Channel<String>(Channel.BUFFERED)
     /** One-off messages for the snackbar. */
@@ -138,15 +141,22 @@ class InboxViewModel(private val graph: MailGraph, private val saved: SavedState
     }
 
     fun refresh() {
-        if (_refreshing.value) return
+        if (_refreshing.value || _syncing.value) return
         viewModelScope.launch {
             _refreshing.value = true
+            _syncing.value = true
             val started = System.currentTimeMillis()
-            // Bounded: the spinner must never get stuck if a sync hangs.
-            runCatching { kotlinx.coroutines.withTimeout(60_000) { graph.mail.refresh(_mailbox.value) } }
-                .onFailure { _events.send(if (it is kotlinx.coroutines.TimeoutCancellationException) "Still syncing in the background" else it.message ?: "Couldn't refresh") }
-            // A true→false flip inside one frame never reaches PullToRefreshBox, leaving its indicator stuck.
-            kotlinx.coroutines.delay((600 - (System.currentTimeMillis() - started)).coerceAtLeast(0))
+            val sync = launch {
+                // Bounded: nothing may stay "syncing" forever if a server hangs.
+                runCatching { kotlinx.coroutines.withTimeout(60_000) { graph.mail.refresh(_mailbox.value) } }
+                    .onFailure { _events.send(if (it is kotlinx.coroutines.TimeoutCancellationException) "Still syncing in the background" else it.message ?: "Couldn't refresh") }
+                _syncing.value = false
+            }
+            // The pull spinner is only the "got it" confirmation: it leaves after a short beat (never over the list
+            // for a whole slow IMAP sync) and the header progress line takes over. A true→false flip inside one frame
+            // never reaches PullToRefreshBox, hence the minimum.
+            kotlinx.coroutines.withTimeoutOrNull(SPINNER_MAX_MS) { sync.join() }
+            kotlinx.coroutines.delay((SPINNER_MIN_MS - (System.currentTimeMillis() - started)).coerceAtLeast(0))
             _refreshing.value = false
         }
     }
@@ -167,5 +177,10 @@ class InboxViewModel(private val graph: MailGraph, private val saved: SavedState
         saved.get<Long>("mailboxFolder")?.let { return Mailbox.InFolder(it) }
         val role = saved.get<String>("mailboxRole")?.let { runCatching { FolderRole.valueOf(it) }.getOrNull() }
         return Mailbox.Unified(role ?: FolderRole.INBOX)
+    }
+
+    private companion object {
+        const val SPINNER_MIN_MS = 600L
+        const val SPINNER_MAX_MS = 900L
     }
 }

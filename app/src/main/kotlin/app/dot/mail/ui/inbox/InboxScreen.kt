@@ -144,6 +144,7 @@ fun InboxScreen(
     val drawer by vm.drawer.collectAsStateWithLifecycle()
     val selection by vm.selection.collectAsStateWithLifecycle()
     val refreshing by vm.refreshing.collectAsStateWithLifecycle()
+    val userSyncing by vm.syncing.collectAsStateWithLifecycle()
     val threads = vm.threads.collectAsLazyPagingItems()
     val outbox by graph.compose.outbox.collectAsStateWithLifecycle(emptyList())
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -220,6 +221,16 @@ fun InboxScreen(
                             style = Dot.type.caption, color = Dot.colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis,
                         )
                     }
+                }
+                // Real sync activity (pull-to-refresh after its spinner left, background or IDLE syncs): a hairline
+                // under the header that never covers or blocks the list. Indeterminate — sync has no honest percentage.
+                val anySyncing = userSyncing || accountsNow.any { it.syncState is app.dot.mail.data.model.SyncState.Syncing }
+                Box(Modifier.fillMaxWidth().height(2.dp)) {
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = anySyncing && !refreshing,
+                        enter = androidx.compose.animation.fadeIn(tween(DotMotion.fast)),
+                        exit = androidx.compose.animation.fadeOut(tween(DotMotion.medium)),
+                    ) { app.dot.design.components.DotLinearProgress(modifier = Modifier.fillMaxWidth()) }
                 }
                 PullToRefreshBox(
                     isRefreshing = refreshing,
@@ -684,6 +695,12 @@ private fun QuietRefreshIndicator(
     val c = Dot.colors
     val fraction = state.distanceFraction
     val visible = refreshing || fraction > 0f
+    // One subtle tick when the pull crosses the trigger threshold (the system haptics setting still applies).
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val armed = fraction >= 1f
+    androidx.compose.runtime.LaunchedEffect(armed) {
+        if (armed && !refreshing) haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.GestureThresholdActivate)
+    }
     val offset by androidx.compose.animation.core.animateDpAsState(
         if (refreshing) 16.dp else (fraction.coerceAtMost(1.5f) * 56).dp - 40.dp, label = "ptr-offset",
     )
