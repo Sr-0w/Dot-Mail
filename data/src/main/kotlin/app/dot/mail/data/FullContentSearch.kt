@@ -25,7 +25,9 @@ internal class FullContentSearch(private val graph:RealMailGraph) {
             val old=states.entries.firstOrNull { it.key!=key && it.value.subscriptionCount.value==0 && !it.value.value.running }
             if(old!=null) { states.remove(old.key); graph.scope.launch { graph.dao.clearSearchMatches(old.key) } }
         }
-        states.getOrPut(key) { MutableStateFlow(ServerState()) }
+        // Progress is observed before the paging source necessarily starts serverSearch.
+        // Reserve that interval as running so an empty local page cannot look final.
+        states.getOrPut(key) { MutableStateFlow(ServerState(running=scope.includeServer,available=!scope.includeServer)) }
     }
     fun hash(query:String,scope:SearchScope):String = java.security.MessageDigest.getInstance("SHA-256").digest("${scope.accountIds.sorted()}:${scope.folderIds.sorted()}:$query".toByteArray()).joinToString("") { "%02x".format(it) }
     fun progress(query:String,scope:SearchScope):Flow<SearchProgress> = combine(graph.searchIndex.progress,state(query,scope)) { index,server -> SearchProgress(index,server.running,server.available,server.error,server.limited) }
@@ -98,7 +100,7 @@ internal class FullContentSearch(private val graph:RealMailGraph) {
     }
     internal suspend fun serverSearch(query:String,scope:SearchScope,networkAvailable:Boolean=online()) {
         val status=state(query,scope)
-        if(!scope.includeServer || !networkAvailable || query.isBlank()) { status.value=ServerState(available=networkAvailable && scope.includeServer); return }
+        if(!scope.includeServer || !networkAvailable || query.isBlank()) { status.value=ServerState(available=!scope.includeServer || networkAvailable); return }
         status.value=ServerState(running=true,available=true)
         try {
             withTimeout(60000) {

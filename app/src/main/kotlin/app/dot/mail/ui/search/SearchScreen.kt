@@ -92,7 +92,6 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -135,7 +134,8 @@ class SearchViewModel(private val graph: MailGraph, private val folderId: Long, 
 
     private val scope: Flow<SearchScope> = combine(mode, sort, includeServer, context) { m, s, server, ctx -> scopeFor(m, s, server, ctx) }
 
-    private val request: Flow<Pair<String, SearchScope>> = combine(query.map { it.trim() }.debounce(250).distinctUntilChanged(), scope) { q, sc -> q to sc }
+    // Switch on each edit so results for a previous query are not kept visible during a debounce.
+    private val request: Flow<Pair<String, SearchScope>> = combine(query.map { it.trim() }.distinctUntilChanged(), scope) { q, sc -> q to sc }
 
     val results: Flow<PagingData<SearchResult>> = request
         .flatMapLatest { (q, sc) -> if (q.length < 2) flowOf(PagingData.empty()) else graph.mail.search(q, sc) }
@@ -184,17 +184,23 @@ fun SearchScreen(onBack: () -> Unit, onOpenThread: (Long) -> Unit, folderId: Lon
         )
         val q = query.trim()
         if (q.length >= 2) ProgressLines(progress)
-        when {
-            q.length < 2 -> SearchHints()
-            results.itemCount == 0 && results.loadState.refresh is LoadState.Loading ->
+        when (searchDisplayState(q, results.itemCount, results.loadState.refresh, progress)) {
+            SearchDisplayState.IDLE -> SearchHints()
+            SearchDisplayState.SEARCHING ->
                 Box(Modifier.fillMaxSize().padding(top = 64.dp), contentAlignment = Alignment.TopCenter) {
                     CircularProgressIndicator(Modifier.size(22.dp), color = c.textTertiary, strokeWidth = 1.5.dp)
                 }
-            results.itemCount == 0 && results.loadState.refresh is LoadState.Error ->
+            SearchDisplayState.ERROR ->
                 EmptyState(Icons.Outlined.WifiOff, stringResource(R.string.search_error_title), (results.loadState.refresh as LoadState.Error).error.message ?: stringResource(R.string.search_error_body))
-            results.itemCount == 0 && results.loadState.refresh is LoadState.NotLoading && !progress.serverRunning ->
+            SearchDisplayState.NO_RESULTS ->
                 EmptyState(Icons.Outlined.SearchOff, stringResource(R.string.search_no_results_title), stringResource(R.string.search_no_results_body, q))
-            else -> LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
+            SearchDisplayState.PARTIAL_RESULTS -> if (results.itemCount == 0) EmptyState(Icons.Outlined.WifiOff, stringResource(R.string.search_error_title), progress.serverError ?: stringResource(R.string.search_server_error)) else LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
+                items(results.itemCount, key = results.itemKey { it.messageId }) { i ->
+                    val r = results[i] ?: return@items
+                    SearchResultRow(r, onClick = { onOpenThread(r.thread.threadId) })
+                }
+            }
+            SearchDisplayState.RESULTS -> LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
                 items(results.itemCount, key = results.itemKey { it.messageId }) { i ->
                     val r = results[i] ?: return@items
                     SearchResultRow(r, onClick = { onOpenThread(r.thread.threadId) })
@@ -202,6 +208,22 @@ fun SearchScreen(onBack: () -> Unit, onOpenThread: (Long) -> Unit, folderId: Lon
             }
         }
     }
+}
+
+/** Distinguishes a settled empty result from a local page while indexing or remote search is active. */
+internal enum class SearchDisplayState { IDLE, SEARCHING, RESULTS, NO_RESULTS, PARTIAL_RESULTS, ERROR }
+
+internal fun searchDisplayState(query: String, count: Int, refresh: LoadState, progress: SearchProgress): SearchDisplayState {
+    if (query.length < 2) return SearchDisplayState.IDLE
+    val refreshError = refresh as? LoadState.Error
+    if (count == 0 && refreshError != null) return SearchDisplayState.ERROR
+    val sourceBusy = progress.serverRunning || progress.index.running
+    val sourceFailed = progress.serverError != null || progress.index.error != null || (progress.serverAvailable.not() && progress.serverRunning.not())
+    if (refresh is LoadState.Loading) return SearchDisplayState.SEARCHING
+    if (count > 0) return if (sourceFailed || sourceBusy) SearchDisplayState.PARTIAL_RESULTS else SearchDisplayState.RESULTS
+    if (sourceBusy) return SearchDisplayState.SEARCHING
+    if (refresh !is LoadState.NotLoading) return SearchDisplayState.SEARCHING
+    return if (sourceFailed) SearchDisplayState.PARTIAL_RESULTS else SearchDisplayState.NO_RESULTS
 }
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
