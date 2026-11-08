@@ -1,7 +1,16 @@
 package app.dot.design.components
 
+import android.provider.Settings
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,11 +40,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -126,6 +139,226 @@ fun DotButton(
             Spacer(Modifier.width(DotSpacing.s))
         }
         Text(text, style = Dot.type.label, color = fgFinal, maxLines = 1)
+    }
+}
+
+/**
+ * Primary / confirmatory action button (Send, Save, Confirm): solid Accent Blue fill with
+ * high-contrast foreground, rounded geometry ([DotShapes.medium]), and >= 48dp touch target.
+ */
+@Composable
+fun DotPrimaryButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    enabled: Boolean = true,
+    loading: Boolean = false,
+    compact: Boolean = false,
+    contentDescription: String? = null,
+) {
+    val c = Dot.colors
+    val haptics = LocalHapticFeedback.current
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    // Solid Accent Blue fill with >= 4.7:1 WCAG AA contrast against white foreground in both themes.
+    val accentFill = if (c.isDark) Color(0xFF476CE8) else c.accent
+    val bgAnimated by animateColorAsState(
+        when {
+            !enabled -> c.surfaceRaised
+            pressed -> accentFill.copy(alpha = 0.86f)
+            else -> accentFill
+        },
+        tween(DotMotion.fast), label = "primary-btn",
+    )
+    val fgFinal = if (enabled) Color.White else c.textTertiary
+    Row(
+        modifier
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled && !loading,
+                role = Role.Button,
+            ) {
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            }
+            .then(if (contentDescription != null) Modifier.semantics { this.contentDescription = contentDescription } else Modifier)
+            .minimumInteractiveComponentSize()
+            .heightIn(min = if (compact) 36.dp else 48.dp)
+            .clip(DotShapes.medium)
+            .background(bgAnimated)
+            .padding(horizontal = if (compact) 14.dp else 20.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (loading) {
+            CircularProgressIndicator(Modifier.size(16.dp), color = fgFinal, strokeWidth = 1.5.dp)
+            Spacer(Modifier.width(DotSpacing.s))
+        } else if (icon != null) {
+            Icon(icon, null, Modifier.size(18.dp), tint = fgFinal)
+            Spacer(Modifier.width(DotSpacing.s))
+        }
+        Text(text, style = Dot.type.label, color = fgFinal, maxLines = 1)
+    }
+}
+
+/**
+ * Icon-only variant of [DotPrimaryButton] (e.g., top-bar Send action): solid Accent Blue fill,
+ * rounded geometry ([DotShapes.medium]), and >= 48dp interactive touch target.
+ */
+@Composable
+fun DotPrimaryButton(
+    icon: ImageVector,
+    contentDescription: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    loading: Boolean = false,
+    compact: Boolean = true,
+) {
+    val c = Dot.colors
+    val haptics = LocalHapticFeedback.current
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val accentFill = if (c.isDark) Color(0xFF476CE8) else c.accent
+    val bgAnimated by animateColorAsState(
+        when {
+            !enabled -> c.surfaceRaised
+            pressed -> accentFill.copy(alpha = 0.86f)
+            else -> accentFill
+        },
+        tween(DotMotion.fast), label = "primary-icon-btn",
+    )
+    val fgFinal = if (enabled) Color.White else c.textTertiary
+    val visualSize = if (compact) 40.dp else 48.dp
+    Box(
+        modifier
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled && !loading,
+                role = Role.Button,
+            ) {
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            }
+            .minimumInteractiveComponentSize()
+            .size(visualSize)
+            .clip(DotShapes.medium)
+            .background(bgAnimated),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (loading) {
+            CircularProgressIndicator(Modifier.size(16.dp), color = fgFinal, strokeWidth = 1.5.dp)
+        } else {
+            Icon(icon, contentDescription, Modifier.size(19.dp), tint = fgFinal)
+        }
+    }
+}
+
+/**
+ * Soft Frosted Pill for floating actions (Compose / New email):
+ * compact fully-rounded translucent graphite surface, subtle top highlight, delicate low-contrast
+ * hairline border, minimal elevation, no glow, light + dark variants, and >= 48dp touch target.
+ */
+@Composable
+fun DotFrostedPill(
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    label: String? = null,
+    expanded: Boolean = true,
+    enabled: Boolean = true,
+    contentDescription: String? = label,
+) {
+    val c = Dot.colors
+    val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val reduceMotion = remember(context) {
+        runCatching {
+            Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+        }.getOrDefault(false)
+    }
+
+    val surfaceBrush = if (c.isDark) {
+        val top = if (pressed) Color(0xEB313138) else Color(0xE02A2A30)
+        val bottom = if (pressed) Color(0xEB232328) else Color(0xE01C1C21)
+        Brush.verticalGradient(listOf(top, bottom))
+    } else {
+        val top = if (pressed) Color(0xEDEAEAEF) else Color(0xEBF5F5F8)
+        val bottom = if (pressed) Color(0xEDDFDFE6) else Color(0xEBE8E8EE)
+        Brush.verticalGradient(listOf(top, bottom))
+    }
+
+    val borderBrush = if (c.isDark) {
+        Brush.verticalGradient(listOf(Color(0xFF42424A), Color(0xFF2B2B31)))
+    } else {
+        Brush.verticalGradient(listOf(Color(0xFFFFFFFF), Color(0xFFD2D2DA)))
+    }
+
+    val fg = if (!enabled) c.textTertiary else c.textPrimary
+    val showLabel = expanded && !label.isNullOrEmpty()
+    val enterTransition = if (reduceMotion) {
+        EnterTransition.None
+    } else {
+        expandHorizontally(tween(200, easing = FastOutSlowInEasing)) + fadeIn(tween(200, easing = FastOutSlowInEasing))
+    }
+    val exitTransition = if (reduceMotion) {
+        ExitTransition.None
+    } else {
+        shrinkHorizontally(tween(200, easing = FastOutSlowInEasing)) + fadeOut(tween(150, easing = FastOutSlowInEasing))
+    }
+
+    Row(
+        modifier
+            .minimumInteractiveComponentSize()
+            .heightIn(min = 48.dp)
+            .shadow(
+                elevation = 3.dp,
+                shape = CircleShape,
+                ambientColor = Color(0x26000000),
+                spotColor = Color(0x33000000),
+            )
+            .clip(CircleShape)
+            .background(surfaceBrush, CircleShape)
+            .border(DotSpacing.hairline * 2, borderBrush, CircleShape)
+            .clickable(
+                interactionSource = interaction,
+                indication = ripple(bounded = true, color = c.textPrimary),
+                enabled = enabled,
+                role = Role.Button,
+            ) {
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            }
+            .semantics {
+                if (contentDescription != null) {
+                    this.contentDescription = contentDescription
+                }
+            }
+            .padding(horizontal = if (showLabel) 16.dp else 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Icon(icon, null, Modifier.size(19.dp), tint = fg)
+        if (!label.isNullOrEmpty()) {
+            AnimatedVisibility(
+                visible = expanded,
+                enter = enterTransition,
+                exit = exitTransition,
+            ) {
+                Text(
+                    text = label,
+                    style = Dot.type.label,
+                    color = fg,
+                    maxLines = 1,
+                    modifier = Modifier.padding(start = 8.dp, end = 2.dp),
+                )
+            }
+        }
     }
 }
 
