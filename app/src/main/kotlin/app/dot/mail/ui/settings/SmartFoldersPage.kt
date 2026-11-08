@@ -108,7 +108,7 @@ internal fun SmartFoldersPage(onBack: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SmartFolderEditor(initial: SmartFolder, isNew: Boolean, onBack: () -> Unit, store: SmartFolderStore) {
+internal fun SmartFolderEditor(initial: SmartFolder, isNew: Boolean, onBack: () -> Unit, store: SmartFolderStore) {
     val c = Dot.colors
     val accounts by LocalMailGraph.current.accounts.accounts.collectAsStateWithLifecycle(emptyList())
     var name by remember { mutableStateOf(initial.name) }

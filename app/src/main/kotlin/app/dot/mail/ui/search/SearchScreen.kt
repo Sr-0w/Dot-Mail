@@ -204,14 +204,20 @@ fun SearchScreen(onBack: () -> Unit, onOpenThread: (Long) -> Unit, folderId: Lon
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 /** Scope chips (this folder / all folders / all accounts), server toggle and sort menu in one quiet scrolling row. */
 @Composable
-private fun ScopeBar(
+internal fun ScopeBar(
     mode: SearchMode, sort: SearchSort, server: Boolean, hasFolder: Boolean, hasAccount: Boolean,
     onMode: (SearchMode) -> Unit, onSort: (SearchSort) -> Unit, onServer: (Boolean) -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = DotSpacing.s), verticalAlignment = Alignment.CenterVertically) {
+    // Wraps instead of scrolling: on a phone the five controls overflow one line and a clipped chip looks broken.
+    androidx.compose.foundation.layout.FlowRow(
+        Modifier.fillMaxWidth().padding(horizontal = DotSpacing.s),
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(DotSpacing.xs),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+    ) {
         Box {
             DotIconButton(Icons.Outlined.SwapVert, stringResource(R.string.search_sort), onClick = { menu = true })
             DotMenu(menu, { menu = false }) {
@@ -222,21 +228,18 @@ private fun ScopeBar(
         }
         if (hasFolder) {
             DotFilterChip(stringResource(R.string.search_scope_folder), mode == SearchMode.THIS_FOLDER, { onMode(SearchMode.THIS_FOLDER) }, radio = true)
-            Spacer(Modifier.width(DotSpacing.s))
             if (hasAccount) {
                 DotFilterChip(stringResource(R.string.search_scope_all_folders), mode == SearchMode.ALL_FOLDERS, { onMode(SearchMode.ALL_FOLDERS) }, radio = true)
-                Spacer(Modifier.width(DotSpacing.s))
             }
         }
         DotFilterChip(stringResource(R.string.search_scope_all_accounts), mode == SearchMode.ALL_ACCOUNTS, { onMode(SearchMode.ALL_ACCOUNTS) }, radio = true)
-        Spacer(Modifier.width(DotSpacing.m))
         DotFilterChip(stringResource(R.string.search_server_toggle), server, { onServer(!server) })
     }
 }
 
 /** Indexing and server activity, shown as quiet caption lines so partial results never look final. */
 @Composable
-private fun ProgressLines(p: SearchProgress) {
+internal fun ProgressLines(p: SearchProgress) {
     val c = Dot.colors
     Column(Modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter)) {
         if (p.index.running && p.index.total > 0) {
@@ -269,10 +272,10 @@ internal fun highlighted(text: String, ranges: List<HighlightRange>, emphasis: S
 }
 
 @Composable
-private fun SearchResultRow(r: SearchResult, onClick: () -> Unit) {
+internal fun SearchResultRow(r: SearchResult, onClick: () -> Unit) {
     val c = Dot.colors
     val t = r.thread
-    val emphasis = remember(c.accent) { SpanStyle(fontWeight = FontWeight.SemiBold, background = c.accent.copy(alpha = 0.16f)) }
+    val emphasis = remember(c.accent) { SpanStyle(fontWeight = FontWeight.SemiBold, background = c.accent.copy(alpha = if (c.isDark) 0.30f else 0.16f)) }
     val subject = r.subject.ifBlank { stringResource(R.string.inbox_no_subject) }
     val onServer = stringResource(R.string.search_server_only)
     Row(
