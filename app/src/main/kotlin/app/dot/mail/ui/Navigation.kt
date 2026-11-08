@@ -62,7 +62,20 @@ import kotlinx.serialization.Serializable
 @Serializable object WelcomeRoute
 @Serializable data class AddAccountRoute(val firstAccount: Boolean = true)
 @Serializable object InboxRoute
-@Serializable data class ThreadRoute(val threadId: Long)
+/** [sourceFolderId]/[sourceRole] describe the mailbox the conversation was opened from, so actions stay scoped to it. */
+@Serializable data class ThreadRoute(val threadId: Long, val sourceFolderId: Long = 0, val sourceRole: String? = null) {
+    constructor(threadId: Long, source: app.dot.mail.data.model.Mailbox?) : this(
+        threadId,
+        (source as? app.dot.mail.data.model.Mailbox.InFolder)?.folderId ?: 0,
+        (source as? app.dot.mail.data.model.Mailbox.Unified)?.role?.name,
+    )
+    val source: app.dot.mail.data.model.Mailbox?
+        get() = when {
+            sourceFolderId != 0L -> app.dot.mail.data.model.Mailbox.InFolder(sourceFolderId)
+            sourceRole != null -> sourceRole.let { r -> runCatching { app.dot.mail.data.model.Mailbox.Unified(app.dot.mail.data.model.FolderRole.valueOf(r)) }.getOrNull() }
+            else -> null
+        }
+}
 @Serializable object SearchRoute
 @Serializable object SettingsRoute
 @Serializable object OutboxRoute
@@ -122,10 +135,11 @@ fun DotMailRoot(requests: StateFlow<ExternalRequest?>, onRequestConsumed: () -> 
                 androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
                     val twoPane = maxWidth >= TWO_PANE_MIN_WIDTH
                     var selected by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<Long?>(null) }
+                    var selectedSource by androidx.compose.runtime.remember { mutableStateOf<app.dot.mail.data.model.Mailbox?>(null) }
                     val inbox = @Composable { mod: Modifier ->
                         Box(mod) {
                             InboxScreen(
-                                onOpenThread = { if (twoPane) selected = it else nav.navigate(ThreadRoute(it)) },
+                                onOpenThread = { id, source -> if (twoPane) { selected = id; selectedSource = source } else nav.navigate(ThreadRoute(id, source)) },
                                 onCompose = { nav.openCompose() },
                                 onSearch = { nav.navigate(SearchRoute) },
                                 onSettings = { nav.navigate(SettingsRoute) },
@@ -152,6 +166,7 @@ fun DotMailRoot(requests: StateFlow<ExternalRequest?>, onRequestConsumed: () -> 
                                     androidx.compose.runtime.key(id) {
                                         ThreadScreen(
                                             threadId = id,
+                                            source = selectedSource,
                                             onBack = { selected = null },
                                             onOpenAdjacent = { next -> selected = next },
                                             onReply = { messageId, mode -> nav.openCompose(ComposeRoute(replyToMessageId = messageId, replyMode = mode.name)) },
@@ -165,10 +180,12 @@ fun DotMailRoot(requests: StateFlow<ExternalRequest?>, onRequestConsumed: () -> 
                 }
             }
             composable<ThreadRoute> { entry ->
+                val route = entry.toRoute<ThreadRoute>()
                 ThreadScreen(
-                    threadId = entry.toRoute<ThreadRoute>().threadId,
+                    threadId = route.threadId,
+                    source = route.source,
                     onBack = { nav.popBackStack() },
-                    onOpenAdjacent = { next -> nav.navigate(ThreadRoute(next)) { popUpTo<ThreadRoute> { inclusive = true } } },
+                    onOpenAdjacent = { next -> nav.navigate(ThreadRoute(next, route.source)) { popUpTo<ThreadRoute> { inclusive = true } } },
                     onReply = { messageId, mode -> nav.openCompose(ComposeRoute(replyToMessageId = messageId, replyMode = mode.name)) },
                     onComposeTo = { target ->
                         val m = if (target.startsWith("mailto:", true)) app.dot.mail.MailtoParser.parse(target) else ExternalRequest.Compose(to = listOf(target))

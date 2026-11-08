@@ -138,7 +138,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InboxScreen(
-    onOpenThread: (Long) -> Unit,
+    onOpenThread: (threadId: Long, source: app.dot.mail.data.model.Mailbox) -> Unit,
     onCompose: () -> Unit,
     onSearch: () -> Unit,
     onSettings: () -> Unit,
@@ -278,7 +278,7 @@ fun InboxScreen(
                             when {
                                 selection.isNotEmpty() -> vm.toggleSelection(t.threadId)
                                 t.draftId != null -> onOpenDraft(t.draftId!!)
-                                else -> onOpenThread(t.threadId)
+                                else -> onOpenThread(t.threadId, mailbox)
                             }
                         },
                         onToggleSelect = vm::toggleSelection,

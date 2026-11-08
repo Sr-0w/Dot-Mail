@@ -127,6 +127,8 @@ class ThreadViewModel(
     private val graph: MailGraph,
     private val threadId: Long,
     private val remotePolicy: app.dot.mail.ui.settings.RemoteImagePolicy,
+    /** Mailbox the conversation was opened from; moves/archives only touch its messages there. Null = search/notification. */
+    private val source: app.dot.mail.data.model.Mailbox? = null,
 ) : ViewModel() {
     val messages: StateFlow<List<Message>?> =
         graph.mail.thread(threadId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -168,13 +170,13 @@ class ThreadViewModel(
         }
         if (initial.any { it.isUnread } && mode != app.dot.mail.MarkRead.MANUALLY) viewModelScope.launch {
             if (mode == app.dot.mail.MarkRead.AFTER_2S) kotlinx.coroutines.delay(2_000) // cancelled if the user leaves sooner
-            runCatching { graph.mail.apply(MessageAction.MARK_READ, listOf(threadId)) }
+            runCatching { @Suppress("DEPRECATION") graph.mail.apply(MessageAction.MARK_READ, listOf(threadId)) }
         }
     }
 
     fun move(folderId: Long) {
         viewModelScope.launch {
-            runCatching { graph.mail.move(listOf(threadId), folderId) }
+            runCatching { if (source != null) graph.mail.move(listOf(threadId), folderId, source) else @Suppress("DEPRECATION") graph.mail.move(listOf(threadId), folderId) }
                 .onSuccess { _events.send(ThreadEvent.Close) }
                 .onFailure { _events.send(ThreadEvent.Message(it.message ?: "Couldn't move")) }
         }
@@ -188,7 +190,7 @@ class ThreadViewModel(
 
     fun act(action: MessageAction) {
         viewModelScope.launch {
-            runCatching { graph.mail.apply(action, listOf(threadId)) }
+            runCatching { if (source != null) graph.mail.apply(action, listOf(threadId), source) else @Suppress("DEPRECATION") graph.mail.apply(action, listOf(threadId)) }
                 .onSuccess {
                     when (action) {
                         MessageAction.ARCHIVE, MessageAction.TRASH, MessageAction.SPAM, MessageAction.NOT_SPAM,
@@ -222,13 +224,14 @@ sealed interface ThreadEvent {
 fun ThreadScreen(
     threadId: Long,
     onBack: () -> Unit,
+    source: app.dot.mail.data.model.Mailbox? = null,
     onReply: (messageId: Long, mode: ReplyMode) -> Unit,
     onComposeTo: (String) -> Unit,
     onOpenAdjacent: (Long) -> Unit = {},
 ) {
     val graph = LocalMailGraph.current
     val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
-    val vm: ThreadViewModel = viewModel(key = "thread-$threadId") { ThreadViewModel(graph, threadId, app.dot.mail.ui.settings.RemoteImagePolicy.get(appContext)) }
+    val vm: ThreadViewModel = viewModel(key = "thread-$threadId") { ThreadViewModel(graph, threadId, app.dot.mail.ui.settings.RemoteImagePolicy.get(appContext), source) }
     val messages by vm.messages.collectAsStateWithLifecycle()
     val toggled by vm.toggled.collectAsStateWithLifecycle()
     val remotePolicy = remember { app.dot.mail.ui.settings.RemoteImagePolicy.get(appContext) }
