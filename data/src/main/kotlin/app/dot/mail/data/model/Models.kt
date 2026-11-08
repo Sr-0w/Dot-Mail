@@ -80,6 +80,8 @@ data class ThreadSummary(
     val hasAttachments: Boolean,
     val draftId: Long? = null,
     val recipients: List<EmailAddress> = emptyList(),
+    /** Wake-up time (epoch ms); only set for rows of the Snoozed list. */
+    val snoozedUntil: Long? = null,
 ) {
     val isUnread: Boolean get() = unreadCount > 0
 }

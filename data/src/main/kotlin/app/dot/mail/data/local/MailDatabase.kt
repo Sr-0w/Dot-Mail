@@ -65,6 +65,8 @@ interface MailDao {
     @Query("DELETE FROM snoozed WHERE resurfacedAt IS NOT NULL AND resurfacedAt<:before") suspend fun pruneSnoozes(before: Long)
     @Query("SELECT COUNT(*) FROM snoozed WHERE resurfacedAt IS NULL") fun observeSnoozedCount(): Flow<Int>
     @Query("SELECT * FROM snoozed ORDER BY id") suspend fun allSnoozes(): List<SnoozeRow>
+    @Query("SELECT MIN(until) FROM snoozed WHERE threadId=:thread AND resurfacedAt IS NULL") suspend fun snoozedUntilOfThread(thread: Long): Long?
+    @Query("SELECT MIN(until) FROM snoozed WHERE resurfacedAt IS NULL AND (messageId=:message OR (messageId IS NULL AND threadId=:thread))") suspend fun snoozedUntilOfMessage(message: Long, thread: Long): Long?
     @Query("DELETE FROM folders WHERE id=:id") suspend fun deleteFolderRow(id: Long)
     /** Local ids of folders whose deletion is queued: hidden from the UI meanwhile. */
     @Query("SELECT uid FROM operations WHERE action='FOLDER_DELETE'") fun observeDeletingFolderIds(): Flow<List<Long>>

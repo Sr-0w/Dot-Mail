@@ -76,6 +76,14 @@ class SnoozeTest {
         assertThat(subjects(Mailbox.Unified(FolderRole.SNOOZED))).containsExactly("Topic B", "Re: Topic A").inOrder()
     }
 
+    @Test fun snoozedRowsCarryTheirWakeUpTime() = withMail { f ->
+        val until = System.currentTimeMillis() + 5 * hour
+        graph.snooze(listOf(f.threadA), until)
+        assertThat(graph.threads(Mailbox.Unified(FolderRole.SNOOZED)).asSnapshot().single().snoozedUntil).isEqualTo(until)
+        assertThat(graph.messages(Mailbox.Unified(FolderRole.SNOOZED)).asSnapshot().map { it.snoozedUntil }.distinct()).containsExactly(until)
+        assertThat(graph.threads(Mailbox.InFolder(f.inbox.id)).asSnapshot().map { it.snoozedUntil }).containsExactly(null) // ordinary lists have none
+    }
+
     @Test fun dueItemsComeBackOnTopAsIfNew() = withMail { f ->
         val now = System.currentTimeMillis()
         assertThat(subjects(inboxBox(f))).containsExactly("Topic B", "Re: Topic A").inOrder() // B is newer
