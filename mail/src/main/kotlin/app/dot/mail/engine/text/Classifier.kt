@@ -86,14 +86,18 @@ object Classifier {
     private const val MAX_PATTERN_LENGTH = 200
     private const val MAX_INPUT_LENGTH = 2000
 
-    fun classify(input: ClassifierInput, rules: List<Rule> = emptyList()): Classification {
+    fun classify(input: ClassifierInput, rules: List<Rule> = emptyList()): Classification =
+        matchRules(input, rules) ?: builtIn(input)
+
+    /** The first enabled user rule that matches [input], or null (the built-in heuristics are not consulted). */
+    fun matchRules(input: ClassifierInput, rules: List<Rule>): Classification? {
         for (rule in rules) {
             if (!rule.enabled) continue
             if (ruleMatches(rule, input)) {
                 return Classification(rule.category, "Rule '${rule.id}' matched", rule.id)
             }
         }
-        return builtIn(input)
+        return null
     }
 
     // ------------------------------------------------------------- rules

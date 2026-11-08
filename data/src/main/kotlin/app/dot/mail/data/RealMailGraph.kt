@@ -44,6 +44,8 @@ internal class RealMailGraph(
 ) : AccountRepository, MailRepository, ComposeRepository {
     internal val dao = database.mail()
     internal val identityStore = IdentityStore.get(context)
+    /** Loads the user's classification rules into [ClassificationRules] before the first sync. */
+    internal val categorySettings = CategorySettings.get(context)
     internal val cacheCleanup = PrivateCacheCleanup(context,dao)
     internal val bodyStore = BodyStore(context, dao)
     internal val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -143,6 +145,19 @@ internal class RealMailGraph(
 
     override suspend fun removeAccount(accountId: Long) = withContext(Dispatchers.IO) { syncLock.withLock { dao.deleteAccount(accountId); identityStore.forget(accountId); AccountSettingsStore.get(context).forget(accountId); File(context.filesDir, "attachments/$accountId").deleteRecursively(); File(context.filesDir, "outbox/$accountId").deleteRecursively(); Unit } }
     override fun folders(accountId: Long): Flow<List<app.dot.mail.data.model.Folder>> = combine(dao.observeFolders(accountId), dao.observeDeletingFolderIds()) { rows, deleting -> rows.filter { it.id !in deleting } }.map { rows -> rows.map { app.dot.mail.data.model.Folder(it.id, it.accountId, it.path, it.name, FolderRole.valueOf(it.role), it.unread, it.total) } }
+
+    override suspend fun reclassifyAll() {
+        val rules = categorySettings.rules.value
+        var after = 0L
+        while (true) {
+            val batch = dao.headersAfter(after, 500)
+            if (batch.isEmpty()) break
+            database.withTransaction {
+                batch.forEach { row -> runCatching { Codec.reclassified(row.header, row.subject, rules) }.getOrNull()?.let { dao.setHeader(row.id, it) } }
+            }
+            after = batch.last().id
+        }
+    }
     internal suspend fun summary(t: ThreadRow, draftView: Boolean = false): ThreadSummary {
         if (t.id < 0) {
             val row = dao.draft(-t.id)
@@ -180,7 +195,7 @@ internal class RealMailGraph(
                 val folder = dao.folder(mailbox.folderId)
                 emitAll(paging("EXISTS(SELECT 1 FROM messages m WHERE m.threadId=t.id AND m.folderId=?)", listOf(mailbox.folderId), folder?.role == "DRAFTS", folder?.accountId))
             }
-            is Mailbox.Unified -> if (mailbox.role == FolderRole.NEWSLETTERS) emitAll(paging("EXISTS(SELECT 1 FROM messages m JOIN folders f ON f.id=m.folderId WHERE m.threadId=t.id AND ${newsletterPredicate("m","f")})",emptyList())) else if (mailbox.role == FolderRole.SNOOZED) emitAll(snoozedThreadsPaging()) else emitAll(paging("EXISTS(SELECT 1 FROM messages m JOIN folders f ON f.id=m.folderId WHERE m.threadId=t.id AND f.role=?)", listOf(mailbox.role.name), mailbox.role == FolderRole.DRAFTS))
+            is Mailbox.Unified -> if (mailbox.role.category() != null) emitAll(paging("EXISTS(SELECT 1 FROM messages m JOIN folders f ON f.id=m.folderId WHERE m.threadId=t.id AND ${categoryPredicate("m","f",mailbox.role.category()!!)})",emptyList())) else if (mailbox.role == FolderRole.SNOOZED) emitAll(snoozedThreadsPaging()) else emitAll(paging("EXISTS(SELECT 1 FROM messages m JOIN folders f ON f.id=m.folderId WHERE m.threadId=t.id AND f.role=?)", listOf(mailbox.role.name), mailbox.role == FolderRole.DRAFTS))
         }
     }
     override fun search(query: String, accountId: Long?): Flow<PagingData<ThreadSummary>> = flow {
@@ -332,7 +347,7 @@ internal class RealMailGraph(
         }
         return when (mailbox) {
             is Mailbox.InFolder -> rows.filter { it.folderId == mailbox.folderId }
-            is Mailbox.Unified -> if(mailbox.role==FolderRole.NEWSLETTERS) rows.filter { isNewsletter(it,dao.folder(it.folderId)?.role) } else rows.filter { dao.folder(it.folderId)?.role == mailbox.role.name }
+            is Mailbox.Unified -> if(mailbox.role.category()!=null) rows.filter { isInCategory(it,dao.folder(it.folderId)?.role,mailbox.role.category()!!) } else rows.filter { dao.folder(it.folderId)?.role == mailbox.role.name }
         }
     }
 
@@ -413,7 +428,7 @@ internal class RealMailGraph(
         }
         val ready=CompletableDeferred<Unit>()
         val remaining=ids.toMutableSet()
-        val early=when(mailbox) { is Mailbox.InFolder -> true; is Mailbox.Unified -> mailbox.role !in setOf(FolderRole.NEWSLETTERS,FolderRole.SNOOZED) }
+        val early=when(mailbox) { is Mailbox.InFolder -> true; is Mailbox.Unified -> mailbox.role.category()==null && mailbox.role != FolderRole.SNOOZED }
         val progressLock=Mutex()
         scope.launch {
             try {

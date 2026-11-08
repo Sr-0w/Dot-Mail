@@ -15,6 +15,8 @@ data class ThreadRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val acco
 data class ThreadKeyRow(val accountId: Long, val key: String, val threadId: Long)
 @Entity(tableName = "messages", foreignKeys = [ForeignKey(entity = FolderRow::class, parentColumns = ["id"], childColumns = ["folderId"], onDelete = ForeignKey.CASCADE), ForeignKey(entity = ThreadRow::class, parentColumns = ["id"], childColumns = ["threadId"], onDelete = ForeignKey.CASCADE)], indices = [Index(value = ["folderId", "uid"], unique = true), Index("threadId"), Index("accountId"), Index(value = ["threadId", "sentAt"]), Index(value = ["folderId", "messageIdKey"])])
 data class MessageRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val accountId: Long, val folderId: Long, val threadId: Long, val uid: Long, val header: String, val subject: String, val sentAt: Long, val unread: Boolean, val starred: Boolean, val hasAttachments: Boolean, val snippet: String = "", val text: String? = null, val html: String? = null, val bodyLoaded: Boolean = false, val remoteImages: Boolean = false, val senderSearch: String = "", val recipientSearch: String = "", @ColumnInfo(defaultValue = "0") val snippetFetched: Boolean = false, val bodyPath: String? = null, val messageIdKey: String? = null)
+/** Just enough of a message to re-run classification rules. */
+data class HeaderOnly(val id: Long, val subject: String, val header: String)
 @Entity(tableName = "attachments", foreignKeys = [ForeignKey(entity = MessageRow::class, parentColumns = ["id"], childColumns = ["messageId"], onDelete = ForeignKey.CASCADE)], indices = [Index("messageId")])
 data class AttachmentRow(@PrimaryKey(autoGenerate = true) val id: Long = 0, val messageId: Long, val partId: String, val name: String, val mime: String, val size: Long, val cid: String?, val inline: Boolean, val localUri: String?)
 @Entity(tableName = "drafts", foreignKeys = [ForeignKey(entity = AccountRow::class, parentColumns = ["id"], childColumns = ["accountId"], onDelete = ForeignKey.CASCADE)], indices = [Index("accountId"), Index(value = ["sourceMessageId"], unique = true)])
@@ -90,6 +92,8 @@ interface MailDao {
     @Query("DELETE FROM threads WHERE id=:id") suspend fun deleteThread(id: Long)
     @Insert suspend fun insertMessage(row: MessageRow): Long
     @Update suspend fun updateMessageRaw(row: MessageRow)
+    @Query("SELECT id, subject, header FROM messages WHERE id>:after ORDER BY id LIMIT :limit") suspend fun headersAfter(after: Long, limit: Int): List<HeaderOnly>
+    @Query("UPDATE messages SET header=:header WHERE id=:id") suspend fun setHeader(id: Long, header: String)
     @Query("UPDATE messages SET accountId=:account,folderId=:folder,threadId=:thread,uid=:uid,header=:header,subject=:subject,sentAt=:sent,unread=:unread,starred=:starred,hasAttachments=:attachments,snippet=:snippet,bodyLoaded=:loaded,remoteImages=:remote,senderSearch=:sender,recipientSearch=:recipient,snippetFetched=:fetched,messageIdKey=:key WHERE id=:id")
     suspend fun metadata(id: Long,account: Long,folder: Long,thread: Long,uid: Long,header: String,subject: String,sent: Long,unread: Boolean,starred: Boolean,attachments: Boolean,snippet: String,loaded: Boolean,remote: Boolean,sender: String,recipient: String,fetched: Boolean,key: String?)
     suspend fun updateMessage(row: MessageRow) {

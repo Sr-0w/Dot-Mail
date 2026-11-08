@@ -9,6 +9,8 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import app.dot.mail.data.model.category
+import app.dot.mail.data.model.viewRole
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -128,8 +130,16 @@ fun MailDrawer(
                     }
                 }
                 item {
-                    val box = Mailbox.Unified(FolderRole.NEWSLETTERS)
-                    DrawerItem(Format.roleName(FolderRole.NEWSLETTERS), Format.roleIcon(FolderRole.NEWSLETTERS), null, selected = current == box, onClick = { onOpen(box) })
+                    // Optional category views (Settings → Categories). Mail stays in the Inbox either way.
+                    val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
+                    val categories = remember { app.dot.mail.data.CategorySettings.get(appContext) }
+                    val on by categories.enabled.collectAsStateWithLifecycle()
+                    Column {
+                        app.dot.mail.engine.text.Category.entries.mapNotNull { it.viewRole() }.filter { role -> role.category() in on || current == Mailbox.Unified(role) }.forEach { role ->
+                            val box = Mailbox.Unified(role)
+                            DrawerItem(Format.roleName(role), Format.roleIcon(role), null, selected = current == box, onClick = { onOpen(box) })
+                        }
+                    }
                 }
                 val focused = state.accounts.firstOrNull { it.id == state.focusedAccountId }
                 if (focused != null) {

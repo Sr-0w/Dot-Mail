@@ -421,4 +421,14 @@ class ClassifierTest {
     fun `decoding an empty array yields no rules`() {
         assertThat(Classifier.decodeRules("[]")).isEmpty()
     }
+
+    @Test fun `matchRules ignores the built-in heuristics and honours order and enabled`() {
+        val input = ClassifierInput("promo@shop.example", "Shop", "Your order has shipped", "", mapOf("List-Id" to listOf("<deals.shop.example>")), false)
+        assertThat(Classifier.matchRules(input, emptyList())).isNull() // built-in would say PURCHASE, but matchRules never does
+        val off = Rule("a", Field.FROM_DOMAIN, null, Op.EQUALS, "shop.example", Category.SOCIAL, enabled = false)
+        val listRule = Rule("b", Field.LIST_ID, null, Op.CONTAINS, "deals", Category.NEWSLETTER, enabled = true)
+        val later = Rule("c", Field.SUBJECT, null, Op.CONTAINS, "order", Category.BILL, enabled = true)
+        assertThat(Classifier.matchRules(input, listOf(off, listRule, later))!!.category).isEqualTo(Category.NEWSLETTER)
+        assertThat(Classifier.classify(input, listOf(off)).category).isEqualTo(Category.PURCHASE)
+    }
 }

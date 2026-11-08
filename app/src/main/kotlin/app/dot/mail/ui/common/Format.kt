@@ -8,6 +8,10 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Drafts
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Inbox
+import androidx.compose.material.icons.outlined.ShoppingBag
+import androidx.compose.material.icons.outlined.ReceiptLong
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Report
 import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material.icons.outlined.StarOutline
@@ -86,6 +90,10 @@ object Format {
         FolderRole.CUSTOM -> R.string.inbox_role_custom
         FolderRole.SNOOZED -> R.string.inbox_role_snoozed
         FolderRole.NEWSLETTERS -> R.string.inbox_role_newsletters
+        FolderRole.PURCHASES -> R.string.inbox_role_purchases
+        FolderRole.BILLS -> R.string.inbox_role_bills
+        FolderRole.NOTIFICATIONS -> R.string.inbox_role_notifications
+        FolderRole.SOCIAL -> R.string.inbox_role_social
     }
 
     /** Name of a system folder role in the current language. */
@@ -107,6 +115,10 @@ object Format {
         FolderRole.CUSTOM -> Icons.Outlined.Folder
         FolderRole.SNOOZED -> Icons.Outlined.Snooze
         FolderRole.NEWSLETTERS -> Icons.Outlined.Email
+        FolderRole.PURCHASES -> Icons.Outlined.ShoppingBag
+        FolderRole.BILLS -> Icons.Outlined.ReceiptLong
+        FolderRole.NOTIFICATIONS -> Icons.Outlined.Notifications
+        FolderRole.SOCIAL -> Icons.Outlined.Groups
     }
 
     /** Display order of system folders in the drawer. */

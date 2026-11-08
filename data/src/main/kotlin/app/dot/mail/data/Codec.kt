@@ -21,8 +21,24 @@ internal object Codec {
         fun convert(a: List<app.dot.mail.engine.Address>) = addresses(a.map { EmailAddress(it.email, it.name) })
         val signals=h.classificationHeaders.toMutableMap()
         h.unsubscribe?.let { unsubscribe -> if(signals.keys.none { it.equals("List-Unsubscribe",true) }) signals["List-Unsubscribe"]=listOf(unsubscribe) }
-        val category=app.dot.mail.engine.text.Classifier.classify(app.dot.mail.engine.text.ClassifierInput(h.from.firstOrNull()?.email.orEmpty(),h.from.firstOrNull()?.name.orEmpty(),h.subject,"",signals,h.hasPdfAttachment)).category
-        return JSONObject().put("category",category.name).put("listId",signals.entries.firstOrNull { it.key.equals("List-Id",true) }?.value?.firstOrNull()).put("from", convert(h.from)).put("to", convert(h.to)).put("cc", convert(h.cc)).put("bcc", convert(h.bcc)).put("replyTo", convert(h.replyTo)).put("messageId", h.messageId).put("refs", strings(h.references)).put("unsubscribe", h.unsubscribe).put("unsubOneClick", h.unsubscribeOneClick).toString()
+        val classifierInput=app.dot.mail.engine.text.ClassifierInput(h.from.firstOrNull()?.email.orEmpty(),h.from.firstOrNull()?.name.orEmpty(),h.subject,"",signals,h.hasPdfAttachment)
+        val auto=app.dot.mail.engine.text.Classifier.classify(classifierInput).category
+        val category=app.dot.mail.engine.text.Classifier.matchRules(classifierInput,ClassificationRules.current)?.category ?: auto
+        return JSONObject().put("category",category.name).put("autoCategory",auto.name).put("listId",signals.entries.firstOrNull { it.key.equals("List-Id",true) }?.value?.firstOrNull()).put("from", convert(h.from)).put("to", convert(h.to)).put("cc", convert(h.cc)).put("bcc", convert(h.bcc)).put("replyTo", convert(h.replyTo)).put("messageId", h.messageId).put("refs", strings(h.references)).put("unsubscribe", h.unsubscribe).put("unsubOneClick", h.unsubscribeOneClick).toString()
+    }
+    /**
+     * Re-applies the user's [rules] to a stored header: rule match (sender, domain, subject, List-Id) wins, otherwise the
+     * heuristic category recorded at sync time. Returns the new header JSON, or null when nothing changes.
+     */
+    fun reclassified(raw: String, subject: String, rules: List<app.dot.mail.engine.text.Rule>): String? {
+        val json = JSONObject(raw)
+        val auto = json.nullString("autoCategory") ?: json.nullString("category") ?: return null
+        val from = runCatching { addresses(json.getString("from")).firstOrNull() }.getOrNull()
+        val headers = json.nullString("listId")?.let { mapOf("List-Id" to listOf(it)) }.orEmpty()
+        val input = app.dot.mail.engine.text.ClassifierInput(from?.email.orEmpty(), from?.name.orEmpty(), subject, "", headers, false)
+        val category = app.dot.mail.engine.text.Classifier.matchRules(input, rules)?.category?.name ?: auto
+        if (json.nullString("category") == category && json.nullString("autoCategory") == auto) return null
+        return json.put("autoCategory", auto).put("category", category).toString()
     }
     fun field(raw: String, name: String): String? = JSONObject(raw).nullString(name)
     fun addressField(raw: String, name: String): List<EmailAddress> = addresses(JSONObject(raw).getString(name))

@@ -483,6 +483,7 @@ private fun EmptyFor(role: FolderRole?) {
         FolderRole.TRASH -> R.string.inbox_empty_trash_title to R.string.inbox_empty_trash_body
         FolderRole.NEWSLETTERS -> R.string.inbox_empty_newsletters_title to R.string.inbox_empty_newsletters_body
         FolderRole.SNOOZED -> R.string.inbox_empty_snoozed_title to R.string.inbox_empty_snoozed_body
+        FolderRole.PURCHASES, FolderRole.BILLS, FolderRole.NOTIFICATIONS, FolderRole.SOCIAL -> R.string.inbox_empty_category_title to R.string.inbox_empty_category_body
         else -> R.string.inbox_empty_folder_title to R.string.inbox_empty_folder_body
     }
     EmptyState(if (role == FolderRole.INBOX || role == null) Icons.Outlined.Inbox else Format.roleIcon(role), stringResource(title), stringResource(msg))

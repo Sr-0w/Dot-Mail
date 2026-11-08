@@ -1,6 +1,7 @@
 package app.dot.mail.data
 
 import androidx.paging.Pager
+import app.dot.mail.data.model.category
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.map
@@ -34,7 +35,7 @@ internal fun RealMailGraph.messagesPaging(mailbox: Mailbox): Flow<PagingData<Thr
         is Mailbox.Unified -> {
             if (mailbox.role == FolderRole.DRAFTS) { emitAll(threads(mailbox)); return@flow }
             if (mailbox.role == FolderRole.SNOOZED) { emitAll(snoozedMessagesPaging()); return@flow }
-            if(mailbox.role==FolderRole.NEWSLETTERS) "id IN (SELECT n.id FROM messages n JOIN folders f ON f.id=n.folderId WHERE ${newsletterPredicate("n","f")})" to emptyList<Any>()
+            if(mailbox.role.category()!=null) "id IN (SELECT n.id FROM messages n JOIN folders f ON f.id=n.folderId WHERE ${categoryPredicate("n","f",mailbox.role.category()!!)})" to emptyList<Any>()
             else "folderId IN (SELECT id FROM folders WHERE role=?)" to listOf<Any>(mailbox.role.name)
         }
     }
