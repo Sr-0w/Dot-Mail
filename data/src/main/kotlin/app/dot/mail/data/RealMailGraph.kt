@@ -11,14 +11,12 @@ import app.dot.mail.data.model.*
 import app.dot.mail.engine.*
 import app.dot.mail.engine.autoconfig.AutoDiscovery
 import app.dot.mail.engine.autoconfig.SocketType
-import jakarta.mail.AuthenticationFailedException
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.util.UUID
-import javax.net.ssl.SSLException
 import app.dot.mail.data.oauth.*
 
 fun createMailGraph(context: Context): MailGraph {
@@ -94,12 +92,9 @@ internal class RealMailGraph(
     }
     override suspend fun verify(config: AccountConfig, password: String): VerifyResult = withContext(Dispatchers.IO) {
         try { client.verify(config.imap.endpoint(), config.smtp.endpoint(), Credentials(password, config.authType == AuthType.OAUTH2)); VerifyResult.Ok }
-        catch (e: AuthenticationFailedException) { VerifyResult.AuthFailed("Authentication failed. Check your password or app password.") }
-        catch (e: Exception) {
-            if (generateSequence<Throwable>(e) { it.cause }.any { it is SSLException }) VerifyResult.CertificateProblem("Server TLS certificate could not be verified")
-            else VerifyResult.ConnectionFailed("Could not connect to the mail server")
-        }
+        catch (e: Exception) { verificationFailure(e) }
     }
+
     override suspend fun addAccount(config: AccountConfig, password: String): Long = withContext(Dispatchers.IO) {
         require(config.authType == AuthType.PASSWORD) { "OAuth accounts must be added through browser sign-in" }
         require(config.email.isNotBlank() && config.imap.host.isNotBlank() && config.smtp.host.isNotBlank())
