@@ -182,6 +182,15 @@ class AddAccountViewModel(private val repo: AccountRepository) : ViewModel() {
                     }
                     return@launch
                 }
+                if (found.imap.security == Security.NONE || found.smtp.security == Security.NONE) {
+                    _state.update {
+                        it.copy(
+                            busy = false, status = null, step = SetupState.Step.Manual,
+                            error = found.providerHint ?: "This provider only advertises unencrypted settings. Review the security options below before continuing.",
+                        )
+                    }
+                    return@launch
+                }
                 found.copy(displayName = s.name.ifBlank { found.displayName })
             }
             _state.update { it.copy(status = "Signing in to ${config.imap.host}…") }

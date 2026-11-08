@@ -65,6 +65,11 @@ data class ComposeState(
     val hasRecipients: Boolean get() = draft?.let { it.to.isNotEmpty() || it.cc.isNotEmpty() || it.bcc.isNotEmpty() } == true ||
         pending.values.any { it.isNotBlank() }
     val isEmpty: Boolean get() = draft?.let { !hasRecipients && it.subject.isBlank() && it.bodyText.isBlank() && it.attachmentUris.isEmpty() } != false
+    /** True when both Cc and Bcc have no chips and no pending input, allowing Cc/Bcc to collapse. */
+    val canCollapseCcBcc: Boolean
+        get() = draft?.let { it.cc.isEmpty() && it.bcc.isEmpty() } != false &&
+            pending[RecipientField.CC].isNullOrBlank() &&
+            pending[RecipientField.BCC].isNullOrBlank()
     /** Combined editor HTML (including any quoted tail) when in rich-text mode, or null in plain-text mode. */
     val composedHtml: String? get() = if (isRichText) ComposeViewModel.combineBodyHtml(bodyHtml, quotedText) else null
 }
@@ -375,6 +380,29 @@ class ComposeViewModel(
     }
 
     fun showCcBcc() = _state.update { it.copy(showCcBcc = true) }
+
+    fun hideCcBcc() = _state.update { s ->
+        if (!s.canCollapseCcBcc) s
+        else s.copy(
+            showCcBcc = false,
+            suggestFor = s.suggestFor.takeUnless { it == RecipientField.CC || it == RecipientField.BCC },
+            suggestions = if (s.suggestFor == RecipientField.CC || s.suggestFor == RecipientField.BCC) emptyList() else s.suggestions,
+        )
+    }
+
+    /** Toggles Cc/Bcc visibility (collapses only when both Cc and Bcc are empty). Returns the new `showCcBcc` state. */
+    fun toggleCcBcc(): Boolean {
+        val s = _state.value
+        return if (!s.showCcBcc) {
+            showCcBcc()
+            true
+        } else if (s.canCollapseCcBcc) {
+            hideCcBcc()
+            false
+        } else {
+            true
+        }
+    }
 
     fun addRecipient(field: RecipientField, raw: String): Boolean {
         val parsed = raw.split(',', ';', ' ', '\n').map { it.trim() }.filter { it.isNotEmpty() }.map(::parseAddress)

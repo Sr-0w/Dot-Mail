@@ -179,4 +179,23 @@ class ComposeAddressTest {
         val richSender = plainOnly.copy(signatureHtml = "<i> Alice </i>")
         assertEquals("<p>-- <br><i> Alice </i></p>", ComposeViewModel.richSignatureBlock(richSender))
     }
+
+    @Test
+    fun `canCollapseCcBcc is true only when both cc and bcc chips and pending text are empty`() {
+        val emptyDraft = app.dot.mail.data.model.Draft(accountId = 1L, identityId = null)
+        val base = app.dot.mail.ui.compose.ComposeState(loaded = true, draft = emptyDraft, showCcBcc = true)
+        assertTrue(base.canCollapseCcBcc)
+
+        val withCcChip = base.copy(draft = emptyDraft.copy(cc = listOf(EmailAddress("cc@example.org"))))
+        assertFalse(withCcChip.canCollapseCcBcc)
+
+        val withBccChip = base.copy(draft = emptyDraft.copy(bcc = listOf(EmailAddress("bcc@example.org"))))
+        assertFalse(withBccChip.canCollapseCcBcc)
+
+        val withPendingCc = base.copy(pending = mapOf(app.dot.mail.ui.compose.RecipientField.CC to "typing"))
+        assertFalse(withPendingCc.canCollapseCcBcc)
+
+        val withPendingToOnly = base.copy(pending = mapOf(app.dot.mail.ui.compose.RecipientField.TO to "to@example.org"))
+        assertTrue(withPendingToOnly.canCollapseCcBcc)
+    }
 }

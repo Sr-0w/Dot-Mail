@@ -3,10 +3,19 @@ package app.dot.mail.ui.compose
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -112,6 +121,7 @@ import app.dot.design.components.DotButton
 import app.dot.design.components.DotIconButton
 import app.dot.design.components.DotMenu
 import app.dot.design.components.DotMenuItem
+import app.dot.design.components.DotPrimaryButton
 import app.dot.design.components.DotTextField
 import app.dot.design.components.DotTopBar
 import app.dot.design.components.Hairline
@@ -162,6 +172,13 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
     var bodyFocused by remember { mutableStateOf(false) }
     val bodyFocus = remember { FocusRequester() }
     val toFocus = remember { FocusRequester() }
+    val ccFocus = remember { FocusRequester() }
+    var focusCcOnReveal by remember { mutableStateOf(false) }
+    val reduceMotion = remember(context) {
+        runCatching {
+            Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+        }.getOrDefault(false)
+    }
 
     val richTextState = rememberRichTextState()
     LaunchedEffect(c.accent, c.textPrimary, c.surfaceRaised, c.border) {
@@ -270,28 +287,75 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                 }
                 Hairline()
             }
+            val canToggleCcBcc = !state.showCcBcc || state.canCollapseCcBcc
             RecipientRow(
                 label = "To", field = RecipientField.TO, list = draft.to, vm = vm, state = state,
                 focusRequester = toFocus,
-                trailing = if (!state.showCcBcc) ({
+                trailing = if (canToggleCcBcc) ({
                     Box(
                         Modifier
+                            .minimumInteractiveComponentSize()
                             .heightIn(min = 32.dp)
                             .clip(DotShapes.small)
-                            .clickable(role = Role.Button) { vm.showCcBcc() }
-                            .padding(horizontal = 8.dp),
+                            .clickable(
+                                role = Role.Button,
+                                onClickLabel = if (state.showCcBcc) "Hide Cc and Bcc" else "Show Cc and Bcc",
+                            ) {
+                                if (!state.showCcBcc) {
+                                    focusCcOnReveal = true
+                                    vm.showCcBcc()
+                                } else if (state.canCollapseCcBcc) {
+                                    focusCcOnReveal = false
+                                    vm.hideCcBcc()
+                                    runCatching { toFocus.requestFocus() }
+                                }
+                            }
+                            .padding(horizontal = 8.dp)
+                            .semantics {
+                                contentDescription = if (state.showCcBcc) "Hide Cc and Bcc" else "Show Cc and Bcc"
+                            },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text("Cc Bcc", style = Dot.type.label, color = c.textTertiary)
+                        Text(
+                            "Cc Bcc",
+                            style = Dot.type.label,
+                            color = if (state.showCcBcc) c.textSecondary else c.textTertiary,
+                        )
                     }
                 }) else null,
             )
             Hairline()
-            if (state.showCcBcc) {
-                RecipientRow("Cc", RecipientField.CC, draft.cc, vm, state)
-                Hairline()
-                RecipientRow("Bcc", RecipientField.BCC, draft.bcc, vm, state)
-                Hairline()
+            val ccBccEnter = if (reduceMotion) {
+                EnterTransition.None
+            } else {
+                expandVertically(
+                    animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+                    expandFrom = Alignment.Top,
+                ) + fadeIn(
+                    animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+                )
+            }
+            val ccBccExit = if (reduceMotion) {
+                ExitTransition.None
+            } else {
+                shrinkVertically(
+                    animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+                    shrinkTowards = Alignment.Top,
+                ) + fadeOut(
+                    animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing),
+                )
+            }
+            AnimatedVisibility(
+                visible = state.showCcBcc,
+                enter = ccBccEnter,
+                exit = ccBccExit,
+            ) {
+                Column(Modifier.fillMaxWidth()) {
+                    RecipientRow("Cc", RecipientField.CC, draft.cc, vm, state, focusRequester = ccFocus)
+                    Hairline()
+                    RecipientRow("Bcc", RecipientField.BCC, draft.bcc, vm, state)
+                    Hairline()
+                }
             }
             Row(Modifier.padding(horizontal = DotSpacing.gutter, vertical = 14.dp)) {
                 Plain(
@@ -414,6 +478,13 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
     LaunchedEffect(state.loaded) {
         if (state.loaded && draft != null) {
             if (draft.to.isEmpty()) toFocus.requestFocus() else bodyFocus.requestFocus()
+        }
+    }
+
+    LaunchedEffect(state.showCcBcc, focusCcOnReveal) {
+        if (state.showCcBcc && focusCcOnReveal) {
+            focusCcOnReveal = false
+            runCatching { ccFocus.requestFocus() }
         }
     }
 }
@@ -626,7 +697,7 @@ private fun ConfirmPlainTextDialog(
         shape = DotShapes.large,
         title = { Text("Plain text", style = Dot.type.title, color = c.textPrimary) },
         text = { Text("Formatting will be removed", style = Dot.type.callout, color = c.textSecondary) },
-        confirmButton = { DotButton("Convert", onClick = onConfirm, compact = true) },
+        confirmButton = { DotPrimaryButton("Convert", onClick = onConfirm, compact = true) },
         dismissButton = { DotButton("Cancel", onClick = onDismiss, style = ButtonStyle.Ghost, compact = true) },
     )
 }
@@ -676,7 +747,7 @@ private fun InsertLinkDialog(
             }
         },
         confirmButton = {
-            DotButton(
+            DotPrimaryButton(
                 text = if (isEditing) "Save" else "Insert",
                 onClick = { onConfirm(text.trim(), url.trim()) },
                 enabled = url.isNotBlank(),
@@ -771,18 +842,14 @@ private fun scheduleOptions(): List<Pair<String, Long>> {
 
 @Composable
 private fun SendButton(enabled: Boolean, onClick: () -> Unit) {
-    val c = Dot.colors
-    Box(
-        Modifier
-            .padding(start = 4.dp, end = 8.dp)
-            .size(40.dp)
-            .clip(DotShapes.medium)
-            .background(if (enabled) c.inverse else c.surfaceRaised)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(Icons.AutoMirrored.Outlined.Send, "Send", Modifier.size(19.dp), tint = if (enabled) c.onInverse else c.textTertiary)
-    }
+    DotPrimaryButton(
+        icon = Icons.AutoMirrored.Outlined.Send,
+        contentDescription = "Send",
+        enabled = enabled,
+        onClick = onClick,
+        compact = true,
+        modifier = Modifier.padding(start = 4.dp, end = 8.dp),
+    )
 }
 
 @Composable

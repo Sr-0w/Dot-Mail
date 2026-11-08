@@ -262,7 +262,9 @@ fun InboxScreen(
                     )
                 }
             }
-            ComposeButton(
+            app.dot.design.components.DotFrostedPill(
+                icon = Icons.Outlined.Edit,
+                label = "Compose",
                 expanded = !listState.canScrollBackward,
                 onClick = onCompose,
                 modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(DotSpacing.xl),
