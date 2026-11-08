@@ -16,6 +16,7 @@ class SearchScreenLogicTest {
         val loading = SearchProgress(serverRunning = true, serverAvailable = true)
         assertThat(searchDisplayState("invoice", 0, LoadState.NotLoading(false), loading)).isEqualTo(SearchDisplayState.SEARCHING)
         assertThat(searchDisplayState("invoice", 1, LoadState.NotLoading(false), loading)).isEqualTo(SearchDisplayState.PARTIAL_RESULTS)
+        assertThat(searchDisplayState("invoic", 0, LoadState.NotLoading(false), SearchProgress(serverAvailable = true), queryPending = true)).isEqualTo(SearchDisplayState.SEARCHING)
         assertThat(searchDisplayState("invoice", 0, LoadState.Loading, SearchProgress())).isEqualTo(SearchDisplayState.SEARCHING)
         assertThat(searchDisplayState("invoice", 0, LoadState.NotLoading(false), SearchProgress(serverAvailable = true))).isEqualTo(SearchDisplayState.NO_RESULTS)
     }
@@ -25,6 +26,7 @@ class SearchScreenLogicTest {
         assertThat(searchDisplayState("invoice", 1, LoadState.NotLoading(false), SearchProgress(serverAvailable = true))).isEqualTo(SearchDisplayState.RESULTS)
         assertThat(searchDisplayState("invoice", 0, LoadState.NotLoading(false), SearchProgress(serverError = "offline"))).isEqualTo(SearchDisplayState.PARTIAL_RESULTS)
         assertThat(searchDisplayState("invoice", 0, LoadState.Error(IllegalStateException()), SearchProgress())).isEqualTo(SearchDisplayState.ERROR)
+        assertThat(searchDisplayState("invoice", 0, LoadState.NotLoading(false), SearchProgress(serverAvailable = true, index = app.dot.mail.data.model.SearchIndexProgress(running = true)))).isEqualTo(SearchDisplayState.NO_RESULTS)
     }
 
     @Test fun `highlights apply to the exact UTF-16 ranges`(): Unit {

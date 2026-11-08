@@ -290,6 +290,9 @@
     <string name="search_error_body">Vérifiez votre connexion et réessayez.</string>
     <string name="search_no_results_title">Aucun résultat</string>
     <string name="search_no_results_body">Aucun résultat pour « %1$s » dans les messages téléchargés ou sur vos serveurs.</string>
+    <string name="search_no_results_indexing">Aucun résultat pour « %1$s » pour l’instant. L’indexation continue ; d’autres résultats peuvent apparaître.</string>
+    <string name="search_partial_title">Sur cet appareil uniquement</string>
+    <string name="search_partial_body">Le serveur n’a pas pu être interrogé ; seuls les messages de cet appareil sont affichés.</string>
     <string name="search_hints_intro">Recherchez par expéditeur, objet ou mots du message.</string>
     <string name="search_hint_from">Messages d\'un expéditeur</string>
     <string name="search_hint_to">Messages envoyés à une adresse</string>

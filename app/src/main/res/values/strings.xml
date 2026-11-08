@@ -290,6 +290,9 @@
     <string name="search_error_body">Check your connection and try again.</string>
     <string name="search_no_results_title">No results</string>
     <string name="search_no_results_body">Nothing matches “%1$s” in downloaded mail or on your servers.</string>
+    <string name="search_no_results_indexing">Nothing matches “%1$s” yet. Indexing continues; more results may appear.</string>
+    <string name="search_partial_title">Only on this device</string>
+    <string name="search_partial_body">The server could not be searched, so these results include only mail on this device.</string>
     <string name="search_hints_intro">Search by sender, subject or words in the message.</string>
     <string name="search_hint_from">Mail from a sender</string>
     <string name="search_hint_to">Mail sent to an address</string>
