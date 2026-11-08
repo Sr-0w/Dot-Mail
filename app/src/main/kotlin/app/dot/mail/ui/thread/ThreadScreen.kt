@@ -128,6 +128,18 @@ import app.dot.design.components.EmptyState
 import app.dot.design.components.Hairline
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import app.dot.design.components.DotFloatingCapsule
+import app.dot.design.components.DotCapsuleButton
+import app.dot.design.components.DotCapsuleDivider
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import app.dot.design.DotMotion
 import app.dot.mail.R
 import app.dot.mail.LocalMailGraph
 import app.dot.mail.LocalSettings
@@ -360,6 +372,21 @@ fun ThreadScreen(
     val last = list?.lastOrNull()
     val c = Dot.colors
 
+    // Floating chrome (Back, actions, reply capsules): hides while reading downwards, returns on any scroll up,
+    // and is always shown at the very top and at the end of the mail.
+    var chromeVisible by remember { mutableStateOf(true) }
+    val chromeConnection = remember {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                if (available.y < -CHROME_SCROLL_THRESHOLD) chromeVisible = false else if (available.y > CHROME_SCROLL_THRESHOLD) chromeVisible = true
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
+        }
+    }
+    val showChrome = chromeVisible || !listState.canScrollBackward || !listState.canScrollForward
+    val reducedMotionChrome = app.dot.design.rememberReducedMotion()
+    val chromeTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 60.dp
+    val chromeBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 84.dp
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     // Hardware keyboard shortcuts (tablets, Chromebooks, DeX), Gmail-style single keys.
     val keyFocus = remember { androidx.compose.ui.focus.FocusRequester() }
@@ -393,43 +420,7 @@ fun ThreadScreen(
                 }
             },
     ) {
-        Column(Modifier.fillMaxSize()) {
-            DotTopBar(
-                elevated = listState.canScrollBackward,
-                navigation = { BackButton(onBack) },
-                actions = {
-                    DotIconButton(Icons.Outlined.Archive, stringResource(R.string.inbox_action_archive), onClick = { vm.act(MessageAction.ARCHIVE) })
-                    DotIconButton(Icons.Outlined.Delete, stringResource(R.string.inbox_action_delete), onClick = { if (prefs.confirmDelete) confirmTrash = true else vm.act(MessageAction.TRASH) })
-                    DotIconButton(Icons.Outlined.MarkEmailUnread, stringResource(R.string.inbox_action_mark_unread), onClick = { vm.act(MessageAction.MARK_UNREAD) })
-                    Box {
-                        DotIconButton(Icons.Outlined.MoreVert, stringResource(R.string.thread_more), onClick = { menu = true })
-                        DotMenu(menu, { menu = false }) {
-                            val starred = list?.any { it.isStarred } == true
-                            DotMenuItem(stringResource(R.string.inbox_action_snooze_ellipsis), Icons.Outlined.Snooze) { menu = false; snoozing = true }
-                            DotMenuItem(stringResource(if (muted) R.string.thread_unmute_conversation else R.string.thread_mute_conversation), if (muted) Icons.Outlined.NotificationsActive else Icons.Outlined.NotificationsOff) { menu = false; vm.setMuted(!muted) }
-                            DotMenuItem(stringResource(if (starred) R.string.thread_remove_star else R.string.thread_star), if (starred) Icons.Outlined.StarOutline else Icons.Outlined.Star) {
-                                menu = false; vm.act(if (starred) MessageAction.UNSTAR else MessageAction.STAR)
-                            }
-                            DotMenuItem(stringResource(R.string.inbox_action_report_spam), Icons.Outlined.Report) { menu = false; vm.act(MessageAction.SPAM) }
-                            DotMenuItem(stringResource(R.string.inbox_action_not_spam), Icons.Outlined.Inbox) { menu = false; vm.act(MessageAction.NOT_SPAM) }
-                            DotMenuItem(stringResource(R.string.inbox_action_move_ellipsis), Icons.Outlined.DriveFileMove) { menu = false; showMove = true }
-                            DotMenuItem(stringResource(R.string.inbox_action_delete_forever), Icons.Outlined.DeleteForever, color = c.danger) { menu = false; confirmDelete = true }
-                            val oneClick = list?.lastOrNull { it.unsubscribeOneClick != null }?.unsubscribeOneClick
-                            val target = list?.lastOrNull { it.unsubscribe != null }?.unsubscribe
-                            if (oneClick != null || target != null) {
-                                DotMenuItem(stringResource(R.string.thread_unsubscribe), Icons.Outlined.Unsubscribe) {
-                                    menu = false
-                                    when {
-                                        oneClick != null -> confirmUnsubscribe = oneClick
-                                        target!!.startsWith("mailto:", ignoreCase = true) -> onComposeTo(target)
-                                        else -> pendingLink = target
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-            )
+        Column(Modifier.fillMaxSize().nestedScroll(chromeConnection)) {
             when {
                 list == null -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     app.dot.design.components.DotSpinner(size = 22.dp, color = c.textTertiary)
@@ -440,7 +431,8 @@ fun ThreadScreen(
                 else -> LazyColumn(
                     state = listState,
                     modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(bottom = DotSpacing.xl),
+                    // Room for the floating capsules: the message starts below them and its end is never covered.
+                    contentPadding = PaddingValues(top = chromeTop, bottom = chromeBottom),
                 ) {
                     item(key = "subject") {
                         Text(
@@ -479,8 +471,66 @@ fun ThreadScreen(
                     }
                 }
             }
-            if (last != null) ReplyBar(last, onReply, replyAllByDefault = prefs.replyAllByDefault)
         }
+        ReaderChrome(
+            visible = showChrome, reducedMotion = reducedMotionChrome,
+            topScrim = chromeTop, bottomScrim = chromeBottom,
+            back = { DotFloatingCapsule { DotCapsuleButton(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(app.dot.design.R.string.ds_back), onClick = onBack) } },
+            actions = {
+                DotFloatingCapsule {
+                    DotCapsuleButton(Icons.Outlined.Archive, stringResource(R.string.inbox_action_archive), onClick = { vm.act(MessageAction.ARCHIVE) })
+                    DotCapsuleDivider()
+                    DotCapsuleButton(Icons.Outlined.Delete, stringResource(R.string.inbox_action_delete), onClick = { if (prefs.confirmDelete) confirmTrash = true else vm.act(MessageAction.TRASH) })
+                    DotCapsuleDivider()
+                    DotCapsuleButton(Icons.Outlined.MarkEmailUnread, stringResource(R.string.inbox_action_mark_unread), onClick = { vm.act(MessageAction.MARK_UNREAD) })
+                    DotCapsuleDivider()
+                    Box {
+                        DotCapsuleButton(Icons.Outlined.MoreVert, stringResource(R.string.thread_more), onClick = { menu = true })
+                        DotMenu(menu, { menu = false }) {
+                            val starred = list?.any { it.isStarred } == true
+                            DotMenuItem(stringResource(R.string.inbox_action_snooze_ellipsis), Icons.Outlined.Snooze) { menu = false; snoozing = true }
+                            DotMenuItem(stringResource(if (muted) R.string.thread_unmute_conversation else R.string.thread_mute_conversation), if (muted) Icons.Outlined.NotificationsActive else Icons.Outlined.NotificationsOff) { menu = false; vm.setMuted(!muted) }
+                            DotMenuItem(stringResource(if (starred) R.string.thread_remove_star else R.string.thread_star), if (starred) Icons.Outlined.StarOutline else Icons.Outlined.Star) {
+                                menu = false; vm.act(if (starred) MessageAction.UNSTAR else MessageAction.STAR)
+                            }
+                            DotMenuItem(stringResource(R.string.inbox_action_report_spam), Icons.Outlined.Report) { menu = false; vm.act(MessageAction.SPAM) }
+                            DotMenuItem(stringResource(R.string.inbox_action_not_spam), Icons.Outlined.Inbox) { menu = false; vm.act(MessageAction.NOT_SPAM) }
+                            DotMenuItem(stringResource(R.string.inbox_action_move_ellipsis), Icons.Outlined.DriveFileMove) { menu = false; showMove = true }
+                            DotMenuItem(stringResource(R.string.inbox_action_delete_forever), Icons.Outlined.DeleteForever, color = c.danger) { menu = false; confirmDelete = true }
+                            val oneClick = list?.lastOrNull { it.unsubscribeOneClick != null }?.unsubscribeOneClick
+                            val target = list?.lastOrNull { it.unsubscribe != null }?.unsubscribe
+                            if (oneClick != null || target != null) {
+                                DotMenuItem(stringResource(R.string.thread_unsubscribe), Icons.Outlined.Unsubscribe) {
+                                    menu = false
+                                    when {
+                                        oneClick != null -> confirmUnsubscribe = oneClick
+                                        target!!.startsWith("mailto:", ignoreCase = true) -> onComposeTo(target)
+                                        else -> pendingLink = target
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            reply = if (last == null) null else ({
+                val multiple = (last.to + last.cc).size > 1
+                val allFirst = multiple && prefs.replyAllByDefault
+                DotFloatingCapsule {
+                    if (allFirst) {
+                        DotCapsuleButton(Icons.AutoMirrored.Outlined.ReplyAll, stringResource(R.string.compose_reply_all), onClick = { onReply(last.id, ReplyMode.REPLY_ALL) })
+                        DotCapsuleDivider()
+                    }
+                    DotCapsuleButton(Icons.AutoMirrored.Outlined.Reply, stringResource(R.string.compose_reply), onClick = { onReply(last.id, ReplyMode.REPLY) })
+                    if (multiple && !allFirst) {
+                        DotCapsuleDivider()
+                        DotCapsuleButton(Icons.AutoMirrored.Outlined.ReplyAll, stringResource(R.string.compose_reply_all), onClick = { onReply(last.id, ReplyMode.REPLY_ALL) })
+                    }
+                    DotCapsuleDivider()
+                    DotCapsuleButton(Icons.AutoMirrored.Outlined.Forward, stringResource(R.string.compose_forward), onClick = { onReply(last.id, ReplyMode.FORWARD) })
+                }
+            }),
+        )
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 72.dp)) { DotSnackbar(it) }
     }
 
@@ -997,38 +1047,6 @@ private fun AttachmentStrip(files: List<Attachment>, onOpen: (Attachment, Boolea
     }
 }
 
-/** Quiet reply affordance, like a chat composer: a soft field that opens the full composer. */
-@Composable
-private fun ReplyBar(last: Message, onReply: (Long, ReplyMode) -> Unit, replyAllByDefault: Boolean = false) {
-    val c = Dot.colors
-    val multiple = (last.to + last.cc).size > 1
-    val primaryAll = multiple && replyAllByDefault
-    Column(Modifier.background(c.background).navigationBarsPadding()) {
-        Hairline()
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = DotSpacing.m, vertical = DotSpacing.s),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(
-                Modifier.weight(1f).clip(DotShapes.large).background(c.surface)
-                    .clickable { onReply(last.id, if (primaryAll) ReplyMode.REPLY_ALL else ReplyMode.REPLY) }
-                    .padding(horizontal = DotSpacing.l, vertical = 13.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.AutoMirrored.Outlined.Reply, null, Modifier.size(18.dp), tint = c.textTertiary)
-                Spacer(Modifier.width(DotSpacing.s))
-                Text(
-                    if (primaryAll) stringResource(R.string.thread_reply_to_all) else stringResource(R.string.thread_reply_to_name, last.from.displayName.substringBefore(' ')),
-                    style = Dot.type.callout, color = c.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (multiple && primaryAll) DotIconButton(Icons.AutoMirrored.Outlined.Reply, stringResource(R.string.compose_reply), onClick = { onReply(last.id, ReplyMode.REPLY) })
-            else if (multiple) DotIconButton(Icons.AutoMirrored.Outlined.ReplyAll, stringResource(R.string.compose_reply_all), onClick = { onReply(last.id, ReplyMode.REPLY_ALL) })
-            DotIconButton(Icons.AutoMirrored.Outlined.Forward, stringResource(R.string.compose_forward), onClick = { onReply(last.id, ReplyMode.FORWARD) })
-        }
-    }
-}
-
 /** Order of the list the user came from, for "after archive: open next/previous". */
 /**
  * Optional sideways swipe to the next (leftwards) / previous (rightwards) conversation. It only *observes* touches
@@ -1065,4 +1083,43 @@ object ThreadOrder {
     @Volatile var ids: List<Long> = emptyList()
     fun after(id: Long): Long? = ids.indexOf(id).takeIf { it >= 0 }?.let { ids.getOrNull(it + 1) }
     fun before(id: Long): Long? = ids.indexOf(id).takeIf { it > 0 }?.let { ids.getOrNull(it - 1) }
+}
+
+private const val CHROME_SCROLL_THRESHOLD = 6f
+
+/**
+ * Soft frosted capsules floating over the message: Back (top left), one grouped action capsule (top right) and one
+ * reply capsule (bottom centre). They fade and slide away while scrolling down and return on scroll up (reduced
+ * motion: they just appear / disappear). Thin scrims keep status-bar icons and text legible under them.
+ */
+@Composable
+private fun BoxScope.ReaderChrome(
+    visible: Boolean,
+    reducedMotion: Boolean,
+    topScrim: androidx.compose.ui.unit.Dp,
+    bottomScrim: androidx.compose.ui.unit.Dp,
+    back: @Composable () -> Unit,
+    actions: @Composable () -> Unit,
+    reply: (@Composable () -> Unit)?,
+) {
+    val c = Dot.colors
+    val enter = { fromTop: Boolean ->
+        if (reducedMotion) androidx.compose.animation.EnterTransition.None
+        else androidx.compose.animation.fadeIn(tween(DotMotion.fast)) +
+            androidx.compose.animation.slideInVertically(tween(DotMotion.medium, easing = DotMotion.decelerate)) { if (fromTop) -it / 2 else it / 2 }
+    }
+    val exit = { toTop: Boolean ->
+        if (reducedMotion) androidx.compose.animation.ExitTransition.None
+        else androidx.compose.animation.fadeOut(tween(DotMotion.fast)) +
+            androidx.compose.animation.slideOutVertically(tween(DotMotion.fast, easing = DotMotion.accelerate)) { if (toTop) -it / 2 else it / 2 }
+    }
+    // Scrims only make sense while the capsules are there; they are plain gradients of the page colour.
+    AnimatedVisibility(visible, Modifier.align(Alignment.TopCenter), enter = androidx.compose.animation.fadeIn(), exit = androidx.compose.animation.fadeOut()) {
+        Box(Modifier.fillMaxWidth().height(topScrim - 8.dp).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(c.background, c.background.copy(alpha = 0f)))))
+    }
+    AnimatedVisibility(visible, Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = DotSpacing.s, top = DotSpacing.xs), enter = enter(true), exit = exit(true)) { back() }
+    AnimatedVisibility(visible, Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = DotSpacing.s, top = DotSpacing.xs), enter = enter(true), exit = exit(true)) { actions() }
+    if (reply != null) {
+        AnimatedVisibility(visible, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = DotSpacing.m), enter = enter(false), exit = exit(false)) { reply() }
+    }
 }
