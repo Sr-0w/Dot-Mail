@@ -54,6 +54,7 @@ import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.PersonAddAlt
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.FormatBold
 import androidx.compose.material.icons.outlined.FormatClear
@@ -952,6 +953,34 @@ private fun RecipientRow(
                         },
                 )
             }
+            // System contact picker: Android grants access to the one picked address only — no contacts permission.
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val pickContact = androidx.activity.compose.rememberLauncherForActivityResult(
+                androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
+            ) { result ->
+                val uri = result.data?.data ?: return@rememberLauncherForActivityResult
+                runCatching {
+                    context.contentResolver.query(
+                        uri,
+                        arrayOf(android.provider.ContactsContract.CommonDataKinds.Email.ADDRESS, android.provider.ContactsContract.Contacts.DISPLAY_NAME_PRIMARY),
+                        null, null, null,
+                    )?.use { cur ->
+                        if (cur.moveToFirst()) {
+                            val address = cur.getString(0)?.trim().orEmpty()
+                            val name = cur.getString(1)?.takeIf { it.isNotBlank() && it != address }
+                            if (address.contains('@')) vm.addSuggestion(field, EmailAddress(address, name))
+                        }
+                    }
+                }
+            }
+            app.dot.design.components.DotIconButton(
+                androidx.compose.material.icons.Icons.Outlined.PersonAddAlt, "Choose from contacts",
+                onClick = {
+                    runCatching {
+                        pickContact.launch(android.content.Intent(android.content.Intent.ACTION_PICK, android.provider.ContactsContract.CommonDataKinds.Email.CONTENT_URI))
+                    }
+                },
+            )
             trailing?.invoke()
         }
         if (state.suggestFor == field && state.suggestions.isNotEmpty()) {
