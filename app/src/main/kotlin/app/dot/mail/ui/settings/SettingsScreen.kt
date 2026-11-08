@@ -336,6 +336,9 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             )
             Divider()
 
+            BackupSettings()
+            Divider()
+
             // ---- About
             SectionLabel("About")
             ListRow("About Dot Mail", subtitle = "Version ${BuildConfig.VERSION_NAME} · GPL-3.0-or-later", icon = Icons.Outlined.Info, onClick = { about = true })
