@@ -37,6 +37,7 @@ dependencies {
     api(libs.kotlinx.coroutines.android)
     api(libs.paging.common)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.kotlinx.serialization.json) // settings backup (pure JSON model, JVM-testable)
     implementation("androidx.browser:browser:1.8.0")
     implementation(libs.jsoup)
     implementation(libs.room.runtime)

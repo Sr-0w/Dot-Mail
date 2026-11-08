@@ -109,6 +109,9 @@ internal class RealMailGraph(
     }
     override suspend fun deleteIdentity(accountId: Long, identityId: Long) = withContext(Dispatchers.IO) { identityStore.delete(accountId, identityId) }
     override suspend fun setDefaultIdentity(accountId: Long, identityId: Long) = withContext(Dispatchers.IO) { identityStore.setDefault(accountId, identityId) }
+    override suspend fun exportBackup(): String = exportAccountsBackup()
+    override suspend fun previewBackup(json: String): BackupPreview = previewAccountsBackup(json)
+    override suspend fun applyBackup(json: String): BackupPreview = applyAccountsBackup(json)
     override suspend fun renameAccount(accountId: Long, displayName: String) = withContext(Dispatchers.IO) { dao.accountName(accountId, displayName.trim().ifEmpty { return@withContext }) }
     override suspend fun updatePassword(accountId: Long, password: String): VerifyResult = withContext(Dispatchers.IO) {
         val snapshot = dao.account(accountId) ?: return@withContext VerifyResult.ConnectionFailed("Account no longer exists")

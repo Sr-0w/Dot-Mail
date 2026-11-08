@@ -50,6 +50,17 @@ interface AccountRepository {
 
     suspend fun removeAccount(accountId: Long)
 
+    // ---- Settings backup. Never includes credentials: restored accounts need their password (or browser sign-in) again. ----
+
+    /** JSON (object) with accounts, identities, signatures, per-account settings, folder notify switches, sync and notification rules. */
+    suspend fun exportBackup(): String = "{}"
+
+    /** What importing [json] (the string produced by [exportBackup]) would change. Changes nothing. */
+    suspend fun previewBackup(json: String): app.dot.mail.data.model.BackupPreview = app.dot.mail.data.model.BackupPreview(emptyList(), error = "Not supported")
+
+    /** Applies it: existing accounts (matched by address) get their identities and preferences, missing ones are re-created signed out. */
+    suspend fun applyBackup(json: String): app.dot.mail.data.model.BackupPreview = app.dot.mail.data.model.BackupPreview(emptyList(), error = "Not supported")
+
     /** Changes the name shown for the account (and used as sender name of its primary identity). */
     suspend fun renameAccount(accountId: Long, displayName: String) {}
 
