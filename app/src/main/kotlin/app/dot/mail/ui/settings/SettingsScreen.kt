@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.rememberScrollState
+import dev.chrisbanes.haze.hazeSource
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
@@ -195,7 +196,9 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
         AccountPage(pageAccount, onBack = { accountPage = 0 }, onEditIdentity = { identityPage = it }, onRemove = { removing = pageAccount })
     } else Column(Modifier.fillMaxSize().background(c.background)) {
         DotTopBar(title = stringResource(R.string.settings_title), elevated = scroll.value > 0, navigation = { BackButton(onBack) })
-        Column(Modifier.verticalScroll(scroll)) {
+        val edgeState = app.dot.design.components.rememberGlassBackdrop()
+        Box(Modifier.weight(1f)) {
+        Column(Modifier.fillMaxSize().hazeSource(edgeState).verticalScroll(scroll)) {
             app.dot.design.components.SearchField(
                 value = query,
                 onValueChange = { query = it },
@@ -448,6 +451,8 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             }
             Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
             Spacer(Modifier.height(DotSpacing.xl))
+        }
+            app.dot.design.components.TopEdgeFade(edgeState, app.dot.design.components.rememberTopEdgeProgress(scroll), Modifier.align(androidx.compose.ui.Alignment.TopCenter))
         }
     }
 

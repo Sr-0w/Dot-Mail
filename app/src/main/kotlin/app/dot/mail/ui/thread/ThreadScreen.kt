@@ -514,7 +514,7 @@ fun ThreadScreen(
         }
         ReaderChrome(
             visible = showChrome, reducedMotion = reducedMotionChrome,
-            topScrim = chromeTop, bottomScrim = chromeBottom,
+            topScrim = chromeTop, bottomScrim = chromeBottom, backdrop = glass,
             back = { DotFloatingCapsule(backdrop = glass) { DotCapsuleButton(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(app.dot.design.R.string.ds_back), onClick = onBack) } },
             actions = {
                 DotFloatingCapsule(backdrop = glass) {
@@ -1188,6 +1188,8 @@ private fun BoxScope.ReaderChrome(
     reducedMotion: Boolean,
     topScrim: androidx.compose.ui.unit.Dp,
     bottomScrim: androidx.compose.ui.unit.Dp,
+    /** Lets the top scrim blur plain-text messages passing under it (WebView content cannot be captured: gradient only). */
+    backdrop: dev.chrisbanes.haze.HazeState? = null,
     back: @Composable () -> Unit,
     actions: @Composable () -> Unit,
     reply: (@Composable () -> Unit)?,
@@ -1216,7 +1218,7 @@ private fun BoxScope.ReaderChrome(
     )
     // Scrims only make sense while the capsules are there; they are plain gradients of the page colour.
     AnimatedVisibility(visible, Modifier.align(Alignment.TopCenter), enter = androidx.compose.animation.fadeIn(), exit = androidx.compose.animation.fadeOut()) {
-        Box(Modifier.fillMaxWidth().height(topScrim - 8.dp).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(c.background, c.background.copy(alpha = 0f)))))
+        app.dot.design.components.TopEdgeFade(backdrop, 1f, Modifier, height = topScrim - 8.dp)
     }
     AnimatedVisibility(visible, Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = DotSpacing.s, top = DotSpacing.xs), enter = enter(true), exit = exit(true)) { back() }
     AnimatedVisibility(visible, Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = DotSpacing.s, top = DotSpacing.xs), enter = enter(true), exit = exit(true)) { actions() }

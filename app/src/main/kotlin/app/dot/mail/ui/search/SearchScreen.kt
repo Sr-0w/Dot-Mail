@@ -52,6 +52,7 @@ import app.dot.mail.data.MailGraph
 import app.dot.mail.data.model.ThreadSummary
 import app.dot.mail.ui.inbox.ThreadRow
 import androidx.compose.foundation.border
+import dev.chrisbanes.haze.hazeSource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.width
@@ -232,11 +233,16 @@ internal fun searchDisplayState(query: String, count: Int, refresh: LoadState, p
 
 @Composable
 private fun ResultsList(results: androidx.paging.compose.LazyPagingItems<SearchResult>, onOpenThread: (Long) -> Unit) {
-    LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
-        items(results.itemCount, key = results.itemKey { it.messageId }) { i ->
-            val result = results[i] ?: return@items
-            SearchResultRow(result, onClick = { onOpenThread(result.thread.threadId) })
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val edgeState = app.dot.design.components.rememberGlassBackdrop()
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(state = listState, modifier = Modifier.fillMaxSize().hazeSource(edgeState).navigationBarsPadding()) {
+            items(results.itemCount, key = results.itemKey { it.messageId }) { i ->
+                val result = results[i] ?: return@items
+                SearchResultRow(result, onClick = { onOpenThread(result.thread.threadId) })
+            }
         }
+        app.dot.design.components.TopEdgeFade(edgeState, app.dot.design.components.rememberTopEdgeProgress(listState), Modifier.align(Alignment.TopCenter))
     }
 }
 

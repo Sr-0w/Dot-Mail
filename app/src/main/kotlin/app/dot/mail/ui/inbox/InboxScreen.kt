@@ -18,6 +18,7 @@ import androidx.compose.ui.input.key.key
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.horizontalScroll
+import dev.chrisbanes.haze.hazeSource
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.foundation.rememberScrollState
 import app.dot.design.components.DotButton
@@ -363,14 +364,18 @@ fun InboxScreen(
                     if (firstFolder) { firstFolder = false; return@LaunchedEffect }
                     if (!reducedMotion) { listAlpha.snapTo(0.4f); listAlpha.animateTo(1f, tween(DotMotion.medium, easing = DotMotion.decelerate)) }
                 }
+                // The list fades and blurs softly into the header as it scrolls under it (see TopEdgeFade).
+                val edgeState = app.dot.design.components.rememberGlassBackdrop()
+                Box(Modifier.weight(1f)) {
                 PullToRefreshBox(
                     isRefreshing = refreshing,
                     onRefresh = vm::refresh,
-                    modifier = Modifier.weight(1f).graphicsLayer { alpha = listAlpha.value },
+                    modifier = Modifier.fillMaxSize().graphicsLayer { alpha = listAlpha.value },
                     state = pullState,
                     indicator = { QuietRefreshIndicator(pullState, refreshing, Modifier.align(Alignment.TopCenter)) },
                 ) {
                     ThreadList(
+                        edge = Modifier.hazeSource(edgeState),
                         myAddresses = remember(accountsNow) { accountsNow.map { it.email.lowercase() }.toSet() },
                         threads = threads,
                         mutedThreads = mutedThreads,
@@ -395,6 +400,8 @@ fun InboxScreen(
                             if (action == MessageAction.TRASH && prefs.confirmDelete) pendingTrash = listOf(t.threadId) else vm.act(action, listOf(t.threadId))
                         },
                     )
+                }
+                    app.dot.design.components.TopEdgeFade(edgeState, app.dot.design.components.rememberTopEdgeProgress(listState), Modifier.align(Alignment.TopCenter))
                 }
             }
             app.dot.design.components.DotFrostedPill(
@@ -448,6 +455,7 @@ fun InboxScreen(
 
 @Composable
 private fun ThreadList(
+    edge: Modifier = Modifier,
     myAddresses: Set<String>,
     threads: LazyPagingItems<ThreadSummary>,
     mutedThreads: Set<Long>,
@@ -479,7 +487,7 @@ private fun ThreadList(
             LaunchedEffect(threads.itemSnapshotList.items) { app.dot.mail.ui.thread.ThreadOrder.ids = threads.itemSnapshotList.items.map { it.threadId } }
             LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = edge.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 112.dp),
         ) {
             items(threads.itemCount, key = threads.itemKey { it.threadId }, contentType = { "thread" }) { index ->

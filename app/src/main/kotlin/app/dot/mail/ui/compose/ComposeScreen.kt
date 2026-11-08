@@ -42,6 +42,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import dev.chrisbanes.haze.hazeSource
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -288,7 +289,10 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
             },
         )
         if (draft == null) return@Column
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+        val edgeState = app.dot.design.components.rememberGlassBackdrop()
+        val bodyScroll = rememberScrollState()
+        Box(Modifier.weight(1f)) {
+        Column(Modifier.fillMaxSize().hazeSource(edgeState).verticalScroll(bodyScroll)) {
             // From
             if (state.senders.size > 1) {
                 Box {
@@ -425,6 +429,8 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                     onToggle = vm::toggleQuoteExpanded,
                 )
             }
+        }
+            app.dot.design.components.TopEdgeFade(edgeState, app.dot.design.components.rememberTopEdgeProgress(bodyScroll), Modifier.align(Alignment.TopCenter))
         }
         if (state.savedOnce) {
             Text(
