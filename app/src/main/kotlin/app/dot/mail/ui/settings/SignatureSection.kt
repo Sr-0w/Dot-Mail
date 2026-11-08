@@ -75,7 +75,7 @@ internal fun SignatureSection(
     Column(verticalArrangement = Arrangement.spacedBy(DotSpacing.s)) {
         Text(stringResource(R.string.identity_signature), style = Dot.type.callout, color = c.textSecondary)
         Column(Modifier.fillMaxWidth().border(BorderStroke(1.dp, if (focused) c.accent else c.border), DotShapes.medium)) {
-            if (focused) FormattingToolbar(state) { linkDialog = true }
+            if (focused) FormattingToolbar(state, wrap = true) { linkDialog = true }
             Box(Modifier.padding(DotSpacing.m)) {
                 if (state.annotatedString.text.isEmpty()) {
                     Text(stringResource(R.string.identity_signature_placeholder_rich), style = Dot.type.body, color = c.textTertiary)

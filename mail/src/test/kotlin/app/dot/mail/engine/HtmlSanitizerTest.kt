@@ -275,4 +275,19 @@ class HtmlSanitizerTest {
         assertFalse(res.responsive)
         assertTrue(res.html.contains("width:640px"))
     }
+
+    @Test fun reportsLinksWhoseTextNamesAnotherSite() {
+        val res = HtmlSanitizer.sanitize(
+            "<a href='https://evil.example/login'>https://mybank.com/secure</a>" +
+                "<a href='https://news.example/a'>Read more</a>" +
+                "<a href='https://www.mybank.com/x'>mybank.com</a>",
+        )
+        assertEquals(mapOf("https://evil.example/login" to "https://mybank.com/secure"), res.suspiciousLinks)
+    }
+
+    @Test fun exposesTrackerCountThroughTheReaderWrapper() {
+        val res = app.dot.mail.engine.html.HtmlSanitizer.sanitize("<p>Hi</p><img src='https://t.example/o.gif' width=1 height=1>")
+        assertEquals(1, res.trackersBlocked)
+        assertTrue(res.suspiciousLinks.isEmpty())
+    }
 }

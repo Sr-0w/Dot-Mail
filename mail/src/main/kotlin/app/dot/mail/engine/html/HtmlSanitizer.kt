@@ -9,12 +9,16 @@ data class SanitizedHtml(
     val blockedRemoteResources: Int,
     val layoutWidth: Int = 0,
     val responsive: Boolean = false,
+    /** Open-tracking pixels removed (always, even when images are allowed). */
+    val trackersBlocked: Int = 0,
+    /** href → visible text for links that claim to go somewhere else. */
+    val suspiciousLinks: Map<String, String> = emptyMap(),
 ) {
     val hasRemoteImages: Boolean get() = blockedRemoteResources > 0
 }
 object HtmlSanitizer {
     fun sanitize(html: String, allowRemoteImages: Boolean = false, cidUris: Map<String, String> = emptyMap()): SanitizedHtml {
         val result = app.dot.mail.engine.HtmlSanitizer.sanitize(html, allowRemoteImages, cidUris)
-        return SanitizedHtml(result.html, result.blockedRemoteResources, result.layoutWidth, result.responsive)
+        return SanitizedHtml(result.html, result.blockedRemoteResources, result.layoutWidth, result.responsive, result.trackersBlocked, result.suspiciousLinks)
     }
 }

@@ -23,6 +23,8 @@ object HtmlSanitizer {
         val responsive: Boolean = false,
         /** Tracking pixels removed even though remote images were allowed. */
         val trackersBlocked: Int = 0,
+        /** href → visible text for links whose text looks like a different site than where they go. */
+        val suspiciousLinks: Map<String, String> = emptyMap(),
     )
 
     private val tags = arrayOf("a", "abbr", "b", "blockquote", "br", "caption", "center", "code", "col", "colgroup", "dd", "del", "div", "dl", "dt", "em", "font", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "i", "img", "li", "ol", "p", "pre", "s", "small", "span", "strong", "sub", "sup", "table", "tbody", "td", "tfoot", "th", "thead", "tr", "u", "ul")
@@ -257,6 +259,11 @@ object HtmlSanitizer {
         val cleaned = Cleaner(safe).clean(doc)
         cleaned.outputSettings().prettyPrint(false)
         cleaned.select("a").attr("rel", "noreferrer noopener")
+        val suspicious = LinkedHashMap<String, String>()
+        cleaned.select("a[href]").forEach { a ->
+            val href = a.attr("href"); val text = a.text().trim()
+            if (text.isNotEmpty() && suspicious.size < 200 && app.dot.mail.engine.text.Links.textMismatch(text, href)) suspicious.putIfAbsent(href, text.take(120))
+        }
         backgrounds.forEachIndexed { i, url ->
             cleaned.select(".$BG_MARKER$i").forEach { el ->
                 el.removeClass("$BG_MARKER$i")
@@ -284,6 +291,7 @@ object HtmlSanitizer {
             layoutWidth = layout,
             responsive = responsive,
             trackersBlocked = trackers,
+            suspiciousLinks = suspicious,
         )
     }
 

@@ -326,6 +326,8 @@ fun ThreadScreen(
     val snackbar = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
     var pendingLink by remember { mutableStateOf<String?>(null) }
+    // href → visible text of links whose text names another site (collected from each sanitised message).
+    val suspiciousLinks = remember { androidx.compose.runtime.mutableStateMapOf<String, String>() }
     var confirmUnsubscribe by remember { mutableStateOf<String?>(null) }
     var pdfPreview by remember { mutableStateOf<ThreadEvent.OpenUri?>(null) }
     var menu by remember { mutableStateOf(false) }
@@ -459,10 +461,11 @@ fun ThreadScreen(
                             onAlwaysSender = { vm.alwaysAllowSender(m) },
                             onAlwaysDomain = { vm.alwaysAllowDomain(m) },
                             onStopRemote = { reason -> vm.stopRemote(m, reason) },
+                            onSuspiciousLinks = { suspiciousLinks.putAll(it) },
                             onLink = { url ->
                                 if (url.startsWith("mailto:", ignoreCase = true)) onComposeTo(url)
                                 else if (prefs.confirmLinks) pendingLink = url
-                                else openUrl(context, url)
+                                else openUrl(context, app.dot.mail.engine.text.Links.stripTracking(url))
                             },
                             onAttachment = vm::openAttachment,
                             onSender = { onComposeTo(it.email) },
@@ -603,7 +606,7 @@ fun ThreadScreen(
             dismissButton = { DotButton(stringResource(R.string.inbox_cancel), { confirmUnsubscribe = null }, style = ButtonStyle.Ghost, compact = true) },
         )
     }
-    pendingLink?.let { url -> LinkDialog(url, onDismiss = { pendingLink = null }, onOpen = { target -> pendingLink = null; openUrl(context, target) }) }
+    pendingLink?.let { url -> LinkDialog(url, suspiciousLinks[url] ?: suspiciousLinks[url.trimEnd('/')] ?: suspiciousLinks.entries.firstOrNull { it.key.trimEnd('/') == url.trimEnd('/') }?.value, onDismiss = { pendingLink = null }, onOpen = { target -> pendingLink = null; openUrl(context, target) }) }
 }
 
 private fun openUrl(context: android.content.Context, url: String) {
@@ -616,7 +619,9 @@ private fun openUrl(context: android.content.Context, url: String) {
 
 /** Shows the real destination before leaving the app: the main defence against disguised phishing links. */
 @Composable
-private fun LinkDialog(url: String, onDismiss: () -> Unit, onOpen: (String) -> Unit) {
+private fun LinkDialog(url: String, shownText: String?, onDismiss: () -> Unit, onOpen: (String) -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     val info = remember(url) { app.dot.mail.engine.text.Links.describe(url) }
     val cleaned = remember(url) { app.dot.mail.engine.text.Links.stripTracking(url) }
     val hasTracking = cleaned != url
@@ -636,6 +641,10 @@ private fun LinkDialog(url: String, onDismiss: () -> Unit, onOpen: (String) -> U
                     Spacer(Modifier.height(DotSpacing.xs))
                 }
                 Text(target, style = Dot.type.caption, color = c.textSecondary, maxLines = 4, overflow = TextOverflow.Ellipsis)
+                if (shownText != null) {
+                    Spacer(Modifier.height(DotSpacing.s))
+                    Text(stringResource(R.string.thread_link_mismatch, shownText, host), style = Dot.type.caption, color = c.danger)
+                }
                 if (info?.isIdnHomographRisk == true) {
                     Spacer(Modifier.height(DotSpacing.s))
                     Text(
@@ -646,6 +655,16 @@ private fun LinkDialog(url: String, onDismiss: () -> Unit, onOpen: (String) -> U
                 if (info != null && !info.isHttps) {
                     Spacer(Modifier.height(DotSpacing.s))
                     Text(stringResource(R.string.thread_link_not_encrypted), style = Dot.type.caption, color = c.danger)
+                }
+                Spacer(Modifier.height(DotSpacing.s))
+                Row(horizontalArrangement = Arrangement.spacedBy(DotSpacing.s)) {
+                    DotButton(stringResource(R.string.thread_link_copy), {
+                        clipboard.setText(androidx.compose.ui.text.AnnotatedString(target))
+                    }, style = ButtonStyle.Ghost, compact = true)
+                    DotButton(stringResource(R.string.thread_link_share), {
+                        val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, target)
+                        runCatching { context.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                    }, style = ButtonStyle.Ghost, compact = true)
                 }
                 if (hasTracking) {
                     Spacer(Modifier.height(DotSpacing.s))
@@ -678,6 +697,7 @@ private fun MessageCard(
     onAlwaysDomain: () -> Unit,
     onStopRemote: (app.dot.mail.ui.settings.LoadReason) -> Unit,
     onLink: (String) -> Unit,
+    onSuspiciousLinks: (Map<String, String>) -> Unit = {},
     onAttachment: (Attachment, Boolean) -> Unit,
     onSender: (EmailAddress) -> Unit,
     readingScale: Float = 1f,
@@ -742,11 +762,13 @@ private fun MessageCard(
                 }
             }
             val clean = sanitized
+            androidx.compose.runtime.LaunchedEffect(clean) { clean?.suspiciousLinks?.takeIf { it.isNotEmpty() }?.let(onSuspiciousLinks) }
             if (clean != null && clean.blockedRemoteResources > 0 && !allowRemote) {
                 RemoteContentBanner(clean.blockedRemoteResources, message.from, onAllowRemote, onAlwaysSender, onAlwaysDomain)
             } else if (html != null && remoteReason.canStop) {
                 RemoteImagesLoadedRow(remoteReason, message.from) { onStopRemote(remoteReason) }
             }
+            if (clean != null && clean.trackersBlocked > 0) TrackerNote(clean.trackersBlocked)
             if (html != null && clean == null) {
                 Box(Modifier.fillMaxWidth().height(120.dp))
             } else if (clean != null) {
@@ -825,6 +847,17 @@ private fun fmt(a: EmailAddress) = if (a.name.isNullOrBlank()) a.email else "${a
 
 private val app.dot.mail.ui.settings.LoadReason.canStop: Boolean
     get() = this == app.dot.mail.ui.settings.LoadReason.MESSAGE || this == app.dot.mail.ui.settings.LoadReason.SENDER || this == app.dot.mail.ui.settings.LoadReason.DOMAIN
+
+/** One quiet line: how many open-tracking pixels were removed from this message. */
+@Composable
+private fun TrackerNote(count: Int) {
+    val c = Dot.colors
+    Row(Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.xs), verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Outlined.Shield, null, Modifier.size(14.dp), tint = c.textTertiary)
+        Spacer(Modifier.width(DotSpacing.xs))
+        Text(pluralStringResource(R.plurals.thread_trackers_blocked, count, count), style = Dot.type.caption, color = c.textTertiary)
+    }
+}
 
 @Composable
 private fun RemoteContentBanner(

@@ -552,9 +552,12 @@ internal fun RichLinkDialog(richTextState: RichTextState, onDismiss: () -> Unit)
     )
 }
 
+/** [wrap] lays the buttons out on several lines instead of scrolling sideways (used where width is tight). */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun FormattingToolbar(
     richTextState: RichTextState,
+    wrap: Boolean = false,
     onLinkClick: () -> Unit,
 ) {
     val c = Dot.colors
@@ -569,15 +572,7 @@ internal fun FormattingToolbar(
     val isNumbered = richTextState.isOrderedList
     val isQuote = paragraph.textIndent?.firstLine == QuoteIndent
 
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(c.background)
-            .focusProperties { canFocus = false }
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = DotSpacing.s, vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    val buttons: @Composable () -> Unit = {
         FormatButton(Icons.Outlined.FormatBold, stringResource(R.string.compose_format_bold), active = isBold) {
             richTextState.toggleSpanStyle(SpanStyle(fontWeight = FontWeight.Bold))
         }
@@ -620,6 +615,21 @@ internal fun FormattingToolbar(
                 richTextState.removeParagraphStyle(QuoteParagraphStyle)
             }
         }
+    }
+    val modifier = Modifier
+        .fillMaxWidth()
+        .background(c.background)
+        .focusProperties { canFocus = false }
+    if (wrap) {
+        androidx.compose.foundation.layout.FlowRow(
+            modifier.padding(horizontal = DotSpacing.s, vertical = 2.dp),
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+        ) { buttons() }
+    } else {
+        Row(
+            modifier.horizontalScroll(rememberScrollState()).padding(horizontal = DotSpacing.s, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) { buttons() }
     }
 }
 

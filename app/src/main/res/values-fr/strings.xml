@@ -810,4 +810,19 @@
     <string name="categories_rule_delete">Supprimer</string>
     <string name="categories_rule_summary">%1$s %2$s « %3$s » → %4$s</string>
     <string name="categories_rule_off">désactivée</string>
+
+    <!-- Anti-tracking -->
+    <string name="thread_link_mismatch">Le lien indique « %1$s » mais mène à %2$s. Assurez-vous de lui faire confiance.</string>
+    <string name="thread_link_copy">Copier le lien</string>
+    <string name="thread_link_share">Partager le lien</string>
+    <plurals name="thread_trackers_blocked">
+        <item quantity="one">%d traceur bloqué</item>
+        <item quantity="other">%d traceurs bloqués</item>
+    </plurals>
+
+    <!-- Unsaved changes -->
+    <string name="identity_discard_title">Abandonner les modifications ?</string>
+    <string name="identity_discard_body">Vos modifications de cette identité n’ont pas été enregistrées.</string>
+    <string name="identity_keep_editing">Continuer à modifier</string>
+    <string name="identity_discard">Abandonner</string>
 </resources>
