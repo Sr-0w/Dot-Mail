@@ -40,24 +40,104 @@ object HtmlSanitizer {
     )
     private val colourFunction = Regex("(?i)rgba?\\(\\s*[0-9.]+%?\\s*[, ]\\s*[0-9.]+%?\\s*[, ]\\s*[0-9.]+%?\\s*([,/]\\s*[0-9.]+%?\\s*)?\\)")
     private val safeValue = Regex("[a-zA-Z0-9#.,%\\s'\"+/-]+")
+    private val negativeNumber = Regex("(?<![a-zA-Z0-9_-])-\\s*\\.?[0-9]")
+    private val remoteCssPattern = Regex("(?i)url\\s*\\(|image-set\\s*\\(|@import|@font-face|\\\\")
+
+    private fun hasBalancedQuotes(s: String): Boolean {
+        var activeQuote = '\u0000'
+        for (ch in s) {
+            if (ch == '"' || ch == '\'') {
+                when (activeQuote) {
+                    '\u0000' -> activeQuote = ch
+                    ch -> activeQuote = '\u0000'
+                    else -> return false // nested opposite quote
+                }
+            }
+        }
+        return activeQuote == '\u0000'
+    }
+
+    private fun hasBalancedParens(s: String): Boolean {
+        var depth = 0
+        var prev = '\u0000'
+        for (ch in s) {
+            if (ch == '(') {
+                depth++
+            } else if (ch == ')') {
+                if (prev == '(') return false // empty ()
+                depth--
+                if (depth < 0) return false
+            }
+            if (!ch.isWhitespace()) prev = ch
+        }
+        return depth == 0
+    }
+
+    /**
+     * Strips CSS block comments with string awareness.
+     * Returns `null` if comment delimiters appear inside quoted strings or a stray close-comment appears outside a comment.
+     * Truncates cleanly if an unclosed block comment reaches EOF.
+     */
+    private fun stripCssComments(css: String): String? {
+        val sb = StringBuilder(css.length)
+        var i = 0
+        var quote = '\u0000'
+        while (i < css.length) {
+            val c = css[i]
+            val next = if (i + 1 < css.length) css[i + 1] else '\u0000'
+            if (quote != '\u0000') {
+                if (c == '/' && next == '*') return null
+                if (c == '*' && next == '/') return null
+                if (c == quote) quote = '\u0000'
+                sb.append(c)
+                i++
+            } else if (c == '"' || c == '\'') {
+                quote = c
+                sb.append(c)
+                i++
+            } else if (c == '/' && next == '*') {
+                i += 2
+                val close = css.indexOf("*/", i)
+                if (close < 0) break // unclosed comment truncates remaining stylesheet
+                // Reject if the comment body itself tries to smuggle quotes that pair with outside quotes
+                sb.append(' ')
+                i = close + 2
+            } else if (c == '*' && next == '/') {
+                return null
+            } else {
+                sb.append(c)
+                i++
+            }
+        }
+        return if (quote == '\u0000') sb.toString() else null
+    }
 
     /** One `property:value` declaration, or null when it isn't on the allow-list. */
     private fun declaration(raw: String): String? {
+        if ("/*" in raw || "*/" in raw) return null
         val pair = raw.split(':', limit = 2)
         if (pair.size != 2) return null
         val key = pair[0].trim().lowercase(Locale.ROOT)
         var value = pair[1].trim()
         val important = value.endsWith("!important", ignoreCase = true)
         if (important) value = value.dropLast("!important".length).trim()
-        if (key !in properties || value.isEmpty()) return null
+        if (key !in properties || value.isEmpty() || value.length > MAX_VALUE_CHARS) return null
+        if ('"' in value || '\'' in value) {
+            if (key != "font-family" && key != "font") return null
+            if (!hasBalancedQuotes(value)) return null
+        }
+        if (key != "letter-spacing" && key != "word-spacing" && negativeNumber.containsMatchIn(value)) return null
         if (!colourFunction.replace(value, "c").matches(safeValue)) return null
         return "$key:$value" + if (important) " !important" else ""
     }
 
-    private fun declarations(block: String): String = block.split(';').mapNotNull(::declaration).joinToString(";")
+    private fun declarations(block: String): String =
+        block.split(';').take(MAX_DECLARATIONS_PER_RULE).mapNotNull(::declaration).joinToString(";")
 
-    private val safeSelector = Regex("[a-zA-Z0-9\\s.#,_*>+~:=\\[\\]\"'()-]+")
-    private val safeMedia = Regex("(?i)@media[a-z0-9\\s(),:.-]*")
+    // Allow only element, .class, #id, *, descendant, child (>), adjacent (+), and comma selectors.
+    // No attribute selectors ([...]), pseudo-classes (:has, :nth-child), quotes, or parentheses.
+    private val safeSelector = Regex("[a-zA-Z0-9\\s.#,_*>+-]+")
+    private val safeMedia = Regex("(?i)^@media(?:\\s+[a-z0-9]+|\\s*\\()[a-z0-9\\s(),:.-]*$")
 
     /**
      * Rebuilds a stylesheet from scratch, keeping only plain style rules (allow-listed declarations) and
@@ -65,12 +145,14 @@ object HtmlSanitizer {
      * markup-looking content — is dropped. Returns an empty string when nothing survives.
      */
     internal fun sanitizeStylesheet(css: String): String {
-        if ('\\' in css || '<' in css) return ""
-        val text = css.replace(Regex("(?s)/\\*.*?\\*/"), " ")
+        if (css.isEmpty() || '\\' in css || '<' in css || "-->" in css || '\u0000' in css) return ""
+        val bounded = if (css.length > MAX_STYLE_TAG_CHARS) css.substring(0, MAX_STYLE_TAG_CHARS) else css
+        val text = stripCssComments(bounded) ?: return ""
         val out = StringBuilder()
+        var ruleCount = 0
         fun rules(from: Int, to: Int, depth: Int) {
             var i = from
-            while (i < to) {
+            while (i < to && ruleCount < MAX_CSS_RULES && out.length < MAX_TOTAL_CSS_CHARS) {
                 val brace = text.indexOf('{', i).takeIf { it in i until to } ?: return
                 val semi = text.indexOf(';', i).takeIf { it in i until brace }
                 if (semi != null && text.substring(i, semi).trim().startsWith("@")) { i = semi + 1; continue } // @import/@charset…
@@ -82,7 +164,8 @@ object HtmlSanitizer {
                 if (level != 0) return
                 val inner = brace + 1 until j - 1
                 when {
-                    prelude.startsWith("@media", true) && depth == 0 && prelude.matches(safeMedia) -> {
+                    prelude.startsWith("@media", true) && depth == 0 && prelude.length <= MAX_SELECTOR_CHARS &&
+                        prelude.matches(safeMedia) && hasBalancedParens(prelude) -> {
                         val mark = out.length
                         out.append(prelude.replace(Regex("\\s+"), " ")).append('{')
                         val before = out.length
@@ -90,9 +173,15 @@ object HtmlSanitizer {
                         if (out.length == before) out.setLength(mark) else out.append('}')
                     }
                     prelude.startsWith("@") -> Unit
-                    prelude.matches(safeSelector) -> {
+                    prelude.isNotEmpty() && prelude.length <= MAX_SELECTOR_CHARS && prelude.matches(safeSelector) -> {
                         val body = declarations(text.substring(inner.first, inner.last + 1))
-                        if (body.isNotEmpty()) out.append(prelude.replace(Regex("\\s+"), " ")).append('{').append(body).append('}')
+                        if (body.isNotEmpty()) {
+                            val ruleStr = prelude.replace(Regex("\\s+"), " ") + "{" + body + "}"
+                            if (out.length + ruleStr.length <= MAX_TOTAL_CSS_CHARS) {
+                                out.append(ruleStr)
+                                ruleCount++
+                            }
+                        }
                     }
                 }
                 i = j
@@ -111,8 +200,17 @@ object HtmlSanitizer {
         for (el in doc.allElements) {
             if (el.hasAttr("srcset") || el.hasAttr("background")) { remote = true; blocked++ }
             val style = el.attr("style")
-            if (Regex("(?i)url\\s*\\(|@import|\\\\").containsMatchIn(if (el.tagName() == "style") el.data() else style)) { remote = true; blocked++ }
-            if (el.tagName() == "style") sheets.append(sanitizeStylesheet(el.data()))
+            if (style.isNotEmpty() && containsRemoteCss(style)) { remote = true; blocked++ }
+            if (el.tagName() == "style") {
+                val cssData = el.data()
+                if (containsRemoteCss(cssData)) { remote = true; blocked++ }
+                if (sheets.length < MAX_TOTAL_CSS_CHARS) {
+                    val sanitizedCss = sanitizeStylesheet(cssData)
+                    if (sheets.length + sanitizedCss.length <= MAX_TOTAL_CSS_CHARS) {
+                        sheets.append(sanitizedCss)
+                    }
+                }
+            }
             if (el.tagName() == "img") {
                 val src = el.attr("src").trim()
                 if (src.startsWith("cid:", true)) {
@@ -173,5 +271,18 @@ object HtmlSanitizer {
         return max.coerceAtMost(MAX_LAYOUT_WIDTH)
     }
 
+    private fun containsRemoteCss(css: String): Boolean {
+        if (remoteCssPattern.containsMatchIn(css)) return true
+        val stripped = stripCssComments(css) ?: css.replace(Regex("(?s)/\\*.*?\\*/"), "")
+        val collapsed = css.replace(Regex("(?s)/\\*.*?\\*/"), "")
+        return remoteCssPattern.containsMatchIn(stripped) || remoteCssPattern.containsMatchIn(collapsed)
+    }
+
     private const val MAX_LAYOUT_WIDTH = 1280
+    private const val MAX_STYLE_TAG_CHARS = 65_536
+    private const val MAX_TOTAL_CSS_CHARS = 32_768
+    private const val MAX_CSS_RULES = 500
+    private const val MAX_DECLARATIONS_PER_RULE = 48
+    private const val MAX_SELECTOR_CHARS = 256
+    private const val MAX_VALUE_CHARS = 256
 }
