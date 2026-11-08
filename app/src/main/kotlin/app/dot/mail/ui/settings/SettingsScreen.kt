@@ -1,5 +1,6 @@
 package app.dot.mail.ui.settings
 
+import androidx.compose.material.icons.outlined.Storage
 import android.Manifest
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Box
@@ -137,6 +138,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
     var remoteImagesPage by rememberSaveable { mutableStateOf(false) }
     var categoriesPage by rememberSaveable { mutableStateOf(false) }
     var smartPage by rememberSaveable { mutableStateOf(false) }
+    var storagePage by rememberSaveable { mutableStateOf(false) }
     val pageAccount = accounts.firstOrNull { it.id == accountPage }
     // Settings search: a field on top of the page; while it has text, matching settings replace the sections.
     var query by rememberSaveable { mutableStateOf("") }
@@ -156,12 +158,13 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
         when (target) {
             is SettingsTarget.Section -> pendingSection = target.section
             is SettingsTarget.Account -> { accountPage = target.accountId; identityPage = -1 }
+            SettingsTarget.Storage -> storagePage = true
             SettingsTarget.SmartFolders -> smartPage = true
             SettingsTarget.Categories -> categoriesPage = true
             SettingsTarget.RemoteImages -> remoteImagesPage = true
         }
     }
-    BackHandler(enabled = accountPage != 0L || remoteImagesPage || categoriesPage || smartPage) { if (smartPage) smartPage = false else if (categoriesPage) categoriesPage = false else if (remoteImagesPage) remoteImagesPage = false else if (identityPage >= 0) identityPage = -1 else accountPage = 0 }
+    BackHandler(enabled = accountPage != 0L || remoteImagesPage || categoriesPage || smartPage || storagePage) { if (storagePage) storagePage = false else if (smartPage) smartPage = false else if (categoriesPage) categoriesPage = false else if (remoteImagesPage) remoteImagesPage = false else if (identityPage >= 0) identityPage = -1 else accountPage = 0 }
     val c = Dot.colors
     val canLock = remember {
         BiometricManager.from(context).canAuthenticate(
@@ -183,7 +186,9 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
     // Permission revoked in system settings while the toggle was on: show it off.
     LaunchedEffect(Unit) { contactsGranted = hasContacts() }
 
-    if (smartPage) {
+    if (storagePage) {
+        StoragePage(onBack = { storagePage = false })
+    } else if (smartPage) {
         SmartFoldersPage(onBack = { smartPage = false })
     } else if (categoriesPage) {
         CategoriesPage(onBack = { categoriesPage = false })
@@ -407,6 +412,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
 
             // ---- Storage
             SectionLabel(stringResource(R.string.settings_section_storage), Modifier.anchor(SettingsSection.STORAGE))
+            ListRow(stringResource(R.string.storage_title), subtitle = stringResource(R.string.storage_progress), icon = Icons.Outlined.Storage, onClick = { storagePage = true })
             val cacheBytes by produceState(0L, cacheVersion) {
                 value = withContext(Dispatchers.IO) { context.cacheDir.walkTopDown().filter { it.isFile }.sumOf { it.length() } }
             }

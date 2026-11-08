@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="storage_title">Stockage et hors ligne</string>
+    <string name="storage_explanation">Choisissez une politique puis Appliquer pour l’activer. Aucun message serveur n’est supprimé. Brouillons, boîte d’envoi, modifications en attente et messages conservés restent protégés et peuvent dépasser la limite. Sans limite reste soumis à l’espace disponible.</string>
+    <string name="storage_used">Stockage local total</string>
+    <string name="storage_database">Base partagée et index de recherche</string>
+    <string name="storage_local_work">Boîte d’envoi et pièces jointes des brouillons</string>
+    <string name="storage_orphans">Cache temporaire sans référence</string>
+    <string name="storage_available">Espace disponible sur l’appareil</string>
+    <string name="storage_approximate">Certaines tailles protégées sont estimées.</string>
+    <string name="storage_refresh_usage">Actualiser l’utilisation du stockage</string>
+    <string name="storage_global_limit">Limite de stockage totale</string>
+    <string name="storage_unlimited">Sans limite</string>
+    <string name="storage_account">Compte</string>
+    <string name="storage_payloads">Corps et pièces jointes téléchargés</string>
+    <string name="storage_protected">Fichiers en cache protégés</string>
+    <string name="storage_progress">Téléchargement hors ligne</string>
+    <string name="storage_messages">Messages en cache</string>
+    <string name="storage_counts">%1$d / %2$d</string>
+    <string name="storage_count_unknown">%1$d en cache · total encore inconnu</string>
+    <string name="storage_bodies">Corps téléchargés</string>
+    <string name="storage_attachments">Pièces jointes téléchargées</string>
+    <string name="storage_pause">Pause</string>
+    <string name="storage_resume">Reprendre</string>
+    <string name="storage_retry">Réessayer le téléchargement</string>
+    <string name="storage_clear">Effacer les téléchargements</string>
+    <string name="storage_clear_sub">Mettre les téléchargements en pause et libérer le cache admissible.</string>
+    <string name="storage_clear_confirm">Effacer les téléchargements de ce compte ? Ils seront mis en pause. Les en-têtes, brouillons, boîte d’envoi, messages conservés et opérations en attente restent protégés. Rien n’est supprimé sur le serveur.</string>
+    <string name="storage_cancel">Annuler</string>
+    <string name="storage_freed">%1$s libérés</string>
+    <string name="storage_retention">Conserver sur l’appareil</string>
+    <string name="storage_latest">Messages récents</string>
+    <string name="storage_days">Derniers jours</string>
+    <string name="storage_all">Tous les messages du serveur</string>
+    <string name="storage_full_offline">Choisir le hors ligne sans limite</string>
+    <string name="storage_full_offline_sub">Tous les corps, avec pièces jointes facultatives. Appliquez pour démarrer. La limite totale et l’espace disponible restent applicables.</string>
+    <string name="storage_latest_count">Nombre de messages</string>
+    <string name="storage_days_count">Nombre de jours</string>
+    <string name="storage_account_limit">Limite du cache du compte (Mio)</string>
+    <string name="storage_zero_unlimited">0 = sans limite. 1024 Mio = 1 Gio. Les fichiers protégés sont conservés.</string>
+    <string name="storage_prefetch_bodies">Télécharger les corps automatiquement</string>
+    <string name="storage_prefetch_attachments">Télécharger les pièces jointes automatiquement</string>
+    <string name="storage_wifi">Wi-Fi uniquement pour le hors ligne</string>
+    <string name="storage_charging">Uniquement pendant la charge</string>
+    <string name="storage_invalid">Saisissez un nombre de messages (1–1 000 000), de jours (1–36 500) et une limite entière positive ou nulle en Mio.</string>
+    <string name="storage_apply">Appliquer la politique</string>
+    <string name="storage_idle">Pas encore démarré</string>
+    <string name="storage_queued">En attente de démarrage</string>
+    <string name="storage_downloading">Téléchargement en cours</string>
+    <string name="storage_paused">En pause</string>
+    <string name="storage_wait_network">En attente d’un réseau autorisé</string>
+    <string name="storage_wait_charging">En attente de charge</string>
+    <string name="storage_limit_reached">Limite de stockage atteinte</string>
+    <string name="storage_device_full">Espace insuffisant sur l’appareil</string>
+    <string name="storage_complete">Téléchargement terminé</string>
+    <string name="storage_partial">Certains messages ne sont pas disponibles hors ligne</string>
+    <string name="storage_error">L’opération de stockage a échoué. Réessayez.</string>
+    <string name="storage_keywords">hors ligne téléchargement miroir stockage espace cache limite quota conservation corps pièces jointes charge wifi</string>
+    <plurals name="storage_skipped">
+        <item quantity="one">%1$d message n’a pas pu être téléchargé. Réessayez pour le reprendre.</item>
+        <item quantity="other">%1$d messages n’ont pas pu être téléchargés. Réessayez pour les reprendre.</item>
+    </plurals>
+</resources>

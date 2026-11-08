@@ -112,7 +112,8 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
   - [x] Engine: per-account retention, payload caching, disk budgets, LRU eviction that never deletes server mail,
     resumable full-offline download, Wi-Fi/charging constraints, pause/resume, usage breakdown (PR #55, Room v9;
     `docs/reports/codex-storage-offline.md`)
-  - [ ] Settings UI for policies, usage breakdown, offline progress, pause/resume (API exists, UI "remains for Claude")
+  - [ ] Settings UI for policies, usage breakdown, offline progress, pause/resume (Sol implementation under review;
+    EN/FR/DE, direct Settings search entry and Robolectric coverage; `docs/reports/codex-storage-settings-ui.md`)
   - [ ] Real-device checks (storage pressure, WorkManager constraints, large first download)
 - **FR-12 · P2 · Native Android Contacts integration** — partly done: system contact picker needs no permission; contact
   photos are an opt-in avatar source; "From contacts" filter uses Sent/outbox correspondents or the permission-gated
