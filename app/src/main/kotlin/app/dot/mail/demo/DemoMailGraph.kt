@@ -12,6 +12,8 @@ import app.dot.mail.data.model.Attachment
 import app.dot.mail.data.model.Draft
 import app.dot.mail.data.model.EmailAddress
 import app.dot.mail.data.model.Folder
+import app.dot.mail.data.model.FolderException
+import app.dot.mail.data.model.FolderFailure
 import app.dot.mail.data.model.FolderRole
 import app.dot.mail.data.model.Mailbox
 import app.dot.mail.data.model.Message
@@ -35,7 +37,11 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
     private val accountsState = MutableStateFlow(
         listOf(Account(1, "Robin", me.email, 0), Account(2, "Robin (work)", "robin@studio.example", 1)),
     )
-    private val folders = listOf(
+    private val foldersState = MutableStateFlow(initialFolders())
+    private val folders get() = foldersState.value
+    private var nextFolderId = 100L
+
+    private fun initialFolders() = listOf(
         Folder(10, 1, "INBOX", "Inbox", FolderRole.INBOX, 3, 12),
         Folder(11, 1, "Sent", "Sent", FolderRole.SENT, 0, 4),
         Folder(12, 1, "Drafts", "Drafts", FolderRole.DRAFTS, 0, 0),
@@ -70,7 +76,7 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
     }
 
     override val mail = object : MailRepository {
-        override fun folders(accountId: Long): Flow<List<Folder>> = messages.map { msgs ->
+        override fun folders(accountId: Long): Flow<List<Folder>> = combine(messages, foldersState) { msgs, _ -> msgs }.map { msgs ->
             folders.filter { it.accountId == accountId }.map { f -> f.copy(unreadCount = msgs.count { it.folderId == f.id && it.isUnread }) }
         }
 
@@ -147,6 +153,59 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
             messages.update { list -> list.map { if (it.threadId in threadIds) it.copy(folderId = targetFolderId) else it } }
 
         override suspend fun refresh(mailbox: Mailbox) = delay(700)
+
+        private fun checkName(raw: String): String {
+            val name = raw.trim()
+            if (name.isEmpty() || name.length > 100 || name.any { it in "/.*%#\\" }) throw FolderException(FolderFailure.INVALID_NAME, "Folder names can't be empty or contain / . * % # \\")
+            return name
+        }
+
+        override suspend fun createFolder(accountId: Long, parentFolderId: Long?, name: String): Long {
+            val n = checkName(name)
+            val parent = parentFolderId?.let { id -> folders.firstOrNull { it.id == id } ?: throw FolderException(FolderFailure.NOT_FOUND, "The parent folder no longer exists") }
+            val path = parent?.let { it.path + "/" + n } ?: n
+            if (folders.any { it.accountId == accountId && it.path.equals(path, true) }) throw FolderException(FolderFailure.ALREADY_EXISTS, "A folder named \"$n\" already exists here")
+            val id = nextFolderId++
+            foldersState.update { it + Folder(id, accountId, path, n, FolderRole.CUSTOM, 0, 0) }
+            return id
+        }
+
+        private fun relocate(folderId: Long, newParent: Folder?, name: String) {
+            val f = folders.firstOrNull { it.id == folderId } ?: throw FolderException(FolderFailure.NOT_FOUND, "The folder no longer exists")
+            if (f.role != FolderRole.CUSTOM) throw FolderException(FolderFailure.PROTECTED_FOLDER, "System folders can't be renamed, moved or deleted")
+            if (newParent != null && (newParent.id == f.id || newParent.path.startsWith(f.path + "/"))) throw FolderException(FolderFailure.INVALID_TARGET, "A folder can't be moved into itself or its subfolders")
+            val path = newParent?.let { it.path + "/" + name } ?: name
+            if (folders.any { it.id != f.id && it.accountId == f.accountId && it.path.equals(path, true) }) throw FolderException(FolderFailure.ALREADY_EXISTS, "A folder named \"$name\" already exists there")
+            foldersState.update { list -> list.map { x ->
+                when {
+                    x.id == f.id -> x.copy(path = path, name = name)
+                    x.path.startsWith(f.path + "/") -> x.copy(path = path + x.path.removePrefix(f.path))
+                    else -> x
+                }
+            } }
+        }
+
+        override suspend fun renameFolder(folderId: Long, newName: String) {
+            val f = folders.firstOrNull { it.id == folderId } ?: throw FolderException(FolderFailure.NOT_FOUND, "The folder no longer exists")
+            val parentPath = f.path.removeSuffix(f.name).removeSuffix("/").ifEmpty { null }
+            relocate(folderId, parentPath?.let { p -> folders.firstOrNull { it.accountId == f.accountId && it.path == p } }, checkName(newName))
+        }
+
+        override suspend fun moveFolder(folderId: Long, newParentFolderId: Long?) {
+            val f = folders.firstOrNull { it.id == folderId } ?: throw FolderException(FolderFailure.NOT_FOUND, "The folder no longer exists")
+            relocate(folderId, newParentFolderId?.let { id -> folders.firstOrNull { it.id == id } }, f.name)
+        }
+
+        override suspend fun deleteFolder(folderId: Long, moveContentsTo: Long?) {
+            val f = folders.firstOrNull { it.id == folderId } ?: throw FolderException(FolderFailure.NOT_FOUND, "The folder no longer exists")
+            if (f.role != FolderRole.CUSTOM) throw FolderException(FolderFailure.PROTECTED_FOLDER, "System folders can't be deleted")
+            if (folders.any { it.path.startsWith(f.path + "/") && it.accountId == f.accountId }) throw FolderException(FolderFailure.HAS_SUBFOLDERS, "Delete or move the subfolders first")
+            if (messages.value.any { it.folderId == folderId }) {
+                val target = moveContentsTo ?: throw FolderException(FolderFailure.NOT_EMPTY, "This folder contains messages")
+                messages.update { list -> list.map { if (it.folderId == folderId) it.copy(folderId = target) else it } }
+            }
+            foldersState.update { list -> list.filterNot { it.id == folderId } }
+        }
 
         override suspend fun suggestContacts(prefix: String, limit: Int): List<EmailAddress> =
             messages.value.flatMap { listOf(it.from) + it.to }.distinctBy { it.email }
