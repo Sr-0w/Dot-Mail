@@ -33,12 +33,12 @@ class StorageMigrationTest {
                 }
                 val setup=schema.getJSONArray("setupQueries"); for(i in 0 until setup.length()) db.execSQL(setup.getString(i))
                 db.execSQL("INSERT INTO accounts(id,email,name,color,config,secret,authError) VALUES(1,'fixture@example.org','Fixture',0,'{}','ciphertext',0)")
-                for((id,role) in listOf(1 to "INBOX",2 to "SENT")) db.execSQL("INSERT INTO folders(id,accountId,path,name,role,unread,total,validity,nextUid,modSeq) VALUES(?,1,?,?,?,1,1,7,3,-1)",arrayOf(id,role,role,role))
+                for((id,role) in listOf(1 to "INBOX",2 to "SENT")) db.execSQL("INSERT INTO folders(id,accountId,path,name,role,unread,total,validity,nextUid,modSeq) VALUES(?,1,?,?,?,1,1,7,3,-1)",arrayOf<Any?>(id,role,role,role))
                 val incoming=Header(1,"<incoming@fixture.invalid>",emptyList(),null,listOf(Address("unknown@example.org")),listOf(Address("fixture@example.org")),emptyList(),emptyList(),emptyList(),"Inbox",1,RemoteFlags(1,false,false,false),false)
                 val sent=incoming.copy(uid=2,messageId="<sent@fixture.invalid>",from=listOf(Address("fixture@example.org")),to=listOf(Address("Friend@example.org")),cc=listOf(Address("cc@example.org")),bcc=listOf(Address("bcc@example.org")))
                 for((id,header) in listOf(1 to incoming,2 to sent)) {
                     db.execSQL("INSERT INTO threads(id,accountId,subject,participants,snippet,lastAt,count,unread,starred,attachments) VALUES(?,1,'Fixture','[]','',1,1,1,0,0)",arrayOf(id))
-                    db.execSQL("INSERT INTO messages(id,accountId,folderId,threadId,uid,header,subject,sentAt,unread,starred,hasAttachments,snippet,text,html,bodyLoaded,remoteImages,senderSearch,recipientSearch,snippetFetched,bodyPath,messageIdKey) VALUES(?,1,?,?,?,?,'Fixture',1,1,0,0,'',NULL,NULL,0,0,'sender','recipient',1,NULL,NULL)",arrayOf(id,id,id,id,Codec.header(header)))
+                    db.execSQL("INSERT INTO messages(id,accountId,folderId,threadId,uid,header,subject,sentAt,unread,starred,hasAttachments,snippet,text,html,bodyLoaded,remoteImages,senderSearch,recipientSearch,snippetFetched,bodyPath,messageIdKey) VALUES(?,1,?,?,?,?,'Fixture',1,1,0,0,'',NULL,NULL,0,0,'sender','recipient',1,NULL,NULL)",arrayOf<Any?>(id,id,id,id,Codec.header(header)))
                 }
                 db.execSQL("INSERT INTO contacts(accountId,email,name,lastSeen) VALUES(1,'unknown@example.org','Unknown',10)")
                 db.execSQL("INSERT INTO contacts(accountId,email,name,lastSeen) VALUES(1,'friend@example.org','Friend',10)")

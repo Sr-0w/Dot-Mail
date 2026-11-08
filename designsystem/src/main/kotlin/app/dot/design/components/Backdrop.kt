@@ -6,6 +6,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
@@ -62,8 +63,10 @@ fun Modifier.backdropBlur(backdrop: Backdrop, radius: Dp, background: Color, tin
             noiseFactor(0.05f)
             colorEffects(t.value?.let { listOf(HazeColorEffect.tint(it)) } ?: emptyList())
             mask(m.value)
+            // Edges repeat their own pixels instead of fading into transparent nothing: no dark, pulsing rim.
+            blurredEdgeTreatment(BlurredEdgeTreatment.Rectangle)
         }
     }
     val input = remember(backdrop) { HazeInput.Sources(backdrop.haze) }
-    return hazeBlur(input = input, style = style, performanceMode = HazePerformanceMode.Quality)
+    return hazeBlur(input = input, style = style, performanceMode = HazePerformanceMode.Quality, expandLayerBounds = true)
 }
