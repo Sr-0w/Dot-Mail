@@ -21,8 +21,13 @@ data class Identity(
     val accountId: Long,
     val name: String,
     val email: String,
+    /** Plain-text signature (also used as the text part when [signatureHtml] is set). */
     val signature: String? = null,
     val isDefault: Boolean = false,
+    /** Optional Reply-To address for messages sent with this identity. */
+    val replyTo: String? = null,
+    /** Rich signature for the HTML composer. */
+    val signatureHtml: String? = null,
 )
 
 sealed interface SyncState {

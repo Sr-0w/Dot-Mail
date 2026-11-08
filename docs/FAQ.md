@@ -11,9 +11,12 @@ exist.
 ## Adding an account
 
 Type your address and password in *Add account*. Dot Mail looks up the servers, tries a
-test login (IMAP + SMTP), and only saves the account when both succeed. Any step can be
-done manually — if detection fails or the login errors, the setup screen offers a full
-manual form (IMAP/SMTP host, port, encryption, username).
+test login (IMAP + SMTP), and only saves the account when both succeed. Detection order:
+built-in table for the big providers, the provider's own autoconfig, your domain's MX
+records (custom domains hosted at a known provider — e.g. Infomaniak or Google — are
+recognised from their MX hosts, like Thunderbird does), then Mozilla's ISPDB. Any step
+can be done manually — if detection fails or the login errors, the setup screen offers a
+full manual form (IMAP/SMTP host, port, encryption, username).
 
 ### Gmail / googlemail
 
@@ -63,9 +66,9 @@ manual form (IMAP/SMTP host, port, encryption, username).
   per-device password in the Manager: your Mail service → the address → *Manage
   password* → *Add a device* ([guide](https://www.infomaniak.com/en/support/faq/711/manage-devices-passwords-from-mail-infomaniak)).
   Use that generated password in Dot Mail.
-- Autodetection covers Infomaniak's own domains. For **your own domain hosted on
-  Infomaniak** the servers are the same (`mail.infomaniak.com`) — enter them manually in
-  the setup form.
+- Your **own domain hosted on Infomaniak** is detected automatically: Dot Mail looks up
+  the domain's MX records and recognises Infomaniak's MX hosts (the servers are still
+  `mail.infomaniak.com`). Manual setup works as a fallback.
 
 ### Fastmail
 
@@ -179,9 +182,10 @@ A few facts, from the app's behaviour:
   account address.
 - The app is **excluded from Android cloud backup and device transfer** (`allowBackup`
   is off): restoring a phone does not copy your mail cache or credentials.
-- Nothing of yours is sent anywhere except your mail server — and, once, only your
-  domain (never your full address) when Dot Mail asks Mozilla's public ISPDB for
-  server settings.
+- Nothing of yours is sent anywhere except your mail server. The only other lookups are
+  a DNS MX query for your domain (never your address) when adding an account on a
+  custom domain, and, once, your domain (never your full address) sent to Mozilla's
+  public ISPDB when Dot Mail needs server settings.
 
 ### How do I report a bug?
 

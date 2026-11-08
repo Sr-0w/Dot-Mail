@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.asStateFlow
 enum class SwipeAction { ARCHIVE, TRASH, READ_TOGGLE, STAR_TOGGLE, NONE }
 enum class Density { COMFORTABLE, COMPACT }
 
+/** Format of newly started messages. */
+enum class ComposeFormat { RICH, PLAIN }
+
 /** Where to go after archiving / deleting the open conversation. */
 enum class AfterAction { LIST, NEXT, PREVIOUS }
 
@@ -56,6 +59,7 @@ data class UiPrefs(
     // --- Composing
     val replyAllByDefault: Boolean = false,
     val includeOriginal: Boolean = true,
+    val defaultFormat: ComposeFormat = ComposeFormat.RICH,
 
     // --- Privacy
     /** Minutes in the background before the app locks again; 0 = as soon as it leaves the screen. */
@@ -98,6 +102,7 @@ class AppSettings(context: Context) {
             putBoolean("quotedExpanded", next.quotedExpanded)
             putBoolean("replyAllByDefault", next.replyAllByDefault)
             putBoolean("includeOriginal", next.includeOriginal)
+            putString("defaultFormat", next.defaultFormat.name)
             putInt("lockAfterMinutes", next.lockAfterMinutes)
         }
     }
@@ -128,6 +133,7 @@ class AppSettings(context: Context) {
             quotedExpanded = prefs.getBoolean("quotedExpanded", d.quotedExpanded),
             replyAllByDefault = prefs.getBoolean("replyAllByDefault", d.replyAllByDefault),
             includeOriginal = prefs.getBoolean("includeOriginal", d.includeOriginal),
+            defaultFormat = enumOr(prefs.getString("defaultFormat", null), d.defaultFormat),
             lockAfterMinutes = prefs.getInt("lockAfterMinutes", d.lockAfterMinutes),
         )
     }

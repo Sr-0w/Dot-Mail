@@ -296,7 +296,7 @@ fun ThreadScreen(
             )
             when {
                 list == null -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(Modifier.size(22.dp), color = c.textTertiary, strokeWidth = 1.5.dp)
+                    app.dot.design.components.DotSpinner(size = 22.dp, color = c.textTertiary)
                 }
                 list.isEmpty() -> Box(Modifier.weight(1f)) {
                     EmptyState(Icons.Outlined.Description, "Conversation unavailable", "It may have been moved or deleted.")
@@ -474,9 +474,9 @@ private fun MessageCard(
         val body = message.body
         if (body == null) {
             Row(Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.l), verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(Modifier.size(16.dp), color = c.textTertiary, strokeWidth = 1.5.dp)
-                Spacer(Modifier.width(DotSpacing.m))
-                Text("Downloading…", style = Dot.type.callout, color = c.textTertiary)
+                Text("Downloading", style = Dot.type.callout, color = c.textTertiary)
+                Spacer(Modifier.width(DotSpacing.s))
+                app.dot.design.components.DotDotsLoader(color = c.textTertiary)
             }
         } else {
             val cids = remember(message.attachments) {
@@ -510,6 +510,13 @@ private fun MessageCard(
                 )
             } else {
                 PlainTextBody(body.plainText.orEmpty(), onLink, textScale = readingScale, quotedExpanded = quotedExpanded)
+            }
+            if (body.isTruncated) {
+                Text(
+                    "This message is very long — showing the beginning.",
+                    style = Dot.type.caption, color = c.textTertiary,
+                    modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.xs),
+                )
             }
             val files = message.attachments.filter { !it.isInline || it.contentId == null }
             if (files.isNotEmpty()) AttachmentStrip(files, onAttachment)

@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -81,6 +82,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -112,6 +114,7 @@ import app.dot.design.components.DotTopBar
 import app.dot.design.components.EmptyState
 import app.dot.design.components.ListRow
 import app.dot.design.components.UnreadDot
+import app.dot.design.components.dotShimmer
 import app.dot.mail.Density
 import app.dot.mail.LocalMailGraph
 import app.dot.mail.LocalSettings
@@ -223,13 +226,7 @@ fun InboxScreen(
                     onRefresh = vm::refresh,
                     modifier = Modifier.weight(1f),
                     state = pullState,
-                    indicator = {
-                        PullToRefreshDefaults.Indicator(
-                            state = pullState, isRefreshing = refreshing,
-                            modifier = Modifier.align(Alignment.TopCenter),
-                            containerColor = Dot.colors.surfaceRaised, color = Dot.colors.textPrimary,
-                        )
-                    },
+                    indicator = { QuietRefreshIndicator(pullState, refreshing, Modifier.align(Alignment.TopCenter)) },
                 ) {
                     ThreadList(
                         myAddresses = remember(accountsNow) { accountsNow.map { it.email.lowercase() }.toSet() },
@@ -641,7 +638,7 @@ private fun SkeletonRow() {
         label = "sk-a",
     )
     Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = DotSpacing.gutter, top = 16.dp, bottom = 16.dp)) {
-        Box(Modifier.size(40.dp).clip(CircleShape).background(c.surface.copy(alpha = pulse)))
+        Box(Modifier.size(40.dp).clip(CircleShape).background(c.surface.copy(alpha = pulse)).dotShimmer())
         Spacer(Modifier.width(DotSpacing.m))
         Column(Modifier.weight(1f)) {
             Box(Modifier.fillMaxWidth(0.4f).height(12.dp).clip(DotShapes.small).background(c.surface.copy(alpha = pulse)))
@@ -669,6 +666,48 @@ private fun AskNotificationPermissionOnce() {
         if (!granted && !prefs.getBoolean("askedNotifications", false)) {
             prefs.edit().putBoolean("askedNotifications", true).apply()
             launcher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+}
+
+/**
+ * Pull-to-refresh in the Quiet style: a small raised disc that follows the finger, drawing a ring
+ * that fills as you pull; while syncing it becomes the design-system spinner. No Material arrow.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun QuietRefreshIndicator(
+    state: androidx.compose.material3.pulltorefresh.PullToRefreshState,
+    refreshing: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val c = Dot.colors
+    val fraction = state.distanceFraction
+    val visible = refreshing || fraction > 0f
+    val offset by androidx.compose.animation.core.animateDpAsState(
+        if (refreshing) 16.dp else (fraction.coerceAtMost(1.5f) * 56).dp - 40.dp, label = "ptr-offset",
+    )
+    val alpha by androidx.compose.animation.core.animateFloatAsState(if (visible) 1f else 0f, tween(DotMotion.fast), label = "ptr-alpha")
+    Box(
+        modifier
+            .offset(y = offset)
+            .graphicsLayer { this.alpha = alpha; scaleX = 0.6f + 0.4f * alpha; scaleY = scaleX }
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(c.surfaceRaised),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (refreshing) {
+            app.dot.design.components.DotSpinner(size = 18.dp, color = c.textPrimary)
+        } else {
+            val sweep = (fraction.coerceIn(0f, 1f) * 300f)
+            androidx.compose.foundation.Canvas(Modifier.size(18.dp)) {
+                drawArc(
+                    color = c.textPrimary.copy(alpha = 0.35f + 0.65f * fraction.coerceIn(0f, 1f)),
+                    startAngle = -90f, sweepAngle = sweep, useCenter = false,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round),
+                )
+            }
         }
     }
 }

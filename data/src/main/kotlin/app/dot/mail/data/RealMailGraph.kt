@@ -70,7 +70,8 @@ internal class RealMailGraph(
     } }.flowOn(Dispatchers.IO)
     internal fun start() { if (scheduling) { WorkScheduling.periodic(context); ForegroundIdle(this).start(); scope.launch { recoverOutbox() } } }
     internal suspend fun credentials(row: AccountRow): Credentials = withContext(Dispatchers.IO) {
-        if (Codec.config(row.config).authType == AuthType.OAUTH2) oauth.credentials(row.id) else Credentials(vault.decrypt(row.email, row.secret))
+        if (Codec.config(row.config).authType == AuthType.OAUTH2) oauth.credentials(row.id) else try { Credentials(vault.decrypt(row.email, row.secret)) }
+        catch(e:java.security.GeneralSecurityException) { dao.syncError(row.id,"Saved credentials are unavailable. Sign in again.",true); throw ReauthenticationRequired(e) }
     }
     override fun oauthAvailability(provider: OAuthProvider) = oauth.availability(provider)
     override suspend fun beginOAuth(email: String, provider: OAuthProvider, accountId: Long?): android.content.Intent = oauth.begin(email, provider, accountId)

@@ -45,6 +45,17 @@ interface AccountRepository {
     suspend fun addAccount(config: AccountConfig, password: String): Long
 
     suspend fun removeAccount(accountId: Long)
+
+    /** Sender identities of an account, the default first. The account address itself is always one of them and cannot be deleted. */
+    fun identities(accountId: Long): Flow<List<app.dot.mail.data.model.Identity>> = kotlinx.coroutines.flow.flowOf(emptyList())
+
+    /** Inserts (id == 0) or updates an identity. Returns its id. Throws IllegalArgumentException for an invalid address. */
+    suspend fun saveIdentity(identity: app.dot.mail.data.model.Identity): Long = throw UnsupportedOperationException()
+
+    /** Deletes an added identity; the account's own address is permanent. Drafts using it fall back to the default. */
+    suspend fun deleteIdentity(accountId: Long, identityId: Long) {}
+
+    suspend fun setDefaultIdentity(accountId: Long, identityId: Long) {}
 }
 
 interface MailRepository {

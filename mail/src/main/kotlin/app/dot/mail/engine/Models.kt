@@ -27,6 +27,8 @@ data class OutgoingMail(
     val subject: String, val text: String, val html: String? = null, val attachments: List<OutgoingAttachment> = emptyList(),
     val inReplyTo: String? = null, val references: List<String> = emptyList(),
     val messageId: String? = null, val date: Instant = Instant.now(),
+    /** Reply-To header; empty = replies go to [from]. */
+    val replyTo: List<Address> = emptyList(),
 )
 
 data class CachedPart(val partId: String, val name: String, val mimeType: String, val contentId: String?, val inline: Boolean, val file: java.io.File)

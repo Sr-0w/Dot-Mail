@@ -107,7 +107,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import app.dot.design.Dot
 import app.dot.design.DotShapes
 import app.dot.design.DotSpacing
-import app.dot.design.components.Avatar
 import app.dot.design.components.ButtonStyle
 import app.dot.design.components.DotButton
 import app.dot.design.components.DotIconButton
@@ -120,6 +119,7 @@ import app.dot.mail.LocalMailGraph
 import app.dot.mail.LocalSettings
 import app.dot.mail.data.model.EmailAddress
 import app.dot.mail.ui.ComposeRoute
+import app.dot.mail.ui.avatar.SenderAvatar
 import app.dot.mail.ui.common.Format
 import com.mohamedrejeb.richeditor.model.RichTextState
 import com.mohamedrejeb.richeditor.model.rememberRichTextState
@@ -146,6 +146,8 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
             route = route,
             undoSeconds = { settings.ui.value.undoSendSeconds },
             defaultRichText = true,
+            defaultAccountId = { settings.ui.value.defaultAccountId },
+            includeOriginal = { settings.ui.value.includeOriginal },
         )
     }
     val state by vm.state.collectAsStateWithLifecycle()
@@ -872,7 +874,7 @@ private fun RecipientRow(
                             .padding(horizontal = DotSpacing.m, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Avatar(s.displayName, s.email, size = 28.dp)
+                        SenderAvatar(s, size = 28.dp)
                         Spacer(Modifier.width(DotSpacing.m))
                         Column {
                             Text(s.displayName, style = Dot.type.label, color = c.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)

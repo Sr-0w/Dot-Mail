@@ -17,7 +17,7 @@ import kotlin.math.max
 
 /** Each operation owns its connection. No shared selected folder or blocking calls on Main. */
 class MailClient(val timeoutMs: Int = 30_000) {
-    private fun session(endpoint: Endpoint, credentials: Credentials, smtp: Boolean = false): Session {
+    private fun session(endpoint: Endpoint, credentials: Credentials, smtp: Boolean = false, envelopeFrom: String? = null): Session {
         val protocol = if (smtp) "smtp" else "imap"
         return Session.getInstance(Properties().apply {
             setProperty("mail.$protocol.connectiontimeout", timeoutMs.toString())
@@ -31,6 +31,9 @@ class MailClient(val timeoutMs: Int = 30_000) {
             setProperty("mail.imap.peek", "true")
             setProperty("mail.imap.enablecondstore", "true")
             if (credentials.oauth2) setProperty("mail.$protocol.auth.mechanisms", "XOAUTH2")
+            // SMTP MAIL FROM. Providers reject envelope senders that are not the logged-in account, so aliases
+            // (a different From header) still submit with the account address.
+            if (smtp && envelopeFrom != null) setProperty("mail.smtp.from", envelopeFrom)
         })
     }
     private fun connect(endpoint: Endpoint, credentials: Credentials): IMAPStore =
@@ -180,8 +183,8 @@ class MailClient(val timeoutMs: Int = 30_000) {
             if (id == null || opened.search(HeaderTerm("Message-ID", id)).isEmpty()) opened.appendMessages(arrayOf(message))
         }
     }
-    suspend fun send(endpoint: Endpoint, credentials: Credentials, message: MimeMessage) = withContext(Dispatchers.IO) {
-        session(endpoint, credentials, true).getTransport("smtp").use { transport ->
+    suspend fun send(endpoint: Endpoint, credentials: Credentials, message: MimeMessage, envelopeFrom: String? = null) = withContext(Dispatchers.IO) {
+        session(endpoint, credentials, true, envelopeFrom).getTransport("smtp").use { transport ->
             try { transport.connect(endpoint.host, endpoint.port, endpoint.username, credentials.secret) }
             catch (e: Exception) { throw SubmissionNotStartedException(e) }
             transport.sendMessage(message, message.allRecipients)

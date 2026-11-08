@@ -134,11 +134,11 @@ private fun wrap(body: String, dark: Boolean, textColor: Int, linkColor: Int): S
 <!DOCTYPE html><html><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="${if (dark) "dark light" else "light"}">
+${if (dark) "" else "<meta name=\"color-scheme\" content=\"light\">"}
 <style>
 html,body{margin:0;padding:0;background:transparent;}
-body{font-family:sans-serif;font-size:15px;line-height:1.55;color:${css(textColor)};word-wrap:break-word;overflow-wrap:anywhere;-webkit-text-size-adjust:100%;}
-a{color:${css(linkColor)};}
+body{font-family:sans-serif;font-size:15px;line-height:1.55;${if (dark) "" else "color:${css(textColor)};"}word-wrap:break-word;overflow-wrap:anywhere;-webkit-text-size-adjust:100%;}
+${if (dark) "" else "a{color:${css(linkColor)};}"}
 img{max-width:100%!important;height:auto!important;}
 table{max-width:100%;}
 pre{white-space:pre-wrap;}

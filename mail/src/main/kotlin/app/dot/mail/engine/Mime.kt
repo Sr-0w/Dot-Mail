@@ -39,6 +39,7 @@ object Mime {
             }
         }
         message.setFrom(address(mail.from))
+        if (mail.replyTo.isNotEmpty()) message.setReplyTo(mail.replyTo.map(::address).toTypedArray())
         listOf(Message.RecipientType.TO to mail.to, Message.RecipientType.CC to mail.cc, Message.RecipientType.BCC to mail.bcc).forEach { (type, list) ->
             message.setRecipients(type, list.map(::address).toTypedArray())
         }

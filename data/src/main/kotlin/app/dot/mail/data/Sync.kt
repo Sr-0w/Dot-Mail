@@ -176,8 +176,7 @@ internal suspend fun RealMailGraph.deliverOutbox(id: Long): Boolean = outboxLock
             dao.transitionOutbox(id, "SUBMITTING", "UNCERTAIN", "Delivery could not be confirmed. Check Sent before retrying.")
             dao.syncError(account.id, "A queued send could not be confirmed. Check Sent before retrying.")
             return@withLock true
-        }
-        (mime as? java.io.Closeable)?.close()
+        } finally { runCatching { (mime as? java.io.Closeable)?.close() }.onFailure { SyncDiagnostics.warn("Close outbox MIME id=$id",it) } }
         val autoSent = config.smtp.host.equals("smtp.gmail.com", true) || config.smtp.host.equals("smtp.googlemail.com", true)
         dao.transitionOutbox(id, "SUBMITTING", if (autoSent) "SENT" else "APPEND")
         row = requireNotNull(dao.outbox(id))

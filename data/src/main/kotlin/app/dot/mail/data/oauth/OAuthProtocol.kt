@@ -49,4 +49,4 @@ internal object OAuthProtocol {
         return codes.single()
     }
 }
-internal class ReauthenticationRequired : Exception("Sign in again to reconnect this account")
+internal class ReauthenticationRequired(cause: Throwable? = null) : Exception("Sign in again to reconnect this account", cause)

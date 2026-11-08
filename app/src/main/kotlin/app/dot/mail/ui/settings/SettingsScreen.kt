@@ -47,6 +47,7 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.ShieldMoon
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.SwipeLeft
+import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material.icons.outlined.SwipeRight
 import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material.icons.outlined.VerifiedUser
@@ -82,6 +83,7 @@ import app.dot.design.components.ListRow
 import app.dot.design.components.SectionLabel
 import app.dot.mail.AfterAction
 import app.dot.mail.BuildConfig
+import app.dot.mail.ComposeFormat
 import app.dot.mail.Density
 import app.dot.mail.LocalMailGraph
 import app.dot.mail.LocalSettings
@@ -238,6 +240,10 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
 
             // ---- Composing
             SectionLabel("Composing")
+            ChoiceRow(
+                "Default format", Icons.Outlined.TextFields, prefs.defaultFormat,
+                listOf(ComposeFormat.RICH to "Rich text", ComposeFormat.PLAIN to "Plain text"),
+            ) { f -> settings.update { it.copy(defaultFormat = f) } }
             UndoSetting(prefs.undoSendSeconds) { s -> settings.update { it.copy(undoSendSeconds = s) } }
             ToggleRow("Reply to all by default", "Tapping Reply addresses everyone on the message.", Icons.Outlined.ReplyAll, prefs.replyAllByDefault) { v ->
                 settings.update { it.copy(replyAllByDefault = v) }

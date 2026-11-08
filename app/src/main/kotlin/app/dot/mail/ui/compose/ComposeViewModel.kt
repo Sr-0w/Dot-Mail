@@ -76,6 +76,8 @@ class ComposeViewModel(
     private val route: ComposeRoute,
     private val undoSeconds: () -> Int,
     private val defaultRichText: Boolean = true,
+    private val defaultAccountId: () -> Long = { 0L },
+    private val includeOriginal: () -> Boolean = { true },
 ) : ViewModel() {
     private val _state = MutableStateFlow(ComposeState(isRichText = defaultRichText))
     val state: StateFlow<ComposeState> = _state.asStateFlow()
@@ -93,7 +95,8 @@ class ComposeViewModel(
         viewModelScope.launch {
             val accounts = graph.accounts.accounts.first()
             val senders = accounts.flatMap { a ->
-                a.identities.ifEmpty { listOf(Identity(0, a.id, a.displayName, a.email, isDefault = true)) }
+                a.identities.sortedByDescending { it.isDefault }
+                    .ifEmpty { listOf(Identity(0, a.id, a.displayName, a.email, isDefault = true)) }
                     .map { Sender(a.id, it.id.takeIf { id -> id > 0 }, it.name, it.email) }
             }
             val draft = when {
@@ -104,10 +107,12 @@ class ComposeViewModel(
                 )
                 else -> null
             } ?: run {
-                val first = senders.firstOrNull()
-                Draft(accountId = first?.accountId ?: 0, identityId = first?.identityId)
+                val prefAccountId = defaultAccountId()
+                val preferred = senders.firstOrNull { it.accountId == prefAccountId } ?: senders.firstOrNull()
+                Draft(accountId = preferred?.accountId ?: 0, identityId = preferred?.identityId)
             }
-            val (initialEditable, quoted) = splitEditableAndQuoted(draft.bodyText)
+            val (initialEditable, rawQuoted) = splitEditableAndQuoted(draft.bodyText)
+            val quoted = if (route.replyToMessageId > 0 && !includeOriginal()) null else rawQuoted
             val editable = route.body?.let {
                 if (initialEditable.isBlank()) it else "$it\n\n$initialEditable"
             } ?: initialEditable
