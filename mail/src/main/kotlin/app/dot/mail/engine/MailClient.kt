@@ -17,9 +17,13 @@ import kotlin.math.max
 
 /** Each operation owns its connection. No shared selected folder or blocking calls on Main. */
 class MailClient(val timeoutMs: Int = 30_000) {
-    private fun session(endpoint: Endpoint, credentials: Credentials, smtp: Boolean = false, envelopeFrom: String? = null): Session {
+    internal fun session(endpoint: Endpoint, credentials: Credentials, smtp: Boolean = false, envelopeFrom: String? = null): Session {
         val protocol = if (smtp) "smtp" else "imap"
         return Session.getInstance(Properties().apply {
+            val tlsProtocols = MailTlsPolicy.protocols()
+            for (name in listOf("imap", "imaps", "smtp", "smtps")) setProperty("mail.$name.ssl.protocols", tlsProtocols)
+            setProperty("mail.debug", "false")
+            setProperty("mail.debug.auth", "false")
             setProperty("mail.$protocol.connectiontimeout", timeoutMs.toString())
             setProperty("mail.$protocol.timeout", timeoutMs.toString())
             setProperty("mail.$protocol.writetimeout", timeoutMs.toString())
