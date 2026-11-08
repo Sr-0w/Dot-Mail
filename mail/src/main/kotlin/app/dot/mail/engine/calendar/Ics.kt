@@ -277,7 +277,7 @@ object Ics {
 
     // ------------------------------------------------------------- parsing
 
-    internal data class ParsedLine(val name: String, val params: Map<String, String>, val value: String)
+    private data class ParsedLine(val name: String, val params: Map<String, String>, val value: String)
 
     /** Splits raw text into content lines: normalises line endings and unfolds continuations. */
     private fun unfold(text: String): List<String> {
@@ -546,9 +546,6 @@ object Ics {
     /** Test hook around [summarizeRrule]. */
     internal fun summarizeForTest(raw: String): String? = summarizeRrule(raw)
 
-    /** Temporary debug hook. */
-    internal fun debugParseContentLine(line: String): ParsedLine? = parseContentLine(line)
-
     /** Human summary for the simple cases; null when the rule uses anything else. */
     private fun summarizeRrule(raw: String): String? {
         val params = LinkedHashMap<String, String>()
@@ -648,7 +645,7 @@ object Ics {
 
     private fun serializeTime(name: String, t: EventTime): String {
         val base = t.date.format(DateTimeFormatter.BASIC_ISO_DATE) +
-            (t.time?.let { TIME_FORMAT.format(it) } ?: "")
+            (t.time?.let { "T" + TIME_FORMAT.format(it) } ?: "")
         return when {
             t.allDay -> "$name;VALUE=DATE:$base"
             t.vtimeZone != null -> "$name;TZID=${t.vtimeZone!!.tzid}:$base"

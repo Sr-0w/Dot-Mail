@@ -133,7 +133,8 @@ class IcsTest {
         // May: back to NZST +12:00 (second year of the same zone)
         val shifted = ics("two-events-southern.ics").replace("20260115T090000", "20260501T090000")
         val may = Ics.parse(shifted).first()
-        assertThat(may.start.toInstant()).isEqualTo(Instant.parse("2026-05-01T21:00:00Z"))
+        // 09:00 NZST (+12:00) lands the previous day in UTC
+        assertThat(may.start.toInstant()).isEqualTo(Instant.parse("2026-04-30T21:00:00Z"))
 
         // IANA zone, no VTIMEZONE
         assertThat(chicago.start.zoneName).isEqualTo("America/Chicago")
@@ -306,9 +307,15 @@ class IcsTest {
     fun `reply carries known attendee name as cn`() {
         val inv = one("outlook-request.ics")
         val out = Ics.reply(inv, "alice@example.com", Ics.PartStat.ACCEPTED, now)
-        assertThat(out).contains("ATTENDEE;CN=Alice Jones;ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED:mailto:alice@example.com")
+        // The full logical ATTENDEE line exceeds 74 octets and is folded on the wire;
+        // unfold before checking it.
+        val unfolded = out.replace("\r\n ", "")
+        assertThat(unfolded).contains("ATTENDEE;CN=Alice Jones;ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED:mailto:alice@example.com")
         // VTIMEZONE zone id is re-serialised by its original name
         assertThat(out).contains("DTSTART;TZID=Eastern Standard Time:20260610T090000")
+        out.split("\r\n").forEach { line ->
+            assertThat(line.toByteArray(Charsets.UTF_8).size).isAtMost(75)
+        }
     }
 
     @Test
