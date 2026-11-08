@@ -44,6 +44,8 @@ Priority hints (optional): `P1` = next, `P2` = soon (default), `P3` = nice to ha
 
 - P2 · Add an **optional horizontal swipe gesture inside the opened email reader** to navigate to the next or previous message/conversation in the current mailbox, without returning to the inbox. Provide a clear Settings toggle (off/on) and configurable swipe direction if appropriate; preserve reading position and offer a subtle transition/haptic feedback. Do not interfere with Android's system Back gesture, horizontal scrolling of HTML content, carousels, text selection, or attachment interactions. Keep the existing previous/next controls available.
 
+- P2 · Add **native-feeling pinch-to-zoom for HTML emails** in the message reader: smooth two-finger scaling in and out, panning when zoomed, double-tap zoom/reset if feasible, and a sensible maximum/minimum scale. Default rendering must still **fit the available screen width** without clipping; zoom is an optional reading aid, not a workaround for broken HTML layout. Ensure zoom gestures coexist correctly with vertical scrolling, optional horizontal swipes between messages, text selection, attachments and Android edge-back gestures. Make zoom behavior configurable in Settings if appropriate, and verify on a real device against Gmail/Samsung Email.
+
 ## In progress
 
 - P1 · Harden IMAP synchronization and message operations before daily-driver release: fix subject-only threading collisions, cross-folder archive/move behavior, large-body storage/performance, IDLE reconnect loops and global sync lock contention; add regression and network-failure tests. — Codex (file-backed bodies, IDLE churn, lock contention, threading — from Gemini's review)
