@@ -511,7 +511,7 @@
     <string name="settings_sender_pictures_intro">Les initiales sont utilisées sauf si vous activez une source. Chaque source ci-dessous, hormis les contacts, interroge un autre serveur, qui apprend que vous avez reçu un e-mail de cet expéditeur.</string>
     <string name="settings_contact_photos">Photos des contacts</string>
     <string name="settings_contact_photos_denied">L’accès aux contacts a été refusé. Autorisez-le dans les réglages du système pour l’utiliser.</string>
-    <string name="settings_contact_photos_sub">Photos de votre carnet d’adresses. Reste sur cet appareil.</string>
+    <string name="settings_contact_photos_sub">Photos de votre carnet d’adresses, et suggestions du carnet quand vous saisissez un destinataire. Reste sur cet appareil.</string>
     <string name="settings_gravatar">Gravatar</string>
     <string name="settings_gravatar_sub">Envoie une empreinte de l’adresse de l’expéditeur à gravatar.com.</string>
     <string name="settings_brand_logos">Logos de marque</string>

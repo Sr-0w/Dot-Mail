@@ -19,6 +19,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 internal fun interface DeviceContactReader { suspend fun read(consume:suspend (String)->Unit) }
+/** Live prefix lookup in the Android address book for recipient autocomplete; nothing is cached or stored. */
+internal fun interface DeviceContactSearcher { suspend fun search(prefix:String,limit:Int):List<app.dot.mail.data.model.EmailAddress> }
 /** Private on-device cache. It never requests permission, sends addresses, or uses privileged permission listeners. */
 internal class AddressBookIndex(private val graph:RealMailGraph) {
     internal var hasPermission:()->Boolean = { ContextCompat.checkSelfPermission(graph.context,Manifest.permission.READ_CONTACTS)==PackageManager.PERMISSION_GRANTED }
@@ -26,6 +28,25 @@ internal class AddressBookIndex(private val graph:RealMailGraph) {
         graph.context.contentResolver.query(ContactsContract.CommonDataKinds.Email.CONTENT_URI,arrayOf(ContactsContract.CommonDataKinds.Email.ADDRESS),null,null,null)?.use { cursor ->
             while(cursor.moveToNext()) cursor.getString(0)?.let { consume(it) }
         }
+    }
+    internal var searcher=DeviceContactSearcher { prefix,limit ->
+        val uri=ContactsContract.CommonDataKinds.Email.CONTENT_FILTER_URI.buildUpon().appendPath(prefix).appendQueryParameter("limit",limit.toString()).build()
+        val out=ArrayList<app.dot.mail.data.model.EmailAddress>()
+        graph.context.contentResolver.query(uri,arrayOf(ContactsContract.CommonDataKinds.Email.ADDRESS,ContactsContract.CommonDataKinds.Email.DISPLAY_NAME_PRIMARY),null,null,null)?.use { cursor ->
+            while(cursor.moveToNext() && out.size<limit) {
+                val email=canonicalContactEmail(cursor.getString(0) ?: continue) ?: continue
+                out+=app.dot.mail.data.model.EmailAddress(email,cursor.getString(1)?.takeIf { it.isNotBlank() && !it.equals(email,true) })
+            }
+        }
+        out
+    }
+    /**
+     * Address-book matches for [prefix], only while READ_CONTACTS is already granted (this class never asks). Any failure of
+     * the platform provider means "no address-book suggestions", never a failed autocomplete.
+     */
+    suspend fun suggest(prefix:String,limit:Int):List<app.dot.mail.data.model.EmailAddress> = withContext(Dispatchers.IO) {
+        if(prefix.isBlank() || !hasPermission()) return@withContext emptyList()
+        try { searcher.search(prefix.trim(),limit) } catch(e:CancellationException) { throw e } catch(_:Exception) { emptyList() }
     }
     private val lock=Mutex(); private var loadedPermission:Boolean?=null
     private val changes=Channel<Boolean>(Channel.CONFLATED)
