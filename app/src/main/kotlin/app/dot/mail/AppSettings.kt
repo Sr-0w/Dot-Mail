@@ -58,6 +58,8 @@ data class UiPrefs(
 
     // --- Composing
     val replyAllByDefault: Boolean = false,
+    /** Swipe sideways in an open conversation to go to the next / previous one. */
+    val swipeBetweenMessages: Boolean = false,
     val includeOriginal: Boolean = true,
     val defaultFormat: ComposeFormat = ComposeFormat.RICH,
 
@@ -101,6 +103,7 @@ class AppSettings(context: Context) {
             putInt("readingTextPercent", next.readingTextPercent)
             putBoolean("quotedExpanded", next.quotedExpanded)
             putBoolean("replyAllByDefault", next.replyAllByDefault)
+            putBoolean("swipeBetweenMessages", next.swipeBetweenMessages)
             putBoolean("includeOriginal", next.includeOriginal)
             putString("defaultFormat", next.defaultFormat.name)
             putInt("lockAfterMinutes", next.lockAfterMinutes)
@@ -132,6 +135,7 @@ class AppSettings(context: Context) {
             readingTextPercent = prefs.getInt("readingTextPercent", d.readingTextPercent).coerceIn(90, 130),
             quotedExpanded = prefs.getBoolean("quotedExpanded", d.quotedExpanded),
             replyAllByDefault = prefs.getBoolean("replyAllByDefault", d.replyAllByDefault),
+            swipeBetweenMessages = prefs.getBoolean("swipeBetweenMessages", d.swipeBetweenMessages),
             includeOriginal = prefs.getBoolean("includeOriginal", d.includeOriginal),
             defaultFormat = enumOr(prefs.getString("defaultFormat", null), d.defaultFormat),
             lockAfterMinutes = prefs.getInt("lockAfterMinutes", d.lockAfterMinutes),

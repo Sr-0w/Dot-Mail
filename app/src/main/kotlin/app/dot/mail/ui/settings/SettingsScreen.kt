@@ -249,6 +249,9 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             ToggleRow("Show quoted text", "Expand earlier messages quoted in a reply.", Icons.Outlined.FormatQuote, prefs.quotedExpanded) { v ->
                 settings.update { it.copy(quotedExpanded = v) }
             }
+            ToggleRow("Swipe between conversations", "Swipe left for the next conversation, right for the previous one.", Icons.Outlined.SwipeLeft, prefs.swipeBetweenMessages) { v ->
+                settings.update { it.copy(swipeBetweenMessages = v) }
+            }
             Divider()
 
             // ---- Composing

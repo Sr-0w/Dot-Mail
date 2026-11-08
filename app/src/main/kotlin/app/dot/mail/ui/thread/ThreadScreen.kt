@@ -1,5 +1,11 @@
 package app.dot.mail.ui.thread
 
+import androidx.compose.foundation.gestures.awaitFirstDown
+
+import androidx.compose.foundation.gestures.awaitEachGesture
+
+import androidx.compose.ui.input.pointer.pointerInput
+
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
@@ -273,7 +279,17 @@ fun ThreadScreen(
     val last = list?.lastOrNull()
     val c = Dot.colors
 
-    Box(Modifier.fillMaxSize().background(c.background)) {
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    Box(
+        Modifier.fillMaxSize().background(c.background)
+            .swipeBetweenConversations(enabled = prefs.swipeBetweenMessages) { forward ->
+                val target = if (forward) ThreadOrder.after(threadId) else ThreadOrder.before(threadId)
+                if (target != null) {
+                    haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.GestureEnd)
+                    onOpenAdjacent(target)
+                }
+            },
+    ) {
         Column(Modifier.fillMaxSize()) {
             DotTopBar(
                 elevated = listState.canScrollBackward,
@@ -768,6 +784,37 @@ private fun ReplyBar(last: Message, onReply: (Long, ReplyMode) -> Unit, replyAll
 }
 
 /** Order of the list the user came from, for "after archive: open next/previous". */
+/**
+ * Optional sideways swipe to the next (leftwards) / previous (rightwards) conversation. It only *observes* touches
+ * (Initial pass, nothing consumed) so scrolling, text selection, links and the HTML view behave as before. It ignores
+ * gestures that start in the system Back edge zones, multi-touch (pinch), slow drags and anything mostly vertical.
+ */
+private fun Modifier.swipeBetweenConversations(enabled: Boolean, onSwipe: (forward: Boolean) -> Unit): Modifier =
+    if (!enabled) this else pointerInput(Unit) {
+        val edge = 24.dp.toPx()
+        val distance = 96.dp.toPx()
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+            if (down.position.x < edge || down.position.x > size.width - edge) return@awaitEachGesture
+            val start = down.position
+            val startedAt = down.uptimeMillis
+            var end = start
+            while (true) {
+                val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                if (event.changes.size > 1) return@awaitEachGesture
+                val change = event.changes.firstOrNull { it.id == down.id } ?: return@awaitEachGesture
+                end = change.position
+                if (!change.pressed) {
+                    val dx = end.x - start.x
+                    val dy = end.y - start.y
+                    val quick = change.uptimeMillis - startedAt < 700
+                    if (quick && kotlin.math.abs(dx) > distance && kotlin.math.abs(dx) > 2.5f * kotlin.math.abs(dy)) onSwipe(dx < 0)
+                    return@awaitEachGesture
+                }
+            }
+        }
+    }
+
 object ThreadOrder {
     @Volatile var ids: List<Long> = emptyList()
     fun after(id: Long): Long? = ids.indexOf(id).takeIf { it >= 0 }?.let { ids.getOrNull(it + 1) }
