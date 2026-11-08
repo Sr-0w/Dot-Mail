@@ -11,6 +11,7 @@ import app.dot.mail.data.model.AccountConfig
 import app.dot.mail.data.model.Attachment
 import app.dot.mail.data.model.Draft
 import app.dot.mail.data.model.EmailAddress
+import app.dot.mail.data.model.ConversationIds
 import app.dot.mail.data.model.Folder
 import app.dot.mail.data.model.FolderException
 import app.dot.mail.data.model.Identity
@@ -136,7 +137,25 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
             )
         }
 
+        private fun targets(m: Message, ids: Collection<Long>) = m.threadId in ids || ConversationIds.ofMessage(m.id) in ids
+
+        override fun messages(mailbox: Mailbox): Flow<PagingData<ThreadSummary>> = combine(messages, accountsState) { msgs, accts ->
+            val ids = accts.map { it.id }.toSet()
+            val inBox = when (mailbox) {
+                is Mailbox.Unified -> { val fIds = folders.filter { it.role == mailbox.role }.map { it.id }.toSet(); msgs.filter { it.folderId in fIds } }
+                is Mailbox.InFolder -> msgs.filter { it.folderId == mailbox.folderId }
+            }.filter { it.accountId in ids }.sortedByDescending { it.sentAt }
+            PagingData.from(inBox.map { m ->
+                ThreadSummary(
+                    threadId = ConversationIds.ofMessage(m.id), accountId = m.accountId, subject = m.subject, participants = listOf(m.from),
+                    snippet = m.snippet, lastMessageAt = m.sentAt, messageCount = 1, unreadCount = if (m.isUnread) 1 else 0,
+                    isStarred = m.isStarred, hasAttachments = m.attachments.any { !it.isInline }, recipients = m.to,
+                )
+            })
+        }
+
         override fun thread(threadId: Long): Flow<List<Message>> = messages.map { all ->
+            if (ConversationIds.isMessage(threadId)) return@map all.filter { it.id == ConversationIds.messageIdOf(threadId) }
             val folder = all.firstOrNull { it.threadId == threadId }?.folderId
             all.filter { it.threadId == threadId && (it.folderId == folder) }.sortedBy { it.sentAt }
         }
@@ -157,7 +176,7 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
             }
             messages.update { list ->
                 list.mapNotNull { m ->
-                    if (m.threadId !in threadIds) return@mapNotNull m
+                    if (!targets(m, threadIds)) return@mapNotNull m
                     when (action) {
                         MessageAction.MARK_READ -> m.copy(isUnread = false)
                         MessageAction.MARK_UNREAD -> m.copy(isUnread = true)
@@ -171,7 +190,7 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
         }
 
         override suspend fun move(threadIds: Collection<Long>, targetFolderId: Long) =
-            messages.update { list -> list.map { if (it.threadId in threadIds) it.copy(folderId = targetFolderId) else it } }
+            messages.update { list -> list.map { if (targets(it, threadIds)) it.copy(folderId = targetFolderId) else it } }
 
         override suspend fun refresh(mailbox: Mailbox) = delay(700)
 

@@ -188,7 +188,7 @@ internal class RealMailGraph(
             }
         }
     }
-    override fun thread(threadId: Long): Flow<List<app.dot.mail.data.model.Message>> = dao.observeThread(threadId).map { allRows ->
+    override fun thread(threadId: Long): Flow<List<app.dot.mail.data.model.Message>> = (if (ConversationIds.isMessage(threadId)) dao.observeMessage(ConversationIds.messageIdOf(threadId)) else dao.observeThread(threadId)).map { allRows ->
         val rows = allRows.groupBy { Codec.field(it.header, "messageId") ?: "local:${it.id}" }.values.map { copies -> copies.firstOrNull { it.bodyLoaded } ?: copies.first() }.sortedBy { it.sentAt }
         val attachments = dao.attachmentsFor(rows.map { it.id }).groupBy { it.messageId }
         rows.map { row ->
@@ -282,7 +282,8 @@ internal class RealMailGraph(
         database.withTransaction {
             for (thread in threadIds.distinct()) {
                 if (thread < 0) { if (action in setOf(MessageAction.TRASH, MessageAction.DELETE_FOREVER)) removeDraftAndSource(-thread); continue }
-                for (message in dao.threadMessages(thread)) {
+                val rows = threadOrMessageRows(thread)
+                for (message in rows) {
                     if (action == MessageAction.ARCHIVE && dao.folder(message.folderId)?.role != "INBOX") continue
                     val seen = when(action) { MessageAction.MARK_READ -> true; MessageAction.MARK_UNREAD -> false; else -> null }
                     val starred = when(action) { MessageAction.STAR -> true; MessageAction.UNSTAR -> false; else -> null }
@@ -312,10 +313,11 @@ internal class RealMailGraph(
                         dao.deleteMessage(message.id)
                     }
                 }
-                rebuildThread(thread)
+                if (!ConversationIds.isMessage(thread)) rebuildThread(thread) else rows.firstOrNull()?.let { rebuildThread(it.threadId) }
             }
         }; requestSync()
     }
+    override fun messages(mailbox: Mailbox): Flow<PagingData<ThreadSummary>> = messagesPaging(mailbox)
     override suspend fun createFolder(accountId: Long, parentFolderId: Long?, name: String): Long = createFolderLocal(accountId, parentFolderId, name)
     override suspend fun renameFolder(folderId: Long, newName: String) = relocateFolderLocal(folderId, keepParent = true, newParentId = null, newName = newName)
     override suspend fun moveFolder(folderId: Long, newParentFolderId: Long?) = relocateFolderLocal(folderId, keepParent = false, newParentId = newParentFolderId, newName = null)
@@ -324,10 +326,10 @@ internal class RealMailGraph(
         val target = dao.folder(targetFolderId) ?: throw MailActionException(MailActionFailure.FOLDER_UNAVAILABLE, "Destination folder is no longer available")
         database.withTransaction {
             if (threadIds.any { it < 0 }) throw MailActionException(MailActionFailure.OPERATION_PENDING, "Open or discard a local draft instead of moving it")
-            val messages = threadIds.distinct().flatMap { dao.threadMessages(it) }
+            val messages = threadIds.distinct().flatMap { threadOrMessageRows(it) }
             if (messages.any { it.accountId != target.accountId }) throw MailActionException(MailActionFailure.ACCOUNT_MISMATCH, "Choose conversations and a destination in the same account")
             messages.forEach { moveMessage(it, target) }
-            threadIds.distinct().forEach { rebuildThread(it) }
+            messages.map { it.threadId }.distinct().forEach { rebuildThread(it) }
         }; requestSync()
     }
     override suspend fun refresh(mailbox: Mailbox) {

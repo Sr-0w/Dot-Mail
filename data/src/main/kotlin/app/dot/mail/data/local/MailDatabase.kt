@@ -31,7 +31,7 @@ data class BodyTextRow(val messageId: Long, val chunk: Int, val text: String)
 @Entity(tableName = "search_matches", primaryKeys = ["queryHash", "messageId"], foreignKeys = [ForeignKey(entity = MessageRow::class, parentColumns = ["id"], childColumns = ["messageId"], onDelete = ForeignKey.CASCADE)], indices = [Index("messageId")])
 data class SearchMatchRow(val queryHash: String, val messageId: Long)
 data class BodyChunk(val text: String?, val html: String?)
-private const val MESSAGE_META = "id,accountId,folderId,threadId,uid,header,subject,sentAt,unread,starred,hasAttachments,snippet,NULL AS text,NULL AS html,bodyLoaded,remoteImages,senderSearch,recipientSearch,snippetFetched,bodyPath,messageIdKey"
+internal const val MESSAGE_META = "id,accountId,folderId,threadId,uid,header,subject,sentAt,unread,starred,hasAttachments,snippet,NULL AS text,NULL AS html,bodyLoaded,remoteImages,senderSearch,recipientSearch,snippetFetched,bodyPath,messageIdKey"
 
 @Dao
 interface MailDao {
@@ -56,6 +56,9 @@ interface MailDao {
     @Query("SELECT $MESSAGE_META FROM messages WHERE threadId=:id ORDER BY sentAt,id") suspend fun threadMessages(id: Long): List<MessageRow>
     @Query("SELECT $MESSAGE_META FROM messages WHERE folderId=:id") suspend fun folderMessages(id: Long): List<MessageRow>
     @Query("SELECT $MESSAGE_META FROM messages WHERE id=:id") suspend fun message(id: Long): MessageRow?
+    @Query("SELECT $MESSAGE_META FROM messages WHERE id=:id") fun observeMessage(id: Long): Flow<List<MessageRow>>
+    /** Single-message list (conversation grouping off). Columns must be MESSAGE_META so bodies stay out of the cursor. */
+    @RawQuery(observedEntities = [MessageRow::class, FolderRow::class]) fun pageMessages(query: SupportSQLiteQuery): PagingSource<Int, MessageRow>
     @Query("SELECT $MESSAGE_META FROM messages WHERE folderId=:folder AND uid=:uid") suspend fun byUid(folder: Long, uid: Long): MessageRow?
     @Query("SELECT $MESSAGE_META FROM messages WHERE folderId=:folder AND uid<0") suspend fun pendingMoves(folder: Long): List<MessageRow>
     @Query("UPDATE messages SET threadId=:target WHERE threadId=:source") suspend fun mergeMessages(source: Long, target: Long)

@@ -132,6 +132,7 @@ import app.dot.mail.data.model.FolderRole
 import app.dot.mail.data.model.MessageAction
 import app.dot.mail.data.model.ThreadSummary
 import app.dot.mail.ui.common.Format
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -146,7 +147,8 @@ fun InboxScreen(
     onOutbox: () -> Unit,
 ) {
     val graph = LocalMailGraph.current
-    val vm: InboxViewModel = viewModel { InboxViewModel(graph, createSavedStateHandle()) }
+    val appSettings = LocalSettings.current
+    val vm: InboxViewModel = viewModel { InboxViewModel(graph, createSavedStateHandle(), appSettings.ui.map { it.conversationView }) }
     val prefs by LocalSettings.current.ui.collectAsStateWithLifecycle()
     val mailbox by vm.mailbox.collectAsStateWithLifecycle()
     val header by vm.header.collectAsStateWithLifecycle()
