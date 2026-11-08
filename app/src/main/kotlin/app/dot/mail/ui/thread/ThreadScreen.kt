@@ -751,7 +751,13 @@ private fun MessageCard(
         }
         if (!expanded) return@Column
         AnimatedVisibility(details) { HeaderDetails(message, onSender) }
-        val body = message.body
+        // OpenPGP: status line + in-memory plaintext from OpenKeychain replaces the ciphertext for display only.
+        val pgp = app.dot.mail.ui.pgp.rememberPgpReader(message.id, message.body)
+        message.body?.let { if (it.pgp != null) app.dot.mail.ui.pgp.PgpBar(it, pgp) }
+        val body = pgp.decrypted ?: message.body?.let { b ->
+            // An encrypted PGP/MIME message has no readable part until decrypted; show nothing instead of an empty frame.
+            if (b.pgp is app.dot.mail.data.model.PgpContent.Encrypted) b.copy(plainText = b.plainText.orEmpty(), html = null) else b
+        }
         if (body == null) {
             Row(Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.l), verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.thread_downloading), style = Dot.type.callout, color = c.textTertiary)

@@ -21,7 +21,7 @@ internal class BodyStore(private val context: Context, private val dao: MailDao)
         if (row.bodyPath != null) {
             val dir=File(row.bodyPath)
             val (text,cutText)=prefix(File(dir,"plain.txt")); val(html,cutHtml)=prefix(File(dir,"body.html"))
-            return MessageBody(text,html,row.remoteImages,isTruncated=cutText||cutHtml)
+            return MessageBody(text,html,row.remoteImages,isTruncated=cutText||cutHtml,pgp=pgp(dir,text))
         }
         val text=StringBuilder(); val html=StringBuilder(); var offset=1; var truncated=false
         while(text.length<=displayLimit && html.length<=displayLimit) {
@@ -34,5 +34,17 @@ internal class BodyStore(private val context: Context, private val dao: MailDao)
             if(offset>displayLimit) { truncated=truncated||t.length==32_768||h.length==32_768; break }
         }
         return MessageBody(text.toString().takeIf { it.isNotEmpty() },html.toString().takeIf { it.isNotEmpty() },row.remoteImages,isTruncated=truncated)
+    }
+
+    private fun pgp(dir: File, text: String?): app.dot.mail.data.model.PgpContent? {
+        val encrypted = File(dir, app.dot.mail.engine.Pgp.ENCRYPTED_FILE)
+        if (encrypted.isFile) return app.dot.mail.data.model.PgpContent.Encrypted(encrypted.path)
+        val signed = File(dir, app.dot.mail.engine.Pgp.SIGNED_FILE); val signature = File(dir, app.dot.mail.engine.Pgp.SIGNATURE_FILE)
+        if (signed.isFile && signature.isFile) return app.dot.mail.data.model.PgpContent.Signed(signed.path, signature.path)
+        return when (app.dot.mail.engine.Pgp.inline(text)) {
+            app.dot.mail.engine.Pgp.Inline.ENCRYPTED -> app.dot.mail.data.model.PgpContent.InlineEncrypted
+            app.dot.mail.engine.Pgp.Inline.SIGNED -> app.dot.mail.data.model.PgpContent.InlineSigned
+            null -> null
+        }
     }
 }

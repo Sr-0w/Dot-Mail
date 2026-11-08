@@ -979,4 +979,22 @@
     <string name="settings_reader_font_system">System</string>
     <string name="settings_reader_font_serif">Serif</string>
     <string name="settings_reader_line_height">Reading line height</string>
+    <string name="pgp_encrypted">Encrypted with OpenPGP</string>
+    <string name="pgp_decrypt">Decrypt</string>
+    <string name="pgp_decrypting">Decrypting with OpenKeychain…</string>
+    <string name="pgp_verifying">Checking the signature…</string>
+    <string name="pgp_decrypted">Decrypted on this device · not saved</string>
+    <string name="pgp_decrypted_prefix">Decrypted · </string>
+    <string name="pgp_sig_valid">Signed by %1$s · verified</string>
+    <string name="pgp_sig_unconfirmed">Signed by %1$s · key not confirmed</string>
+    <string name="pgp_sig_key_missing">Signed, but the sender’s key isn’t in OpenKeychain</string>
+    <string name="pgp_sig_expired">Signed by %1$s with an expired or revoked key</string>
+    <string name="pgp_sig_invalid">The signature is not valid: the message may have been altered</string>
+    <string name="pgp_signed_unchecked">Signed with OpenPGP</string>
+    <string name="pgp_unknown_signer">an unknown key</string>
+    <string name="pgp_failed">OpenKeychain couldn’t process this message (%1$s)</string>
+    <string name="pgp_retry">Retry</string>
+    <string name="pgp_install_encrypted">This message is encrypted. Install OpenKeychain to read it.</string>
+    <string name="pgp_install_signed">This message is signed. Install OpenKeychain to check it.</string>
+    <string name="pgp_get_openkeychain">Get OpenKeychain</string>
 </resources>

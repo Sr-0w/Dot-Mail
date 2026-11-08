@@ -102,7 +102,20 @@ object Mime {
             val disposition = runCatching { p.disposition }.getOrNull()
             val name = runCatching { p.fileName }.getOrNull()
             val cid = runCatching { p.getHeader("Content-ID")?.firstOrNull()?.trim()?.trim('<','>') }.getOrNull()
-            if (type.startsWith("multipart/")) {
+            if (type == "multipart/encrypted" && Pgp.protocol(p) == "application/pgp-encrypted") {
+                // PGP/MIME (RFC 3156): keep only the ciphertext; the reader decrypts it in memory through OpenKeychain.
+                val multipart = p.content as Multipart
+                if (multipart.count >= 2) save(multipart.getBodyPart(1), Pgp.ENCRYPTED_FILE) else for (i in 0 until multipart.count) visit(multipart.getBodyPart(i), "$id.$i", depth+1)
+            } else if (type == "multipart/signed" && Pgp.protocol(p) == "application/pgp-signature") {
+                // Keep the signed entity byte-for-byte (headers + body, CRLF) and the detached signature for verification;
+                // the signed content is still shown normally.
+                val multipart = p.content as Multipart
+                if (multipart.count >= 2) {
+                    java.io.File(directory, Pgp.SIGNED_FILE).outputStream().use { out -> multipart.getBodyPart(0).writeTo(out) }
+                    save(multipart.getBodyPart(1), Pgp.SIGNATURE_FILE)
+                    visit(multipart.getBodyPart(0), "$id.0", depth+1)
+                } else for (i in 0 until multipart.count) visit(multipart.getBodyPart(i), "$id.$i", depth+1)
+            } else if (type.startsWith("multipart/")) {
                 val multipart = p.content as Multipart
                 for (i in 0 until multipart.count) visit(multipart.getBodyPart(i), "$id.$i", depth+1)
             } else if (name != null || disposition.equals(Part.ATTACHMENT,true) || type !in setOf("text/plain","text/html") || cid != null) {

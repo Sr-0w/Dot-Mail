@@ -204,7 +204,20 @@ data class MessageBody(
     val hasRemoteImages: Boolean,
     /** The private file retains the complete body; rendering is bounded to protect the app heap. */
     val isTruncated: Boolean = false,
+    /** OpenPGP content to decrypt/verify through OpenKeychain; null for ordinary mail. */
+    val pgp: PgpContent? = null,
 )
+
+/** OpenPGP shapes of a message body. Paths point into the app-private body directory. */
+sealed interface PgpContent {
+    /** PGP/MIME encrypted: [ciphertext] is the armoured payload; nothing readable is stored. */
+    data class Encrypted(val ciphertext: String) : PgpContent
+    /** PGP/MIME signed: the exact signed entity and its detached signature. */
+    data class Signed(val signedEntity: String, val signature: String) : PgpContent
+    /** Inline armour in the plain text (decrypt or verify the text itself). */
+    data object InlineEncrypted : PgpContent
+    data object InlineSigned : PgpContent
+}
 
 enum class MessageAction { MARK_READ, MARK_UNREAD, STAR, UNSTAR, ARCHIVE, TRASH, SPAM, NOT_SPAM, DELETE_FOREVER }
 

@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "DotMail"
-include(":app", ":designsystem", ":mail", ":data")
+include(":app", ":designsystem", ":mail", ":data", ":openpgp")

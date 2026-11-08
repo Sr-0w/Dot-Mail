@@ -6,6 +6,11 @@
     <!-- Only requested at runtime if the user turns on Settings > Sender pictures > Contact photos. -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
 
+    <queries>
+        <!-- OpenPGP provider (OpenKeychain), bound only when the user decrypts/verifies a message. -->
+        <package android:name="org.sufficientlysecure.keychain" />
+    </queries>
+
     <application
         android:name=".DotMailApp"
         android:allowBackup="false"

@@ -979,4 +979,22 @@
     <string name="settings_reader_font_system">System</string>
     <string name="settings_reader_font_serif">Serifenschrift</string>
     <string name="settings_reader_line_height">Zeilenhöhe beim Lesen</string>
+    <string name="pgp_encrypted">Mit OpenPGP verschlüsselt</string>
+    <string name="pgp_decrypt">Entschlüsseln</string>
+    <string name="pgp_decrypting">Entschlüsseln mit OpenKeychain…</string>
+    <string name="pgp_verifying">Signatur wird geprüft…</string>
+    <string name="pgp_decrypted">Auf diesem Gerät entschlüsselt · nicht gespeichert</string>
+    <string name="pgp_decrypted_prefix">Entschlüsselt · </string>
+    <string name="pgp_sig_valid">Signiert von %1$s · bestätigt</string>
+    <string name="pgp_sig_unconfirmed">Signiert von %1$s · Schlüssel nicht bestätigt</string>
+    <string name="pgp_sig_key_missing">Signiert, aber der Schlüssel des Absenders fehlt in OpenKeychain</string>
+    <string name="pgp_sig_expired">Von %1$s mit abgelaufenem oder widerrufenem Schlüssel signiert</string>
+    <string name="pgp_sig_invalid">Die Signatur ist ungültig: Die Nachricht wurde möglicherweise verändert</string>
+    <string name="pgp_signed_unchecked">Mit OpenPGP signiert</string>
+    <string name="pgp_unknown_signer">einem unbekannten Schlüssel</string>
+    <string name="pgp_failed">OpenKeychain konnte diese Nachricht nicht verarbeiten (%1$s)</string>
+    <string name="pgp_retry">Erneut</string>
+    <string name="pgp_install_encrypted">Diese Nachricht ist verschlüsselt. Installieren Sie OpenKeychain, um sie zu lesen.</string>
+    <string name="pgp_install_signed">Diese Nachricht ist signiert. Installieren Sie OpenKeychain, um sie zu prüfen.</string>
+    <string name="pgp_get_openkeychain">OpenKeychain holen</string>
 </resources>
