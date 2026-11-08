@@ -940,4 +940,20 @@
     <string name="oauth_error_denied">La connexion a été annulée ou refusée.</string>
     <string name="oauth_error_provider_response">La réponse du fournisseur n’est pas exploitable.</string>
     <string name="oauth_error_other">La connexion a échoué.</string>
+    <!-- Full-content search -->
+    <string name="search_scope_folder">Ce dossier</string>
+    <string name="search_scope_all_folders">Tous les dossiers</string>
+    <string name="search_scope_all_accounts">Tous les comptes</string>
+    <string name="search_server_toggle">Serveur</string>
+    <string name="search_sort">Trier les résultats</string>
+    <string name="search_sort_relevance">Pertinence</string>
+    <string name="search_sort_newest">Plus récents d’abord</string>
+    <string name="search_sort_oldest">Plus anciens d’abord</string>
+    <string name="search_indexing">Indexation… %1$d sur %2$d</string>
+    <string name="search_index_error">Indexation interrompue ; les résultats peuvent être incomplets.</string>
+    <string name="search_server_running">Recherche sur le serveur…</string>
+    <string name="search_server_limited">Affichage des résultats les plus récents par dossier. Affinez la recherche pour en voir plus.</string>
+    <string name="search_server_error">Le serveur n’a pas pu être interrogé. Résultats de cet appareil affichés.</string>
+    <string name="search_server_only">Sur le serveur</string>
+    <string name="search_result_in_folder">dans %1$s</string>
 </resources>

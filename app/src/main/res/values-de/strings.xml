@@ -940,4 +940,20 @@
     <string name="oauth_error_denied">Die Anmeldung wurde abgebrochen oder verweigert.</string>
     <string name="oauth_error_provider_response">Die Antwort des Anbieters war nicht verwendbar.</string>
     <string name="oauth_error_other">Anmeldung fehlgeschlagen.</string>
+    <!-- Full-content search -->
+    <string name="search_scope_folder">Dieser Ordner</string>
+    <string name="search_scope_all_folders">Alle Ordner</string>
+    <string name="search_scope_all_accounts">Alle Konten</string>
+    <string name="search_server_toggle">Server</string>
+    <string name="search_sort">Ergebnisse sortieren</string>
+    <string name="search_sort_relevance">Relevanz</string>
+    <string name="search_sort_newest">Neueste zuerst</string>
+    <string name="search_sort_oldest">Älteste zuerst</string>
+    <string name="search_indexing">Nachrichten werden indexiert… %1$d von %2$d</string>
+    <string name="search_index_error">Indexierung pausiert; Ergebnisse können unvollständig sein.</string>
+    <string name="search_server_running">Server wird durchsucht…</string>
+    <string name="search_server_limited">Es werden die neuesten Treffer pro Ordner gezeigt. Verfeinern Sie die Suche für mehr.</string>
+    <string name="search_server_error">Der Server konnte nicht durchsucht werden. Ergebnisse dieses Geräts werden gezeigt.</string>
+    <string name="search_server_only">Auf dem Server</string>
+    <string name="search_result_in_folder">in %1$s</string>
 </resources>

@@ -77,7 +77,8 @@ import kotlinx.serialization.Serializable
             else -> null
         }
 }
-@Serializable object SearchRoute
+/** [folderId] / [role]: the mailbox the search was opened from (0 / null = none). */
+@Serializable data class SearchRoute(val folderId: Long = 0, val role: String? = null)
 @Serializable object AttachmentsRoute
 @Serializable object SettingsRoute
 @Serializable object OutboxRoute
@@ -143,7 +144,15 @@ fun DotMailRoot(requests: StateFlow<ExternalRequest?>, onRequestConsumed: () -> 
                             InboxScreen(
                                 onOpenThread = { id, source -> if (twoPane) { selected = id; selectedSource = source } else nav.navigate(ThreadRoute(id, source)) },
                                 onCompose = { nav.openCompose() },
-                                onSearch = { nav.navigate(SearchRoute) },
+                                onSearch = { box ->
+                                    nav.navigate(
+                                        when (box) {
+                                            is app.dot.mail.data.model.Mailbox.InFolder -> SearchRoute(folderId = box.folderId)
+                                            is app.dot.mail.data.model.Mailbox.Unified -> SearchRoute(role = box.role.name)
+                                            else -> SearchRoute()
+                                        },
+                                    )
+                                },
                                 onSettings = { nav.navigate(SettingsRoute) },
                                 onAddAccount = { nav.navigate(AddAccountRoute(firstAccount = false)) },
                                 onOpenDraft = { nav.openCompose(ComposeRoute(draftId = it)) },
@@ -204,8 +213,9 @@ fun DotMailRoot(requests: StateFlow<ExternalRequest?>, onRequestConsumed: () -> 
             ) { entry ->
                 ComposeScreen(route = entry.toRoute(), onClose = { nav.popBackStack() })
             }
-            composable<SearchRoute> {
-                SearchScreen(onBack = { nav.popBackStack() }, onOpenThread = { nav.navigate(ThreadRoute(it)) })
+            composable<SearchRoute> { entry ->
+                val route = entry.toRoute<SearchRoute>()
+                SearchScreen(onBack = { nav.popBackStack() }, onOpenThread = { nav.navigate(ThreadRoute(it)) }, folderId = route.folderId, role = route.role)
             }
             composable<OutboxRoute> { app.dot.mail.ui.outbox.OutboxScreen(onBack = { nav.popBackStack() }) }
             composable<AttachmentsRoute> { app.dot.mail.ui.attachments.AttachmentsScreen(onBack = { nav.popBackStack() }) }
@@ -240,7 +250,7 @@ fun DotMailRoot(requests: StateFlow<ExternalRequest?>, onRequestConsumed: () -> 
                         subject = request.subject, body = request.body, attachments = request.attachments,
                     ),
                 )
-                ExternalRequest.Search -> nav.navigate(SearchRoute)
+                ExternalRequest.Search -> nav.navigate(SearchRoute())
             }
             onRequestConsumed()
         }

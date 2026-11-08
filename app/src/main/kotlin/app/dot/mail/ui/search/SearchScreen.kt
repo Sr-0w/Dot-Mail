@@ -51,6 +51,42 @@ import app.dot.mail.LocalMailGraph
 import app.dot.mail.data.MailGraph
 import app.dot.mail.data.model.ThreadSummary
 import app.dot.mail.ui.inbox.ThreadRow
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.outlined.Attachment
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.SwapVert
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import app.dot.design.DotShapes
+import app.dot.design.components.DotFilterChip
+import app.dot.design.components.DotIconButton
+import app.dot.design.components.DotMenu
+import app.dot.design.components.DotMenuItem
+import app.dot.mail.data.model.HighlightRange
+import app.dot.mail.data.model.SearchProgress
+import app.dot.mail.data.model.SearchResult
+import app.dot.mail.data.model.SearchScope
+import app.dot.mail.data.model.SearchSort
+import app.dot.mail.ui.common.Format
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
@@ -62,25 +98,66 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
+/** Where a search was opened from; lets the scope chips offer "this folder" / "all folders". */
+data class SearchContext(val folderIds: Set<Long>, val accountId: Long?)
+
+enum class SearchMode { THIS_FOLDER, ALL_FOLDERS, ALL_ACCOUNTS }
+
+/** Empty account/folder sets mean "everything", so a missing context falls back to all accounts. */
+internal fun scopeFor(mode: SearchMode, sort: SearchSort, server: Boolean, ctx: SearchContext?): SearchScope {
+    val base = SearchScope(includeServer = server, sort = sort)
+    return when {
+        ctx == null || mode == SearchMode.ALL_ACCOUNTS -> base
+        mode == SearchMode.THIS_FOLDER -> base.copy(folderIds = ctx.folderIds)
+        else -> base.copy(accountIds = setOfNotNull(ctx.accountId))
+    }
+}
+
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
-class SearchViewModel(graph: MailGraph) : ViewModel() {
+class SearchViewModel(private val graph: MailGraph, private val folderId: Long, private val role: String?) : ViewModel() {
     val query = MutableStateFlow("")
-    val results: Flow<PagingData<ThreadSummary>> = query
-        .map { it.trim() }
-        .debounce(250)
-        .distinctUntilChanged()
-        .flatMapLatest { q -> if (q.length < 2) flowOf(PagingData.empty()) else graph.mail.search(q) }
+    val mode = MutableStateFlow(SearchMode.ALL_ACCOUNTS)
+    val sort = MutableStateFlow(SearchSort.RELEVANCE)
+    val includeServer = MutableStateFlow(true)
+
+    /** Resolved from the mailbox the search was opened from; null when opened without one. */
+    val context: StateFlow<SearchContext?> = flow {
+        val accounts = graph.accounts.accounts.first()
+        val folders = accounts.flatMap { a -> graph.mail.folders(a.id).first() }
+        emit(
+            when {
+                folderId > 0 -> folders.firstOrNull { it.id == folderId }?.let { SearchContext(setOf(it.id), it.accountId) }
+                role != null -> folders.filter { it.role.name == role }.map { it.id }.toSet().takeIf { it.isNotEmpty() }?.let { SearchContext(it, null) }
+                else -> null
+            },
+        )
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    private val scope: Flow<SearchScope> = combine(mode, sort, includeServer, context) { m, s, server, ctx -> scopeFor(m, s, server, ctx) }
+
+    private val request: Flow<Pair<String, SearchScope>> = combine(query.map { it.trim() }.debounce(250).distinctUntilChanged(), scope) { q, sc -> q to sc }
+
+    val results: Flow<PagingData<SearchResult>> = request
+        .flatMapLatest { (q, sc) -> if (q.length < 2) flowOf(PagingData.empty()) else graph.mail.search(q, sc) }
         .cachedIn(viewModelScope)
+
+    val progress: StateFlow<SearchProgress> = request
+        .flatMapLatest { (q, sc) -> if (q.length < 2) flowOf(SearchProgress()) else graph.mail.searchProgress(q, sc) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SearchProgress())
     val current: StateFlow<String> get() = query
 }
 
 @Composable
-fun SearchScreen(onBack: () -> Unit, onOpenThread: (Long) -> Unit) {
+fun SearchScreen(onBack: () -> Unit, onOpenThread: (Long) -> Unit, folderId: Long = 0, role: String? = null) {
     val graph = LocalMailGraph.current
-    val vm: SearchViewModel = viewModel { SearchViewModel(graph) }
+    val vm: SearchViewModel = viewModel { SearchViewModel(graph, folderId, role) }
     val query by vm.current.collectAsStateWithLifecycle()
     val results = vm.results.collectAsLazyPagingItems()
-    val compact = LocalSettings.current.ui.collectAsStateWithLifecycle().value.density == Density.COMPACT
+    val progress by vm.progress.collectAsStateWithLifecycle()
+    val mode by vm.mode.collectAsStateWithLifecycle()
+    val sort by vm.sort.collectAsStateWithLifecycle()
+    val server by vm.includeServer.collectAsStateWithLifecycle()
+    val ctx by vm.context.collectAsStateWithLifecycle()
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val c = Dot.colors
@@ -101,7 +178,12 @@ fun SearchScreen(onBack: () -> Unit, onOpenThread: (Long) -> Unit) {
                 onSearch = { keyboard?.hide() },
             )
         }
+        ScopeBar(
+            mode = mode, sort = sort, server = server, hasFolder = ctx != null, hasAccount = ctx?.accountId != null,
+            onMode = { vm.mode.value = it }, onSort = { vm.sort.value = it }, onServer = { vm.includeServer.value = it },
+        )
         val q = query.trim()
+        if (q.length >= 2) ProgressLines(progress)
         when {
             q.length < 2 -> SearchHints()
             results.itemCount == 0 && results.loadState.refresh is LoadState.Loading ->
@@ -110,13 +192,127 @@ fun SearchScreen(onBack: () -> Unit, onOpenThread: (Long) -> Unit) {
                 }
             results.itemCount == 0 && results.loadState.refresh is LoadState.Error ->
                 EmptyState(Icons.Outlined.WifiOff, stringResource(R.string.search_error_title), (results.loadState.refresh as LoadState.Error).error.message ?: stringResource(R.string.search_error_body))
-            results.itemCount == 0 && results.loadState.refresh is LoadState.NotLoading ->
+            results.itemCount == 0 && results.loadState.refresh is LoadState.NotLoading && !progress.serverRunning ->
                 EmptyState(Icons.Outlined.SearchOff, stringResource(R.string.search_no_results_title), stringResource(R.string.search_no_results_body, q))
             else -> LazyColumn(Modifier.fillMaxSize().navigationBarsPadding()) {
-                items(results.itemCount, key = results.itemKey { it.threadId }) { i ->
-                    val t = results[i] ?: return@items
-                    ThreadRow(t, selected = false, selectionMode = false, compact = compact, onClick = { onOpenThread(t.threadId) }, onLongClick = {})
+                items(results.itemCount, key = results.itemKey { it.messageId }) { i ->
+                    val r = results[i] ?: return@items
+                    SearchResultRow(r, onClick = { onOpenThread(r.thread.threadId) })
                 }
+            }
+        }
+    }
+}
+
+/** Scope chips (this folder / all folders / all accounts), server toggle and sort menu in one quiet scrolling row. */
+@Composable
+private fun ScopeBar(
+    mode: SearchMode, sort: SearchSort, server: Boolean, hasFolder: Boolean, hasAccount: Boolean,
+    onMode: (SearchMode) -> Unit, onSort: (SearchSort) -> Unit, onServer: (Boolean) -> Unit,
+) {
+    var menu by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = DotSpacing.s), verticalAlignment = Alignment.CenterVertically) {
+        Box {
+            DotIconButton(Icons.Outlined.SwapVert, stringResource(R.string.search_sort), onClick = { menu = true })
+            DotMenu(menu, { menu = false }) {
+                listOf(
+                    SearchSort.RELEVANCE to R.string.search_sort_relevance, SearchSort.NEWEST to R.string.search_sort_newest, SearchSort.OLDEST to R.string.search_sort_oldest,
+                ).forEach { (value, label) -> DotMenuItem(stringResource(label), if (value == sort) Icons.Outlined.Check else null) { menu = false; onSort(value) } }
+            }
+        }
+        if (hasFolder) {
+            DotFilterChip(stringResource(R.string.search_scope_folder), mode == SearchMode.THIS_FOLDER, { onMode(SearchMode.THIS_FOLDER) }, radio = true)
+            Spacer(Modifier.width(DotSpacing.s))
+            if (hasAccount) {
+                DotFilterChip(stringResource(R.string.search_scope_all_folders), mode == SearchMode.ALL_FOLDERS, { onMode(SearchMode.ALL_FOLDERS) }, radio = true)
+                Spacer(Modifier.width(DotSpacing.s))
+            }
+        }
+        DotFilterChip(stringResource(R.string.search_scope_all_accounts), mode == SearchMode.ALL_ACCOUNTS, { onMode(SearchMode.ALL_ACCOUNTS) }, radio = true)
+        Spacer(Modifier.width(DotSpacing.m))
+        DotFilterChip(stringResource(R.string.search_server_toggle), server, { onServer(!server) })
+    }
+}
+
+/** Indexing and server activity, shown as quiet caption lines so partial results never look final. */
+@Composable
+private fun ProgressLines(p: SearchProgress) {
+    val c = Dot.colors
+    Column(Modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter)) {
+        if (p.index.running && p.index.total > 0) {
+            Text(stringResource(R.string.search_indexing, p.index.indexed, p.index.total), style = Dot.type.caption, color = c.textTertiary)
+        } else if (p.index.error != null) {
+            Text(stringResource(R.string.search_index_error), style = Dot.type.caption, color = c.textTertiary)
+        }
+        if (p.serverRunning) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.search_server_running), style = Dot.type.caption, color = c.textTertiary)
+                Spacer(Modifier.width(DotSpacing.s))
+                app.dot.design.components.DotDotsLoader(color = c.textTertiary)
+            }
+        } else if (p.serverError != null) {
+            Text(stringResource(R.string.search_server_error), style = Dot.type.caption, color = c.textTertiary)
+        } else if (p.serverLimited) {
+            Text(stringResource(R.string.search_server_limited), style = Dot.type.caption, color = c.textTertiary)
+        }
+    }
+}
+
+/** [text] with the engine's [ranges] (UTF-16, end exclusive) emphasised; out-of-bounds ranges are ignored. */
+internal fun highlighted(text: String, ranges: List<HighlightRange>, emphasis: SpanStyle): AnnotatedString = buildAnnotatedString {
+    append(text)
+    ranges.forEach { r ->
+        val start = r.start.coerceIn(0, text.length)
+        val end = r.endExclusive.coerceIn(start, text.length)
+        if (end > start) addStyle(emphasis, start, end)
+    }
+}
+
+@Composable
+private fun SearchResultRow(r: SearchResult, onClick: () -> Unit) {
+    val c = Dot.colors
+    val t = r.thread
+    val emphasis = remember(c.accent) { SpanStyle(fontWeight = FontWeight.SemiBold, background = c.accent.copy(alpha = 0.16f)) }
+    val subject = r.subject.ifBlank { stringResource(R.string.inbox_no_subject) }
+    val onServer = stringResource(R.string.search_server_only)
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick)
+            .semantics(mergeDescendants = true) { if (r.serverOnly) stateDescription = onServer }
+            .padding(horizontal = DotSpacing.gutter, vertical = 12.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        app.dot.mail.ui.avatar.SenderAvatar(t.participants.lastOrNull() ?: app.dot.mail.data.model.EmailAddress("?"))
+        Spacer(Modifier.width(DotSpacing.m))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    t.participants.lastOrNull()?.displayName.orEmpty(), style = Dot.type.headline, color = c.textPrimary,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                )
+                if (t.hasAttachments) {
+                    Icon(Icons.Outlined.Attachment, null, Modifier.size(15.dp), tint = c.textTertiary)
+                    Spacer(Modifier.width(6.dp))
+                }
+                Text(Format.listDate(t.lastMessageAt), style = Dot.type.caption, color = c.textTertiary)
+            }
+            Spacer(Modifier.height(2.dp))
+            Text(
+                highlighted(subject, r.subjectHighlights, emphasis), style = Dot.type.callout, color = c.textPrimary,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+            if (r.snippet.isNotBlank()) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    highlighted(r.snippet, r.highlights, emphasis), style = Dot.type.callout, color = c.textTertiary,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (r.serverOnly) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    onServer, style = Dot.type.label, color = c.textSecondary,
+                    modifier = Modifier.clip(DotShapes.small).border(1.dp, c.border, DotShapes.small).padding(horizontal = DotSpacing.s, vertical = 2.dp),
+                )
             }
         }
     }
