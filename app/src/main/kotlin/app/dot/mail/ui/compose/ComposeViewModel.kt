@@ -280,6 +280,37 @@ class ComposeViewModel(
         }
     }
 
+    /**
+     * Inserts a reusable template above whatever is already written (so a signature stays at the end), filling
+     * {{first_name}}/{{name}}/{{email}} from the first recipient and {{my_name}} from the sender. Sets the subject
+     * only when it is still empty.
+     */
+    fun insertTemplate(template: app.dot.mail.engine.text.EmailTemplate) {
+        val s = _state.value
+        val d = s.draft ?: return
+        val to = d.to.firstOrNull()
+        val me = s.senders.firstOrNull { it.accountId == d.accountId && it.identityId == d.identityId } ?: s.senders.firstOrNull { it.accountId == d.accountId }
+        val vars = buildMap {
+            to?.let { a ->
+                val name = a.name?.takeIf { it.isNotBlank() }
+                put("email", a.email)
+                put("name", name ?: a.email)
+                put("first_name", name?.substringBefore(' ') ?: a.email.substringBefore('@'))
+            }
+            me?.let { put("my_name", it.name) }
+            put("date", java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM)))
+        }
+        val t = app.dot.mail.engine.text.render(template, vars)
+        if (d.subject.isBlank() && !t.subject.isNullOrBlank()) edit { it.copy(subject = t.subject!!) }
+        if (s.isRichText) {
+            val html = t.bodyHtml ?: EmailHtml.fromPlainText(t.bodyText)
+            onRichBodyChanged(if (s.bodyHtml.isBlank() || s.bodyHtml == "<p><br></p>") html else html + s.bodyHtml.removePrefix("<p><br></p>"))
+        } else {
+            val current = s.editableText
+            onPlainBodyChanged(if (current.isBlank()) t.bodyText else t.bodyText.trimEnd() + "\n" + current.trimStart('\n').let { if (it.startsWith("-- ")) "\n$it" else it })
+        }
+    }
+
     fun toggleQuoteExpanded() = _state.update { it.copy(quoteExpanded = !it.quoteExpanded) }
 
     fun setSender(sender: Sender) {

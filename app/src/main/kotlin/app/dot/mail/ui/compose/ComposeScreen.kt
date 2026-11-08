@@ -184,6 +184,8 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
     val reduceMotion = rememberReducedMotion()
 
     val richTextState = rememberRichTextState()
+    var templatesOpen by remember { mutableStateOf(false) }
+    if (templatesOpen) TemplateSheet(state, onInsert = { templatesOpen = false; vm.insertTemplate(it) }, onDismiss = { templatesOpen = false })
     LaunchedEffect(c.accent, c.textPrimary, c.surfaceRaised, c.border) {
         richTextState.config.linkColor = c.accent
         richTextState.config.linkTextDecoration = TextDecoration.Underline
@@ -261,6 +263,7 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                                 vm.switchToRichText()
                             }
                         }
+                        DotMenuItem("Templates…", Icons.Outlined.Description) { menu = false; templatesOpen = true }
                         DotMenuItem(stringResource(R.string.compose_schedule_send), Icons.Outlined.Schedule) { menu = false; scheduleMenu = true }
                         DotMenuItem(stringResource(R.string.compose_discard), Icons.Outlined.DeleteOutline, color = c.danger) { menu = false; vm.discard() }
                     }
