@@ -179,8 +179,8 @@ fun AttachmentsScreen(onBack: () -> Unit) {
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = DotSpacing.gutter, vertical = DotSpacing.s),
                 horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(DotSpacing.s),
             ) {
-                item { FilterChip(stringResource(R.string.attachments_filter_all), kind == null) { vm.kind.value = null } }
-                items(AttachmentKind.entries.toList()) { k -> FilterChip(stringResource(label(k)), kind == k) { vm.kind.value = if (kind == k) null else k } }
+                item { app.dot.design.components.DotFilterChip(stringResource(R.string.attachments_filter_all), kind == null, { vm.kind.value = null }, radio = true) }
+                items(AttachmentKind.entries.toList()) { k -> app.dot.design.components.DotFilterChip(stringResource(label(k)), kind == k, { vm.kind.value = if (kind == k) null else k }, radio = true) }
             }
             if (items.itemCount == 0 && items.loadState.refresh is androidx.paging.LoadState.NotLoading) {
                 EmptyState(
@@ -210,21 +210,6 @@ private fun label(k: AttachmentKind) = when (k) {
     AttachmentKind.PDFS -> R.string.attachments_kind_pdfs
     AttachmentKind.DOCUMENTS -> R.string.attachments_kind_documents
     AttachmentKind.OTHER -> R.string.attachments_kind_other
-}
-
-@Composable
-private fun FilterChip(text: String, selected: Boolean, onClick: () -> Unit) {
-    val c = Dot.colors
-    Box(
-        Modifier.defaultMinSize(minHeight = 48.dp).selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text, style = Dot.type.label, color = if (selected) c.onInverse else c.textSecondary,
-            modifier = Modifier.clip(DotShapes.small).background(if (selected) c.inverse else androidx.compose.ui.graphics.Color.Transparent)
-                .border(1.dp, if (selected) c.inverse else c.border, DotShapes.small).padding(horizontal = DotSpacing.m, vertical = 7.dp),
-        )
-    }
 }
 
 @Composable

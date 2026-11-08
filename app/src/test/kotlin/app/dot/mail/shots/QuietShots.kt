@@ -102,4 +102,18 @@ class QuietShots {
     }
     @Test fun searchLight() = shoot("search", false, searchScreen())
     @Test fun searchDark() = shoot("search", true, searchScreen())
+
+    // ---- audit leftovers: composer, account setup, attachments, outbox, snooze, dialogs ----
+    private fun both(name: String, content: @Composable () -> Unit) { shoot(name, false, content) }
+
+    @Test fun composeLight() = shoot("compose", false) { app.dot.mail.ui.compose.ComposeScreen(route = app.dot.mail.ui.ComposeRoute(), onClose = {}) }
+    @Test fun composeDark() = shoot("compose", true) { app.dot.mail.ui.compose.ComposeScreen(route = app.dot.mail.ui.ComposeRoute(), onClose = {}) }
+    @Test fun setupLight() = shoot("account-setup", false) { app.dot.mail.ui.account.AddAccountScreen(onBack = {}, onDone = {}) }
+    @Test fun setupDark() = shoot("account-setup", true) { app.dot.mail.ui.account.AddAccountScreen(onBack = {}, onDone = {}) }
+    @Test fun attachmentsLight() = shoot("attachments", false) { app.dot.mail.ui.attachments.AttachmentsScreen(onBack = {}) }
+    @Test fun attachmentsDark() = shoot("attachments", true) { app.dot.mail.ui.attachments.AttachmentsScreen(onBack = {}) }
+    @Test fun outboxLight() = shoot("outbox", false) { app.dot.mail.ui.outbox.OutboxScreen(onBack = {}) }
+    @Test fun outboxDark() = shoot("outbox", true) { app.dot.mail.ui.outbox.OutboxScreen(onBack = {}) }
+    @Test fun snoozeLight() = shoot("snooze", false) { app.dot.mail.ui.snooze.SnoozeSheet(onDismiss = {}, onPick = {}) }
+    @Test fun snoozeDark() = shoot("snooze", true) { app.dot.mail.ui.snooze.SnoozeSheet(onDismiss = {}, onPick = {}) }
 }
