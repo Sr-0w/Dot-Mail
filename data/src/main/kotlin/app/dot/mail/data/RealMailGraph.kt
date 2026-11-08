@@ -309,6 +309,32 @@ internal class RealMailGraph(
     override suspend fun apply(action: MessageAction, threadIds: Collection<Long>, sourceMailbox: Mailbox) =
         applyScoped(action, threadIds, sourceMailbox)
 
+    override suspend fun applyUndoable(action: MessageAction, threadIds: Collection<Long>, sourceMailbox: Mailbox): app.dot.mail.data.model.UndoToken? {
+        if (action !in setOf(MessageAction.ARCHIVE, MessageAction.TRASH, MessageAction.SPAM)) { applyScoped(action, threadIds, sourceMailbox); return null }
+        // Record where each affected message lives *before* moving it; drafts (negative ids) have no undo here.
+        val origins = withContext(Dispatchers.IO) {
+            threadIds.distinct().filter { it >= 0 }.flatMap { actionRows(it, sourceMailbox, true) }.map { it.id to it.folderId }
+        }
+        applyScoped(action, threadIds, sourceMailbox)
+        return app.dot.mail.data.model.UndoToken(origins)
+    }
+
+    override suspend fun undo(token: app.dot.mail.data.model.UndoToken): Int = withContext(Dispatchers.IO) {
+        var failed = 0
+        database.withTransaction {
+            val threads = mutableSetOf<Long>()
+            for ((messageId, folderId) in token.moves) {
+                val message = dao.message(messageId); val folder = dao.folder(folderId)
+                if (message == null || folder == null) { failed++; continue }
+                // A move not yet sent to the server is simply cancelled here (see moveMessage), so nothing reaches IMAP.
+                runCatching { moveMessage(message, folder) }.onSuccess { threads += message.threadId }.onFailure { failed++ }
+            }
+            threads.forEach { rebuildThread(it) }
+        }
+        requestSync()
+        failed
+    }
+
     private suspend fun actionRows(id: Long, mailbox: Mailbox?, moving: Boolean): List<MessageRow> {
         val rows = threadOrMessageRows(id)
         if (mailbox == null) {

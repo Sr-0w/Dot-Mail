@@ -71,6 +71,17 @@ class InboxViewModel(
     private val _events = Channel<String>(Channel.BUFFERED)
     /** One-off messages for the snackbar. */
     val events: Flow<String> = _events.receiveAsFlow()
+    private val _undoEvents = Channel<Pair<String, app.dot.mail.data.model.UndoToken>>(Channel.BUFFERED)
+    /** Confirmation text + what to undo, shown as a snackbar with an Undo action. */
+    val undoEvents: Flow<Pair<String, app.dot.mail.data.model.UndoToken>> = _undoEvents.receiveAsFlow()
+
+    fun undo(token: app.dot.mail.data.model.UndoToken) {
+        viewModelScope.launch {
+            runCatching { graph.mail.undo(token) }
+                .onSuccess { failed -> if (failed > 0) _events.send(str(R.string.inbox_undo_partial)) }
+                .onFailure { _events.send(it.message ?: str(R.string.inbox_error_action_failed)) }
+        }
+    }
 
     val accounts: StateFlow<List<Account>> =
         graph.accounts.accounts.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -150,10 +161,13 @@ class InboxViewModel(
         val count = ids.size
         val source = _mailbox.value
         viewModelScope.launch {
-            runCatching { graph.mail.apply(action, ids.toList(), source) }
-                .onSuccess {
+            runCatching { graph.mail.applyUndoable(action, ids.toList(), source) }
+                .onSuccess { token ->
                     _selection.value = emptySet()
-                    confirmation(action, count)?.let { _events.send(it) }
+                    val text = confirmation(action, count)
+                    // Archive/trash/spam can be undone from the snackbar (a swipe is easy to trigger by accident).
+                    if (text != null && token != null && token.moves.isNotEmpty()) _undoEvents.send(text to token)
+                    else text?.let { _events.send(it) }
                 }
                 .onFailure { _events.send(it.message ?: str(R.string.inbox_error_action_failed)) }
         }

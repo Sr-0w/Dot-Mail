@@ -125,6 +125,14 @@ interface MailRepository {
     /** Apply only to messages visible in [sourceMailbox], including per-account folders in a unified role. */
     suspend fun apply(action: MessageAction, threadIds: Collection<Long>, sourceMailbox: Mailbox) = apply(action, threadIds)
 
+    /** Like [apply], and for archive/trash/spam returns what [undo] needs to put the messages back (null otherwise). */
+    suspend fun applyUndoable(action: MessageAction, threadIds: Collection<Long>, sourceMailbox: Mailbox): app.dot.mail.data.model.UndoToken? {
+        apply(action, threadIds, sourceMailbox); return null
+    }
+
+    /** Moves the messages of [token] back to their original folders. Returns how many could not be moved back. */
+    suspend fun undo(token: app.dot.mail.data.model.UndoToken): Int = token.moves.size
+
     /** Move only messages visible in [sourceMailbox]; other copies/replies in the conversation stay put. */
     suspend fun move(threadIds: Collection<Long>, targetFolderId: Long, sourceMailbox: Mailbox) = move(threadIds, targetFolderId)
 

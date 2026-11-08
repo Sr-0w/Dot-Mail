@@ -210,6 +210,16 @@ fun InboxScreen(
     val pullState = rememberPullToRefreshState()
 
     LaunchedEffect(Unit) { vm.events.collect { snackbar.showSnackbar(it) } }
+    val undoLabel = stringResource(R.string.inbox_undo)
+    LaunchedEffect(Unit) {
+        vm.undoEvents.collect { (text, token) ->
+            // Launched so a new action can replace this snackbar without waiting for it to time out.
+            launch {
+                val result = snackbar.showSnackbar(text, actionLabel = undoLabel, duration = androidx.compose.material3.SnackbarDuration.Long)
+                if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) vm.undo(token)
+            }
+        }
+    }
     AskNotificationPermissionOnce()
     // Back closes the selection first.
     androidx.activity.compose.BackHandler(enabled = selection.isNotEmpty()) { vm.clearSelection() }

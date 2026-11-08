@@ -997,4 +997,6 @@
     <string name="pgp_install_encrypted">Diese Nachricht ist verschlüsselt. Installieren Sie OpenKeychain, um sie zu lesen.</string>
     <string name="pgp_install_signed">Diese Nachricht ist signiert. Installieren Sie OpenKeychain, um sie zu prüfen.</string>
     <string name="pgp_get_openkeychain">OpenKeychain holen</string>
+    <string name="inbox_undo">Rückgängig</string>
+    <string name="inbox_undo_partial">Einige Nachrichten konnten nicht zurückgelegt werden; das geschieht bei der nächsten Synchronisierung.</string>
 </resources>

@@ -997,4 +997,6 @@
     <string name="pgp_install_encrypted">Ce message est chiffré. Installez OpenKeychain pour le lire.</string>
     <string name="pgp_install_signed">Ce message est signé. Installez OpenKeychain pour le vérifier.</string>
     <string name="pgp_get_openkeychain">Obtenir OpenKeychain</string>
+    <string name="inbox_undo">Annuler</string>
+    <string name="inbox_undo_partial">Certains messages n’ont pas pu être remis en place ; ils le seront à la prochaine synchronisation.</string>
 </resources>
