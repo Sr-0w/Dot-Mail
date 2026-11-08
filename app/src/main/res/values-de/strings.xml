@@ -1069,4 +1069,6 @@
     <string name="aliases_remove_key">Schlüssel entfernen</string>
     <string name="aliases_copy">Kopieren</string>
     <string name="aliases_error">Alias-Anbieter nicht erreichbar. Prüfen Sie den Schlüssel und versuchen Sie es erneut.</string>
+    <string name="compose_use_alias">Alias verwenden…</string>
+    <string name="aliases_reply_to_guidance">Diese Alias-Domain gehört nicht zu Ihren Identitäten. Die Adresse wurde kopiert; verwenden Sie sie als Antwort-an-Hinweis.</string>
 </resources>

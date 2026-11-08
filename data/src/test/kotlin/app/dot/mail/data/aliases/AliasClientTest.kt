@@ -2,9 +2,12 @@ package app.dot.mail.data.aliases
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 import java.net.ServerSocket
 import java.util.concurrent.atomic.AtomicReference
 
+@RunWith(RobolectricTestRunner::class)
 class AliasClientTest {
     private fun serve(body: String, block: (String) -> Unit) {
         val server = ServerSocket(0)

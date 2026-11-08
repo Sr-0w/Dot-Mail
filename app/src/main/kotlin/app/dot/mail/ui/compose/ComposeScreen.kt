@@ -68,6 +68,7 @@ import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.TextFormat
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
@@ -76,6 +77,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -135,6 +137,18 @@ import app.dot.mail.LocalMailGraph
 import app.dot.mail.LocalSettings
 import app.dot.mail.R
 import app.dot.mail.data.model.EmailAddress
+import app.dot.mail.data.model.Identity
+import app.dot.mail.data.aliases.AliasSettings
+import app.dot.mail.data.aliases.EmailAlias
+import app.dot.mail.data.aliases.SimpleLoginClient
+import app.dot.mail.data.aliases.AddyClient
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.widget.Toast
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import app.dot.mail.ui.ComposeRoute
 import app.dot.mail.ui.avatar.SenderAvatar
 import app.dot.mail.ui.common.Format
@@ -146,8 +160,6 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.temporal.TemporalAdjusters
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 private val QuoteIndent = 16.sp
 private val QuoteParagraphStyle = ParagraphStyle(textIndent = TextIndent(firstLine = QuoteIndent, restLine = QuoteIndent))
@@ -178,11 +190,13 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
     }
     LaunchedEffect(pgpPrompt) { pgpPrompt?.let { pgpLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(it.intentSender).build()) } }
     val state by vm.state.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
     val closed by vm.closed.collectAsStateWithLifecycle()
     val c = Dot.colors
     var menu by remember { mutableStateOf(false) }
     var scheduleMenu by remember { mutableStateOf(false) }
     var senderMenu by remember { mutableStateOf(false) }
+    var aliasChoices by remember { mutableStateOf<List<EmailAlias>?>(null) }
     var confirmPlainDialog by remember { mutableStateOf(false) }
     var confirmCloseDialog by remember { mutableStateOf(false) }
     val requestClose: () -> Unit = { if (vm.needsCloseChoice()) confirmCloseDialog = true else vm.close() }
@@ -290,7 +304,7 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
         if (draft == null) return@Column
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             // From
-            if (state.senders.size > 1) {
+            if (state.senders.isNotEmpty()) {
                 Box {
                     FieldRow(stringResource(R.string.compose_from), onClick = { senderMenu = true }) {
                         Text(state.sender?.email.orEmpty(), style = Dot.type.callout, color = c.textPrimary, modifier = Modifier.weight(1f))
@@ -299,6 +313,20 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                     DotMenu(senderMenu, { senderMenu = false }) {
                         state.senders.forEach { s ->
                             DotMenuItem("${s.name} <${s.email}>", null) { senderMenu = false; vm.setSender(s) }
+                        }
+                        DotMenuItem(stringResource(R.string.compose_use_alias), null) {
+                            senderMenu = false
+                            scope.launch {
+                                val store = AliasSettings.create(appContext)
+                                val selected = state.sender
+                                val result = withContext(Dispatchers.IO) {
+                                    listOf("simplelogin" to SimpleLoginClient(), "addy" to AddyClient()).flatMap { (id, provider) ->
+                                        store.key(id)?.let { runCatching { provider.list(it) }.getOrDefault(emptyList()) }.orEmpty()
+                                    }
+                                }
+                                aliasChoices = result
+                                if (result.isEmpty() && selected == null) Toast.makeText(context, R.string.aliases_error, Toast.LENGTH_SHORT).show()
+                            }
                         }
                     }
                 }
@@ -425,6 +453,27 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                     onToggle = vm::toggleQuoteExpanded,
                 )
             }
+        }
+        aliasChoices?.let { choices ->
+            AlertDialog(onDismissRequest = { aliasChoices = null }, title = { Text(stringResource(R.string.compose_use_alias)) },
+                text = { Column { choices.forEach { alias -> TextButton(onClick = {
+                    aliasChoices = null
+                    val sender = state.sender
+                    scope.launch {
+                        val accounts = graph.accounts.accounts.first()
+                        val account = accounts.firstOrNull { it.id == sender?.accountId }
+                        val domain = alias.email.substringAfterLast('@', "").lowercase()
+                        val hasDomain = account?.identities.orEmpty().any { it.email.substringAfterLast('@', "").equals(domain, true) }
+                        if (hasDomain && account != null) {
+                            val identity = Identity(0, account.id, alias.email.substringBefore('@'), alias.email)
+                            val id = graph.accounts.saveIdentity(identity)
+                            vm.setSender(Sender(account.id, id, identity.name, identity.email))
+                        } else {
+                            (context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("email alias", alias.email))
+                            Toast.makeText(context, R.string.aliases_reply_to_guidance, Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }) { Text(alias.email) } } } }, confirmButton = { TextButton(onClick = { aliasChoices = null }) { Text(stringResource(R.string.compose_close)) } })
         }
         if (state.savedOnce) {
             Text(
