@@ -44,6 +44,8 @@ Microsoft no longer accepts passwords for IMAP on personal accounts, so this is 
 Release and debug Android clients exist for `app.dot.mail`; the consent screen is in **Testing** (only listed test
 users can sign in, grants expire after 7 days) until Google's verification is requested.
 
+Verification steps: [GOOGLE_VERIFICATION.md](GOOGLE_VERIFICATION.md).
+
 Gmail keeps working with app passwords (Google account → Security → 2-Step Verification → App passwords). Full
 mail access (`https://mail.google.com/`) is a *restricted* scope: a client ID works immediately for up to 100 test
 users (grants expire after 7 days while the app is in "Testing"), and a public release needs Google's OAuth app
