@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-Changes merged after `v0.1.0-alpha.2`, through `8fff792` (PR #84). This is a release-readiness candidate, not a published version; the maintainer chooses the next versionCode/tag.
+Changes merged after `v0.1.0-alpha.2`, through `d991284` (PR #101). This is a release-readiness candidate, not a published version; the maintainer chooses the next versionCode/tag.
 
 ### Mail reliability and offline data
 
@@ -17,6 +17,7 @@ Changes merged after `v0.1.0-alpha.2`, through `8fff792` (PR #84). This is a rel
 - SimpleLogin/addy.io alias tools and sender identities (#47); richer recipient suggestions (#63).
 - Custom scheduled-send dates/time zones, outbox editing and restart/clock-change recovery without blind duplicate sends (#59, #72, #73).
 - Protected OpenPGP compose/outbox flows through OpenKeychain (#50); distinct verification/encryption indicators (#66).
+- S/MIME with your own certificate from Android KeyChain (#84, #87, #92–#101): per-account signing/encryption certificates and defaults; Sign/Encrypt in Compose with per-recipient lock state, no silent downgrade when a certificate is missing, and one envelope for To+Cc with a separate one per Bcc recipient. Received mail shows its signature state (trusted only for a certificate chaining to a device CA and issued for the sender's address; certificate details on tap), detached and Outlook-style opaque signatures, and decrypts AES-CBC/GCM envelopes in memory, including attachments and inline images. Revocation is not checked (no OCSP/CRL requests), and this is stated in the details. Bouncy Castle 1.86 is the CMS library; its notices are bundled.
 
 ### Native interface and reading
 
@@ -29,7 +30,7 @@ Changes merged after `v0.1.0-alpha.2`, through `8fff792` (PR #84). This is a rel
 
 - Toolchain updated to AGP 9.5.1, Gradle 9.9.0, Kotlin 2.4.21, compile SDK 37 and Room 2.8.5 (#70).
 - Localized provider hints, clearer empty-state actions and resource parity checks (#88, #89).
-- Isolated S/MIME CMS engine using Bouncy Castle 1.86 (#84); reader/composer integration is separate work and is not claimed by this candidate.
+- Bouncy Castle provider kept under R8, verified on ART by the `minifiedCheck` S/MIME self-test; release notices are recomputed from the shrunk APK on every release build.
 - Read-only JMAP engine and fixture tests behind an explicit MailClient facade (#79). Account integration remains future work; no JMAP setup or write operations are advertised.
 
 ## 0.1.0-alpha.2

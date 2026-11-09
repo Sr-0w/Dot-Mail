@@ -81,7 +81,14 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
 
 - **FR-44b · P3 · S/MIME** — user-owned certificate/key (PKCS#12 or Android KeyChain), sign/encrypt/both for new mail,
   replies and forwards, per-account defaults, per-recipient certificate validation, no silent downgrade, validity info,
-  interoperability tests with real S/MIME clients, audited libraries only. Evidence: none; OpenPGP is FR-44a.
+  interoperability tests with real S/MIME clients, audited libraries only.
+  - [x] Keys from Android KeyChain (PKCS#12 imported through the system); per-account signing/encryption aliases and defaults (#87, #95)
+  - [x] Sign / encrypt / both in Compose, per-recipient lock state, blocked send instead of downgrade; To+Cc share one envelope, each Bcc its own (#93, #97, #98)
+  - [x] Recipient certificates collected from signed mail, pinning; trust = PKIX to device CAs + mailbox + validity + emailProtection; revocation deliberately not checked and stated (#92, #94)
+  - [x] Received: detached and opaque signatures with certificate details; AES-CBC/GCM decryption in memory incl. attachments (#96, #99, #100, #101)
+  - [x] Bouncy Castle 1.86 only (CMS); R8 keep rules proven on ART by the `minifiedCheck` self-test; notices bundled (release-readiness PR)
+  - [ ] Interop fixtures from real client shapes (x-pkcs7, RSA-PSS/ECDSA, OAEP, ECDH key agreement, LF/8bit) — in progress
+  - [ ] Device check with the owner's certificate: badge/details, hidden .p7s, decrypt, compose locks
 
 ---
 

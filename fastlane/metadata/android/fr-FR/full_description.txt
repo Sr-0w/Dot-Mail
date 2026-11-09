@@ -10,6 +10,7 @@ Dot Mail est un client e-mail Android libre et natif, écrit en Kotlin et Jetpac
 <li>Brouillons enrichis, signatures, identités et outils d’alias SimpleLogin/addy.io facultatifs</li>
 <li>Annulation, envoi programmé et confirmation avant de relancer un envoi au résultat incertain</li>
 <li>Pièces jointes, aperçu PDF, invitations de calendrier et OpenPGP via OpenKeychain en option</li>
+<li>Signature et chiffrement S/MIME avec votre propre certificat, depuis le magasin de certificats d’Android</li>
 <li>Politiques de téléchargement par compte, quotas de stockage et téléchargement hors ligne facultatif ; le contenu déjà téléchargé reste accessible sans réseau</li>
 </ul>
 
@@ -28,7 +29,7 @@ Interface en français, anglais et allemand ; thèmes clair, sombre et OLED.
 <b>Préversion</b>
 Les mots de passe applicatifs fonctionnent avec les serveurs compatibles. La connexion Gmail par navigateur est réservée aux utilisateurs de test Google inscrits ; les autorisations expirent après 7 jours tant que la vérification des accès restreints reste en attente. Elle exige un identifiant Google enregistré dans cette compilation. Un mot de passe d’application Gmail reste une alternative si le compte le permet. La connexion OAuth Microsoft/Outlook est exclue de la première version. Les politiques du fournisseur peuvent aussi limiter l’accès.
 
-S/MIME et la configuration de comptes JMAP ne sont pas inclus. OpenPGP nécessite l’app OpenKeychain facultative. Seul le contenu téléchargé est lisible hors ligne. Dot Mail reste une préversion : conservez vos messages importants sur le serveur et signalez les problèmes reproductibles.
+La configuration de comptes JMAP n’est pas incluse. OpenPGP nécessite l’app OpenKeychain facultative. Seul le contenu téléchargé est lisible hors ligne. Dot Mail reste une préversion : conservez vos messages importants sur le serveur et signalez les problèmes reproductibles.
 
 Code source : https://github.com/Sr-0w/Dot-Mail
 Licence : GPL-3.0-or-later.
