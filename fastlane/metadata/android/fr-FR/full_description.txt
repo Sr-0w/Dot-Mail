@@ -30,10 +30,9 @@ chez nous, sans serveur intermédiaire, sans publicité, sans suivi. Un logiciel
 
 <h3>État du projet</h3>
 <p>Dot Mail est jeune : utilisable et testée, mais pas encore éprouvée sur des milliers
-de boîtes aux lettres. La connexion par mot de passe (et mot de passe applicatif)
-fonctionne aujourd'hui ; la connexion OAuth (nécessaire pour les comptes
-Outlook/Hotmail personnels) n'est pas encore implémentée, pas plus que le PGP/S-MIME ni
-les identités multiples par compte. En arrière-plan, la synchronisation s'exécute toutes
+de boîtes aux lettres. Les connexions par mot de passe et par mot de passe applicatif
+fonctionnent aujourd’hui, ainsi que la connexion avec Google. Les comptes Microsoft
+(Outlook, Hotmail, Live) ne sont pas pris en charge, et S/MIME n’est pas encore implémenté. En arrière-plan, la synchronisation s'exécute toutes
 les 15 minutes, et en direct (IDLE) tant que l'application est ouverte.</p>
 
 <p>100 % Kotlin et Jetpack Compose, aucune couche multiplateforme. Dot Mail est la

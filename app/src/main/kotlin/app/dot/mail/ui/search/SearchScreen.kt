@@ -213,15 +213,15 @@ fun SearchScreen(onBack: () -> Unit, onOpenThread: (Long) -> Unit, folderId: Lon
                     app.dot.design.components.DotSpinner(size = 22.dp, color = c.textTertiary)
                 }
             SearchDisplayState.ERROR ->
-                EmptyState(Icons.Outlined.WifiOff, stringResource(R.string.search_error_title), (results.loadState.refresh as LoadState.Error).error.message ?: stringResource(R.string.search_error_body))
+                app.dot.mail.ui.inbox.LoadErrorState(stringResource(R.string.search_error_title), (results.loadState.refresh as LoadState.Error).error.message ?: stringResource(R.string.search_error_body), onRetry = { results.retry() })
             SearchDisplayState.NO_RESULTS ->
                 EmptyState(Icons.Outlined.SearchOff, stringResource(R.string.search_no_results_title), stringResource(if (progress.index.running) R.string.search_no_results_indexing else R.string.search_no_results_body, q))
             SearchDisplayState.PARTIAL_RESULTS -> if (results.itemCount == 0) {
                 val unavailable = progress.serverError == null && progress.index.error == null && !progress.serverAvailable
-                EmptyState(
-                    Icons.Outlined.WifiOff,
+                app.dot.mail.ui.inbox.LoadErrorState(
                     stringResource(if (unavailable) R.string.search_partial_title else R.string.search_error_title),
                     stringResource(if (unavailable) R.string.search_partial_body else R.string.search_server_error),
+                    onRetry = { results.retry() },
                 )
             } else ResultsList(results, onOpenThread, edgeState, headerPadding, listState, headerControls)
             SearchDisplayState.RESULTS -> ResultsList(results, onOpenThread, edgeState, headerPadding, listState, headerControls)

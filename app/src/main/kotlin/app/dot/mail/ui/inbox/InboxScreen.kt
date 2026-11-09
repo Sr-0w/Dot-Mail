@@ -174,6 +174,12 @@ import app.dot.mail.ui.common.Format
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
+/** A list that could not load (no network, server down): says why and offers Retry, so the way forward is not only pull-to-refresh. */
+@Composable
+internal fun LoadErrorState(title: String, message: String, onRetry: () -> Unit) {
+    EmptyState(Icons.Outlined.WifiOff, title, message, action = { DotButton(stringResource(R.string.inbox_retry), onRetry, style = ButtonStyle.Secondary, compact = true) })
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InboxScreen(
@@ -404,6 +410,7 @@ fun InboxScreen(
                         filtered = filtersActive.any,
                         smart = mailbox is Mailbox.Smart,
                         mailbox = mailbox,
+                        onClearFilters = vm::clearFilters,
                         onOpen = { t ->
                             when {
                                 selection.isNotEmpty() -> vm.toggleSelection(t.threadId)
@@ -485,6 +492,7 @@ private fun ThreadList(
     filtered: Boolean,
     smart: Boolean,
     mailbox: Mailbox,
+    onClearFilters: () -> Unit,
     onOpen: (ThreadSummary) -> Unit,
     onToggleSelect: (Long) -> Unit,
     onSwipe: (MessageAction, ThreadSummary) -> Unit,
@@ -494,12 +502,12 @@ private fun ThreadList(
     val refresh = threads.loadState.refresh
     when {
         threads.itemCount == 0 && refresh is LoadState.Loading -> Box(Modifier.padding(top=contentPadding.calculateTopPadding())) { SkeletonList() }
-        threads.itemCount == 0 && refresh is LoadState.Error -> Box(Modifier.padding(top=contentPadding.calculateTopPadding())) { EmptyState(
-            Icons.Outlined.WifiOff, stringResource(R.string.inbox_error_load_title), refresh.error.message ?: stringResource(R.string.inbox_error_load_body),
-        ) }
+        threads.itemCount == 0 && refresh is LoadState.Error -> Box(Modifier.padding(top=contentPadding.calculateTopPadding())) {
+            LoadErrorState(stringResource(R.string.inbox_error_load_title), refresh.error.message ?: stringResource(R.string.inbox_error_load_body), onRetry = { threads.retry() })
+        }
         threads.itemCount == 0 -> LazyColumn(edge.fillMaxSize(),contentPadding=contentPadding) {
             // Must be scrollable for pull-to-refresh to work on an empty list.
-            item { EmptyFor(role, filtered, smart) }
+            item { EmptyFor(role, filtered, smart, onClearFilters) }
         }
         else -> {
             LaunchedEffect(mailbox, threads.itemSnapshotList.items) { app.dot.mail.ui.thread.ThreadOrder.record(mailbox, threads.itemSnapshotList.items.map { it.threadId }) }
@@ -587,9 +595,11 @@ private fun FilterBar(
 }
 
 @Composable
-private fun EmptyFor(role: FolderRole?, filtered: Boolean = false, smart: Boolean = false) {
+internal fun EmptyFor(role: FolderRole?, filtered: Boolean = false, smart: Boolean = false, onClearFilters: () -> Unit = {}) {
     if (filtered) {
-        EmptyState(Icons.Outlined.FilterList, stringResource(R.string.inbox_empty_filtered_title), stringResource(R.string.inbox_empty_filtered_body))
+        // The way forward from "nothing matches these filters" is to drop them.
+        EmptyState(Icons.Outlined.FilterList, stringResource(R.string.inbox_empty_filtered_title), stringResource(R.string.inbox_empty_filtered_body),
+            action = { DotButton(stringResource(R.string.inbox_filter_clear), onClearFilters, style = ButtonStyle.Secondary, compact = true) })
         return
     }
     if (smart) {

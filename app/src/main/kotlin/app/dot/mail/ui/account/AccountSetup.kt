@@ -337,7 +337,7 @@ class AddAccountViewModel(
     private companion object { const val RETURN_GRACE_MS = 1_500L }
 
     private fun SetupState.withConfig(c: AccountConfig) = copy(
-        hint = c.providerHint,
+        hint = SetupHints.localize(c.providerHint) { id -> str(id, c.providerHint.orEmpty()) },
         imapHost = c.imap.host, imapPort = c.imap.port.toString(), imapSecurity = c.imap.security,
         smtpHost = c.smtp.host, smtpPort = c.smtp.port.toString(), smtpSecurity = c.smtp.security,
         username = c.imap.username,

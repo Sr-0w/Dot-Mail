@@ -16,7 +16,7 @@
     <string name="compose_more">Plus</string>
     <string name="compose_plain_text">Texte brut</string>
     <string name="compose_formatted_text">Texte enrichi</string>
-    <string name="compose_schedule_send">Programmer l\'envoi</string>
+    <string name="compose_schedule_send">Programmer l’envoi</string>
     <string name="compose_discard">Supprimer le brouillon</string>
     <string name="compose_close_title">Enregistrer le brouillon ?</string>
     <string name="compose_close_body">Gardez-le dans les brouillons pour le terminer plus tard, ou supprimez-le.</string>
@@ -28,7 +28,7 @@
     <string name="compose_schedule_tomorrow_morning">Demain matin, 08:00</string>
     <string name="compose_schedule_monday_morning">Lundi matin, 08:00</string>
     <string name="compose_from">De</string>
-    <string name="compose_choose_sender">Choisir l\'expéditeur</string>
+    <string name="compose_choose_sender">Choisir l’expéditeur</string>
     <string name="compose_to">À</string>
     <string name="compose_cc">Cc</string>
     <string name="compose_bcc">Cci</string>
@@ -64,10 +64,10 @@
     <string name="compose_save">Enregistrer</string>
     <string name="compose_insert">Insérer</string>
     <string name="compose_remove">Supprimer</string>
-    <string name="compose_error_invalid_address">« %1$s » n\'est pas une adresse valide</string>
-    <string name="compose_error_no_account">Ajoutez un compte avant d\'envoyer</string>
+    <string name="compose_error_invalid_address">« %1$s » n’est pas une adresse valide</string>
+    <string name="compose_error_no_account">Ajoutez un compte avant d’envoyer</string>
     <string name="compose_error_no_recipients">Ajoutez au moins un destinataire</string>
-    <string name="compose_error_send_failed">Impossible de mettre le message en file d\'attente</string>
+    <string name="compose_error_send_failed">Impossible de mettre le message en file d’attente</string>
     <plurals name="compose_attachments_count">
         <item quantity="one">%1$d pièce jointe</item>
         <item quantity="other">%1$d pièces jointes</item>
@@ -78,22 +78,22 @@
     </plurals>
 
     <!-- Account setup -->
-    <string name="setup_welcome_title">Vos e-mails.\nRien d\'autre.</string>
+    <string name="setup_welcome_title">Vos e-mails.\nRien d’autre.</string>
     <string name="setup_welcome_body">Dot Mail se connecte directement à votre fournisseur via IMAP et SMTP. Aucun compte chez nous, aucun serveur intermédiaire, aucun pistage.</string>
     <string name="setup_welcome_cta">Ajouter un compte de messagerie</string>
     <string name="setup_welcome_providers">Compatible avec Infomaniak, Gmail, Fastmail, iCloud, Yahoo, mailbox.org, Posteo et tout serveur IMAP.</string>
     <string name="setup_title">Ajouter un compte</string>
-    <string name="setup_subtitle">Connectez-vous avec votre adresse e-mail. Pour Gmail, iCloud et Yahoo, utilisez un mot de passe d\'application.</string>
+    <string name="setup_subtitle">Connectez-vous avec votre adresse e-mail. Pour Gmail, iCloud et Yahoo, utilisez un mot de passe d’application.</string>
     <string name="setup_email_label">E-mail</string>
     <string name="setup_email_placeholder">vous@exemple.com</string>
     <string name="setup_password_label">Mot de passe</string>
     <string name="setup_configure_manually">Configurer les serveurs manuellement</string>
-    <string name="setup_keystore_notice">Votre mot de passe est chiffré sur cet appareil avec le Keystore Android et n\'est envoyé qu\'à votre serveur de messagerie.</string>
+    <string name="setup_keystore_notice">Votre mot de passe est chiffré sur cet appareil avec le Keystore Android et n’est envoyé qu’à votre serveur de messagerie.</string>
     <string name="setup_connecting">Connexion</string>
     <string name="setup_continue">Continuer</string>
     <string name="setup_incoming_imap">Serveur entrant (IMAP)</string>
     <string name="setup_outgoing_smtp">Serveur sortant (SMTP)</string>
-    <string name="setup_username_label">Nom d\'utilisateur</string>
+    <string name="setup_username_label">Nom d’utilisateur</string>
     <string name="setup_username_placeholder">Généralement votre adresse e-mail</string>
     <string name="setup_name_label">Votre nom</string>
     <string name="setup_name_placeholder">Affiché aux destinataires</string>
@@ -102,19 +102,19 @@
     <string name="setup_security_ssl_tls">SSL/TLS</string>
     <string name="setup_security_starttls">STARTTLS</string>
     <string name="setup_security_none">Aucune</string>
-    <string name="setup_cleartext_warning">Sans chiffrement, votre mot de passe et vos e-mails circulent en clair. N\'utilisez cette option que sur un réseau local de confiance.</string>
+    <string name="setup_cleartext_warning">Sans chiffrement, votre mot de passe et vos e-mails circulent en clair. N’utilisez cette option que sur un réseau local de confiance.</string>
     <string name="setup_status_looking_up">Recherche de votre fournisseur…</string>
     <string name="setup_status_signing_in">Connexion à %1$s…</string>
     <string name="setup_status_setting_up">Configuration de votre boîte aux lettres…</string>
     <string name="setup_error_not_found">Impossible de trouver les paramètres pour cette adresse. Vérifiez-les ci-dessous.</string>
-    <string name="setup_error_oauth_only">%1$s nécessite une connexion via le navigateur (OAuth), qui n\'est pas encore disponible dans cette version.</string>
+    <string name="setup_error_oauth_only">%1$s nécessite une connexion via le navigateur (OAuth), que Dot Mail ne prend pas en charge pour ce fournisseur.</string>
     <string name="setup_this_provider">Ce fournisseur</string>
     <string name="setup_error_unencrypted">Ce fournisseur ne propose que des paramètres non chiffrés. Vérifiez les options de sécurité ci-dessous avant de continuer.</string>
-    <string name="setup_error_save_failed">Impossible d\'enregistrer le compte.</string>
+    <string name="setup_error_save_failed">Impossible d’enregistrer le compte.</string>
     <string name="setup_error_unknown">Erreur inconnue</string>
     <string name="setup_error_auth_failed">Échec de la connexion : %1$s</string>
     <string name="setup_error_connection_failed">Connexion impossible : %1$s</string>
-    <string name="setup_error_certificate">Le certificat du serveur n\'est pas approuvé : %1$s</string>
+    <string name="setup_error_certificate">Le certificat du serveur n’est pas approuvé : %1$s</string>
 
     <!-- Inbox, drawer, search, outbox, snooze, widget -->
     <string name="inbox_open_mailboxes">Ouvrir les boîtes</string>
@@ -160,7 +160,7 @@
     <string name="inbox_empty_trash_title">La corbeille est vide</string>
     <string name="inbox_empty_trash_body">Les conversations supprimées restent ici quelque temps.</string>
     <string name="inbox_empty_snoozed_title">Rien en attente</string>
-    <string name="inbox_empty_snoozed_body">Les conversations mises en attente restent ici jusqu\'au moment choisi.</string>
+    <string name="inbox_empty_snoozed_body">Les conversations mises en attente restent ici jusqu’au moment choisi.</string>
     <string name="inbox_empty_folder_title">Rien ici</string>
     <string name="inbox_empty_folder_body">Ce dossier est vide.</string>
     <string name="inbox_action_archive">Archiver</string>
@@ -192,7 +192,7 @@
     <string name="inbox_action_unsnooze">Rétablir</string>
     <string name="inbox_action_delete_forever">Supprimer définitivement</string>
     <string name="inbox_action_mark_read">Marquer comme lu</string>
-    <string name="inbox_more_actions">Plus d\'actions</string>
+    <string name="inbox_more_actions">Plus d’actions</string>
     <string name="inbox_action_mark_unread">Marquer comme non lu</string>
     <string name="inbox_action_star">Ajouter une étoile</string>
     <string name="inbox_action_snooze_ellipsis">Mettre en attente…</string>
@@ -235,15 +235,15 @@
         <item quantity="one">Déplacé</item>
         <item quantity="other">%1$d conversations déplacées</item>
     </plurals>
-    <string name="inbox_error_action_failed">Cette action n\'a pas pu être effectuée</string>
+    <string name="inbox_error_action_failed">Cette action n’a pas pu être effectuée</string>
     <string name="inbox_error_snooze_failed">Impossible de mettre en attente</string>
     <string name="inbox_error_unsnooze_failed">Impossible de rétablir</string>
     <string name="inbox_error_move_failed">Impossible de déplacer</string>
     <string name="inbox_sync_still_running">Synchronisation en cours en arrière-plan</string>
-    <string name="inbox_error_refresh_failed">Impossible d\'actualiser</string>
-    <string name="inbox_today">Aujourd\'hui</string>
+    <string name="inbox_error_refresh_failed">Impossible d’actualiser</string>
+    <string name="inbox_today">Aujourd’hui</string>
     <string name="inbox_yesterday">Hier</string>
-    <string name="inbox_just_now">À l\'instant</string>
+    <string name="inbox_just_now">À l’instant</string>
     <plurals name="inbox_relative_minutes_ago">
         <item quantity="one">Il y a %1$d min</item>
         <item quantity="other">Il y a %1$d min</item>
@@ -257,8 +257,8 @@
         <item quantity="other">Il y a %1$d j</item>
     </plurals>
     <string name="drawer_all_inboxes">Toutes les boîtes</string>
-    <string name="drawer_outbox">Boîte d\'envoi</string>
-    <string name="drawer_outbox_needs_attention">Boîte d\'envoi · attention requise</string>
+    <string name="drawer_outbox">Boîte d’envoi</string>
+    <string name="drawer_outbox_needs_attention">Boîte d’envoi · attention requise</string>
     <string name="drawer_snoozed">En attente</string>
     <string name="drawer_folders_section">Dossiers</string>
     <string name="drawer_new_folder">Nouveau dossier</string>
@@ -282,10 +282,10 @@
     <string name="drawer_folder_delete_title">Supprimer %1$s ?</string>
     <string name="drawer_folder_delete_empty_body">Le dossier est vide. Il sera également supprimé sur votre serveur de messagerie.</string>
     <plurals name="drawer_folder_delete_move_trash_body">
-        <item quantity="one">Son %1$d message est d\'abord déplacé dans la corbeille, puis le dossier est supprimé sur votre serveur de messagerie.</item>
-        <item quantity="other">Ses %1$d messages sont d\'abord déplacés dans la corbeille, puis le dossier est supprimé sur votre serveur de messagerie.</item>
+        <item quantity="one">Son %1$d message est d’abord déplacé dans la corbeille, puis le dossier est supprimé sur votre serveur de messagerie.</item>
+        <item quantity="other">Ses %1$d messages sont d’abord déplacés dans la corbeille, puis le dossier est supprimé sur votre serveur de messagerie.</item>
     </plurals>
-    <string name="drawer_folder_delete_no_trash_body">Ce dossier contient encore des messages et il n\'y a pas de corbeille où les déplacer.</string>
+    <string name="drawer_folder_delete_no_trash_body">Ce dossier contient encore des messages et il n’y a pas de corbeille où les déplacer.</string>
     <string name="drawer_folder_move_trash_and_delete">Mettre à la corbeille et supprimer</string>
     <string name="drawer_folder_inside_label">Dans</string>
     <string name="drawer_folder_top_level">Racine</string>
@@ -298,38 +298,38 @@
     <string name="search_partial_title">Sur cet appareil uniquement</string>
     <string name="search_partial_body">Le serveur n’a pas pu être interrogé ; seuls les messages de cet appareil sont affichés.</string>
     <string name="search_hints_intro">Recherchez par expéditeur, objet ou mots du message.</string>
-    <string name="search_hint_from">Messages d\'un expéditeur</string>
+    <string name="search_hint_from">Messages d’un expéditeur</string>
     <string name="search_hint_to">Messages envoyés à une adresse</string>
-    <string name="search_hint_subject">Mots dans l\'objet</string>
+    <string name="search_hint_subject">Mots dans l’objet</string>
     <string name="search_hint_attachment">Avec pièces jointes uniquement</string>
     <string name="search_hint_state">Par état</string>
-    <string name="outbox_title">Boîte d\'envoi</string>
+    <string name="outbox_title">Boîte d’envoi</string>
     <string name="outbox_busy_toast">Ce message est en cours de traitement. Réessayez dans un instant.</string>
-    <string name="outbox_empty_title">La boîte d\'envoi est vide</string>
+    <string name="outbox_empty_title">La boîte d’envoi est vide</string>
     <string name="outbox_empty_body">Les messages programmés et en attente apparaissent ici.</string>
     <string name="outbox_no_subject">(sans objet)</string>
     <string name="outbox_to_prefix">À %1$s</string>
     <string name="outbox_retry">Réessayer</string>
     <string name="outbox_delete">Supprimer</string>
     <string name="outbox_send_again_title">Envoyer à nouveau ?</string>
-    <string name="outbox_send_again_body">La connexion a été interrompue pendant l\'envoi de ce message ; il a peut-être déjà été remis. Vérifiez vos Messages envoyés ou demandez au destinataire avant de le renvoyer.</string>
+    <string name="outbox_send_again_body">La connexion a été interrompue pendant l’envoi de ce message ; il a peut-être déjà été remis. Vérifiez vos Messages envoyés ou demandez au destinataire avant de le renvoyer.</string>
     <string name="outbox_send_anyway">Envoyer quand même</string>
     <string name="outbox_cancel">Annuler</string>
     <string name="outbox_state_scheduled">Programmé · %1$s</string>
-    <string name="outbox_state_waiting_retry">En attente d\'un nouvel essai</string>
-    <string name="outbox_state_queued">En file d\'attente</string>
+    <string name="outbox_state_waiting_retry">En attente d’un nouvel essai</string>
+    <string name="outbox_state_queued">En file d’attente</string>
     <string name="outbox_state_sending">Envoi…</string>
     <string name="outbox_state_saving_sent">Enregistrement dans Envoyés…</string>
     <string name="outbox_state_needs_review">À vérifier</string>
-    <string name="snooze_title">Mettre en attente jusqu\'à</string>
-    <string name="snooze_later_today">Plus tard aujourd\'hui</string>
+    <string name="snooze_title">Mettre en attente jusqu’à</string>
+    <string name="snooze_later_today">Plus tard aujourd’hui</string>
     <string name="snooze_this_evening">Ce soir</string>
     <string name="snooze_tomorrow">Demain</string>
     <string name="snooze_this_weekend">Ce week-end</string>
     <string name="snooze_next_week">La semaine prochaine</string>
-    <string name="snooze_today_at">Aujourd\'hui %1$s</string>
+    <string name="snooze_today_at">Aujourd’hui %1$s</string>
     <string name="snooze_tomorrow_at">Demain %1$s</string>
-    <string name="snooze_pick_date_time">Choisir la date et l\'heure</string>
+    <string name="snooze_pick_date_time">Choisir la date et l’heure</string>
     <string name="snooze_next">Suivant</string>
     <string name="snooze_confirm">Mettre en attente</string>
     <string name="snooze_cancel">Annuler</string>
@@ -741,11 +741,11 @@
     <string name="inbox_empty_newsletters_title">Aucune newsletter</string>
     <string name="inbox_empty_newsletters_body">Les listes de diffusion et newsletters apparaissent ici.</string>
     <string name="settings_instant_title">Notifications instantanées</string>
-    <string name="settings_instant_body">Garde une connexion directe à votre boîte de réception pour recevoir les nouveaux e-mails en quelques secondes, sans service de push Google. Consomme plus de batterie et affiche une notification permanente. Désactivé : les vérifications suivent l\'intervalle de synchronisation.</string>
+    <string name="settings_instant_body">Garde une connexion directe à votre boîte de réception pour recevoir les nouveaux e-mails en quelques secondes, sans service de push Google. Consomme plus de batterie et affiche une notification permanente. Désactivé : les vérifications suivent l’intervalle de synchronisation.</string>
     <string name="settings_instant_failed">Impossible de démarrer les notifications instantanées sur cet appareil.</string>
     <string name="sync_error_dns">serveur de messagerie introuvable — vérifiez votre connexion</string>
     <string name="sync_error_timeout">le serveur a mis trop de temps à répondre</string>
-    <string name="sync_error_tls">la connexion sécurisée n\'a pas pu être vérifiée — vérifiez la date et l\'heure</string>
+    <string name="sync_error_tls">la connexion sécurisée n’a pas pu être vérifiée — vérifiez la date et l’heure</string>
     <string name="sync_error_auth">échec de la connexion au compte</string>
     <string name="sync_error_server_closed">le serveur a fermé la connexion</string>
     <string name="sync_error_throttled">le serveur limite les connexions — réessayez dans un instant</string>
@@ -754,9 +754,9 @@
     <string name="inbox_retry">Réessayer</string>
     <string name="pdf_show_text">Afficher le texte</string>
     <string name="pdf_show_pages">Afficher les pages</string>
-    <string name="pdf_no_text">Aucun texte sélectionnable dans ce PDF (c\'est peut-être un scan).</string>
+    <string name="pdf_no_text">Aucun texte sélectionnable dans ce PDF (c’est peut-être un scan).</string>
     <string name="settings_libravatar">Libravatar</string>
-    <string name="settings_libravatar_sub">L\'alternative libre et fédérée à Gravatar. Envoie un hachage de l\'adresse de l\'expéditeur à libravatar.org.</string>
+    <string name="settings_libravatar_sub">L’alternative libre et fédérée à Gravatar. Envoie un hachage de l’adresse de l’expéditeur à libravatar.org.</string>
 
     <!-- Signatures -->
     <string name="identity_signature_placeholder_rich">Rédigez votre signature</string>
@@ -1096,4 +1096,10 @@
     <string name="action_error_draft_account_change">Commencez un nouveau brouillon pour utiliser un autre compte.</string>
     <string name="thread_action_next_conversation">Conversation suivante</string>
     <string name="thread_action_previous_conversation">Conversation précédente</string>
+    <string name="setup_hint_gmail">Gmail : utilisez un mot de passe d’application (Compte Google → Sécurité → Mots de passe d’application).</string>
+    <string name="setup_hint_yahoo">Yahoo : utilisez un mot de passe d’application (Compte Yahoo → Sécurité du compte → Mots de passe d’application).</string>
+    <string name="setup_hint_icloud">iCloud : utilisez un mot de passe spécifique à l’app (appleid.apple.com → Connexion et sécurité → Mots de passe pour app).</string>
+    <string name="setup_hint_proton">Proton Mail ne propose pas d’accès IMAP sur Android (Proton Mail Bridge n’existe que sur ordinateur). Utilisez plutôt l’application Proton Mail.</string>
+    <string name="setup_hint_microsoft">Les comptes Microsoft (Outlook, Hotmail, Live, Microsoft 365) ne peuvent pas être ajoutés : Microsoft n’autorise plus la connexion par mot de passe.</string>
+    <string name="setup_hint_insecure">Ce fournisseur indique des paramètres non chiffrés (sans TLS). Vérifiez-les dans la configuration manuelle avant de vous connecter.</string>
 </resources>
