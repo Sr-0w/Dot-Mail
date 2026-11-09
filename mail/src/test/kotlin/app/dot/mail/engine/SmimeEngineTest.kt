@@ -115,6 +115,28 @@ class SmimeEngineTest {
 
     private fun parse(bytes: ByteArray) = MimeMessage(Session.getInstance(Properties()), bytes.inputStream())
 
+    @Test fun `signatures advertise AES ciphers and the encryption certificate to use`() {
+        val signer = identity("sender@example.test", encryption = false)
+        val encryption = identity("sender@example.test", signing = false)
+        val cms = BouncyCastleSmimeCms().signDetached("entity".toByteArray(), SmimeSigningIdentity(signer.certificate, signer.pair.private, encryptionCertificate = encryption.certificate))
+        val signed = org.bouncycastle.cms.CMSSignedData(CMSProcessableByteArray("entity".toByteArray()), cms)
+        val attributes = signed.signerInfos.signers.single().signedAttributes
+        val capabilities = org.bouncycastle.asn1.smime.SMIMECapabilities.getInstance(
+            attributes.get(org.bouncycastle.asn1.smime.SMIMEAttributes.smimeCapabilities).attrValues.getObjectAt(0),
+        ).getCapabilities(null).map { (it as org.bouncycastle.asn1.smime.SMIMECapability).capabilityID }
+        assertEquals(listOf(org.bouncycastle.asn1.nist.NISTObjectIdentifiers.id_aes256_CBC, org.bouncycastle.asn1.nist.NISTObjectIdentifiers.id_aes192_CBC, org.bouncycastle.asn1.nist.NISTObjectIdentifiers.id_aes128_CBC), capabilities)
+        val preference = attributes.get(org.bouncycastle.asn1.smime.SMIMEAttributes.encrypKeyPref).attrValues.getObjectAt(0) as org.bouncycastle.asn1.ASN1TaggedObject
+        assertEquals("issuerAndSerialNumber choice", 0, preference.tagNo)
+        val issuerSerial = org.bouncycastle.asn1.cms.IssuerAndSerialNumber.getInstance(org.bouncycastle.asn1.ASN1Sequence.getInstance(preference, false))
+        assertEquals(encryption.certificate.serialNumber, issuerSerial.serialNumber.value)
+        val carried = signed.certificates.getMatches(null).map { it.serialNumber }
+        assertTrue("the encryption certificate travels with the signature", encryption.certificate.serialNumber in carried)
+        assertTrue(signer.certificate.serialNumber in carried)
+        val verified = BouncyCastleSmimeCms().verifyDetached("entity".toByteArray(), cms, emptyList()).single()
+        assertTrue(verified.cryptographicSignatureValid)
+        assertEquals(signer.certificate, verified.certificate)
+    }
+
     @Test fun `sign uses detached CMS and never emits Bcc header`() {
         val signer = identity("sender@example.test")
         val message = mail()
@@ -513,5 +535,50 @@ class SmimeEngineTest {
         val sender = identity("sender@example.test")
         val failure = assertThrowsSmime { engine.build(mail().copy(cc = emptyList(), bcc = emptyList()), SmimeMode.ENCRYPT, recipientCertificates = listOf(signOnly.recipient()), senderDecryptionCertificate = sender.certificate) }
         assertEquals(SmimeFailure.RECIPIENT_CERTIFICATE_REJECTED, failure)
+    }
+
+    /**
+     * Device regression: our own multipart/alternative signed mail showed "changed after signing". JavaMail's writeTo of
+     * part 0 appended a CRLF after the nested multipart's closing delimiter. The cache must keep the transmitted bytes.
+     */
+    @Test fun `own signed multipart message verifies after send and cache`() {
+        val signer = identity("sender@example.test")
+        val plain = OutgoingMail(from = Address("sender@example.test"), to = listOf(Address("sender@example.test")), subject = "Dot Mail S/MIME test",
+            text = "Signed test from Dot Mail.", html = "<p style=\"margin: 0 0 1em\">Signed test from Dot Mail.</p>")
+        val variant = engine.build(plain, SmimeMode.SIGN, signer = signer.signing()).single()
+        val file = java.io.File.createTempFile("outbox", ".eml").apply { writeBytes(variant.mimeBytes); deleteOnExit() }
+        val wire = java.io.ByteArrayOutputStream().also { out -> StoredMimeMessage(file).use { it.writeTo(out) } }.toByteArray()
+        assertTrue(engine.verifySignedMime(wire, "sender@example.test").allCryptographicallyValid)
+        val dir = java.nio.file.Files.createTempDirectory("cache").toFile().apply { deleteOnExit() }
+        Mime.cache(parse(wire), dir)
+        val entity = java.io.File(dir, SmimeParts.SIGNED_FILE).readBytes()
+        val signature = java.io.File(dir, SmimeParts.SIGNATURE_FILE).readBytes()
+        assertArrayEquals(SmimeMime.detachedParts(wire).first, entity)
+        assertTrue(engine.verifyDetached(entity, signature, "sender@example.test").allCryptographicallyValid)
+    }
+
+    /** Device regression (European Commission mail): the CMS lists root, encryption cert, signer, intermediate, in that order. */
+    @Test fun `the signer is validated as the leaf whatever order the message lists its certificates in`() {
+        val signer = identity("sender@example.test")
+        val root = identity("root@example.test")
+        val other = identity("other@example.test")
+        val seen = mutableListOf<List<X509Certificate>>()
+        val recording = object : SmimeCertificatePolicy {
+            override fun validate(certificate: X509Certificate, mailbox: String, use: SmimeCertificateUse) = validateChain(listOf(certificate), mailbox, use)
+            override fun validateChain(certificates: Collection<X509Certificate>, mailbox: String, use: SmimeCertificateUse): SmimeCertificateVerdict {
+                seen += certificates.toList(); return SmimeCertificateVerdict.Trusted
+            }
+        }
+        val listed = listOf(root.certificate, other.certificate, signer.certificate)
+        val cms = object : SmimeCms {
+            override fun signDetached(entity: ByteArray, identity: SmimeSigningIdentity) = error("unused")
+            override fun verifyDetached(entity: ByteArray, signature: ByteArray, certificateCandidates: Collection<X509Certificate>) =
+                listOf(SmimeCmsSignerResult(signer.certificate, listed, true))
+            override fun encrypt(entity: ByteArray, recipients: Collection<X509Certificate>) = error("unused")
+            override fun decrypt(envelopedData: ByteArray, identity: SmimeDecryptionIdentity) = error("unused")
+        }
+        val result = SmimeEngine(cms, recording).verifyDetached(ByteArray(1), ByteArray(1), "sender@example.test")
+        assertEquals(signer.certificate, seen.single().first())
+        assertEquals(listed, result.signers.single().certificateCandidates) // kept for storing intermediates and encryption certs
     }
 }

@@ -67,6 +67,18 @@ internal object SmimeMime {
         return entity to parsedSignature.inputStream.use { it.readBytes() }
     }
 
+    /**
+     * The first part of a multipart body exactly as transmitted: from after the first delimiter line up to the CRLF that
+     * precedes the next delimiter (RFC 2046: that CRLF belongs to the delimiter, not to the part). Null when the body does
+     * not use CRLF delimiters as expected; callers then fall back to reserialization.
+     */
+    fun firstPart(body: ByteArray, boundary: String): ByteArray? {
+        val raw = String(body, Charsets.ISO_8859_1)
+        val first = findBoundary(raw, boundary, 0)?.takeUnless { it.closing } ?: return null
+        val second = findBoundary(raw, boundary, first.afterLine) ?: return null
+        return raw.substring(first.afterLine, second.contentEnd).toByteArray(Charsets.ISO_8859_1)
+    }
+
     private data class BoundaryLine(val contentEnd: Int, val afterLine: Int, val closing: Boolean)
 
     /** RFC 2046 transport padding allows spaces/tabs after the boundary marker. */

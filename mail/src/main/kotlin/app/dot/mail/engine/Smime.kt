@@ -31,6 +31,11 @@ data class SmimeSigningIdentity(
     val privateKey: PrivateKey,
     /** Leaf first, followed by optional intermediates returned by Android KeyChain. */
     val certificateChain: List<X509Certificate> = listOf(certificate),
+    /**
+     * The certificate correspondents should encrypt to (RFC 8551 SMIMEEncryptionKeyPreference). It differs from [certificate]
+     * when the account keeps separate signing and encryption keys; it is carried in every signature so they can collect it.
+     */
+    val encryptionCertificate: X509Certificate = certificate,
 )
 data class SmimeDecryptionIdentity(val certificate: X509Certificate, val privateKey: PrivateKey)
 data class SmimeRecipientCertificate(
@@ -277,11 +282,14 @@ class SmimeEngine(
         SmimeVerification(signers.map { signer ->
             val certificate = signer.certificate
             val valid = signer.cryptographicSignatureValid
+            // validateChain takes the leaf first. A CMS object lists its certificates in any order (Outlook/SECEM puts the
+            // root first), so the signer is put in front explicitly; the others are only path-building evidence.
+            val chain = listOf(certificate) + signer.certificateCandidates.filter { it != certificate }
             val verdict = if (valid) {
-                runCatching { certificatePolicy.validateChain(signer.certificateCandidates, expectedSignerMailbox, SmimeCertificateUse.SIGNING) }
+                runCatching { certificatePolicy.validateChain(chain, expectedSignerMailbox, SmimeCertificateUse.SIGNING) }
                     .getOrElse { SmimeCertificateVerdict.Rejected("Certificate validation failed") }
             } else null
-            SmimeSignerResult(certificate, valid, verdict)
+            SmimeSignerResult(certificate, valid, verdict, signer.certificateCandidates)
         })
 
     /**

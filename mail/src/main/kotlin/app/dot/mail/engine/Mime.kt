@@ -86,6 +86,17 @@ object Mime {
         return message
     }
     /** Streams decoded MIME parts into caller-owned private files, retaining no attachment arrays. */
+    /** First part of the multipart/signed [p] exactly as received, or null when the raw bytes are not available. */
+    internal fun transmittedFirstPart(p: Part): ByteArray? = runCatching {
+        val boundary = jakarta.mail.internet.ContentType(p.contentType).getParameter("boundary") ?: return@runCatching null
+        val body = when (p) {
+            is jakarta.mail.internet.MimeMessage -> p.rawInputStream
+            is MimeBodyPart -> p.rawInputStream
+            else -> return@runCatching null
+        }.use { it.readBytes() }
+        SmimeMime.firstPart(body, boundary)
+    }.getOrNull()
+
     fun cache(part: Part, directory: java.io.File, maxBytes: Long = 25L * 1024 * 1024,includeAttachments:Boolean=true,checkCancelled:()->Unit={}): CachedBody {
         directory.mkdirs()
         val encryptionHint = encryptionHintFromMime(runCatching { part.contentType }.getOrNull())
@@ -131,7 +142,10 @@ object Mime {
                 val multipart = p.content as Multipart
                 if (multipart.count >= 2) {
                     val raw=java.io.File(directory,"signed-entity-$id.tmp")
-                    output(raw).use { out -> multipart.getBodyPart(0).writeTo(out) }
+                    // The transmitted bytes, not JavaMail's reserialization (which appends a CRLF after a nested multipart
+                    // and may refold headers, breaking every signature over such an entity).
+                    val exact=transmittedFirstPart(p)
+                    output(raw).use { out -> if (exact != null) out.write(exact) else multipart.getBodyPart(0).writeTo(out) }
                     raw.copyTo(java.io.File(directory,Pgp.SIGNED_FILE),overwrite=true)
                     save(multipart.getBodyPart(1), Pgp.SIGNATURE_FILE)
                     // The signed envelope already contains its attachments. Read cached bytes, preserving
@@ -145,7 +159,10 @@ object Mime {
                 val multipart = p.content as Multipart
                 if (multipart.count >= 2) {
                     val raw=java.io.File(directory,"smime-entity-$id.tmp")
-                    output(raw).use { out -> multipart.getBodyPart(0).writeTo(out) }
+                    // The transmitted bytes, not JavaMail's reserialization (which appends a CRLF after a nested multipart
+                    // and may refold headers, breaking every signature over such an entity).
+                    val exact=transmittedFirstPart(p)
+                    output(raw).use { out -> if (exact != null) out.write(exact) else multipart.getBodyPart(0).writeTo(out) }
                     raw.copyTo(java.io.File(directory,SmimeParts.SIGNED_FILE),overwrite=true)
                     save(multipart.getBodyPart(1), SmimeParts.SIGNATURE_FILE)
                     jakarta.mail.util.SharedFileInputStream(raw).use { input -> visit(MimeBodyPart(input),"$id.0",depth+1,true,signedContent=true) }

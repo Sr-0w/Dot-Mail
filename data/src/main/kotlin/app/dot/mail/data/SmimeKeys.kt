@@ -46,9 +46,14 @@ class KeyChainSmimeKeys(
 ) : SmimeKeyAccess {
 
     override suspend fun signingIdentity(accountId: Long): SmimeSigningIdentity {
-        val alias = config(accountId).signingKeyChainAlias ?: throw notConfigured()
+        val settings = config(accountId)
+        val alias = settings.signingKeyChainAlias ?: throw notConfigured()
         val (chain, key) = load(alias)
-        return SmimeSigningIdentity(chain.first(), key, chain.toList())
+        // Advertise the decryption certificate when it is a separate key; a missing one must not block signing.
+        val encryption = settings.decryptionKeyChainAlias?.takeIf { it != alias }?.let { other ->
+            try { withContext(Dispatchers.IO) { chainOf(context, other)?.firstOrNull() } } catch (e: CancellationException) { throw e } catch (_: Exception) { null }
+        } ?: chain.first()
+        return SmimeSigningIdentity(chain.first(), key, chain.toList(), encryption)
     }
 
     override suspend fun decryptionCertificate(accountId: Long): X509Certificate {
