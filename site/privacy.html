@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dot Mail · Privacy Policy</title>
+<style>
+  :root { --bg:#ffffff; --fg:#111111; --muted:#5c5c5c; --accent:#1f5eff; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#000000; --fg:#f2f2f2; --muted:#a3a3a3; --accent:#6f95ff; } }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:720px; margin:0 auto; padding:40px 16px 64px; }
+  h1 { font-size:32px; margin:0 0 4px; } h2 { font-size:20px; margin:32px 0 8px; }
+  p, li { color:var(--fg); } .muted { color:var(--muted); } a { color:var(--accent); }
+</style>
+</head>
+<body>
+<main>
+<h1>Privacy Policy</h1>
+<p class="muted">Dot Mail for Android · Effective 9 November 2026</p>
+
+<p>Dot Mail is a free, open-source email app. It connects your phone directly to your email provider. The Dot Mail
+project runs <strong>no servers</strong>: there is no Dot Mail account, no backend, no analytics, no advertising, no
+crash reporting and no telemetry. Nobody working on Dot Mail can see your email, your contacts or your credentials.</p>
+
+<h2>What the app accesses</h2>
+<ul>
+  <li><strong>Your email account.</strong> To show, search, send and organise your mail, Dot Mail connects to your
+    provider's IMAP and SMTP servers with your password, an app password, or (for Gmail) Google sign-in.</li>
+  <li><strong>Google user data (Gmail).</strong> When you choose "Continue with Google", Dot Mail requests the scope
+    <code>https://mail.google.com/</code>, which IMAP and SMTP require. It is used only to read, organise and delete
+    your messages and to send the messages you write, inside the app, on your phone. Your Google email address is used to
+    name the account in the app.</li>
+  <li><strong>Contacts (optional).</strong> Only if you grant Android's contacts permission, Dot Mail reads names,
+    addresses and photos on your phone to suggest recipients and show avatars. Contacts are never uploaded.</li>
+  <li><strong>Certificates (optional).</strong> If you set up S/MIME, keys stay in Android's KeyChain; Dot Mail stores
+    only a reference to them. Certificates of people who send you signed mail can be stored on your phone to encrypt
+    replies to them.</li>
+</ul>
+
+<h2>Where your data goes</h2>
+<ul>
+  <li>Mail, attachments and the search index are stored <strong>only on your phone</strong>, inside the app's private
+    storage, and sent <strong>only to your own email provider</strong> (for Gmail: Google) over encrypted connections.</li>
+  <li>Passwords and Google sign-in tokens are encrypted on the phone with the Android Keystore and are sent only to your
+    provider (for Google: Google's sign-in and token endpoints).</li>
+  <li>Dot Mail does not transfer Google user data, or any other email data, to the Dot Mail project or to any third
+    party. It does not sell it, does not use it for advertising, and does not use it to train AI or machine-learning
+    models. No human reads it.</li>
+</ul>
+
+<h2>Optional features that contact other services</h2>
+<p>These are off by default and switched on by you in Settings. They never send message content.</p>
+<ul>
+  <li><strong>Account setup</strong> looks up server settings for your address's domain (DNS and Mozilla's public
+    autoconfig directory, autoconfig.thunderbird.net). Only the domain is sent.</li>
+  <li><strong>Avatars:</strong> Gravatar and Libravatar receive a SHA-256 hash of a sender's address; "brand logos" read the
+    sender domain's public DNS records; "website icons" request the icon file from the sender's own website.</li>
+  <li><strong>Remote images</strong> in HTML mail are loaded only when you allow them; the sender's servers then see that
+    the image was requested.</li>
+  <li><strong>Email aliases</strong> (SimpleLogin, addy.io) contact those services only if you connect them with your own API key.</li>
+  <li><strong>OpenPGP</strong> is handled by the separate OpenKeychain app, if you install and choose it.</li>
+</ul>
+
+<h2>Google API Services User Data Policy</h2>
+<p>Dot Mail's use and transfer of information received from Google APIs adheres to the
+<a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>,
+including the Limited Use requirements.</p>
+
+<h2>Retention and deletion</h2>
+<p>Data stays on your phone until you remove it. Removing an account in Dot Mail deletes its cached mail, attachments,
+search index and stored credentials from the phone; uninstalling the app deletes everything. Messages on your
+provider's server are not affected. You can revoke Dot Mail's Google access at any time at
+<a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</p>
+
+<h2>Children</h2>
+<p>Dot Mail is a general-purpose email client and is not directed at children.</p>
+
+<h2>Changes and contact</h2>
+<p>Changes to this policy are published on this page and in the app's source repository,
+<a href="https://github.com/Sr-0w/Dot-Mail">github.com/Sr-0w/Dot-Mail</a>. Questions:
+<a href="mailto:robin@snyders.xyz">robin@snyders.xyz</a>.</p>
+</main>
+</body>
+</html>
