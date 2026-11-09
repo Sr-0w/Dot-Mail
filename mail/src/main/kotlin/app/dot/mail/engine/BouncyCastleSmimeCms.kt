@@ -21,7 +21,16 @@ import org.bouncycastle.cms.jcajce.JceKeyTransAuthEnvelopedRecipient
 import org.bouncycastle.cms.jcajce.JceKeyTransRecipientId
 import org.bouncycastle.cms.jcajce.JceKeyTransRecipientInfoGenerator
 import org.bouncycastle.jce.provider.BouncyCastleProvider
+import org.bouncycastle.asn1.ASN1EncodableVector
 import org.bouncycastle.asn1.ASN1Primitive
+import org.bouncycastle.asn1.cms.AttributeTable
+import org.bouncycastle.asn1.cms.IssuerAndSerialNumber
+import org.bouncycastle.asn1.nist.NISTObjectIdentifiers
+import org.bouncycastle.asn1.smime.SMIMECapabilitiesAttribute
+import org.bouncycastle.asn1.smime.SMIMECapabilityVector
+import org.bouncycastle.asn1.smime.SMIMEEncryptionKeyPreferenceAttribute
+import org.bouncycastle.asn1.x500.X500Name
+import org.bouncycastle.cms.DefaultSignedAttributeTableGenerator
 import org.bouncycastle.asn1.cms.CMSObjectIdentifiers
 import org.bouncycastle.asn1.cms.ContentInfo
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
@@ -42,10 +51,32 @@ internal class BouncyCastleSmimeCms : SmimeCms {
         val digestProvider = JcaDigestCalculatorProviderBuilder().setProvider(provider).build()
         require(identity.certificateChain.firstOrNull() == identity.certificate) { "Signing certificate chain must start with the selected certificate" }
         val generator = CMSSignedDataGenerator().apply {
-            addSignerInfoGenerator(JcaSignerInfoGeneratorBuilder(digestProvider).build(signer, identity.certificate))
-            addCertificates(JcaCertStore(identity.certificateChain.distinctBy { it.issuerX500Principal to it.serialNumber }))
+            addSignerInfoGenerator(
+                JcaSignerInfoGeneratorBuilder(digestProvider)
+                    .setSignedAttributeGenerator(DefaultSignedAttributeTableGenerator(smimeAttributes(identity.encryptionCertificate)))
+                    .build(signer, identity.certificate),
+            )
+            val certificates = identity.certificateChain + identity.encryptionCertificate
+            addCertificates(JcaCertStore(certificates.distinctBy { it.issuerX500Principal to it.serialNumber }))
         }
         return generator.generate(CMSProcessableByteArray(entity), false).encoded
+    }
+
+    /**
+     * RFC 8551 2.5.2/2.5.3 signed attributes: the content ciphers Dot Mail can decrypt, strongest first (Outlook picks from this
+     * list when it replies encrypted), and which certificate to encrypt to.
+     */
+    private fun smimeAttributes(encryption: X509Certificate): AttributeTable {
+        val capabilities = SMIMECapabilityVector().apply {
+            addCapability(NISTObjectIdentifiers.id_aes256_CBC)
+            addCapability(NISTObjectIdentifiers.id_aes192_CBC)
+            addCapability(NISTObjectIdentifiers.id_aes128_CBC)
+        }
+        val preference = IssuerAndSerialNumber(X500Name.getInstance(encryption.issuerX500Principal.encoded), encryption.serialNumber)
+        return AttributeTable(ASN1EncodableVector().apply {
+            add(SMIMECapabilitiesAttribute(capabilities))
+            add(SMIMEEncryptionKeyPreferenceAttribute(preference))
+        })
     }
 
     override fun verifyDetached(

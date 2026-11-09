@@ -62,12 +62,14 @@ internal class RealMailGraph(
 
     internal val storage=StorageManager(this)
     internal val addressBook=AddressBookIndex(this)
+    /** The certificate chain behind a KeyChain alias (leaf first); replaceable in tests. */
+    internal var keyChainCertificates: (String) -> List<java.security.cert.X509Certificate>? = { alias -> android.security.KeyChain.getCertificateChain(context, alias)?.toList() }
     /** Recipient S/MIME certificates (a cache, not trust). */
     internal val smimeCerts = SmimeCertStore(dao)
     /** Judges stored recipient certificates for the lock state in Compose; replaceable in tests. */
     internal var recipientPolicy: app.dot.mail.engine.SmimeCertificatePolicy = SmimeTrustPolicy()
     val smime: SmimeRepository = object : SmimeRepository {
-        override suspend fun recipientStatus(accountId: Long, mailboxes: List<String>): Map<String, RecipientCertStatus> = mailboxes.associate { raw ->
+        override suspend fun recipientStatus(accountId: Long, mailboxes: List<String>): Map<String, RecipientCertStatus> = collectOwnSmimeCertificateFor(accountId, mailboxes).let { mailboxes.associate { raw ->
             val box = SmimeCertStore.normalize(raw)
             val chains = smimeCerts.candidateChains(accountId, box)
             val pin = smimeCerts.pinnedFingerprint(accountId, box)
@@ -78,7 +80,7 @@ internal class RealMailGraph(
                 chains.any(::usable) -> RecipientCertStatus.USABLE
                 else -> RecipientCertStatus.UNUSABLE
             }
-        }
+        } }
         override fun certificates(accountId: Long) = smimeCerts.observe(accountId)
         override suspend fun pin(accountId: Long, mailbox: String, fingerprint: String) = smimeCerts.pin(accountId, mailbox, fingerprint)
         override suspend fun unpin(accountId: Long, mailbox: String, fingerprint: String) = smimeCerts.unpin(accountId, mailbox, fingerprint)
@@ -191,14 +193,28 @@ internal class RealMailGraph(
             val config = Codec.config(row.config)
             val updated = transform(config.smime)
             dao.accountConfig(accountId, Codec.config(config.copy(smime = updated)))
-            // Writing to yourself (or to another device of yours) encrypts to your own certificate: keep it with the contact
-            // certificates of the account's address, as if it had arrived in a signed message. Trust is still checked on send.
-            val alias = updated.decryptionKeyChainAlias
-            if (alias != null) runCatching {
-                val chain = android.security.KeyChain.getCertificateChain(context, alias)?.toList().orEmpty()
-                chain.firstOrNull()?.let { leaf -> smimeCerts.collect(accountId, row.email, leaf, true, chain.drop(1)) }
-            }
+            collectOwnSmimeCertificate(accountId, row.email, updated)
         }
+    }
+
+    /**
+     * Writing to yourself (or to another device of yours) encrypts to your own certificate: keep it with the contact
+     * certificates of the account's address, as if it had arrived in a signed message. Trust is still checked on send. Also run
+     * before Compose looks up your own address, so a key chosen before this existed (or renewed in KeyChain) is found.
+     */
+    private suspend fun collectOwnSmimeCertificate(accountId: Long, email: String, config: SmimeAccountConfig) {
+        val alias = config.decryptionKeyChainAlias ?: return
+        runCatching {
+            val chain = withContext(Dispatchers.IO) { keyChainCertificates(alias) }.orEmpty()
+            chain.firstOrNull()?.let { leaf -> smimeCerts.collect(accountId, email, leaf, true, chain.drop(1)) }
+        }
+    }
+
+    /** [collectOwnSmimeCertificate] when [mailboxes] include the account's own address. */
+    private suspend fun collectOwnSmimeCertificateFor(accountId: Long, mailboxes: Collection<String>) {
+        val row = dao.account(accountId) ?: return
+        if (mailboxes.none { SmimeCertStore.normalize(it) == SmimeCertStore.normalize(row.email) }) return
+        collectOwnSmimeCertificate(accountId, row.email, Codec.config(row.config).smime)
     }
     override suspend fun renameAccount(accountId: Long, displayName: String) = withContext(Dispatchers.IO) { dao.accountName(accountId, displayName.trim().ifEmpty { return@withContext }) }
     override suspend fun updatePassword(accountId: Long, password: String): VerifyResult = withContext(Dispatchers.IO) {
@@ -640,7 +656,10 @@ internal class RealMailGraph(
     }
     override suspend fun verifySmime(message: app.dot.mail.data.model.Message): app.dot.mail.data.model.SmimeSignatureView? =
         verifySmimeSignature(message, SmimeTrustPolicy(), smimeCerts)
-    override suspend fun sendSmime(draft: Draft, undoWindowMs: Long, builder: SmimeBuilder): Long = queueSmime(draft, undoWindowMs, builder)
+    override suspend fun sendSmime(draft: Draft, undoWindowMs: Long, builder: SmimeBuilder): Long {
+        collectOwnSmimeCertificateFor(draft.accountId, (draft.to + draft.cc + draft.bcc).map { it.email })
+        return queueSmime(draft, undoWindowMs, builder)
+    }
     override fun smimeBuilder(keys: SmimeKeyAccess, policy: app.dot.mail.engine.SmimeCertificatePolicy): SmimeBuilder = EngineSmimeBuilder(app.dot.mail.engine.SmimeEngine(certificatePolicy = policy), keys, smimeCerts)
     override suspend fun rescheduleSend(outboxId: Long, sendAt: Long): Boolean = withContext(Dispatchers.IO) {
         if (SendSchedule.validate(sendAt, System.currentTimeMillis()) != SendSchedule.Validity.OK) return@withContext false

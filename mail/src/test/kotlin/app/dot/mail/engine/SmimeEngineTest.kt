@@ -115,6 +115,28 @@ class SmimeEngineTest {
 
     private fun parse(bytes: ByteArray) = MimeMessage(Session.getInstance(Properties()), bytes.inputStream())
 
+    @Test fun `signatures advertise AES ciphers and the encryption certificate to use`() {
+        val signer = identity("sender@example.test", encryption = false)
+        val encryption = identity("sender@example.test", signing = false)
+        val cms = BouncyCastleSmimeCms().signDetached("entity".toByteArray(), SmimeSigningIdentity(signer.certificate, signer.pair.private, encryptionCertificate = encryption.certificate))
+        val signed = org.bouncycastle.cms.CMSSignedData(CMSProcessableByteArray("entity".toByteArray()), cms)
+        val attributes = signed.signerInfos.signers.single().signedAttributes
+        val capabilities = org.bouncycastle.asn1.smime.SMIMECapabilities.getInstance(
+            attributes.get(org.bouncycastle.asn1.smime.SMIMEAttributes.smimeCapabilities).attrValues.getObjectAt(0),
+        ).getCapabilities(null).map { (it as org.bouncycastle.asn1.smime.SMIMECapability).capabilityID }
+        assertEquals(listOf(org.bouncycastle.asn1.nist.NISTObjectIdentifiers.id_aes256_CBC, org.bouncycastle.asn1.nist.NISTObjectIdentifiers.id_aes192_CBC, org.bouncycastle.asn1.nist.NISTObjectIdentifiers.id_aes128_CBC), capabilities)
+        val preference = attributes.get(org.bouncycastle.asn1.smime.SMIMEAttributes.encrypKeyPref).attrValues.getObjectAt(0) as org.bouncycastle.asn1.ASN1TaggedObject
+        assertEquals("issuerAndSerialNumber choice", 0, preference.tagNo)
+        val issuerSerial = org.bouncycastle.asn1.cms.IssuerAndSerialNumber.getInstance(org.bouncycastle.asn1.ASN1Sequence.getInstance(preference, false))
+        assertEquals(encryption.certificate.serialNumber, issuerSerial.serialNumber.value)
+        val carried = signed.certificates.getMatches(null).map { it.serialNumber }
+        assertTrue("the encryption certificate travels with the signature", encryption.certificate.serialNumber in carried)
+        assertTrue(signer.certificate.serialNumber in carried)
+        val verified = BouncyCastleSmimeCms().verifyDetached("entity".toByteArray(), cms, emptyList()).single()
+        assertTrue(verified.cryptographicSignatureValid)
+        assertEquals(signer.certificate, verified.certificate)
+    }
+
     @Test fun `sign uses detached CMS and never emits Bcc header`() {
         val signer = identity("sender@example.test")
         val message = mail()

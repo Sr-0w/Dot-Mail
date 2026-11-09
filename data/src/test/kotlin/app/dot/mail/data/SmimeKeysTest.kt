@@ -57,6 +57,13 @@ class SmimeKeysTest {
         assertEquals(listOf(idCert("id-alice")), signer.certificateChain)
         assertEquals(idCert("id-bob"), k.decryptionCertificate(1))
         assertEquals(idCert("id-bob"), k.decryptionIdentity(1).certificate)
+        assertEquals("a separate decryption key is advertised for encryption", idCert("id-bob"), signer.encryptionCertificate)
+    }
+
+    @Test fun signingKeyIsAdvertisedWhenThereIsNoSeparateDecryptionKey() = runBlocking<Unit> {
+        assertEquals(idCert("id-alice"), keyAccess(SmimeAccountConfig(signingKeyChainAlias = "sign")).signingIdentity(1).encryptionCertificate)
+        assertEquals(idCert("id-alice"), keyAccess(SmimeAccountConfig(signingKeyChainAlias = "sign", decryptionKeyChainAlias = "sign")).signingIdentity(1).encryptionCertificate)
+        assertEquals("a vanished decryption key does not block signing", idCert("id-alice"), keyAccess(SmimeAccountConfig(signingKeyChainAlias = "sign", decryptionKeyChainAlias = "gone")).signingIdentity(1).encryptionCertificate)
     }
 
     @Test fun noAliasMeansNotConfigured() {
@@ -160,5 +167,22 @@ class SmimeKeysTest {
             override fun validateChain(certificates: Collection<X509Certificate>, mailbox: String, use: SmimeCertificateUse) = SmimeCertificateVerdict.Trusted
         }
         assertEquals(RecipientCertStatus.USABLE, graph.smime.recipientStatus(id, listOf("bob@example.org")).getValue("bob@example.org")) // trust is judged again at every call
+    }
+
+    @Test fun ownAddressFindsTheAccountKeyEvenWhenItWasChosenBeforeCollectionExisted() = runBlocking<Unit> {
+        val cfg = AccountConfig("alice@example.org", "Alice", ServerConfig("h", 993, Security.SSL_TLS, "me"), ServerConfig("h", 465, Security.SSL_TLS, "me"))
+        val id = graph.addAccount(cfg, "pw")
+        // Stored directly, as an older version did: nothing was collected for the account's own address.
+        val stored = Codec.config(db.mail().account(id)!!.config)
+        db.mail().accountConfig(id, Codec.config(stored.copy(smime = SmimeAccountConfig("sign", "dec"))))
+        graph.keyChainCertificates = { alias -> if (alias == "dec") listOf(cert("alice-san")) else null }
+        graph.recipientPolicy = object : SmimeCertificatePolicy {
+            override fun validate(certificate: X509Certificate, mailbox: String, use: SmimeCertificateUse) = SmimeCertificateVerdict.Trusted
+            override fun validateChain(certificates: Collection<X509Certificate>, mailbox: String, use: SmimeCertificateUse) = SmimeCertificateVerdict.Trusted
+        }
+        assertEquals(RecipientCertStatus.MISSING, graph.smime.recipientStatus(id, listOf("bob@example.org")).getValue("bob@example.org"))
+        assertTrue("other addresses never pull in the account key", graph.smime.certificates(id).first().isEmpty())
+        assertEquals(RecipientCertStatus.USABLE, graph.smime.recipientStatus(id, listOf("Alice@example.org")).getValue("alice@example.org"))
+        assertEquals(listOf(cert("alice-san")), graph.smime.certificatesFor(id, listOf("alice@example.org")).getValue("alice@example.org"))
     }
 }

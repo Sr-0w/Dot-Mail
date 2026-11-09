@@ -31,6 +31,11 @@ data class SmimeSigningIdentity(
     val privateKey: PrivateKey,
     /** Leaf first, followed by optional intermediates returned by Android KeyChain. */
     val certificateChain: List<X509Certificate> = listOf(certificate),
+    /**
+     * The certificate correspondents should encrypt to (RFC 8551 SMIMEEncryptionKeyPreference). It differs from [certificate]
+     * when the account keeps separate signing and encryption keys; it is carried in every signature so they can collect it.
+     */
+    val encryptionCertificate: X509Certificate = certificate,
 )
 data class SmimeDecryptionIdentity(val certificate: X509Certificate, val privateKey: PrivateKey)
 data class SmimeRecipientCertificate(
