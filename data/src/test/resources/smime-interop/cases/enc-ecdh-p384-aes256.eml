@@ -1,0 +1,25 @@
+To: Dave <dave-p384@example.test>
+From: Alice <alice-rsa@example.test>
+Subject: ecdh p384
+MIME-Version: 1.0
+Content-Disposition: attachment; filename="smime.p7m"
+Content-Type: application/pkcs7-mime; smime-type=enveloped-data; name="smime.p7m"
+Content-Transfer-Encoding: base64
+
+MIIC2gYJKoZIhvcNAQcDoIICyzCCAscCAQIxge+hgewCAQOgcaFvMAkGByqGSM49
+AgEDYgAEkoBA/ckjMb9fJk8C13yO0fMH8yM/994uTbyJcoCGMWUc1KCz5FP5qNqo
+IQh5kY7Qko1aas2Ydy8kRe8W3Ce9Mm1wX3vc1zOPr/sCdxSy2cKddCpxfJK7O6qC
+GYzcY/tKMBgGCSuBBRCGSD8AAjALBglghkgBZQMEAS0wWjBYMCwwFDESMBAGA1UE
+AwwJZGF2ZS1wMzg0AhQufw7iaDYqyBgwyd7ZUnj0c0LemwQosUTViAdB13UbFExo
+pXj/EKtM2w1JhNPpRzW1SOdtiXFYtrGeYJPXGTCCAc4GCSqGSIb3DQEHATAdBglg
+hkgBZQMEASoEEOmgnV+o46bOtaOSH2AlOSCAggGg8GYsH/7o2pHNWYi8JN/v1r0f
+1sAUm+O+fQo3zg6fCiqbtycVGx9B1bLJvM9TLm5VLGdKbs37/3XZWvxsGHOqOo03
+wCYno/86U7WB4TsBtvCocRK/2Yi6GxrFlweE9Rkcid21Ds2zyogiwUxx8SmtcEkU
+oCVpBxylmltzFahELh1qAiKZn4sApTFauK/6+VjuCa4UWW2n06c3IDEbJDNAbjUt
+YX9yC1Uh9jpRkHK8tkuZILuRZB+5RKEGmzktcrPssvD8XB4JYKJqoP0f5CFe/WKb
+R1M8LmXn8F7qvbS4HOyBCx+QWlAv0y4j7zrhG3UEtzYXmPaJcl4iCVx8+HB8CM3B
+1igGqC55fZjsgFBetEd7XJZEbgitwHDuPc2o07mjHETZTfUJx/Yxz6Dfa/dQZufD
+QLVeAX4Tccxt9co8fiknwN6hRah7fR25R/5bp8X32ebyMceCZ1PuJbN/YucHFq1M
+kj/WlfddBSt5xv05UETZZLIagAHvleiDoPEMKvvid2HKiRYPvcnk1h3WbGvqaxyu
+d4U1q0C8BOKU+JOQzcA=
+

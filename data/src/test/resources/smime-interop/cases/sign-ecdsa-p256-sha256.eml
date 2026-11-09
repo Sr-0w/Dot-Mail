@@ -1,0 +1,41 @@
+To: Bob <bob-rsa@example.test>
+From: Alice <alice-p256@example.test>
+Subject: ecdsa p256
+MIME-Version: 1.0
+Content-Type: multipart/signed; protocol="application/pkcs7-signature"; micalg="sha-256"; boundary="----7D85AB5F31C9B43A84A7DA3707A70644"
+
+This is an S/MIME signed message
+
+------7D85AB5F31C9B43A84A7DA3707A70644
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 8bit
+
+interop body with accents éè ✓
+
+------7D85AB5F31C9B43A84A7DA3707A70644
+Content-Type: application/pkcs7-signature; name="smime.p7s"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="smime.p7s"
+
+MIIDYAYJKoZIhvcNAQcCoIIDUTCCA00CAQExDTALBglghkgBZQMEAgEwCwYJKoZI
+hvcNAQcBoIIBpjCCAaIwggFHoAMCAQICFEstb5LMLGaSvI6kdOSrYeFeTEOVMAoG
+CCqGSM49BAMCMBUxEzARBgNVBAMMCmFsaWNlLXAyNTYwHhcNMjYxMTA5MTMyNzUw
+WhcNMzYxMTA2MTMyNzUwWjAVMRMwEQYDVQQDDAphbGljZS1wMjU2MFkwEwYHKoZI
+zj0CAQYIKoZIzj0DAQcDQgAEmRxhJnqYK5Pnt+1NYc1tRqpHXA3uesjvR158/T4G
+IQacFwkNcttWpvzeuIih1vxscPYyFMzNwCE5LLqomu4fjKN1MHMwIgYDVR0RBBsw
+GYEXYWxpY2UtcDI1NkBleGFtcGxlLnRlc3QwDgYDVR0PAQH/BAQDAgOIMBMGA1Ud
+JQQMMAoGCCsGAQUFBwMEMAkGA1UdEwQCMAAwHQYDVR0OBBYEFIzKDoc1ROOVpS5y
+hh//kPb+M5L3MAoGCCqGSM49BAMCA0kAMEYCIQD8DIuQ+3duMTDmS0H7ABvbSlbk
+CEtggMzwI6gftwu62wIhAM99DUHqBUZDGokCr1BxSsy6DwmA+4QTebkpkrv20G7e
+MYIBgDCCAXwCAQEwLTAVMRMwEQYDVQQDDAphbGljZS1wMjU2AhRLLW+SzCxmkryO
+pHTkq2HhXkxDlTALBglghkgBZQMEAgGggeQwGAYJKoZIhvcNAQkDMQsGCSqGSIb3
+DQEHATAcBgkqhkiG9w0BCQUxDxcNMjYxMTA5MTMyNzUwWjAvBgkqhkiG9w0BCQQx
+IgQgQtaaYQiFydc43VEXqaqwUzqU9vCDjSOhr2OmrYt9BfEweQYJKoZIhvcNAQkP
+MWwwajALBglghkgBZQMEASowCwYJYIZIAWUDBAEWMAsGCWCGSAFlAwQBAjAKBggq
+hkiG9w0DBzAOBggqhkiG9w0DAgICAIAwDQYIKoZIhvcNAwICAUAwBwYFKw4DAgcw
+DQYIKoZIhvcNAwICASgwCgYIKoZIzj0EAwIESDBGAiEA2hm3FgFpNq631W4F+pm7
+C+BEp3fyLsp2UOubw2L9pZkCIQCqjnPagwWuwVyol2Ota2nkA2IS4XBxSL1b2pNs
+e6DWcg==
+
+------7D85AB5F31C9B43A84A7DA3707A70644--
+

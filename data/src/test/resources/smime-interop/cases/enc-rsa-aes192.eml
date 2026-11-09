@@ -1,0 +1,27 @@
+To: Bob <bob-rsa@example.test>
+From: Alice <alice-rsa@example.test>
+Subject: rsa aes192
+MIME-Version: 1.0
+Content-Disposition: attachment; filename="smime.p7m"
+Content-Type: application/pkcs7-mime; smime-type=enveloped-data; name="smime.p7m"
+Content-Transfer-Encoding: base64
+
+MIIDMgYJKoZIhvcNAQcDoIIDIzCCAx8CAQAxggFGMIIBQgIBADAqMBIxEDAOBgNV
+BAMMB2JvYi1yc2ECFCYtS0jmcbEeTWq9jxwwfEJlAwQPMA0GCSqGSIb3DQEBAQUA
+BIIBAHNnawHZqivlBanE2UNOtTi6vX46lXi70Ia2RWE1LmhUmEbt0J5BqaKj/6EE
+P/+dHbfAZWALiVwVAFG7dMVXzxuylC3fzMsZYa5H9Y6LNDPEEcv8Zank4Bq2tCx1
+FvQ9vv6SrpDiGVlikWuSSQvng6y4ty/CrRYgyga45tTomTIakmF0Ipvc43x4K5Zl
+qF47VNucwmWnwou1D0jb98+Aw8klEHRm3p9ghoSgUkHsRUUYhGHx16W1E/SCeB/l
+E24W2/C7IMF8zccBbBrvsxI7oPjGnLed/ot6YzGuwA8QjpNNJwLHUg+mjL83z68c
+ynj0tSxvq5+jpYIey93qglY2nK4wggHOBgkqhkiG9w0BBwEwHQYJYIZIAWUDBAEW
+BBBDBgEi10FZhz85x3bv0VqpgIIBoNd9vD+f7N90XOLQUcTWrVdrsd6QZTpnYbbm
+Ue1kGMNcwP+bKPWoX2rEOvzMu9lNh83PXuVXCL8FQ6WzuEHc2sLe/yq31qKojeuY
+i7HM28i34WVjSM6YfoMhzHBQv1c/8RjDOp50nc52DNztE8ksXBLwgEYku8f1urc7
+o4zYUadNGcY8hHeoOr9Rh3aSjn4wgIdlfxZXug/RnAzkXg/pVVSs+CsFV9liOHNk
+OGYv+K9/dMgQcVMJbfDM74yi0T4fYrPOOJs/Wiw/eliyQO1YqyWTkozb7bBwq42Z
+/pXjyOQyZxhc/QPkJrN8JKuxXGiiYC9kcnUzkNksxyRQnrheFtxX+IF8WF7X2/hQ
+5sHBsjHVFAxcr/ESzinT62JHdCBlhMDaw4RPDNSJIrPetebN1VJzDXqT0HH/mZUW
+T9qcj5pCGkMv97d3abF5wRv/iHrOwq5xiBgxzz4+MhsQ+A+UGQkqcqVCwpTelge+
+avPmR41+gI8Hw94sm64grd4iZP+PnS8XBLJAmR76skW7o0vJHlXNCmuqozIMabGz
+hqfMiGza
+

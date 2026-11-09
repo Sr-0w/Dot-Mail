@@ -52,7 +52,7 @@ class SmimeEngineTest {
             val keyUsage = certificate.keyUsage
             val usageOk = when (use) {
                 SmimeCertificateUse.SIGNING -> keyUsage?.getOrNull(0) == true
-                SmimeCertificateUse.ENCRYPTION -> keyUsage?.getOrNull(2) == true
+                SmimeCertificateUse.ENCRYPTION -> keyUsage?.getOrNull(2) == true || keyUsage?.getOrNull(4) == true // key transport or key agreement
             }
             return if (san.equals(mailbox, true) && certificate.notBefore.before(Date.from(now)) && certificate.notAfter.after(Date.from(now)) && usageOk) {
                 SmimeCertificateVerdict.Trusted
@@ -74,8 +74,10 @@ class SmimeEngineTest {
         encryption: Boolean = true,
         validityDays: Long = 365,
         eku: KeyPurposeId = KeyPurposeId.id_kp_emailProtection,
+        curve: String? = null,
     ): Identity {
-        val generator = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }
+        val generator = if (curve == null) KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }
+        else KeyPairGenerator.getInstance("EC").apply { initialize(java.security.spec.ECGenParameterSpec(curve)) }
         val pair = generator.generateKeyPair()
         val subject = X500Name("CN=$email")
         val start = Date.from(now.minusSeconds(86_400))
@@ -88,13 +90,13 @@ class SmimeEngineTest {
             subject,
             pair.public,
         )
-        val usage = (if (signing) KeyUsage.digitalSignature else 0) or (if (encryption) KeyUsage.keyEncipherment else 0)
+        val usage = (if (signing) KeyUsage.digitalSignature else 0) or (if (encryption) (if (curve == null) KeyUsage.keyEncipherment else KeyUsage.keyAgreement) else 0)
         builder.addExtension(Extension.keyUsage, true, KeyUsage(usage))
         builder.addExtension(Extension.extendedKeyUsage, false, ExtendedKeyUsage(eku))
         builder.addExtension(Extension.subjectAlternativeName, false, GeneralNames(GeneralName(GeneralName.rfc822Name, email)))
         val certificate = JcaX509CertificateConverter()
             .setProvider(org.bouncycastle.jce.provider.BouncyCastleProvider())
-            .getCertificate(builder.build(JcaContentSignerBuilder("SHA256withRSA").build(pair.private)))
+            .getCertificate(builder.build(JcaContentSignerBuilder(if (curve == null) "SHA256withRSA" else "SHA256withECDSA").build(pair.private)))
         certificate.verify(pair.public)
         return Identity(email, pair, certificate)
     }
@@ -468,5 +470,48 @@ class SmimeEngineTest {
     private fun ByteArray.indexOfSlice(needle: ByteArray): Int {
         outer@ for (i in 0..size - needle.size) { for (j in needle.indices) if (this[i + j] != needle[j]) continue@outer; return i }
         return -1
+    }
+
+    // ---- ECDH key agreement (RFC 5753): EC certificates are common now ----
+
+    private fun decryptable(variant: SmimeMessageVariant, who: Identity): String =
+        String(engine.decryptMime(variant.mimeBytes, who.decrypting()), Charsets.ISO_8859_1)
+
+    @Test fun `encrypting to an EC recipient uses ECDH and only that recipient can read it`() {
+        val sender = identity("sender@example.test", curve = "secp256r1")
+        val alice = identity("alice@example.test", curve = "secp256r1")
+        val bob = identity("bob@example.test", curve = "secp384r1")
+        val variants = engine.build(
+            mail().copy(cc = emptyList(), bcc = emptyList()), SmimeMode.ENCRYPT,
+            recipientCertificates = listOf(alice.recipient(), bob.recipient().copy(mailbox = "bob@example.test")),
+            senderDecryptionCertificate = sender.certificate,
+        )
+        // alice is the only To recipient; bob is not on the mail, so only alice's variant exists
+        assertEquals(1, variants.size)
+        val text = decryptable(variants.single(), alice)
+        assertTrue(text.contains("plain body"))
+        assertTrue(runCatching { decryptable(variants.single(), bob) }.isFailure)
+        // the sender can read their own Sent copy through the self certificate (also EC)
+        assertTrue(decryptable(variants.single(), sender).contains("plain body"))
+        // the CMS really carries KeyAgreeRecipientInfo, not a key transport
+        val cms = org.bouncycastle.cms.CMSEnvelopedData(parse(variants.single().mimeBytes).inputStream.use { it.readBytes() })
+        assertTrue(cms.recipientInfos.recipients.all { it is org.bouncycastle.cms.KeyAgreeRecipientInformation })
+    }
+
+    @Test fun `RSA and EC recipients of one message each decrypt with their own key, on P-256 and P-384`() {
+        val rsa = identity("alice@example.test")
+        val p256 = identity("p256@example.test", curve = "secp256r1")
+        val p384 = identity("p384@example.test", curve = "secp384r1")
+        val sender = identity("sender@example.test")
+        val message = mail().copy(to = listOf(Address("alice@example.test"), Address("p256@example.test"), Address("p384@example.test")), cc = emptyList(), bcc = emptyList())
+        val variant = engine.build(message, SmimeMode.ENCRYPT, recipientCertificates = listOf(rsa.recipient(), p256.recipient(), p384.recipient()), senderDecryptionCertificate = sender.certificate).single()
+        for (who in listOf(rsa, p256, p384, sender)) assertTrue(decryptable(variant, who).contains("plain body"))
+    }
+
+    @Test fun `an EC certificate without key agreement or encipherment is refused`() {
+        val signOnly = identity("alice@example.test", encryption = false, curve = "secp256r1")
+        val sender = identity("sender@example.test")
+        val failure = assertThrowsSmime { engine.build(mail().copy(cc = emptyList(), bcc = emptyList()), SmimeMode.ENCRYPT, recipientCertificates = listOf(signOnly.recipient()), senderDecryptionCertificate = sender.certificate) }
+        assertEquals(SmimeFailure.RECIPIENT_CERTIFICATE_REJECTED, failure)
     }
 }

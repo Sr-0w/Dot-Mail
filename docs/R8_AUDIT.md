@@ -35,7 +35,8 @@ adb shell CLASSPATH=/data/local/tmp/r8check.apk app_process / app.dot.mail.check
 ```
 
 It signs + encrypts (AES-256-CBC), decrypts, verifies the detached signature, rejects a tampered one, decrypts AES-GCM
-AuthEnvelopedData and verifies an opaque signed-data fixture. Without the BC keep rules it fails 4 of 5
+AuthEnvelopedData, verifies an opaque signed-data fixture and does an ECDH (P-256 software key) round trip, both our own
+ephemeral-static send and a message made by OpenSSL (X9.63 KDF + AES key wrap). Without the BC keep rules it fails 4 of the first 5
 (`NoSuchAlgorithmException: no such algorithm: SHA256 for provider BC`), i.e. S/MIME would be broken in every release
 build; with them it passes. Rerun it whenever R8 rules, AGP or BC change.
 

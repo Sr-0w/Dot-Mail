@@ -80,6 +80,7 @@ fun rememberSmimeReader(message: Message): SmimeReaderState {
                 val result = runCatching { graph.mail.decryptSmime(message) }.getOrNull() ?: SmimeDecryption.Failed
                 state.decryption = result
                 state.signature = (result as? SmimeDecryption.Done)?.signature
+                    ?: if (content.wrapper != null) runCatching { graph.mail.verifySmime(message) }.getOrNull() else null
             }
         }
         state.checking = false

@@ -1,0 +1,27 @@
+To: Bob <bob-rsa@example.test>
+From: Alice <alice-rsa@example.test>
+Subject: rsa aes128
+MIME-Version: 1.0
+Content-Disposition: attachment; filename="smime.p7m"
+Content-Type: application/pkcs7-mime; smime-type=enveloped-data; name="smime.p7m"
+Content-Transfer-Encoding: base64
+
+MIIDMgYJKoZIhvcNAQcDoIIDIzCCAx8CAQAxggFGMIIBQgIBADAqMBIxEDAOBgNV
+BAMMB2JvYi1yc2ECFCYtS0jmcbEeTWq9jxwwfEJlAwQPMA0GCSqGSIb3DQEBAQUA
+BIIBAGFyTecjUcrnvkjstviqe/I9am9Qjy8X/Ru3IogvkIU4Y+ljbT/kggmxzfZQ
+4gIAfdF2XwFag4vm97pXf8pxsshrIhX4nYOoLRl1LvmQ1F5sDdX/alkGLSRCr15c
+f+G8ONaOtkX+XNqZxWA+UaZefKyGOt35DneUvLPY3yeMuJYQpxfk7PpH1ZyeZIsP
+fpKNVZHXjx0kMSNoZzZoEsmKhxo10cbT1yMBqnHDyvJXnBlB50ON7Z0/oW5gOgh8
+oEXHyZnzH4/Qi0XE7iWacLAe5WpjtE0NiLXG3vJRFcEmLuTwy4RC63BD33BIkqu8
+XGnQ8oX3yKcqy4bdmlm++wRLa9EwggHOBgkqhkiG9w0BBwEwHQYJYIZIAWUDBAEC
+BBAIxb8YQtrAEys3CEDqqWUUgIIBoCvnNNiGEjhA1mSKI0zxsWzZl9L3NcQX+zNr
+uQgiHN9QCQUa0OI8sBDPNmeoDp8cn83C7KoVvAa32b9fNCveZ1JXw42xMpEgR+2/
+3Bjrzrnydrp0YydSP87mDSwkntFpK+2EywHRUJxcuU2I0wZsaW9cYRw3x5TzlSDi
+2bO9pa11UCRi5BjQnAhW0Bi6OSI9aVcmeOdHQG0QgtpDBeGbznkm/Yio6OCtUjwf
+n3vwkGyZFMdejp4TiqLn6I6AehvrOOzXptBHCXQlE2J6jqTB6PQKALfyg5RP+anD
+qlgrKVx+rHBkGsE0cAZd0bJiy+V8Jw8v510NkDFAJJCCKw1e4ABM/SElk4kk5J/V
+mDWbZ5sk5DMgKoBNDzXwTS7kp8nCNpXD4JZdaxE3JubhvQzDB391d002m57n+mJK
+JpD/Au/HqvojI32BNMb8kdRwT92cLkGNxEht694EwgkpPoV48gGM0kCmGxOBqXS4
+RojDhwKUKGOuxUmORDe8zvg/9WQA1nUUsksgJiD7V0oBsNdt0B/M5B7LB/jXnDZL
+xgsWndfX
+

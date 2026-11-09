@@ -1,0 +1,24 @@
+To: Frank <frank-bp256@example.test>
+From: Alice <alice-rsa@example.test>
+Subject: ecdh brainpool 256
+MIME-Version: 1.0
+Content-Disposition: attachment; filename="smime.p7m"
+Content-Type: application/pkcs7-mime; smime-type=enveloped-data; name="smime.p7m"
+Content-Transfer-Encoding: base64
+
+MIICvAYJKoZIhvcNAQcDoIICrTCCAqkCAQIxgdGhgc4CAQOgUaFPMAkGByqGSM49
+AgEDQgAEpR7GlDdMWfUbp5+5OmbjyjtoxlbZBUUbKN3oPtxROmVEq5Wq17JdVnZS
+VTCIrRAOwByYcwIox49oAS893Y7o4TAYBgkrgQUQhkg/AAIwCwYJYIZIAWUDBAEt
+MFwwWjAuMBYxFDASBgNVBAMMC2ZyYW5rLWJwMjU2AhQAiPQtjPh5Qo5XpUp5mFtL
+HOSgJQQogg+SBwNCBpFkkNWaANXNK7I9HaEH/UhyHRJkRf3bszsjuYKAiOB4RzCC
+Ac4GCSqGSIb3DQEHATAdBglghkgBZQMEASoEEG5G4uo334PsCZKUawCX5PyAggGg
+0aC+ardgyHMSus1WOgYAXpDUtknWvXb77jZYYJAxh/e6CY0YFvR30rAMoGF/E0IS
+XV3xxJNsMw5fUryS8TN6AEScD0ZrzQSr6S31QrJ0MhhqR5ZE7Gdt+ccXfs+sXeQs
+8+tcB8Ee1dIlAYOID9IH9ZdiyarqxncTzpsNNdq2id9t84FXO8I0Yszcmd0IhVfg
+TlopGGY2BmmyqPC3V+jw9bGvDv71aoq4NMt5qN/8LMTqJCxMctUPfiBAfA2+dgLw
+n3E1PM0fpoGV6tSv1J4roYaNLxrUlTgxM6LY+UDfx4UXIMsyjKrA2L9ZPGJRTmSC
+XTi95+zdLF2gXiVveHOHLP3K74UcUSHuBGgrru2rt3allfXc790UixvR5Wi+Cf2W
+XUU9ou0ZPLlNkPdnlIUiIPKPiHQBmveTSMe51kY5o2fdPusIWdCkfQmTTtCEPM7V
+EIkfoxZhMl8pyt0ctwFBDXTDVHzWF0OoHyLCWIdXMgAb/WOk/OWbFCBj+nklm3Zn
+K1ZOc12KdHZgpu33yJ0umDPVYAaWxHBu9b0oxLtKBjM=
+

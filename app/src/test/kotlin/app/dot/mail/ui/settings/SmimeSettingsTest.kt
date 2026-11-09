@@ -75,7 +75,8 @@ class SmimeSettingsTest {
     @Test fun aVanishedAliasSaysPickAgainAndCanBeRemoved() {
         current = SmimeAccountConfig("gone-signing", "gone-decryption", signByDefault = true)
         show(account(current))
-        compose.waitForIdle()
+        // The status is read from KeyChain on the IO dispatcher: wait for it instead of assuming the first idle frame has it.
+        compose.waitUntil(timeoutMillis = 10_000) { compose.onAllNodesWithText(s(R.string.smime_key_unavailable), useUnmergedTree = true).fetchSemanticsNodes().size == 2 }
         assertThat(compose.onAllNodesWithText(s(R.string.smime_key_unavailable), useUnmergedTree = true).fetchSemanticsNodes()).hasSize(2)
         compose.onNodeWithText(s(R.string.smime_remove)).performClick()
         compose.onNodeWithText(s(R.string.smime_remove_title)).assertIsDisplayed()

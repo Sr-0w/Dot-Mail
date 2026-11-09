@@ -231,8 +231,11 @@ sealed interface SmimeContent {
     data class Signed(val signedEntity: String, val signature: String) : SmimeContent
     /** application/pkcs7-mime signed-data (opaque signing): the CMS object; the signed content is already cached as the normal body. */
     data class Opaque(val cms: String) : SmimeContent
-    /** application/pkcs7-mime enveloped/authEnveloped data: [envelope] is the CMS object; nothing readable is stored. */
-    data class Encrypted(val envelope: String) : SmimeContent
+    /**
+     * application/pkcs7-mime enveloped/authEnveloped data: [envelope] is the CMS object; nothing readable is stored. [wrapper] is
+     * the outer signature when the envelope itself was signed (signed(enveloped(...))), verifiable without decrypting.
+     */
+    data class Encrypted(val envelope: String, val wrapper: SmimeContent? = null) : SmimeContent
 }
 
 /** Outcome of decrypting an S/MIME message in memory. */
