@@ -90,6 +90,14 @@ object Mime {
         directory.mkdirs()
         val encryptionHint = encryptionHintFromMime(runCatching { part.contentType }.getOrNull())
         if (encryptionHint == EncryptionHint.UNSUPPORTED) return CachedBody(null, null, emptyList(), encryptionHint = encryptionHint)
+        if (encryptionHint == EncryptionHint.SMIME) {
+            // Keep only the CMS object; the reader decrypts it in memory with the account's KeyChain key.
+            part.inputStream.use { input -> java.io.File(directory, SmimeParts.ENCRYPTED_FILE).outputStream().use { out ->
+                val buffer = ByteArray(8192); var total = 0L
+                while (true) { checkCancelled(); val n = input.read(buffer); if (n < 0) break; total += n; require(total <= maxBytes) { "Message exceeds download limit" }; out.write(buffer, 0, n) }
+            } }
+            return CachedBody(null, null, emptyList(), encryptionHint = encryptionHint)
+        }
         val texts = mutableListOf<java.io.File>(); val htmls = mutableListOf<java.io.File>(); val attachments = mutableListOf<CachedPart>()
         val metadata=mutableListOf<RemotePart>()
         var remaining = maxBytes

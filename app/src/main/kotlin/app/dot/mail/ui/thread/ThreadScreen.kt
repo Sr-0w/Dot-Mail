@@ -802,10 +802,12 @@ private fun MessageCard(
         // OpenPGP: status line + in-memory plaintext from OpenKeychain replaces the ciphertext for display only.
         val pgp = app.dot.mail.ui.pgp.rememberPgpReader(message.id, message.body)
         message.body?.let { if (it.pgp != null) app.dot.mail.ui.pgp.PgpBar(it, pgp) }
-        app.dot.mail.ui.smime.SmimeBar(message)
-        val body = pgp.decrypted ?: message.body?.let { b ->
-            // An encrypted PGP/MIME message has no readable part until decrypted; show nothing instead of an empty frame.
-            if (b.pgp is app.dot.mail.data.model.PgpContent.Encrypted) b.copy(plainText = b.plainText.orEmpty(), html = null) else b
+        // S/MIME: verified in place; encrypted mail is decrypted in memory and only displayed.
+        val smime = app.dot.mail.ui.smime.rememberSmimeReader(message)
+        app.dot.mail.ui.smime.SmimeBar(message, smime)
+        val body = pgp.decrypted ?: smime.decrypted ?: message.body?.let { b ->
+            // An encrypted message has no readable part until decrypted; show nothing instead of an empty frame.
+            if (b.pgp is app.dot.mail.data.model.PgpContent.Encrypted || b.smime is app.dot.mail.data.model.SmimeContent.Encrypted) b.copy(plainText = b.plainText.orEmpty(), html = null) else b
         }
         if (body == null) {
             Row(Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.l), verticalAlignment = Alignment.CenterVertically) {

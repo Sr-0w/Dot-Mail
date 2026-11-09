@@ -15,6 +15,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.GppBad
 import androidx.compose.material.icons.outlined.GppMaybe
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -22,7 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -44,31 +46,85 @@ import app.dot.design.components.dotSurfaceEnter
 import app.dot.mail.LocalMailGraph
 import app.dot.mail.R
 import app.dot.mail.data.model.Message
+import app.dot.mail.data.model.MessageBody
+import app.dot.mail.data.model.SmimeContent
+import app.dot.mail.data.model.SmimeDecryption
 import app.dot.mail.data.model.SmimeCertificateInfo
 import app.dot.mail.data.model.SmimeSignatureView
 import app.dot.mail.data.model.SmimeSignatureView.State
 import java.text.DateFormat
 import java.util.Date
 
-/** Verification in progress; null result = not S/MIME signed. */
-private object Checking
+/** What the reader knows about a message's S/MIME protection. [decrypted] replaces the body for display, in memory only. */
+class SmimeReaderState {
+    var checking by mutableStateOf(true)
+    var signature by mutableStateOf<SmimeSignatureView?>(null)
+    var decryption by mutableStateOf<SmimeDecryption?>(null)
+    val decrypted: MessageBody? get() = (decryption as? SmimeDecryption.Done)?.body
+}
 
 /**
- * The S/MIME signature line of a message. Only an intact signature from a certificate the device trusts, issued for the
- * sender's address, gets the accent colour and the check icon; everything else stays neutral or red. Tapping it opens
- * the certificate details.
+ * Verifies (signed) or decrypts (encrypted) [message] once its body is known. Decrypting needs no prompt: the account's
+ * KeyChain key was granted when it was chosen in Settings, and the plaintext stays in memory.
  */
 @Composable
-fun SmimeBar(message: Message, modifier: Modifier = Modifier) {
-    if (message.body?.smime == null) return
+fun rememberSmimeReader(message: Message): SmimeReaderState {
     val graph = LocalMailGraph.current
-    val result by produceState<Any?>(Checking, message.id, message.body?.smime) {
-        value = runCatching<SmimeSignatureView?> { graph.mail.verifySmime(message) }.getOrElse { SmimeSignatureView(State.UNREADABLE) }
+    val content = message.body?.smime
+    val state = remember(message.id, content) { SmimeReaderState() }
+    LaunchedEffect(state) {
+        when (content) {
+            null -> Unit
+            is SmimeContent.Signed -> state.signature = runCatching { graph.mail.verifySmime(message) }.getOrNull() ?: SmimeSignatureView(State.UNREADABLE)
+            is SmimeContent.Encrypted -> {
+                val result = runCatching { graph.mail.decryptSmime(message) }.getOrNull() ?: SmimeDecryption.Failed
+                state.decryption = result
+                state.signature = (result as? SmimeDecryption.Done)?.signature
+            }
+        }
+        state.checking = false
     }
-    val view = result as? SmimeSignatureView
-    if (result == null) return
+    return state
+}
+
+/**
+ * The S/MIME lines of a message: encryption (when encrypted) and signature. Only an intact signature from a certificate the
+ * device trusts, issued for the sender's address, gets the accent colour and the check icon; everything else stays neutral
+ * or red. Tapping the signature opens the certificate details.
+ */
+@Composable
+fun SmimeBar(message: Message, state: SmimeReaderState, modifier: Modifier = Modifier) {
+    val content = message.body?.smime ?: return
+    if (content is SmimeContent.Encrypted) EncryptionLine(state, modifier)
+    if (content is SmimeContent.Signed || state.signature != null) SignatureLine(if (state.checking) null else state.signature ?: SmimeSignatureView(State.UNREADABLE), modifier)
+}
+
+@Composable
+private fun EncryptionLine(state: SmimeReaderState, modifier: Modifier) {
     val c = Dot.colors
-    var details by remember(message.id) { mutableStateOf(false) }
+    val (icon, text, tint) = when (state.decryption) {
+        null -> Triple(Icons.Outlined.Lock, stringResource(R.string.smime_decrypting), c.textSecondary)
+        is SmimeDecryption.Done -> Triple(Icons.Outlined.LockOpen, stringResource(R.string.smime_decrypted), c.textSecondary)
+        SmimeDecryption.NoKey -> Triple(Icons.Outlined.Lock, stringResource(R.string.smime_no_key), c.textSecondary)
+        SmimeDecryption.NotForThisKey -> Triple(Icons.Outlined.Lock, stringResource(R.string.smime_not_for_key), c.textSecondary)
+        SmimeDecryption.WeakEncryption -> Triple(Icons.Outlined.GppBad, stringResource(R.string.smime_weak), c.danger)
+        SmimeDecryption.Failed -> Triple(Icons.Outlined.GppBad, stringResource(R.string.smime_decrypt_failed), c.danger)
+    }
+    Row(
+        modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.xs)
+            .clip(DotShapes.medium).background(c.surface).padding(horizontal = DotSpacing.m, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, Modifier.size(18.dp), tint = tint)
+        Spacer(Modifier.width(DotSpacing.s))
+        Text(text, style = Dot.type.caption, color = c.textSecondary, modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun SignatureLine(view: SmimeSignatureView?, modifier: Modifier) {
+    val c = Dot.colors
+    var details by remember(view) { mutableStateOf(false) }
     val (icon, text, tint) = line(view)
     Row(
         modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.xs)

@@ -105,4 +105,37 @@ class SmimeReceiveTest {
         assertEquals(State.UNREADABLE, verifySmimeSignature(message(dir), trusted, null)!!.state)
         assertNull(verifySmimeSignature(message(dir).copy(body = MessageBody("x", null, false)), trusted, null))
     }
+
+    /** Alice signs and encrypts to Bob; Bob's copy is cached like a fetched body. */
+    private fun receiveEncrypted(): File {
+        val mail = OutgoingMail(from = Address("alice@example.org", "Alice"), to = listOf(Address("bob@example.org")), subject = "Secret", text = "the launch is on friday\r\n")
+        val variant = SmimeEngine(certificatePolicy = trusted).build(
+            mail, SmimeMode.SIGN_AND_ENCRYPT, SmimeSigningIdentity(cert("id-alice"), key("id-alice")),
+            listOf(app.dot.mail.engine.SmimeRecipientCertificate("bob@example.org", cert("id-bob"))), cert("id-alice"),
+        ).single()
+        val dir = tmp.newFolder()
+        val cached = Mime.cache(jakarta.mail.internet.MimeMessage(jakarta.mail.Session.getInstance(java.util.Properties()), variant.mimeBytes.inputStream()), dir)
+        assertNull(cached.text); assertNull(cached.html)
+        return dir
+    }
+    private fun encryptedMessage(dir: File) = message(dir).copy(body = MessageBody(null, null, false, smime = SmimeContent.Encrypted(File(dir, SmimeParts.ENCRYPTED_FILE).path)))
+    private fun identity(name: String): suspend (Long) -> app.dot.mail.engine.SmimeDecryptionIdentity = { app.dot.mail.engine.SmimeDecryptionIdentity(cert(name), key(name)) }
+
+    @Test fun `encrypted mail keeps only the envelope on disk`() {
+        val dir = receiveEncrypted()
+        assertEquals(setOf(SmimeParts.ENCRYPTED_FILE), dir.list()!!.toSet())
+        assertFalse(File(dir, SmimeParts.ENCRYPTED_FILE).readText(Charsets.ISO_8859_1).contains("launch"))
+    }
+
+    @Test fun `decrypts in memory and verifies the inner signature`() = runBlocking {
+        val result = decryptSmimeMessage(encryptedMessage(receiveEncrypted()), identity("id-bob"), trusted, null) as app.dot.mail.data.model.SmimeDecryption.Done
+        assertTrue(result.body.plainText.orEmpty().contains("the launch is on friday"))
+        assertEquals(State.VALID_TRUSTED, result.signature!!.state)
+    }
+
+    @Test fun `missing key and someone else's key are told apart`() = runBlocking {
+        val dir = receiveEncrypted()
+        assertEquals(app.dot.mail.data.model.SmimeDecryption.NoKey, decryptSmimeMessage(encryptedMessage(dir), { throw SmimeUnavailableException(SmimeUnavailableException.Reason.NOT_CONFIGURED, "none") }, trusted, null))
+        assertEquals(app.dot.mail.data.model.SmimeDecryption.NotForThisKey, decryptSmimeMessage(encryptedMessage(dir), identity("id-carol"), trusted, null))
+    }
 }

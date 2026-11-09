@@ -222,6 +222,21 @@ data class MessageBody(
 sealed interface SmimeContent {
     /** multipart/signed: the exact signed entity and its detached CMS signature. */
     data class Signed(val signedEntity: String, val signature: String) : SmimeContent
+    /** application/pkcs7-mime enveloped/authEnveloped data: [envelope] is the CMS object; nothing readable is stored. */
+    data class Encrypted(val envelope: String) : SmimeContent
+}
+
+/** Outcome of decrypting an S/MIME message in memory. */
+sealed interface SmimeDecryption {
+    /** [body] lives only in memory; [signature] is set when the decrypted content was itself signed (sign-then-encrypt). */
+    data class Done(val body: MessageBody, val signature: SmimeSignatureView?) : SmimeDecryption
+    /** This account has no S/MIME decryption certificate set up, or KeyChain no longer has it: pick one in Settings. */
+    data object NoKey : SmimeDecryption
+    /** The message is not encrypted for this account's certificate. */
+    data object NotForThisKey : SmimeDecryption
+    /** DES/3DES/RC2: too weak to decrypt safely. */
+    data object WeakEncryption : SmimeDecryption
+    data object Failed : SmimeDecryption
 }
 
 /** What the reader shows for an S/MIME signature. Trust is never implied by a valid signature alone. */

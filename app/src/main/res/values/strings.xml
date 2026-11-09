@@ -1169,4 +1169,10 @@
     <string name="compose_smime_err_signer">Your signing certificate can\'t be used. Pick again in Settings. Nothing was sent.</string>
     <string name="compose_smime_err_own">Choose a decryption certificate in Settings to encrypt. Nothing was sent.</string>
     <string name="compose_smime_err_failed">S/MIME couldn\'t protect this message. It was not sent.</string>
+    <string name="smime_decrypting">Decrypting (S/MIME)…</string>
+    <string name="smime_decrypted">Decrypted with S/MIME</string>
+    <string name="smime_no_key">Encrypted with S/MIME. Choose your decryption certificate in Settings → account → S/MIME to read it.</string>
+    <string name="smime_not_for_key">Encrypted with S/MIME for another certificate than the one chosen for this account.</string>
+    <string name="smime_weak">Encrypted with an outdated method (DES, 3DES or RC2). Dot Mail does not decrypt it.</string>
+    <string name="smime_decrypt_failed">This S/MIME message could not be decrypted.</string>
 </resources>

@@ -1169,4 +1169,10 @@
     <string name="compose_smime_err_signer">Votre certificat de signature est inutilisable. Choisissez-le à nouveau dans les réglages. Rien n’a été envoyé.</string>
     <string name="compose_smime_err_own">Choisissez un certificat de déchiffrement dans les réglages pour chiffrer. Rien n’a été envoyé.</string>
     <string name="compose_smime_err_failed">S/MIME n’a pas pu protéger ce message. Il n’a pas été envoyé.</string>
+    <string name="smime_decrypting">Déchiffrement (S/MIME)…</string>
+    <string name="smime_decrypted">Déchiffré avec S/MIME</string>
+    <string name="smime_no_key">Chiffré avec S/MIME. Choisissez votre certificat de déchiffrement dans Réglages → compte → S/MIME pour le lire.</string>
+    <string name="smime_not_for_key">Chiffré avec S/MIME pour un autre certificat que celui choisi pour ce compte.</string>
+    <string name="smime_weak">Chiffré avec une méthode obsolète (DES, 3DES ou RC2). Dot Mail ne le déchiffre pas.</string>
+    <string name="smime_decrypt_failed">Impossible de déchiffrer ce message S/MIME.</string>
 </resources>
