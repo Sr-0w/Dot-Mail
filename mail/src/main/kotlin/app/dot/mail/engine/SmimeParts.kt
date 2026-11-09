@@ -6,6 +6,8 @@ object SmimeParts {
     const val SIGNED_FILE = "smime-signed.mime"
     /** The detached CMS SignedData (DER, transfer encoding removed). */
     const val SIGNATURE_FILE = "smime-signature.p7s"
+    /** The CMS EnvelopedData/AuthEnvelopedData of an encrypted message (DER). Plaintext is never written to disk. */
+    const val ENCRYPTED_FILE = "smime-encrypted.p7m"
 
     private val signatureTypes = setOf("application/pkcs7-signature", "application/x-pkcs7-signature")
 

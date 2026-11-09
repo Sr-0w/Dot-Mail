@@ -40,6 +40,12 @@ internal suspend fun verifySmimeSignature(
         } catch (e: Exception) {
             return@withContext SmimeSignatureView(State.UNREADABLE)
         }
+        summarize(verification, from, message.accountId, certs)
+    }
+}
+
+/** One verdict for all signers (the weakest wins), remembering certificates from intact signatures. */
+private suspend fun summarize(verification: app.dot.mail.engine.SmimeVerification, from: String, accountId: Long, certs: SmimeCertStore?): SmimeSignatureView {
         val views = verification.signers.map { signer ->
             val info = signer.certificate.info()
             when {
@@ -51,10 +57,9 @@ internal suspend fun verifySmimeSignature(
         }
         // Remember certificates from intact signatures for encrypted replies (the store re-checks the mailbox; cache != trust).
         if (certs != null) verification.signers.filter { it.cryptographicSignatureValid }.forEach { signer ->
-            runCatching { certs.collect(message.accountId, from, signer.certificate, true, signerIntermediates(signer.certificate, signer.certificateCandidates)) }
+            runCatching { certs.collect(accountId, from, signer.certificate, true, signerIntermediates(signer.certificate, signer.certificateCandidates)) }
         }
-        views.maxByOrNull { severity(it.state) } ?: SmimeSignatureView(State.UNREADABLE)
-    }
+    return views.maxByOrNull { severity(it.state) } ?: SmimeSignatureView(State.UNREADABLE)
 }
 
 private fun severity(state: State) = when (state) {
@@ -76,3 +81,42 @@ internal fun X509Certificate.info() = SmimeCertificateInfo(
     notAfter = notAfter.time,
     sha256 = MessageDigest.getInstance("SHA-256").digest(encoded).joinToString("") { "%02X".format(it) },
 )
+
+/**
+ * Decrypts an S/MIME envelope in memory and renders it like the reader renders a body. When the decrypted content is itself
+ * a detached signature (sign-then-encrypt), that signature is verified too. Plaintext never touches the disk.
+ */
+internal suspend fun decryptSmimeMessage(
+    message: Message,
+    keys: suspend (accountId: Long) -> app.dot.mail.engine.SmimeDecryptionIdentity,
+    policy: SmimeCertificatePolicy,
+    certs: SmimeCertStore?,
+): app.dot.mail.data.model.SmimeDecryption? {
+    val encrypted = message.body?.smime as? SmimeContent.Encrypted ?: return null
+    return withContext(Dispatchers.IO) {
+        val file = File(encrypted.envelope)
+        if (!file.isFile || file.length() > MAX_SIGNED_ENTITY) return@withContext app.dot.mail.data.model.SmimeDecryption.Failed
+        val identity = try { keys(message.accountId) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) {
+            return@withContext app.dot.mail.data.model.SmimeDecryption.NoKey
+        }
+        val engine = SmimeEngine(certificatePolicy = policy)
+        val plain = try { engine.decrypt(file.readBytes(), identity) } catch (e: app.dot.mail.engine.SmimeProtectionException) {
+            return@withContext when {
+                e.failure == app.dot.mail.engine.SmimeFailure.WEAK_CONTENT_ENCRYPTION -> app.dot.mail.data.model.SmimeDecryption.WeakEncryption
+                generateSequence<Throwable>(e) { it.cause }.any { (it.message ?: "").contains("exactly one matching recipient") } -> app.dot.mail.data.model.SmimeDecryption.NotForThisKey
+                else -> app.dot.mail.data.model.SmimeDecryption.Failed
+            }
+        }
+        val from = SmimeCertStore.normalize(message.from.email)
+        val signature = if (isDetachedSigned(plain)) {
+            runCatching { summarize(engine.verifySignedMime(plain, from), from, message.accountId, certs) }.getOrElse { SmimeSignatureView(State.UNREADABLE) }
+        } else null
+        val parsed = app.dot.mail.engine.Pgp.parseDecrypted(plain, mime = true)
+        app.dot.mail.data.model.SmimeDecryption.Done(app.dot.mail.data.model.MessageBody(parsed.text, parsed.html, hasRemoteImages = false), signature)
+    }
+}
+
+private fun isDetachedSigned(entity: ByteArray): Boolean = runCatching {
+    val type = jakarta.mail.internet.MimeBodyPart(entity.inputStream()).contentType
+    jakarta.mail.internet.ContentType(type).let { it.baseType.equals("multipart/signed", true) && app.dot.mail.engine.SmimeParts.isSignaturePart(it.getParameter("protocol")) }
+}.getOrDefault(false)

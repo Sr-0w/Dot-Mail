@@ -1169,4 +1169,10 @@
     <string name="compose_smime_err_signer">Ihr Signaturzertifikat ist nicht nutzbar. Wählen Sie es in den Einstellungen erneut. Es wurde nichts gesendet.</string>
     <string name="compose_smime_err_own">Wählen Sie in den Einstellungen ein Entschlüsselungszertifikat, um zu verschlüsseln. Es wurde nichts gesendet.</string>
     <string name="compose_smime_err_failed">S/MIME konnte diese Nachricht nicht schützen. Sie wurde nicht gesendet.</string>
+    <string name="smime_decrypting">Wird entschlüsselt (S/MIME)…</string>
+    <string name="smime_decrypted">Mit S/MIME entschlüsselt</string>
+    <string name="smime_no_key">Mit S/MIME verschlüsselt. Wählen Sie Ihr Entschlüsselungszertifikat unter Einstellungen → Konto → S/MIME, um sie zu lesen.</string>
+    <string name="smime_not_for_key">Mit S/MIME für ein anderes Zertifikat verschlüsselt als das für dieses Konto gewählte.</string>
+    <string name="smime_weak">Mit einem veralteten Verfahren verschlüsselt (DES, 3DES oder RC2). Dot Mail entschlüsselt es nicht.</string>
+    <string name="smime_decrypt_failed">Diese S/MIME-Nachricht konnte nicht entschlüsselt werden.</string>
 </resources>

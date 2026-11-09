@@ -87,6 +87,12 @@ interface AccountRepository {
 
 interface MailRepository {
     /**
+     * Decrypts [message]'s S/MIME envelope in memory with the account's KeyChain decryption key; the plaintext is never
+     * written to disk. Null when the message is not S/MIME encrypted.
+     */
+    suspend fun decryptSmime(message: app.dot.mail.data.model.Message): app.dot.mail.data.model.SmimeDecryption? = null
+
+    /**
      * Verifies [message]'s S/MIME signature (its body must carry [app.dot.mail.data.model.SmimeContent.Signed]) against
      * its From address and this device's trusted CAs. A certificate from a cryptographically valid signature is remembered
      * for encrypting replies (that is not trust). Null when the message is not S/MIME signed.

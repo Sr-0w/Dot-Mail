@@ -623,6 +623,10 @@ internal class RealMailGraph(
         id
     }
     override suspend fun sendProtected(draft: Draft, undoWindowMs: Long, protector: PgpProtector): Long = queueProtected(draft, undoWindowMs, protector)
+    override suspend fun decryptSmime(message: app.dot.mail.data.model.Message): app.dot.mail.data.model.SmimeDecryption? {
+        val keys = KeyChainSmimeKeys(context, { id -> dao.account(id)?.let { Codec.config(it.config).smime } ?: app.dot.mail.data.model.SmimeAccountConfig() })
+        return decryptSmimeMessage(message, { id -> keys.decryptionIdentity(id) }, SmimeTrustPolicy(), smimeCerts)
+    }
     override suspend fun verifySmime(message: app.dot.mail.data.model.Message): app.dot.mail.data.model.SmimeSignatureView? =
         verifySmimeSignature(message, SmimeTrustPolicy(), smimeCerts)
     override suspend fun sendSmime(draft: Draft, undoWindowMs: Long, builder: SmimeBuilder): Long = queueSmime(draft, undoWindowMs, builder)
