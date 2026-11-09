@@ -68,7 +68,13 @@ class SmimeEngineTest {
     }
     private val engine = SmimeEngine(certificatePolicy = fixturePolicy)
 
-    private fun identity(email: String, signing: Boolean = true, encryption: Boolean = true, validityDays: Long = 365): Identity {
+    private fun identity(
+        email: String,
+        signing: Boolean = true,
+        encryption: Boolean = true,
+        validityDays: Long = 365,
+        eku: KeyPurposeId = KeyPurposeId.id_kp_emailProtection,
+    ): Identity {
         val generator = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }
         val pair = generator.generateKeyPair()
         val subject = X500Name("CN=$email")
@@ -84,7 +90,7 @@ class SmimeEngineTest {
         )
         val usage = (if (signing) KeyUsage.digitalSignature else 0) or (if (encryption) KeyUsage.keyEncipherment else 0)
         builder.addExtension(Extension.keyUsage, true, KeyUsage(usage))
-        builder.addExtension(Extension.extendedKeyUsage, false, ExtendedKeyUsage(KeyPurposeId.id_kp_emailProtection))
+        builder.addExtension(Extension.extendedKeyUsage, false, ExtendedKeyUsage(eku))
         builder.addExtension(Extension.subjectAlternativeName, false, GeneralNames(GeneralName(GeneralName.rfc822Name, email)))
         val certificate = JcaX509CertificateConverter()
             .setProvider(org.bouncycastle.jce.provider.BouncyCastleProvider())
@@ -243,6 +249,56 @@ class SmimeEngineTest {
         ).single()
         assertTrue(runCatching { engine.decryptMime(pinned.mimeBytes, older.decrypting()) }.isSuccess)
         assertFalse(runCatching { engine.decryptMime(pinned.mimeBytes, newer.decrypting()) }.isSuccess)
+    }
+
+    @Test fun `pinned ineligible certificate fails distinctly and never falls back`() {
+        val mail = mail().copy(cc = emptyList(), bcc = emptyList())
+        val sender = identity("sender@example.test", signing = false)
+        val valid = identity("alice@example.test", signing = false, validityDays = 120)
+        val pinnedWrongUsage = identity(
+            "alice@example.test",
+            signing = false,
+            validityDays = 730,
+            eku = KeyPurposeId.id_kp_serverAuth,
+        )
+        val pin = java.security.MessageDigest.getInstance("SHA-256").digest(pinnedWrongUsage.certificate.encoded)
+            .joinToString("") { "%02X".format(it) }
+
+        val error = runCatching {
+            engine.build(
+                mail,
+                SmimeMode.ENCRYPT,
+                recipientCertificates = listOf(valid.recipient(), pinnedWrongUsage.recipient()),
+                senderDecryptionCertificate = sender.certificate,
+                pinnedRecipientCertificateFingerprints = mapOf("alice@example.test" to pin),
+                now = Date.from(now),
+            )
+        }.exceptionOrNull() as SmimeProtectionException
+
+        assertEquals(SmimeFailure.RECIPIENT_PINNED_CERTIFICATE_UNAVAILABLE, error.failure)
+    }
+
+    @Test fun `newest certificate without emailProtection EKU is skipped`() {
+        val mail = mail().copy(cc = emptyList(), bcc = emptyList())
+        val sender = identity("sender@example.test", signing = false)
+        val valid = identity("alice@example.test", signing = false, validityDays = 120)
+        val newerServerOnly = identity(
+            "alice@example.test",
+            signing = false,
+            validityDays = 730,
+            eku = KeyPurposeId.id_kp_serverAuth,
+        )
+
+        val encrypted = engine.build(
+            mail,
+            SmimeMode.ENCRYPT,
+            recipientCertificates = listOf(valid.recipient(), newerServerOnly.recipient()),
+            senderDecryptionCertificate = sender.certificate,
+            now = Date.from(now),
+        ).single()
+
+        assertTrue(runCatching { engine.decryptMime(encrypted.mimeBytes, valid.decrypting()) }.isSuccess)
+        assertFalse(runCatching { engine.decryptMime(encrypted.mimeBytes, newerServerOnly.decrypting()) }.isSuccess)
     }
 
     @Test fun `rejects DES 3DES and RC2 EnvelopedData with a distinct weak encryption failure`() {
