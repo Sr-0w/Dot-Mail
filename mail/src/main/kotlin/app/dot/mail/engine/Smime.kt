@@ -277,11 +277,14 @@ class SmimeEngine(
         SmimeVerification(signers.map { signer ->
             val certificate = signer.certificate
             val valid = signer.cryptographicSignatureValid
+            // validateChain takes the leaf first. A CMS object lists its certificates in any order (Outlook/SECEM puts the
+            // root first), so the signer is put in front explicitly; the others are only path-building evidence.
+            val chain = listOf(certificate) + signer.certificateCandidates.filter { it != certificate }
             val verdict = if (valid) {
-                runCatching { certificatePolicy.validateChain(signer.certificateCandidates, expectedSignerMailbox, SmimeCertificateUse.SIGNING) }
+                runCatching { certificatePolicy.validateChain(chain, expectedSignerMailbox, SmimeCertificateUse.SIGNING) }
                     .getOrElse { SmimeCertificateVerdict.Rejected("Certificate validation failed") }
             } else null
-            SmimeSignerResult(certificate, valid, verdict)
+            SmimeSignerResult(certificate, valid, verdict, signer.certificateCandidates)
         })
 
     /**

@@ -534,4 +534,29 @@ class SmimeEngineTest {
         assertArrayEquals(SmimeMime.detachedParts(wire).first, entity)
         assertTrue(engine.verifyDetached(entity, signature, "sender@example.test").allCryptographicallyValid)
     }
+
+    /** Device regression (European Commission mail): the CMS lists root, encryption cert, signer, intermediate, in that order. */
+    @Test fun `the signer is validated as the leaf whatever order the message lists its certificates in`() {
+        val signer = identity("sender@example.test")
+        val root = identity("root@example.test")
+        val other = identity("other@example.test")
+        val seen = mutableListOf<List<X509Certificate>>()
+        val recording = object : SmimeCertificatePolicy {
+            override fun validate(certificate: X509Certificate, mailbox: String, use: SmimeCertificateUse) = validateChain(listOf(certificate), mailbox, use)
+            override fun validateChain(certificates: Collection<X509Certificate>, mailbox: String, use: SmimeCertificateUse): SmimeCertificateVerdict {
+                seen += certificates.toList(); return SmimeCertificateVerdict.Trusted
+            }
+        }
+        val listed = listOf(root.certificate, other.certificate, signer.certificate)
+        val cms = object : SmimeCms {
+            override fun signDetached(entity: ByteArray, identity: SmimeSigningIdentity) = error("unused")
+            override fun verifyDetached(entity: ByteArray, signature: ByteArray, certificateCandidates: Collection<X509Certificate>) =
+                listOf(SmimeCmsSignerResult(signer.certificate, listed, true))
+            override fun encrypt(entity: ByteArray, recipients: Collection<X509Certificate>) = error("unused")
+            override fun decrypt(envelopedData: ByteArray, identity: SmimeDecryptionIdentity) = error("unused")
+        }
+        val result = SmimeEngine(cms, recording).verifyDetached(ByteArray(1), ByteArray(1), "sender@example.test")
+        assertEquals(signer.certificate, seen.single().first())
+        assertEquals(listed, result.signers.single().certificateCandidates) // kept for storing intermediates and encryption certs
+    }
 }
