@@ -50,6 +50,19 @@ class NoticeGenerationTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'full license/copyright text'):
                 module.generate(inventory, root/'cache', root)
 
+    def test_unnamespaced_maven_pom_and_binary_license_class(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp)
+            p = cache/'example/library/1/hash/library.pom'
+            p.parent.mkdir(parents=True)
+            p.write_text('<project><licenses><license><name>MIT</name></license></licenses></project>')
+            self.assertEqual('MIT', module.pom_licenses(cache, 'example:library:1')[0]['name'])
+        data = io.BytesIO()
+        with zipfile.ZipFile(data, 'w') as z:
+            z.writestr('example/LICENSE.class', b'\xca\xfe\xba\xbe')
+            z.writestr('META-INF/LICENSE.md', 'Actual full license text')
+        self.assertEqual([('META-INF/LICENSE.md', 'Actual full license text')], module.archive_notices(data.getvalue()))
+
     def test_missing_transitive_pom_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaisesRegex(ValueError, 'Expected one cached POM'):

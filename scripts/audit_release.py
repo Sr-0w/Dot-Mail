@@ -82,8 +82,11 @@ def inspect(apk, mapping, manifest):
         notice_manifest = json.loads(archive.read("assets/third-party-components.json"))
         assert hashlib.sha256(notice_bytes).hexdigest() == notice_manifest["bundle_sha256"], "Bundled notices hash mismatch"
         notice_text = notice_bytes.decode("utf-8")
-        for coordinate in notice_manifest["components"]:
-            assert coordinate in notice_text, "Missing bundled component: " + coordinate
+        for coordinate, entry in notice_manifest["components"].items():
+            if entry.get("status", "included") == "included":
+                assert coordinate in notice_text, "Missing bundled component: " + coordinate
+            else:
+                assert coordinate not in notice_text, "Excluded component still displayed: " + coordinate
         assert "SIL OPEN FONT LICENSE Version 1.1" in notice_text
         assert "Copyright (c) 2016 The Inter Project Authors" in notice_text
         for name in archive.namelist():
@@ -134,7 +137,7 @@ def inspect(apk, mapping, manifest):
         target = renamed.get(original)
         assert target and descriptor(target) in classes, "Missing navigation serializer: " + original
         serializers[original] = target
-    return {"startup_initializers": initializers, "navigation_serializers": serializers, "bundled_notice_components": len(notice_manifest["components"]), "notices_sha256": notice_manifest["bundle_sha256"], "workers": workers, "manifest_components": components, "provider_classes": sorted(providers), "native_elf_load_alignments": native,
+    return {"startup_initializers": initializers, "navigation_serializers": serializers, "resolved_notice_coordinates": len(notice_manifest["components"]), "bundled_notice_components": sum(entry.get("status", "included") == "included" for entry in notice_manifest["components"].values()), "notices_sha256": notice_manifest["bundle_sha256"], "workers": workers, "manifest_components": components, "provider_classes": sorted(providers), "native_elf_load_alignments": native,
             "scope": "Static shrunk-artifact inspection; does not replace signed-device smoke or provider interoperability tests."}
 
 

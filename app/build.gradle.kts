@@ -100,3 +100,21 @@ val verifyReleaseNotices by tasks.registering {
     }
 }
 tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(verifyReleaseNotices) }
+
+apply(from = rootProject.file("scripts/license-inventory.gradle"))
+
+// The reviewed asset can exclude a module only while this build proves its absence.
+val verifyShippedNotices by tasks.registering(Exec::class) {
+    dependsOn("packageRelease", "exportReleaseLicenseInventory")
+    workingDir(rootProject.projectDir)
+    commandLine(
+        "python3", "scripts/notice_footprint.py",
+        "--inventory", "app/build/reports/notices/resolved.json",
+        "--apk", "app/build/outputs/apk/release/app-release-unsigned.apk",
+        "--mapping", "app/build/outputs/mapping/release/mapping.txt",
+        "--usage", "app/build/outputs/mapping/release/usage.txt",
+        "--reviewed", "app/src/main/assets/third-party-components.json",
+        "--report", "app/build/reports/notices/footprint.json",
+    )
+}
+tasks.matching { it.name == "assembleRelease" }.configureEach { dependsOn(verifyShippedNotices) }

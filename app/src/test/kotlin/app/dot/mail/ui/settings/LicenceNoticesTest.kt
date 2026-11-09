@@ -36,7 +36,14 @@ class LicenceNoticesTest {
                 "%02x".format(it)
             }
         assertEquals(manifest.getString("bundle_sha256"), hash)
-        manifest.getJSONObject("components").keys().forEach { assertTrue(it, text.contains(it)) }
+        val components = manifest.getJSONObject("components")
+        components.keys().forEach {
+            if (components.getJSONObject(it).getString("status") == "included") {
+                assertTrue(it, text.contains(it))
+            } else {
+                assertTrue(it, !text.contains(it))
+            }
+        }
         assertTrue(text.contains("Apache License"))
         assertTrue(text.contains("END OF TERMS AND CONDITIONS"))
         assertTrue(text.contains("SIL OPEN FONT LICENSE Version 1.1"))

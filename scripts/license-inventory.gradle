@@ -1,0 +1,20 @@
+// Applied to :app. Export all resolved coordinates plus original external binary artifacts.
+import groovy.json.JsonOutput
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+
+tasks.register('exportReleaseLicenseInventory') {
+    doLast {
+        def configuration = configurations.getByName('releaseRuntimeClasspath')
+        def components = configuration.incoming.resolutionResult.allComponents
+            .collect { it.id }.findAll { it instanceof ModuleComponentIdentifier }
+            .collect { "${it.group}:${it.module}:${it.version}" }.sort()
+        def artifacts = configuration.incoming.artifactView {
+            componentFilter { it instanceof ModuleComponentIdentifier }
+        }.artifacts.artifacts.collect {
+            [component: it.id.componentIdentifier.toString(), path: it.file.absolutePath]
+        }.sort { it.component + it.path }
+        def output = layout.buildDirectory.file('reports/notices/resolved.json').get().asFile
+        output.parentFile.mkdirs()
+        output.text = JsonOutput.prettyPrint(JsonOutput.toJson([components: components, artifacts: artifacts])) + '\n'
+    }
+}

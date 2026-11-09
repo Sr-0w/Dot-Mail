@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-Changes merged after `v0.1.0-alpha.2`, through `9cf2ea3` (PR #86). This is a release-readiness candidate, not a published version; the maintainer chooses the next versionCode/tag.
+Changes merged after `v0.1.0-alpha.2`, through `8fff792` (PR #84). This is a release-readiness candidate, not a published version; the maintainer chooses the next versionCode/tag.
 
 ### Mail reliability and offline data
 
@@ -28,6 +28,8 @@ Changes merged after `v0.1.0-alpha.2`, through `9cf2ea3` (PR #86). This is a rel
 ### Build and internal work
 
 - Toolchain updated to AGP 9.5.1, Gradle 9.9.0, Kotlin 2.4.21, compile SDK 37 and Room 2.8.5 (#70).
+- Localized provider hints, clearer empty-state actions and resource parity checks (#88, #89).
+- Isolated S/MIME CMS engine using Bouncy Castle 1.86 (#84); reader/composer integration is separate work and is not claimed by this candidate.
 - Read-only JMAP engine and fixture tests behind an explicit MailClient facade (#79). Account integration remains future work; no JMAP setup or write operations are advertised.
 
 ## 0.1.0-alpha.2
