@@ -212,6 +212,46 @@ data class MessageBody(
     val isTruncated: Boolean = false,
     /** OpenPGP content to decrypt/verify through OpenKeychain; null for ordinary mail. */
     val pgp: PgpContent? = null,
+    /** S/MIME content to verify; null for ordinary mail. */
+    val smime: SmimeContent? = null,
+)
+
+/** S/MIME shapes of a message body. Paths point into the app-private body directory. */
+sealed interface SmimeContent {
+    /** multipart/signed: the exact signed entity and its detached CMS signature. */
+    data class Signed(val signedEntity: String, val signature: String) : SmimeContent
+}
+
+/** What the reader shows for an S/MIME signature. Trust is never implied by a valid signature alone. */
+data class SmimeSignatureView(
+    val state: State,
+    /** Why the signer is not trusted (only for [State.VALID_UNTRUSTED]); in English, for the details sheet. */
+    val reason: String? = null,
+    val signer: SmimeCertificateInfo? = null,
+) {
+    enum class State {
+        /** Intact, and the certificate chains to a CA this device trusts and is issued for the sender's address. */
+        VALID_TRUSTED,
+        /** Intact, but the certificate is not trusted (unknown authority, expired, wrong usage). */
+        VALID_UNTRUSTED,
+        /** Intact, but the certificate belongs to another address than the sender's. */
+        SENDER_MISMATCH,
+        /** The content was changed after signing, or the signature does not match its certificate. */
+        INVALID,
+        /** The signature could not be read. */
+        UNREADABLE,
+    }
+}
+
+/** Certificate details for the reader's sheet. Revocation is never checked online (privacy), and the sheet says so. */
+data class SmimeCertificateInfo(
+    val subject: String,
+    val issuer: String,
+    val mailboxes: Set<String>,
+    val notBefore: Long,
+    val notAfter: Long,
+    /** Upper-case hex SHA-256 of the DER encoding. */
+    val sha256: String,
 )
 
 /** OpenPGP shapes of a message body. Paths point into the app-private body directory. */

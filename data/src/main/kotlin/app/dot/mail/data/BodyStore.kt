@@ -21,7 +21,7 @@ internal class BodyStore(private val context: Context, private val dao: MailDao)
         if (row.bodyPath != null) {
             val dir=File(row.bodyPath)
             val (text,cutText)=prefix(File(dir,"plain.txt")); val(html,cutHtml)=prefix(File(dir,"body.html"))
-            return MessageBody(text,html,row.remoteImages,isTruncated=cutText||cutHtml,pgp=pgp(dir,text))
+            return MessageBody(text,html,row.remoteImages,isTruncated=cutText||cutHtml,pgp=pgp(dir,text),smime=smime(dir))
         }
         val text=StringBuilder(); val html=StringBuilder(); var offset=1; var truncated=false
         while(text.length<=displayLimit && html.length<=displayLimit) {
@@ -34,6 +34,11 @@ internal class BodyStore(private val context: Context, private val dao: MailDao)
             if(offset>displayLimit) { truncated=truncated||t.length==32_768||h.length==32_768; break }
         }
         return MessageBody(text.toString().takeIf { it.isNotEmpty() },html.toString().takeIf { it.isNotEmpty() },row.remoteImages,isTruncated=truncated)
+    }
+
+    private fun smime(dir: File): app.dot.mail.data.model.SmimeContent? {
+        val signed = File(dir, app.dot.mail.engine.SmimeParts.SIGNED_FILE); val signature = File(dir, app.dot.mail.engine.SmimeParts.SIGNATURE_FILE)
+        return if (signed.isFile && signature.isFile) app.dot.mail.data.model.SmimeContent.Signed(signed.path, signature.path) else null
     }
 
     private fun pgp(dir: File, text: String?): app.dot.mail.data.model.PgpContent? {

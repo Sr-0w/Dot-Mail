@@ -1102,4 +1102,21 @@
     <string name="setup_hint_proton">Proton Mail doesn\'t offer IMAP access on Android (Proton Mail Bridge is desktop-only). Use the Proton Mail app instead.</string>
     <string name="setup_hint_microsoft">Microsoft accounts (Outlook, Hotmail, Live, Microsoft 365) can\'t be added: Microsoft no longer allows password sign-in for them.</string>
     <string name="setup_hint_insecure">This provider advertised unencrypted settings (no TLS). Confirm in manual setup before signing in.</string>
+    <string name="smime_verifying">Checking the S/MIME signature…</string>
+    <string name="smime_valid">Signed by %1$s · S/MIME</string>
+    <string name="smime_untrusted">Signed with S/MIME · certificate not trusted</string>
+    <string name="smime_mismatch">Signed with S/MIME by another address (%1$s)</string>
+    <string name="smime_invalid">S/MIME signature invalid: the message was changed after signing</string>
+    <string name="smime_unreadable">The S/MIME signature could not be checked</string>
+    <string name="smime_details_title">Signature certificate</string>
+    <string name="smime_details_trusted">The message is intact. The certificate was issued for the sender\'s address by an authority this device trusts.</string>
+    <string name="smime_details_untrusted">The message is intact, but the certificate was not issued by an authority this device trusts, or it is expired or not meant for e-mail. Anyone can create such a certificate.</string>
+    <string name="smime_details_mismatch">The message is intact, but the certificate belongs to another address than the sender\'s.</string>
+    <string name="smime_details_invalid">The message was changed after it was signed, or the signature does not belong to this certificate. Treat its contents with caution.</string>
+    <string name="smime_details_issued_to">Issued to</string>
+    <string name="smime_details_issuer">Issued by</string>
+    <string name="smime_details_validity">Valid</string>
+    <string name="smime_details_validity_range">%1$s – %2$s</string>
+    <string name="smime_details_fingerprint">SHA-256 fingerprint</string>
+    <string name="smime_details_revocation">Revocation is not checked: Dot Mail does not contact certificate authorities, so they never learn whose mail you read.</string>
 </resources>

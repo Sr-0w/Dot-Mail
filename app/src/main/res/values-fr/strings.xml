@@ -1102,4 +1102,21 @@
     <string name="setup_hint_proton">Proton Mail ne propose pas d’accès IMAP sur Android (Proton Mail Bridge n’existe que sur ordinateur). Utilisez plutôt l’application Proton Mail.</string>
     <string name="setup_hint_microsoft">Les comptes Microsoft (Outlook, Hotmail, Live, Microsoft 365) ne peuvent pas être ajoutés : Microsoft n’autorise plus la connexion par mot de passe.</string>
     <string name="setup_hint_insecure">Ce fournisseur indique des paramètres non chiffrés (sans TLS). Vérifiez-les dans la configuration manuelle avant de vous connecter.</string>
+    <string name="smime_verifying">Vérification de la signature S/MIME…</string>
+    <string name="smime_valid">Signé par %1$s · S/MIME</string>
+    <string name="smime_untrusted">Signé avec S/MIME · certificat non approuvé</string>
+    <string name="smime_mismatch">Signé avec S/MIME par une autre adresse (%1$s)</string>
+    <string name="smime_invalid">Signature S/MIME invalide : le message a été modifié après la signature</string>
+    <string name="smime_unreadable">Impossible de vérifier la signature S/MIME</string>
+    <string name="smime_details_title">Certificat de signature</string>
+    <string name="smime_details_trusted">Le message est intact. Le certificat a été délivré pour l’adresse de l’expéditeur par une autorité approuvée par cet appareil.</string>
+    <string name="smime_details_untrusted">Le message est intact, mais le certificat n’a pas été délivré par une autorité approuvée par cet appareil, ou il est expiré ou n’est pas prévu pour l’e-mail. N’importe qui peut créer un tel certificat.</string>
+    <string name="smime_details_mismatch">Le message est intact, mais le certificat appartient à une autre adresse que celle de l’expéditeur.</string>
+    <string name="smime_details_invalid">Le message a été modifié après sa signature, ou la signature ne correspond pas à ce certificat. Méfiez-vous de son contenu.</string>
+    <string name="smime_details_issued_to">Délivré à</string>
+    <string name="smime_details_issuer">Délivré par</string>
+    <string name="smime_details_validity">Validité</string>
+    <string name="smime_details_validity_range">%1$s – %2$s</string>
+    <string name="smime_details_fingerprint">Empreinte SHA-256</string>
+    <string name="smime_details_revocation">La révocation n’est pas vérifiée : Dot Mail ne contacte pas les autorités de certification, qui ne savent donc jamais de qui vous lisez les messages.</string>
 </resources>
