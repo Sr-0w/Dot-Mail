@@ -802,6 +802,7 @@ private fun MessageCard(
         // OpenPGP: status line + in-memory plaintext from OpenKeychain replaces the ciphertext for display only.
         val pgp = app.dot.mail.ui.pgp.rememberPgpReader(message.id, message.body)
         message.body?.let { if (it.pgp != null) app.dot.mail.ui.pgp.PgpBar(it, pgp) }
+        app.dot.mail.ui.smime.SmimeBar(message)
         val body = pgp.decrypted ?: message.body?.let { b ->
             // An encrypted PGP/MIME message has no readable part until decrypted; show nothing instead of an empty frame.
             if (b.pgp is app.dot.mail.data.model.PgpContent.Encrypted) b.copy(plainText = b.plainText.orEmpty(), html = null) else b
@@ -865,7 +866,8 @@ private fun MessageCard(
                     modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.xs),
                 )
             }
-            val files = message.attachments.filter { !it.isInline || it.contentId == null }
+            // An S/MIME .p7s is verification data (see SmimeBar), never a file to open; older caches still list it.
+            val files = message.attachments.filter { (!it.isInline || it.contentId == null) && !app.dot.mail.engine.SmimeParts.isSignaturePart(it.mimeType) }
             CalendarInvites(message)
             if (files.isNotEmpty()) AttachmentStrip(files, onAttachment)
         }

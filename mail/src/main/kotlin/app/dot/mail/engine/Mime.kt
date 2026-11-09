@@ -127,6 +127,18 @@ object Mime {
                     jakarta.mail.util.SharedFileInputStream(raw).use { input -> visit(MimeBodyPart(input),"$id.0",depth+1,true) }
                     raw.delete()
                 } else for (i in 0 until multipart.count) visit(multipart.getBodyPart(i), "$id.$i", depth+1,materialized)
+            } else if (type == "multipart/signed" && SmimeParts.isSignedProtocol(Pgp.protocol(p))) {
+                // S/MIME (RFC 8551) detached signature: same handling as PGP/MIME above. The .p7s is kept for verification
+                // and never listed as an attachment; the signed content is shown normally.
+                val multipart = p.content as Multipart
+                if (multipart.count >= 2) {
+                    val raw=java.io.File(directory,"smime-entity-$id.tmp")
+                    output(raw).use { out -> multipart.getBodyPart(0).writeTo(out) }
+                    raw.copyTo(java.io.File(directory,SmimeParts.SIGNED_FILE),overwrite=true)
+                    save(multipart.getBodyPart(1), SmimeParts.SIGNATURE_FILE)
+                    jakarta.mail.util.SharedFileInputStream(raw).use { input -> visit(MimeBodyPart(input),"$id.0",depth+1,true) }
+                    raw.delete()
+                } else for (i in 0 until multipart.count) visit(multipart.getBodyPart(i), "$id.$i", depth+1,materialized)
             } else if (type.startsWith("multipart/")) {
                 val multipart = p.content as Multipart
                 for (i in 0 until multipart.count) visit(multipart.getBodyPart(i), "$id.$i", depth+1,materialized)

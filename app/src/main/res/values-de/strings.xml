@@ -1102,4 +1102,21 @@
     <string name="setup_hint_proton">Proton Mail bietet auf Android keinen IMAP-Zugang (Proton Mail Bridge gibt es nur für Computer). Nutzen Sie stattdessen die Proton-Mail-App.</string>
     <string name="setup_hint_microsoft">Microsoft-Konten (Outlook, Hotmail, Live, Microsoft 365) können nicht hinzugefügt werden: Microsoft erlaubt dafür keine Anmeldung per Passwort mehr.</string>
     <string name="setup_hint_insecure">Dieser Anbieter nennt unverschlüsselte Einstellungen (ohne TLS). Prüfen Sie sie in der manuellen Einrichtung, bevor Sie sich anmelden.</string>
+    <string name="smime_verifying">S/MIME-Signatur wird geprüft…</string>
+    <string name="smime_valid">Signiert von %1$s · S/MIME</string>
+    <string name="smime_untrusted">Mit S/MIME signiert · Zertifikat nicht vertrauenswürdig</string>
+    <string name="smime_mismatch">Mit S/MIME von einer anderen Adresse signiert (%1$s)</string>
+    <string name="smime_invalid">S/MIME-Signatur ungültig: Die Nachricht wurde nach dem Signieren verändert</string>
+    <string name="smime_unreadable">Die S/MIME-Signatur konnte nicht geprüft werden</string>
+    <string name="smime_details_title">Signaturzertifikat</string>
+    <string name="smime_details_trusted">Die Nachricht ist unverändert. Das Zertifikat wurde für die Adresse des Absenders von einer Stelle ausgestellt, der dieses Gerät vertraut.</string>
+    <string name="smime_details_untrusted">Die Nachricht ist unverändert, aber das Zertifikat stammt nicht von einer Stelle, der dieses Gerät vertraut, oder es ist abgelaufen oder nicht für E-Mail bestimmt. Ein solches Zertifikat kann jeder erstellen.</string>
+    <string name="smime_details_mismatch">Die Nachricht ist unverändert, aber das Zertifikat gehört zu einer anderen Adresse als der des Absenders.</string>
+    <string name="smime_details_invalid">Die Nachricht wurde nach dem Signieren verändert, oder die Signatur gehört nicht zu diesem Zertifikat. Seien Sie bei ihrem Inhalt vorsichtig.</string>
+    <string name="smime_details_issued_to">Ausgestellt für</string>
+    <string name="smime_details_issuer">Ausgestellt von</string>
+    <string name="smime_details_validity">Gültig</string>
+    <string name="smime_details_validity_range">%1$s – %2$s</string>
+    <string name="smime_details_fingerprint">SHA-256-Fingerabdruck</string>
+    <string name="smime_details_revocation">Der Widerruf wird nicht geprüft: Dot Mail kontaktiert keine Zertifizierungsstellen, daher erfahren diese nie, wessen E-Mails Sie lesen.</string>
 </resources>

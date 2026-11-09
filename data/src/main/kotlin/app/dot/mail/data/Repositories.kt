@@ -77,6 +77,13 @@ interface AccountRepository {
 }
 
 interface MailRepository {
+    /**
+     * Verifies [message]'s S/MIME signature (its body must carry [app.dot.mail.data.model.SmimeContent.Signed]) against
+     * its From address and this device's trusted CAs. A certificate from a cryptographically valid signature is remembered
+     * for encrypting replies (that is not trust). Null when the message is not S/MIME signed.
+     */
+    suspend fun verifySmime(message: app.dot.mail.data.model.Message): app.dot.mail.data.model.SmimeSignatureView? = null
+
     /** Re-check READ_CONTACTS after its permission result; data stays exclusively in the local cache. */
     suspend fun refreshKnownContacts() {}
 

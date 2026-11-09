@@ -51,6 +51,8 @@ data class SmimeSignerResult(
     val certificate: X509Certificate,
     val cryptographicSignatureValid: Boolean,
     val certificateVerdict: SmimeCertificateVerdict?,
+    /** Every certificate the message carried (plus supplied candidates): path-building evidence, never trust. */
+    val certificateCandidates: List<X509Certificate> = emptyList(),
 )
 
 data class SmimeVerification(val signers: List<SmimeSignerResult>) {
@@ -237,7 +239,7 @@ class SmimeEngine(
                 runCatching { certificatePolicy.validateChain(signer.certificateCandidates, expectedSignerMailbox, SmimeCertificateUse.SIGNING) }
                     .getOrElse { SmimeCertificateVerdict.Rejected("Certificate validation failed") }
             } else null
-            SmimeSignerResult(certificate, valid, verdict)
+            SmimeSignerResult(certificate, valid, verdict, signer.certificateCandidates)
         })
     }
 
