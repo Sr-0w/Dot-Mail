@@ -68,7 +68,8 @@ internal object SmimeOutbox {
     const val SUBMITTING = "SUBMITTING"
     const val SENT = "SENT"
 
-    class Variant(val to: String, val file: String, var state: String)
+    /** [to] is the SMTP envelope of this variant (To+Cc together, or one Bcc recipient). */
+    class Variant(val to: List<String>, val file: String, var state: String)
     class Manifest(val sentCopy: String, val variants: List<Variant>)
 
     /** The directory when [path] is an S/MIME outbox item, else null (ordinary and PGP items are single files). */
@@ -77,11 +78,17 @@ internal object SmimeOutbox {
     fun read(dir: File): Manifest {
         val json = JSONObject(File(dir, MANIFEST).readText())
         val vs = json.getJSONArray("variants")
-        return Manifest(json.getString("sentCopy"), List(vs.length()) { i -> vs.getJSONObject(i).let { Variant(it.getString("to"), it.getString("file"), it.getString("state")) } })
+        return Manifest(json.getString("sentCopy"), List(vs.length()) { i -> vs.getJSONObject(i).let { Variant(recipients(it.get("to")), it.getString("file"), it.getString("state")) } })
+    }
+
+    /** Manifests written before To+Cc were grouped hold a single address string. */
+    private fun recipients(raw: Any): List<String> = when (raw) {
+        is JSONArray -> List(raw.length()) { raw.getString(it) }
+        else -> listOf(raw.toString())
     }
 
     fun write(dir: File, m: Manifest) {
-        val json = JSONObject().put("sentCopy", m.sentCopy).put("variants", JSONArray().also { a -> m.variants.forEach { a.put(JSONObject().put("to", it.to).put("file", it.file).put("state", it.state)) } })
+        val json = JSONObject().put("sentCopy", m.sentCopy).put("variants", JSONArray().also { a -> m.variants.forEach { a.put(JSONObject().put("to", JSONArray(it.to)).put("file", it.file).put("state", it.state)) } })
         val tmp = File(dir, "$MANIFEST.tmp")
         try {
             tmp.writeText(json.toString())
@@ -108,7 +115,7 @@ internal object SmimeOutbox {
         require(variants.isNotEmpty()) { "No S/MIME variants" }
         val target = File(parent, "$id.smime")
         val staging = File(parent, "$id.smime.tmp").also { it.deleteRecursively(); it.mkdirs() }
-        val entries = variants.mapIndexed { i, v -> File(staging, "v$i.eml").also { f -> f.writeBytes(v.mimeBytes) }; Variant(v.envelopeRecipient, "v$i.eml", PENDING) }
+        val entries = variants.mapIndexed { i, v -> File(staging, "v$i.eml").also { f -> f.writeBytes(v.mimeBytes) }; Variant(v.envelopeRecipients, "v$i.eml", PENDING) }
         write(staging, Manifest(entries.first().file, entries))
         target.deleteRecursively()
         check(staging.renameTo(target)) { "Could not persist protected MIME" }

@@ -238,7 +238,7 @@ private suspend fun RealMailGraph.submitSmimeVariants(row: app.dot.mail.data.loc
         variant.state = SmimeOutbox.SUBMITTING; SmimeOutbox.write(dir, manifest)
         val mime = StoredMimeMessage(File(dir, variant.file))
         try {
-            client.send(config.smtp.endpoint(), creds, mime, envelopeFrom = account.email, recipients = arrayOf(jakarta.mail.internet.InternetAddress(variant.to)))
+            client.send(config.smtp.endpoint(), creds, mime, envelopeFrom = account.email, recipients = variant.to.map { jakarta.mail.internet.InternetAddress(it) }.toTypedArray())
         } catch (e: SubmissionNotStartedException) {
             SyncDiagnostics.warn("Outbox SMTP connect id=$id", e, setOf(creds.secret, account.email))
             if (e.cause is jakarta.mail.AuthenticationFailedException) dao.syncError(account.id, "Sign in again to reconnect this account", true)
