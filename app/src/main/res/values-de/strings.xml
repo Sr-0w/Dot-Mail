@@ -1175,4 +1175,5 @@
     <string name="smime_not_for_key">Mit S/MIME für ein anderes Zertifikat verschlüsselt als das für dieses Konto gewählte.</string>
     <string name="smime_weak">Mit einem veralteten Verfahren verschlüsselt (DES, 3DES oder RC2). Dot Mail entschlüsselt es nicht.</string>
     <string name="smime_decrypt_failed">Diese S/MIME-Nachricht konnte nicht entschlüsselt werden.</string>
+    <string name="settings_licences_unavailable">Die Lizenztexte konnten nicht geladen werden.</string>
 </resources>

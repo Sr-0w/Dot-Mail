@@ -1,0 +1,20 @@
+{
+  "fixture": "DemoMailGraph",
+  "capture": "Robolectric native graphics, isolated android.app.Application; no installed app, database, credentials or device",
+  "ui_base": "a9313d6",
+  "recipe": "scripts/gw :app:testDebugUnitTest -Pdotmail.storeShots=true --tests '*StoreScreenshotsTest'",
+  "theme": "DARK",
+  "real_accounts": false,
+  "system_ui": false,
+  "sha256": {
+    "fastlane/metadata/android/de-DE/images/phoneScreenshots/1-inbox.png": "0dba193cae3e15fe8a3f05218c91a09153a54dcb8ffdcbca29dd5d33e72b0ddf",
+    "fastlane/metadata/android/de-DE/images/phoneScreenshots/2-thread.png": "c635ca74abeb545289b8af80a39c5bdc9d5fda7d7a27b5c962f39dd526802c50",
+    "fastlane/metadata/android/de-DE/images/phoneScreenshots/3-settings.png": "b29d6cbbd236a5b89f0b046ace4caa4bf261f1236286e15f43443be7945809fa",
+    "fastlane/metadata/android/en-US/images/phoneScreenshots/1-inbox.png": "2e5413e5e2cc186583778b506f7d5cb90198e54417ff913060b77539f08383dd",
+    "fastlane/metadata/android/en-US/images/phoneScreenshots/2-thread.png": "838805e41dbf47f9b139343b30683d55e2ca2e134194a5e0d9092a214107d03f",
+    "fastlane/metadata/android/en-US/images/phoneScreenshots/3-settings.png": "08a388fd345e7b36cb1265e1cc9bbf272d27bacb452ab28df91e7b8731e1ce2f",
+    "fastlane/metadata/android/fr-FR/images/phoneScreenshots/1-inbox.png": "47e34e17c37b7700f324b2827277ea801caf99d8e5147f0754b28b95c91c7a51",
+    "fastlane/metadata/android/fr-FR/images/phoneScreenshots/2-thread.png": "b94e00a216042cae6b831720384dcd48bf64ba17aedc6e5d5c17ec2f2fd14f61",
+    "fastlane/metadata/android/fr-FR/images/phoneScreenshots/3-settings.png": "225cdfc402189c255c394e99048c4b97dfb575b30f309fdd7f2be1f10b661d9e"
+  }
+}

@@ -1,96 +1,55 @@
-# F-Droid metadata (draft)
+# F-Droid submission preparation
 
-Draft `fdroiddata` metadata for **`app.dot.mail`**, to be proposed in a fork of
-<https://gitlab.com/fdroid/fdroiddata> (`metadata/app.dot.mail.yml`). Nothing here is filed yet —
-t1/owner decides when to submit. No real mail data or credentials appear anywhere in this doc or in
-the metadata.
+The source repository contains Fastlane metadata under `fastlane/metadata/android/`: EN/FR/DE titles, summaries, descriptions, version-code changelogs and demo-only images. Nothing in this readiness PR submits an app or publishes a repository. The maintainer decides the final release/tag and F-Droid submission.
 
-## `metadata/app.dot.mail.yml`
+Run `python3 scripts/validate_store_metadata.py`. It checks the [documented metadata format](https://f-droid.org/docs/All_About_Descriptions_Graphics_and_Screenshots/): 50/80/4000-character title/summary/description limits, supported description tags, 500-character changelogs, valid PNG sizes and screenshot provenance. Historical numbered changelogs remain historical; prepared notes for the next code live in docs/releases/next.
+
+## Images and privacy
+
+Current screenshots are native Robolectric renders of the actual UI, using only DemoMailGraph and a plain isolated Application. No real database, account, credential, system notification, phone or network is involved. Mail content is synthetic English fixture text; UI labels are localized. The manifest `fastlane/screenshots.json` records the recipe, source UI revision, theme and each image's SHA-256. It deliberately identifies these as test renders, not device verification.
+
+```sh
+scripts/gw :app:testDebugUnitTest -Pdotmail.storeShots=true --tests '*StoreScreenshotsTest'
+# Review build-out/reports/app/store-shots/<locale>/*.png before replacing store images.
+```
+
+Do not generate screenshots from the owner's account or install on the phone. Normal test runs skip the explicit capture fixture. If rendering changes, review each locale and regenerate the provenance hashes; never silently substitute real-mail captures.
+
+## Build metadata draft
+
+F-Droid imports the store text/images from the tagged source; graphics should not be put in fdroiddata itself. Use its [current metadata reference](https://f-droid.org/docs/Build_Metadata_Reference/). The older draft used obsolete Provides and CurrentVersionName fields; those are removed here.
+
+The following identifies the **historical alpha.2 tag**, not a new build of today's main. Update versionName, code and immutable commit/tag together for the selected release after checking its Gradle file:
 
 ```yaml
-AutoUpdateMode: Version
-UpdateCheckMode: Tags
-CurrentVersionCode: 1
-CurrentVersionName: "0.1.0"
-Provides:
-- action:android.intent.action.VIEW; scheme:mailto
-- action:android.intent.action.SENDTO; scheme:mailto
-- action:android.intent.action.SEND
-- action:android.intent.action.SEND_MULTIPLE
+Categories:
+  - Internet
 License: GPL-3.0-or-later
 SourceCode: https://github.com/Sr-0w/Dot-Mail
 IssueTracker: https://github.com/Sr-0w/Dot-Mail/issues
-AntiFeatures: [] # verified below
+Changelog: https://github.com/Sr-0w/Dot-Mail/blob/main/CHANGELOG.md
+RepoType: git
+Repo: https://github.com/Sr-0w/Dot-Mail.git
+
 Builds:
-- versionCode: 1
-  versionName: "0.1.0"
-  commit: v0.1.0-alpha.1
-  gradle: yes
-  # The Gradle project lives at the repo root (settings.gradle.kts); the
-  # application module is `app/` — no `dir:` entry is needed (a `dir:` would
-  # point at the module itself, which is not a standalone Gradle build).
-  # No `sign:` entry: F-Droid signs with its own key.
+  - versionName: 0.1.0-alpha.2
+    versionCode: 2
+    commit: v0.1.0-alpha.2
+    gradle:
+      - yes
+
+AutoUpdateMode: Version v%v
+UpdateCheckMode: Tags
+CurrentVersion: 0.1.0-alpha.2
+CurrentVersionCode: 2
 ```
 
-Facts used above, and where they come from:
+The multi-module Gradle settings are at the root; the application is :app. A real fdroidserver build is still required to validate the recipe on F-Droid's buildserver image. Today's source uses JDK 21, compile SDK 37 and Build Tools 36.0.0; historical alpha.2 has its own older pins. F-Droid signs an unsigned payload with its channel key unless a separately approved, signature-copy-verified upstream Binaries workflow is configured. See [RELEASES.md](RELEASES.md) and [SIGNING.md](SIGNING.md).
 
-- `app.dot.mail` — `applicationId` in `app/build.gradle.kts`.
-- `versionCode: 1` / `versionName: "0.1.0"` — same file (`defaultConfig`).
-- `commit: v0.1.0-alpha.1` — the first public tag pushed by `scripts/release.sh`.
-- `AutoUpdateMode: Version` — `versionName` changes per release.
-- `UpdateCheckMode: Tags` — releases are git tags (`v*`).
-- `Provides` — the `MainActivity` intent-filters in `app/src/main/AndroidManifest.xml`
-  (VIEW + SENDTO with `scheme="mailto"`; SEND/SEND_MULTIPLE with `mimeType="*/*"`).
-- `License: GPL-3.0-or-later` — the repo `LICENSE` is GPLv3; the "or later" clause follows the
-  wording used in the store descriptions.
-- `AntiFeatures: []` — verified below.
-- `SourceCode`/`IssueTracker` — the project's GitHub repo; the F-Droid build clones the public
-  tag, so nothing private is needed to build.
+## Accurate feature and network disclosure
 
-## Anti-features check
+The descriptions distinguish header sync from downloaded offline content, configured OAuth from universal sign-in, and optional OpenKeychain from built-in OpenPGP. Gmail browser sign-in is in Google Testing mode: listed test users only, with grants expiring after 7 days until restricted-scope verification. A registered client ID must be supplied for the build. An app-password fallback is available only where the Gmail account permits it. Microsoft/Outlook OAuth sign-in is excluded from the first release; the store text must not promise it. JMAP account setup and S/MIME are not advertised merely because engine code exists.
 
-Expected: **none** — no tracking (the app only talks to the user's own mail servers, and remote
-images / tracking pixels are blocked by default), no non-free dependencies, no ads, no
-mandatory account. Verified by listing **every** dependency from `gradle/libs.versions.toml`:
+No Play Services, telemetry, advertising SDK or app-hosted mail intermediary is introduced. Outbound traffic is broader than IMAP/SMTP alone: account discovery can use autoconfig/ISPDB/DNS, browser OAuth contacts the chosen provider, explicitly enabled sender images/remote resources use their sources, and optional alias/unsubscribe tools contact selected endpoints. Do not repeat the old claim that every connection is only to the configured mail servers.
 
-| Dependency (version) | Ships in the APK? | Licence | Verdict |
-|---|---|---|---|
-| androidx.core:core-ktx (1.15.0) | yes | Apache-2.0 | free |
-| androidx.activity:activity-compose (1.9.3) | yes | Apache-2.0 | free |
-| androidx.lifecycle:* (2.8.7) | yes | Apache-2.0 | free |
-| androidx.navigation:navigation-compose (2.8.5) | yes | Apache-2.0 | free |
-| androidx.compose BOM 2025.06.01 → ui/foundation/material3/icons-extended/tooling-preview | yes | Apache-2.0 | free |
-| androidx.room:room-* (2.6.1) | yes | Apache-2.0 | free |
-| androidx.work:work-runtime-ktx (2.10.0) | yes | Apache-2.0 | free |
-| androidx.paging:* (3.3.5) | yes | Apache-2.0 | free |
-| androidx.biometric:biometric (1.1.0) | yes | Apache-2.0 | free |
-| androidx.webkit:webkit (1.12.1) | yes | Apache-2.0 | free |
-| androidx.glance:glance-appwidget (1.1.1) | yes | Apache-2.0 | free |
-| org.jetbrains.kotlinx:kotlinx-coroutines-* (1.9.0) | yes | Apache-2.0 | free |
-| org.jetbrains.kotlinx:kotlinx-serialization-json (1.7.3) | yes | Apache-2.0 | free |
-| kotlin stdlib (2.1.0) | yes | Apache-2.0 | free |
-| org.eclipse.angus:angus-mail (2.0.5) | yes | dual: EPL-2.0 / GPL-2.0 w/ Classpath exception | free (EPL-2.0 branch) |
-| jakarta.mail:jakarta.mail-api (2.1.3) | yes | dual: EPL-2.0 / GPL-2.0 w/ Classpath exception | free (EPL-2.0 branch) |
-| org.jsoup:jsoup (1.18.3) | yes | dual: ISC / MIT | free |
-| com.caverock:androidsvg-aar (1.4) | yes | MPL-2.0 | free (weak copyleft, source-available) |
-| com.mohamedrejeb.richeditor:richeditor-compose (1.0.0-rc13) | yes | Apache-2.0 | free |
-| junit (4.13.2) | no — test only | EPL-1.0 | free |
-| com.google.truth:truth (1.4.4) | no — test only | Apache-2.0 | free |
-| com.icegreen:greenmail (2.1.2) | no — test only | Apache-2.0 | free |
-| org.robolectric:robolectric (4.14.1) | not used (catalog entry only) | MIT | free |
-| androidx.test:* (core/junit/ext 1.3.0/1.7.0), espresso (3.7.0), compose ui-test | no — test only | Apache-2.0 | free |
-| AGP 8.7.3 / Kotlin 2.1.0 / KSP 2.1.0-1.0.29 | no — build tooling | Apache-2.0 (Kotlin plugin) / own terms (tooling, not shipped) | n/a |
-
-No dependency opens a network connection other than the user's configured IMAP/SMTP endpoints;
-there is no analytics, ad, push, or "account with us" code. Therefore `AntiFeatures: []` stands.
-
-Re-check this table whenever `libs.versions.toml` gains a runtime dependency (especially anything
-that fetches from the network: that is a `Networking` / potential `Tracking` review).
-
-## Notes for the submission
-
-- F-Droid builds from the public tag with its own toolchain: pinning issues will show up there
-  first (see `docs/RELEASES.md` → "Recommended changes" for the build-tools/JDK pins).
-- The app is debug-signed in-repo; the F-Droid build signs with the F-Droid key — no interaction.
-- Suggested `AppIcon`/`Scrapshots` for the fdroiddata PR: the existing Play-store icon and
-  screenshots in `fastlane/metadata/android/en-US/images/` (Apache-friendly, project-owned).
+The APK bundles complete license/notice texts and a coverage inventory from the resolved release runtime classpath; Settings → Licences opens them offline. The release build fails if any resolved coordinate has no reviewed entry. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for regeneration and verification. F-Droid maintainers evaluate anti-features and upstream binaries; this document does not assert that dependency-name inspection alone proves acceptance or that every optional network feature is automatically exempt. No AntiFeatures, Binaries or signing private material is silently submitted on the maintainer's behalf.

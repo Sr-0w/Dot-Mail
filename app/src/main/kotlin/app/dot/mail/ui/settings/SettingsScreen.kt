@@ -521,28 +521,13 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             shape = DotShapes.dialog,
             title = { Text(stringResource(R.string.settings_licences_title), style = Dot.type.title, color = c.textPrimary) },
             text = {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
-                    LICENCES.forEach { (name, licence) ->
-                        Text(name, style = Dot.type.bodyStrong, color = c.textPrimary)
-                        Text(licence, style = Dot.type.caption, color = c.textSecondary, modifier = Modifier.padding(bottom = DotSpacing.m))
-                    }
-                }
+                LicenceNotices()
             },
             confirmButton = { DotButton(stringResource(R.string.settings_close), { licences = false }, style = ButtonStyle.Ghost, compact = true) },
         )
     }
 }
 
-private val LICENCES = listOf(
-    "Dot Mail" to "GNU General Public License v3.0 or later",
-    "Inter typeface" to "SIL Open Font License 1.1",
-    "AndroidX, Jetpack Compose, Glance, Room, WorkManager, Paging" to "Apache License 2.0",
-    "Kotlin and kotlinx libraries" to "Apache License 2.0",
-    "liquid-glass (Nadeem Iqbal)" to "Apache License 2.0",
-    "Jakarta Mail (Eclipse Angus)" to "EPL 2.0 / GPL 2.0 with Classpath Exception",
-    "jsoup" to "MIT License",
-    "AndroidSVG" to "Apache License 2.0",
-)
 
 @Composable
 private fun Divider() = Hairline(Modifier.padding(vertical = DotSpacing.s))
