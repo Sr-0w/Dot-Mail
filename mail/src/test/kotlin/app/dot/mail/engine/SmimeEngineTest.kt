@@ -68,12 +68,12 @@ class SmimeEngineTest {
     }
     private val engine = SmimeEngine(certificatePolicy = fixturePolicy)
 
-    private fun identity(email: String, signing: Boolean = true, encryption: Boolean = true): Identity {
+    private fun identity(email: String, signing: Boolean = true, encryption: Boolean = true, validityDays: Long = 365): Identity {
         val generator = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }
         val pair = generator.generateKeyPair()
         val subject = X500Name("CN=$email")
         val start = Date.from(now.minusSeconds(86_400))
-        val end = Date.from(now.plusSeconds(365L * 86_400))
+        val end = Date.from(now.plusSeconds(validityDays * 86_400))
         val builder = JcaX509v3CertificateBuilder(
             subject,
             BigInteger.valueOf(serial.incrementAndGet()),
@@ -213,6 +213,36 @@ class SmimeEngineTest {
             assertTrue(parse(mime).contentType.contains("smime-type=auth-enveloped-data", ignoreCase = true))
             assertArrayEquals("GCM algorithm ${algorithm.id}", content, engine.decryptMime(mime, recipient.decrypting()))
         }
+    }
+
+    @Test fun `recipient certificate choice prefers a valid pin then newest trusted certificate`() {
+        val mail = mail().copy(cc = emptyList(), bcc = emptyList())
+        val sender = identity("sender@example.test", signing = false)
+        val older = identity("alice@example.test", signing = false, validityDays = 120)
+        val newer = identity("alice@example.test", signing = false, validityDays = 730)
+        val candidates = listOf(older.recipient(), newer.recipient())
+        val normal = engine.build(
+            mail,
+            SmimeMode.ENCRYPT,
+            recipientCertificates = candidates,
+            senderDecryptionCertificate = sender.certificate,
+            now = Date.from(now),
+        ).single()
+        assertTrue(runCatching { engine.decryptMime(normal.mimeBytes, newer.decrypting()) }.isSuccess)
+        assertFalse(runCatching { engine.decryptMime(normal.mimeBytes, older.decrypting()) }.isSuccess)
+
+        val pin = java.security.MessageDigest.getInstance("SHA-256").digest(older.certificate.encoded)
+            .joinToString("") { "%02X".format(it) }
+        val pinned = engine.build(
+            mail,
+            SmimeMode.ENCRYPT,
+            recipientCertificates = candidates,
+            senderDecryptionCertificate = sender.certificate,
+            pinnedRecipientCertificateFingerprints = mapOf("ALICE@example.test" to pin),
+            now = Date.from(now),
+        ).single()
+        assertTrue(runCatching { engine.decryptMime(pinned.mimeBytes, older.decrypting()) }.isSuccess)
+        assertFalse(runCatching { engine.decryptMime(pinned.mimeBytes, newer.decrypting()) }.isSuccess)
     }
 
     @Test fun `rejects DES 3DES and RC2 EnvelopedData with a distinct weak encryption failure`() {
