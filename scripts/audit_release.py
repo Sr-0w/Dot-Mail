@@ -121,8 +121,11 @@ def inspect(apk, mapping, manifest):
         assert workers[name] == name, f"Persisted worker name changed: {name}"
         assert any(c["public"] and c["parameters"] == ["Landroid/content/Context;", "Landroidx/work/WorkerParameters;"] for c in constructors.get(descriptor(name), [])), f"WorkerFactory constructor missing: {name}"
     for item in components:
-        if item["name"].startswith("app.dot.mail."):
-            assert descriptor(item["name"]) in classes, f"Manifest component missing: {item['name']}"
+        assert descriptor(item["name"]) in classes, f"Manifest component missing: {item['name']}"
+    initializers = [node.get(ns + "name") for node in root.iter("meta-data") if node.get(ns + "value") == "androidx.startup"]
+    for name in initializers:
+        assert descriptor(name) in classes, "Startup initializer missing: " + name
+        assert any(c["public"] and c["parameters"] == [] for c in constructors.get(descriptor(name), [])), "Startup constructor missing: " + name
     for name in ("app.dot.mail.data.local.MailDatabase", "app.dot.mail.data.local.MailDatabase_Impl"):
         assert renamed.get(name) == name and descriptor(name) in classes, f"Room reflection name missing: {name}"
     serializers = {}
@@ -131,7 +134,7 @@ def inspect(apk, mapping, manifest):
         target = renamed.get(original)
         assert target and descriptor(target) in classes, "Missing navigation serializer: " + original
         serializers[original] = target
-    return {"navigation_serializers": serializers, "bundled_notice_components": len(notice_manifest["components"]), "notices_sha256": notice_manifest["bundle_sha256"], "workers": workers, "manifest_components": components, "provider_classes": sorted(providers), "native_elf_load_alignments": native,
+    return {"startup_initializers": initializers, "navigation_serializers": serializers, "bundled_notice_components": len(notice_manifest["components"]), "notices_sha256": notice_manifest["bundle_sha256"], "workers": workers, "manifest_components": components, "provider_classes": sorted(providers), "native_elf_load_alignments": native,
             "scope": "Static shrunk-artifact inspection; does not replace signed-device smoke or provider interoperability tests."}
 
 

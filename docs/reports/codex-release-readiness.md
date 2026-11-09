@@ -1,6 +1,6 @@
 # Release readiness audit
 
-Status: in progress on codex/release-readiness. No tag, release publication, signature operation, private signing-file read or phone access was performed by this audit. Initial UI capture source: main a9313d6; runtime audit rebased onto b1c2486, then documentation decision #86 (9cf2ea3). The JMAP core-table migration remains explicitly deferred after release (reference proposal in PR #80).
+Status: runtime/build checks green; final clean-clone comparison in progress on codex/release-readiness. No tag, release publication, signature operation, private signing-file read or phone access was performed by this audit. Initial UI capture source: main a9313d6; runtime audit rebased onto b1c2486, then documentation decision #86 (9cf2ea3). The JMAP core-table migration remains explicitly deferred after release (reference proposal in PR #80).
 
 ## Changes prepared
 
@@ -26,7 +26,18 @@ The checked-in assets are opened offline from Settings → Licences; IO runs off
 - Shell syntax checks for release/repro scripts passed. The publishing/signing script itself is intentionally not invoked.
 - Initial full tests/lint/R8 build passed (5m35s). Rebased full :mail:test / :data:testDebugUnitTest / :app:testDebugUnitTest / :app:lintRelease passed (3m56s): 455 mail tests (5 skipped), 228 data tests (4 skipped), 256 app tests (9 opt-in screenshot tests skipped), zero failures. Skips include live-account tests; no live account used.
 - Initial shrunk artifact inspection passed: 10 persisted workers with unchanged names and public (Context, WorkerParameters) constructors; 24 META-INF service/mailcap/providers with matching DEX class definitions; Room database/implementation names; manifest components and 16-KiB native alignment. New final APK inspection also checks provider reflection constructors, route serializers and bundled notices.
-- Full final notices build/tests, final artifact retention and two-build reproducibility: pending.
+- Focused LicenceNoticesTest (asset integrity/full notices and offline viewer) and release lint passed after fixing a test matcher that omitted a trailing newline. The focused tests passed (2/2, no skips), followed by lintRelease + unsigned assembleRelease (5m16s). Final shrunk-artifact audit passes the 206-component notices/hash, 10 persisted workers/constructors, 24 mail/activation providers/constructors, four route serializers, four Startup initializers/constructors, every merged-manifest component, Room reflection names and 16-KiB ELF/ZIP alignment.
+
+- Negative coverage fixture: removed one runtime component from the build-host inventory, ran verifyReleaseNotices through scripts/gw and confirmed it failed with that missing coordinate; restored the exact original file in a finally block. No committed fixture/dependency or APK was altered by this check.
+- First clean-clone attempt is **invalid evidence**: the audit operator edited reprotest.sh while that shell was running, causing a file-offset/resume error before artifact retrieval. No PASS or byte-difference claim is made for that run; its temporary clones were cleaned. The frozen final attempt targets c73e8a7fa056f27d3adc06171df02f78f71a4b52.
+
+## R8 scope and residual validation
+
+No new blanket keep/dontwarn rules were needed. Existing conservative Angus/Jakarta rules preserve provider/mailcap reflection, upstream WorkManager consumer rules preserve the other persisted worker names/constructors, Room's consumer rules preserve generated implementation lookup, and kotlinx.serialization consumer rules retain generated route serializers. App/data source scanning found no Gson/Moshi-style model reflection. JSON DOM/settings persistence is explicit; the typed navigation uses generated serializers. The APK inspection verifies actual DEX definitions and public reflection constructor prototypes, rather than assuming a successful shrink proves their presence.
+
+NotificationActionReceiver and OutboxClockReceiver remain unexported, as does the special-use IDLE service; the exported WorkManager job service requires BIND_JOB_SERVICE. FileProvider remains unexported with explicit URI grants and source paths confined to files/attachments/. Startup includes WorkManager, process lifecycle, emoji and profile installer. Static artifact retention does not replace signed-device notification/restart/mail interoperability checks.
+
+AGP emits its existing Compose stack-trace mapping warning for DotMailWidget.provideGlance; compilation/R8 succeeds, but that diagnostic mapping may be incomplete for this method. No warning is suppressed by this PR. No new runtime dependency is added. The resolved license inventory, rather than requested catalog versions alone, is authoritative (e.g. Jakarta Mail API resolves to 2.1.5 through Angus).
 
 ## Release/distribution gates
 
