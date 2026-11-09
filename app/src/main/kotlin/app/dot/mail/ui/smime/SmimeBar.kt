@@ -75,7 +75,7 @@ fun rememberSmimeReader(message: Message): SmimeReaderState {
     LaunchedEffect(state) {
         when (content) {
             null -> Unit
-            is SmimeContent.Signed -> state.signature = runCatching { graph.mail.verifySmime(message) }.getOrNull() ?: SmimeSignatureView(State.UNREADABLE)
+            is SmimeContent.Signed, is SmimeContent.Opaque -> state.signature = runCatching { graph.mail.verifySmime(message) }.getOrNull() ?: SmimeSignatureView(State.UNREADABLE)
             is SmimeContent.Encrypted -> {
                 val result = runCatching { graph.mail.decryptSmime(message) }.getOrNull() ?: SmimeDecryption.Failed
                 state.decryption = result
@@ -96,7 +96,7 @@ fun rememberSmimeReader(message: Message): SmimeReaderState {
 fun SmimeBar(message: Message, state: SmimeReaderState, modifier: Modifier = Modifier) {
     val content = message.body?.smime ?: return
     if (content is SmimeContent.Encrypted) EncryptionLine(state, modifier)
-    if (content is SmimeContent.Signed || state.signature != null) SignatureLine(if (state.checking) null else state.signature ?: SmimeSignatureView(State.UNREADABLE), modifier)
+    if (content is SmimeContent.Signed || content is SmimeContent.Opaque || state.signature != null) SignatureLine(if (state.checking) null else state.signature ?: SmimeSignatureView(State.UNREADABLE), modifier)
 }
 
 @Composable

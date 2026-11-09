@@ -117,6 +117,10 @@ object Mime {
             val disposition = runCatching { p.disposition }.getOrNull()
             val name = runCatching { p.fileName }.getOrNull()
             val cid = runCatching { p.getHeader("Content-ID")?.firstOrNull()?.trim()?.trim('<','>')?.takeIf { it.length<=512 } }.getOrNull()
+            val opaqueBytes = if (SmimeParts.isOpaqueSigned(runCatching { p.contentType }.getOrNull())) runCatching {
+                p.inputStream.use { input -> input.readNBytes(SmimeParts.MAX_OPAQUE_BYTES + 1).takeIf { it.size <= SmimeParts.MAX_OPAQUE_BYTES } }
+            }.getOrNull() else null
+            val opaqueContent = opaqueBytes?.let(SmimeParts::opaqueContent)
             if (type == "multipart/encrypted" && Pgp.protocol(p) == "application/pgp-encrypted") {
                 // PGP/MIME (RFC 3156): keep only the ciphertext; the reader decrypts it in memory through OpenKeychain.
                 val multipart = p.content as Multipart
@@ -147,6 +151,16 @@ object Mime {
                     jakarta.mail.util.SharedFileInputStream(raw).use { input -> visit(MimeBodyPart(input),"$id.0",depth+1,true) }
                     raw.delete()
                 } else for (i in 0 until multipart.count) visit(multipart.getBodyPart(i), "$id.$i", depth+1,materialized)
+            } else if (opaqueContent != null) {
+                // S/MIME opaque signing: the CMS is kept for verification, the signed entity (not secret) is shown as the body
+                // and its attachments are listed normally. The reader verifies the same CMS bytes.
+                require(opaqueBytes!!.size<=remaining) { "Message exceeds download limit" }
+                remaining-=opaqueBytes.size
+                java.io.File(directory,SmimeParts.OPAQUE_FILE).writeBytes(opaqueBytes)
+                val raw=java.io.File(directory,"smime-opaque-$id.tmp")
+                output(raw).use { out -> out.write(opaqueContent) }
+                jakarta.mail.util.SharedFileInputStream(raw).use { input -> visit(MimeBodyPart(input),"$id.0",depth+1,true) }
+                raw.delete()
             } else if (type.startsWith("multipart/")) {
                 val multipart = p.content as Multipart
                 for (i in 0 until multipart.count) visit(multipart.getBodyPart(i), "$id.$i", depth+1,materialized)

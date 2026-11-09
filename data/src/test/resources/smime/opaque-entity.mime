@@ -1,0 +1,21 @@
+From: Alice <alice@example.org>
+To: me@example.org
+Subject: Opaque
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="===============4655159792549114482=="
+
+--===============4655159792549114482==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+
+opaque signed body text
+
+--===============4655159792549114482==
+Content-Type: application/octet-stream
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="proof.bin"
+MIME-Version: 1.0
+
+YXR0YWNoZWQgYnl0ZXM=
+
+--===============4655159792549114482==--

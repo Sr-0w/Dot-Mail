@@ -222,6 +222,8 @@ data class MessageBody(
 sealed interface SmimeContent {
     /** multipart/signed: the exact signed entity and its detached CMS signature. */
     data class Signed(val signedEntity: String, val signature: String) : SmimeContent
+    /** application/pkcs7-mime signed-data (opaque signing): the CMS object; the signed content is already cached as the normal body. */
+    data class Opaque(val cms: String) : SmimeContent
     /** application/pkcs7-mime enveloped/authEnveloped data: [envelope] is the CMS object; nothing readable is stored. */
     data class Encrypted(val envelope: String) : SmimeContent
 }
