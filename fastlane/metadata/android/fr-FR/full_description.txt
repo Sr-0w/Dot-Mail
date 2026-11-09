@@ -1,40 +1,40 @@
-<p>Votre messagerie. Rien d'autre.</p>
+<p>Votre messagerie. Rien d’autre.</p>
 
 <p><strong>Dot Mail</strong> est une application de messagerie Android, calme et rapide,
-entièrement native, qui parle directement à votre fournisseur d'e-mail — sans compte
+entièrement native, qui parle directement à votre fournisseur d’e-mail — sans compte
 chez nous, sans serveur intermédiaire, sans publicité, sans suivi. Un logiciel libre
 (GPL-3.0-or-later), pour toujours.</p>
 
-<h3>Ce qu'elle sait faire</h3>
+<h3>Ce qu’elle sait faire</h3>
 <ul>
 <li>Plusieurs comptes avec une boîte de réception unifiée et des conversations filées</li>
 <li>Lu / non lu, étoile, archiver, supprimer, spam, déplacer — sur un ou plusieurs messages, avec des gestes de glissement configurables</li>
 <li>Priorité au hors ligne : tout ce qui est synchronisé reste lisible sans connexion, et les actions sont mises en file puis rejouées</li>
 <li>Recherche locale et sur le serveur, sur tous les comptes, avec opérateurs : from:, to:, subject:, has:attachment, is:unread, is:starred</li>
-<li>Une file d'envoi fiable : annulation de l'envoi, envoi programmé, et jamais de doublon silencieux — si la connexion tombe pendant l'envoi, Dot Mail vous demande avant de réessayer</li>
-<li>E-mails en texte brut et HTML, pièces jointes (ouvrir ou partager avec n'importe quelle app), citations repliées</li>
+<li>Une file d’envoi fiable : annulation de l’envoi, envoi programmé, et jamais de doublon silencieux — si la connexion tombe pendant l’envoi, Dot Mail vous demande avant de réessayer</li>
+<li>E-mails en texte brut et HTML, pièces jointes (ouvrir ou partager avec n’importe quelle app), citations repliées</li>
 <li>Détection automatique des fournisseurs majeurs (Gmail, Outlook, Yahoo, iCloud, Infomaniak, Fastmail, GMX, Posteo, Zoho, …) et tout serveur IMAP/SMTP standard, configurable à la main</li>
-<li>Sert d'application e-mail par défaut (liens mailto:), et reçoit les fichiers partagés depuis les autres apps</li>
+<li>Sert d’application e-mail par défaut (liens mailto:), et reçoit les fichiers partagés depuis les autres apps</li>
 </ul>
 
 <h3>Confidentialité par construction</h3>
 <ul>
-<li>Aucun intermédiaire : Dot Mail se connecte directement à votre serveur via TLS. Il n'existe pas de serveur Dot Mail.</li>
-<li>Pas d'analyses, pas de remontées de crash, pas de publicité, pas de Google Play Services. Ce n'est pas une option « désactivable » : c'est absent.</li>
+<li>Aucun intermédiaire : Dot Mail se connecte directement à votre serveur via TLS. Il n’existe pas de serveur Dot Mail.</li>
+<li>Pas d’analyses, pas de remontées de crash, pas de publicité, pas de Google Play Services. Ce n’est pas une option « désactivable » : c’est absent.</li>
 <li>Les images distantes et les pixels de suivi sont bloqués par défaut ; vous pouvez les charger message par message.</li>
 <li>Le HTML des e-mails est assaini, puis affiché avec JavaScript, accès fichiers et réseau désactivés.</li>
-<li>Avant de quitter l'application par un lien, vous voyez réellement où il mène.</li>
-<li>Les mots de passe sont chiffrés avec une clé conservée dans le Keystore Android ; les données de l'app sont exclues de la sauvegarde cloud.</li>
-<li>Verrouillage d'application optionnel (biométrie / PIN) et masquage du contenu dans les applications récentes.</li>
+<li>Avant de quitter l’application par un lien, vous voyez réellement où il mène.</li>
+<li>Les mots de passe sont chiffrés avec une clé conservée dans le Keystore Android ; les données de l’app sont exclues de la sauvegarde cloud.</li>
+<li>Verrouillage d’application optionnel (biométrie / PIN) et masquage du contenu dans les applications récentes.</li>
 </ul>
 
 <h3>État du projet</h3>
 <p>Dot Mail est jeune : utilisable et testée, mais pas encore éprouvée sur des milliers
 de boîtes aux lettres. Les connexions par mot de passe et par mot de passe applicatif
 fonctionnent aujourd’hui, ainsi que la connexion avec Google. Les comptes Microsoft
-(Outlook, Hotmail, Live) ne sont pas pris en charge, et S/MIME n’est pas encore implémenté. En arrière-plan, la synchronisation s'exécute toutes
-les 15 minutes, et en direct (IDLE) tant que l'application est ouverte.</p>
+(Outlook, Hotmail, Live) ne sont pas pris en charge, et S/MIME n’est pas encore implémenté. En arrière-plan, la synchronisation s’exécute toutes
+les 15 minutes, et en direct (IDLE) tant que l’application est ouverte.</p>
 
 <p>100 % Kotlin et Jetpack Compose, aucune couche multiplateforme. Dot Mail est la
-première d'une famille prévue d'applications « Dot » — indépendantes et respectueuses
+première d’une famille prévue d’applications « Dot » — indépendantes et respectueuses
 de la vie privée — qui partageront le même langage de conception.</p>
