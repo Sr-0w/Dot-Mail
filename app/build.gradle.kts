@@ -20,9 +20,8 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Signed with the debug key so `assembleRelease` yields an installable APK out of the box.
-            // Distributors replace this with their own signing config.
-            signingConfig = signingConfigs.getByName("debug")
+            // Release payloads are unsigned. Maintainers/F-Droid sign them externally after verification.
+            // Developer installs continue to use assembleDebug; no signing secret enters the build graph.
         }
     }
     compileOptions {
@@ -71,3 +70,8 @@ dependencies {
 }
 
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
+
+// Store captures use only the in-memory demo graph and run explicitly, never against an installed account.
+tasks.withType<Test>().configureEach {
+    systemProperty("dotmail.storeShots", providers.gradleProperty("dotmail.storeShots").orElse("false").get())
+}
