@@ -1240,23 +1240,16 @@ private fun BoxScope.ReaderChrome(
         else androidx.compose.animation.fadeOut(tween(DotMotion.fast)) +
             androidx.compose.animation.slideOutVertically(tween(DotMotion.fast, easing = DotMotion.accelerate)) { if (toTop) -it / 2 else it / 2 }
     }
-    // Always: the status bar area never shows message content underneath (clock and icons stay readable over images),
-    // even while the capsules are hidden. Solid up to the bar's bottom edge, then a short fade.
+    // One frosted band from the screen top, like the list headers: it covers the status bar while the capsules are hidden
+    // (clock and icons stay readable over images) and grows under the capsules when they are shown. It fades in as content
+    // scrolls under it, so at the top of a conversation the subject stays clear.
     val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val fade = 10.dp
-    Box(
-        Modifier.align(Alignment.TopCenter).fillMaxWidth().height(statusBar + fade).background(
-            androidx.compose.ui.graphics.Brush.verticalGradient(
-                0f to c.background, (statusBar / (statusBar + fade)).coerceIn(0f, 1f) to c.background, 1f to c.background.copy(alpha = 0f),
-            ),
-        ),
+    val small = statusBar + 24.dp
+    val band by androidx.compose.animation.core.animateDpAsState(if (visible) topScrim + 56.dp else small, label = "readerBand")
+    app.dot.design.components.TopEdgeFade(
+        backdrop, topProgress(), Modifier.align(Alignment.TopCenter), height = band,
+        solidUntil = ((statusBar + 4.dp) / band).coerceIn(0.3f, 0.6f).let { if (visible) 0.6f else it },
     )
-    // Scrims only make sense while the capsules are there; they are plain gradients of the page colour.
-    AnimatedVisibility(visible, Modifier.align(Alignment.TopCenter), enter = androidx.compose.animation.fadeIn(), exit = androidx.compose.animation.fadeOut()) {
-        // Nothing is under the band while the conversation sits at its top: it fades in as content scrolls beneath it, so
-        // it never darkens or blurs the subject (the same rule as the list headers).
-        app.dot.design.components.TopEdgeFade(backdrop, topProgress(), Modifier, height = topScrim + 56.dp)
-    }
     AnimatedVisibility(visible, Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = DotSpacing.s, top = DotSpacing.xs), enter = enter(true), exit = exit(true)) { back() }
     AnimatedVisibility(visible, Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = DotSpacing.s, top = DotSpacing.xs), enter = enter(true), exit = exit(true)) { actions() }
     if (reply != null) {
