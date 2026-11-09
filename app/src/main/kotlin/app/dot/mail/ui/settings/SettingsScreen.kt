@@ -139,6 +139,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
     var identityPage by rememberSaveable { mutableLongStateOf(-1L) }
     var remoteImagesPage by rememberSaveable { mutableStateOf(false) }
     var aliasesPage by rememberSaveable { mutableStateOf(false) }
+    var smimeContactsPage by rememberSaveable { mutableStateOf(false) }
     var categoriesPage by rememberSaveable { mutableStateOf(false) }
     var smartPage by rememberSaveable { mutableStateOf(false) }
     var storagePage by rememberSaveable { mutableStateOf(false) }
@@ -169,8 +170,8 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             SettingsTarget.Aliases -> aliasesPage = true
         }
     }
-    BackHandler(enabled = accountPage != 0L || remoteImagesPage || categoriesPage || smartPage || storagePage || aliasesPage) {
-        if (storagePage) storagePage = false else if (aliasesPage) aliasesPage = false else if (smartPage) smartPage = false else if (categoriesPage) categoriesPage = false else if (remoteImagesPage) remoteImagesPage = false else if (identityPage >= 0) identityPage = -1 else accountPage = 0
+    BackHandler(enabled = accountPage != 0L || smimeContactsPage || remoteImagesPage || categoriesPage || smartPage || storagePage || aliasesPage) {
+        if (storagePage) storagePage = false else if (smimeContactsPage) smimeContactsPage = false else if (aliasesPage) aliasesPage = false else if (smartPage) smartPage = false else if (categoriesPage) categoriesPage = false else if (remoteImagesPage) remoteImagesPage = false else if (identityPage >= 0) identityPage = -1 else accountPage = 0
     }
     val c = Dot.colors
     val canLock = remember {
@@ -203,10 +204,12 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
         CategoriesPage(onBack = { categoriesPage = false })
     } else if (remoteImagesPage) {
         RemoteImagesPage(accounts, onBack = { remoteImagesPage = false })
+    } else if (pageAccount != null && smimeContactsPage) {
+        SmimeContactsPage(pageAccount, onBack = { smimeContactsPage = false })
     } else if (pageAccount != null && identityPage >= 0) {
         IdentityEditorPage(pageAccount, identityPage, onBack = { identityPage = -1 })
     } else if (pageAccount != null) {
-        AccountPage(pageAccount, onBack = { accountPage = 0 }, onEditIdentity = { identityPage = it }, onRemove = { removing = pageAccount })
+        AccountPage(pageAccount, onBack = { accountPage = 0 }, onEditIdentity = { identityPage = it }, onRemove = { removing = pageAccount }, onOpenSmimeCerts = { smimeContactsPage = true })
     } else { val edgeState=app.dot.design.components.rememberGlassBackdrop()
         app.dot.design.components.FrostedHeaderLayout(backdrop=edgeState,modifier=Modifier.fillMaxSize().background(c.background),header={ DotTopBar(title = stringResource(R.string.settings_title), elevated = scroll.value > 0, navigation = { BackButton(onBack) }) }) { headerPadding ->
         val headerInset=with(androidx.compose.ui.platform.LocalDensity.current) { headerPadding.calculateTopPadding().roundToPx() }

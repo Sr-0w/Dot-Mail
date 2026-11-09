@@ -21,7 +21,7 @@ import app.dot.mail.data.oauth.*
 
 fun createMailGraph(context: Context): MailGraph {
     val graph = GraphRegistry.get(context)
-    return object : MailGraph { override val accounts: AccountRepository = graph; override val mail: MailRepository = graph; override val compose: ComposeRepository = graph }
+    return object : MailGraph { override val accounts: AccountRepository = graph; override val mail: MailRepository = graph; override val compose: ComposeRepository = graph; override val smime: SmimeRepository = graph.smime }
 }
 internal object GraphRegistry {
     @Volatile private var graph: RealMailGraph? = null
@@ -64,6 +64,14 @@ internal class RealMailGraph(
     internal val addressBook=AddressBookIndex(this)
     /** Recipient S/MIME certificates (a cache, not trust). */
     internal val smimeCerts = SmimeCertStore(dao)
+    val smime: SmimeRepository = object : SmimeRepository {
+        override fun certificates(accountId: Long) = smimeCerts.observe(accountId)
+        override suspend fun pin(accountId: Long, mailbox: String, fingerprint: String) = smimeCerts.pin(accountId, mailbox, fingerprint)
+        override suspend fun unpin(accountId: Long, mailbox: String, fingerprint: String) = smimeCerts.unpin(accountId, mailbox, fingerprint)
+        override suspend fun forget(accountId: Long, mailbox: String, fingerprint: String) = smimeCerts.forget(accountId, mailbox, fingerprint)
+        override suspend fun pinnedFingerprint(accountId: Long, mailbox: String) = smimeCerts.pinnedFingerprint(accountId, mailbox)
+        override suspend fun certificatesFor(accountId: Long, mailboxes: List<String>) = mailboxes.associate { box -> SmimeCertStore.normalize(box) to smimeCerts.candidateChains(accountId, box).map { it.leaf } }
+    }
     override suspend fun refreshKnownContacts() { addressBook.refresh(force=true) }
     override val globalStorageLimit:Flow<Long> = storage.preferences.version.map { storage.preferences.globalLimit() }.distinctUntilChanged()
     override suspend fun setGlobalStorageLimit(bytes:Long) { storage.globalLimit(bytes) }
@@ -98,7 +106,7 @@ internal class RealMailGraph(
     override val accounts: Flow<List<Account>> = combine(dao.observeAccounts(), syncing, identityStore.version, AccountSettingsStore.get(context).lastSyncedAll) { rows, active, _, synced -> rows.map { row ->
         Account(row.id, row.name, row.email, row.color, identityStore.resolve(row.id, row.name, row.email),
             if (row.id in active) SyncState.Syncing else row.syncError?.let { SyncDiagnostics.state(it,row.authError) } ?: SyncState.Idle,
-            synced[row.id] ?: 0L)
+            synced[row.id] ?: 0L, runCatching { Codec.config(row.config).smime }.getOrDefault(SmimeAccountConfig()))
     } }
     override val outbox: Flow<List<OutboxItem>> = dao.observeOutbox().map { rows -> rows.map { row ->
         val draft = Codec.draft(row.draft)
@@ -160,6 +168,16 @@ internal class RealMailGraph(
     override suspend fun exportBackup(): String = exportAccountsBackup()
     override suspend fun previewBackup(json: String): BackupPreview = previewAccountsBackup(json)
     override suspend fun applyBackup(json: String): BackupPreview = applyAccountsBackup(json)
+    private val smimeConfigLock = Mutex()
+    override suspend fun updateSmime(accountId: Long, smime: SmimeAccountConfig) = updateSmime(accountId) { smime }
+    override suspend fun updateSmime(accountId: Long, transform: (SmimeAccountConfig) -> SmimeAccountConfig) = withContext(Dispatchers.IO) {
+        // Serialized, and the stored value is read inside the lock: concurrent edits compose instead of overwriting.
+        smimeConfigLock.withLock {
+            val row = dao.account(accountId) ?: return@withLock
+            val config = Codec.config(row.config)
+            dao.accountConfig(accountId, Codec.config(config.copy(smime = transform(config.smime))))
+        }
+    }
     override suspend fun renameAccount(accountId: Long, displayName: String) = withContext(Dispatchers.IO) { dao.accountName(accountId, displayName.trim().ifEmpty { return@withContext }) }
     override suspend fun updatePassword(accountId: Long, password: String): VerifyResult = withContext(Dispatchers.IO) {
         val snapshot = dao.account(accountId) ?: return@withContext VerifyResult.ConnectionFailed("Account no longer exists")

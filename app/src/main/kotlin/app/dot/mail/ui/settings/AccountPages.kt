@@ -65,7 +65,7 @@ import kotlinx.coroutines.launch
 
 /** One account: its status, its sender identities, and removal. */
 @Composable
-internal fun AccountPage(account: Account, onBack: () -> Unit, onEditIdentity: (Long) -> Unit, onRemove: () -> Unit) {
+internal fun AccountPage(account: Account, onBack: () -> Unit, onEditIdentity: (Long) -> Unit, onRemove: () -> Unit, onOpenSmimeCerts: () -> Unit = {}) {
     val c = Dot.colors
     val scroll = rememberScrollState()
     val frostedSource=app.dot.design.components.rememberGlassBackdrop()
@@ -117,6 +117,9 @@ internal fun AccountPage(account: Account, onBack: () -> Unit, onEditIdentity: (
                 ToggleRow(stringResource(R.string.account_pgp_sign), stringResource(R.string.account_pgp_sign_sub), Icons.Outlined.Key, cfg.pgpSignDefault) { v -> store.update(account.id) { it.copy(pgpSignDefault = v) } }
                 ToggleRow(stringResource(R.string.account_pgp_encrypt), stringResource(R.string.account_pgp_encrypt_sub), Icons.Outlined.Key, cfg.pgpEncryptDefault) { v -> store.update(account.id) { it.copy(pgpEncryptDefault = v) } }
             }
+
+            val smimeCerts by remember(account.id) { graph.smime.certificates(account.id) }.collectAsStateWithLifecycle(emptyList())
+            SmimeAccountSection(account, smimeCerts.size, onOpenSmimeCerts)
 
             SectionLabel(stringResource(R.string.account_section_notifications))
             ToggleRow(stringResource(R.string.account_notify), stringResource(R.string.account_notify_for, account.email), Icons.Outlined.Notifications, cfg.notificationsEnabled) { v ->

@@ -140,6 +140,7 @@ interface MailDao {
     @Query("UPDATE accounts SET secret=:secret,config=:config,syncError=NULL,authError=0 WHERE id=:id") suspend fun accountAuthorization(id: Long, secret: String, config: String): Int
     @Query("UPDATE accounts SET secret=:secret,syncError=NULL,authError=0 WHERE id=:id") suspend fun accountSecret(id: Long, secret: String): Int
     @Query("DELETE FROM accounts WHERE id=:id") suspend fun deleteAccount(id: Long)
+    @Query("UPDATE accounts SET config=:config WHERE id=:id") suspend fun accountConfig(id: Long, config: String)
     @Query("UPDATE accounts SET name=:name WHERE id=:id") suspend fun accountName(id: Long, name: String)
     @Query("UPDATE accounts SET syncError=:error,authError=:authError WHERE id=:id") suspend fun syncError(id: Long, error: String?, authError: Boolean = false)
     @Query("SELECT * FROM folders WHERE accountId=:account ORDER BY id") fun observeFolders(account: Long): Flow<List<FolderRow>>

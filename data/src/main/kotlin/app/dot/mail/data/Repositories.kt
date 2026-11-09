@@ -61,6 +61,15 @@ interface AccountRepository {
     /** Applies it: existing accounts (matched by address) get their identities and preferences, missing ones are re-created signed out. */
     suspend fun applyBackup(json: String): app.dot.mail.data.model.BackupPreview = app.dot.mail.data.model.BackupPreview(emptyList(), error = "Not supported")
 
+    /** Stores the account's S/MIME KeyChain aliases and defaults (references only: no key or certificate is stored here). */
+    suspend fun updateSmime(accountId: Long, smime: app.dot.mail.data.model.SmimeAccountConfig) {}
+
+    /**
+     * Read-modify-write of the account's S/MIME settings: [transform] receives the settings as they are stored now, so two quick
+     * changes (both certificates picked in a row) never overwrite each other with a stale snapshot.
+     */
+    suspend fun updateSmime(accountId: Long, transform: (app.dot.mail.data.model.SmimeAccountConfig) -> app.dot.mail.data.model.SmimeAccountConfig) {}
+
     /** Changes the name shown for the account (and used as sender name of its primary identity). */
     suspend fun renameAccount(accountId: Long, displayName: String) {}
 
@@ -286,4 +295,26 @@ interface MailGraph {
     val accounts: AccountRepository
     val mail: MailRepository
     val compose: ComposeRepository
+    /** Recipient S/MIME certificates (collected from verified signed mail or added by hand). */
+    val smime: SmimeRepository get() = SmimeRepository.None
+}
+
+/** The stored recipient certificates of an account. A stored certificate is a cache, never trust: the policy decides when sending. */
+interface SmimeRepository {
+    fun certificates(accountId: Long): Flow<List<StoredSmimeCert>>
+    suspend fun pin(accountId: Long, mailbox: String, fingerprint: String): Boolean
+    suspend fun unpin(accountId: Long, mailbox: String, fingerprint: String)
+    suspend fun forget(accountId: Long, mailbox: String, fingerprint: String): Boolean
+    suspend fun pinnedFingerprint(accountId: Long, mailbox: String): String?
+    /** Stored certificates per normalized mailbox, for deciding which recipients can be encrypted to. */
+    suspend fun certificatesFor(accountId: Long, mailboxes: List<String>): Map<String, List<java.security.cert.X509Certificate>>
+
+    object None : SmimeRepository {
+        override fun certificates(accountId: Long) = kotlinx.coroutines.flow.flowOf(emptyList<StoredSmimeCert>())
+        override suspend fun pin(accountId: Long, mailbox: String, fingerprint: String) = false
+        override suspend fun unpin(accountId: Long, mailbox: String, fingerprint: String) {}
+        override suspend fun forget(accountId: Long, mailbox: String, fingerprint: String) = false
+        override suspend fun pinnedFingerprint(accountId: Long, mailbox: String): String? = null
+        override suspend fun certificatesFor(accountId: Long, mailboxes: List<String>) = emptyMap<String, List<java.security.cert.X509Certificate>>()
+    }
 }
