@@ -18,11 +18,12 @@ internal object SmimeMime {
     fun signedMessage(mail: OutgoingMail, signedEntity: ByteArray): ByteArray =
         message(mail, signedEntity)
 
-    fun envelopedMessage(mail: OutgoingMail, cms: ByteArray): ByteArray {
+    fun envelopedMessage(mail: OutgoingMail, cms: ByteArray, authenticated: Boolean = false): ByteArray {
+        val smimeType = if (authenticated) "auth-enveloped-data" else "enveloped-data"
         val out = ByteArrayOutputStream()
         out.write(outerHeaders(mail))
         out.write((
-            "Content-Type: application/pkcs7-mime; smime-type=enveloped-data; name=\"smime.p7m\"$crlf" +
+            "Content-Type: application/pkcs7-mime; smime-type=$smimeType; name=\"smime.p7m\"$crlf" +
                 "Content-Transfer-Encoding: base64$crlf" +
                 "Content-Disposition: attachment; filename=\"smime.p7m\"$crlf$crlf"
             ).toByteArray(Charsets.US_ASCII))
@@ -46,20 +47,17 @@ internal object SmimeMime {
         val headersEnd = raw.indexOf("\r\n\r\n")
         require(headersEnd >= 0) { "MIME message has no header/body separator" }
         val bodyStart = headersEnd + 4
-        val firstBoundary = "--$boundary\r\n"
-        val firstAt = raw.indexOf(firstBoundary, bodyStart)
-        require(firstAt >= 0) { "First signed MIME boundary is missing" }
-        val entityStart = firstAt + firstBoundary.length
-        val nextPartDelimiter = "\r\n--$boundary\r\n"
-        val secondAt = raw.indexOf(nextPartDelimiter, entityStart)
-        require(secondAt >= entityStart) { "Detached signature MIME part is missing" }
-        val signaturePartStart = secondAt + nextPartDelimiter.length
-        val closing = "\r\n--$boundary--"
-        val closingAt = raw.indexOf(closing, signaturePartStart)
-        require(closingAt >= signaturePartStart) { "Closing signed MIME boundary is missing" }
+        val first = findBoundary(raw, boundary, bodyStart) ?: error("First signed MIME boundary is missing")
+        require(!first.closing) { "First signed MIME boundary is the closing delimiter" }
+        val entityStart = first.afterLine
+        val second = findBoundary(raw, boundary, entityStart) ?: error("Detached signature MIME part is missing")
+        require(!second.closing) { "Detached signature MIME part is missing" }
+        val signaturePartStart = second.afterLine
+        val closing = findBoundary(raw, boundary, signaturePartStart) ?: error("Closing signed MIME boundary is missing")
+        require(closing.closing) { "Expected exactly two multipart/signed parts" }
 
-        val entity = raw.substring(entityStart, secondAt).toByteArray(Charsets.ISO_8859_1)
-        val signaturePart = raw.substring(signaturePartStart, closingAt).toByteArray(Charsets.ISO_8859_1)
+        val entity = raw.substring(entityStart, second.contentEnd).toByteArray(Charsets.ISO_8859_1)
+        val signaturePart = raw.substring(signaturePartStart, closing.contentEnd).toByteArray(Charsets.ISO_8859_1)
         val parsedSignature = MimeBodyPart(ByteArrayInputStream(signaturePart))
         val signatureType = ContentType(parsedSignature.contentType).baseType
         require(signatureType.equals("application/pkcs7-signature", ignoreCase = true) ||
@@ -67,6 +65,15 @@ internal object SmimeMime {
             "Second signed MIME part is not a PKCS#7 signature"
         }
         return entity to parsedSignature.inputStream.use { it.readBytes() }
+    }
+
+    private data class BoundaryLine(val contentEnd: Int, val afterLine: Int, val closing: Boolean)
+
+    /** RFC 2046 transport padding allows spaces/tabs after the boundary marker. */
+    private fun findBoundary(raw: String, boundary: String, from: Int): BoundaryLine? {
+        val pattern = Regex("(?:^|\\r\\n)--${Regex.escape(boundary)}(--)?[ \\t]*(?:\\r\\n|$)")
+        val match = pattern.find(raw, from) ?: return null
+        return BoundaryLine(match.range.first, match.range.last + 1, match.groupValues[1] == "--")
     }
 
     /** Returns a complete multipart/signed MIME entity, suitable for nesting inside EnvelopedData. */

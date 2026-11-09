@@ -5,6 +5,8 @@ import org.bouncycastle.cert.jcajce.JcaCertStore
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder
 import org.bouncycastle.cms.CMSAlgorithm
+import org.bouncycastle.cms.CMSAuthEnvelopedData
+import org.bouncycastle.cms.CMSAuthEnvelopedDataGenerator
 import org.bouncycastle.cms.CMSProcessableByteArray
 import org.bouncycastle.cms.CMSEnvelopedData
 import org.bouncycastle.cms.CMSEnvelopedDataGenerator
@@ -15,9 +17,13 @@ import org.bouncycastle.cms.jcajce.JcaSignerInfoGeneratorBuilder
 import org.bouncycastle.cms.jcajce.JcaSimpleSignerInfoVerifierBuilder
 import org.bouncycastle.cms.jcajce.JceCMSContentEncryptorBuilder
 import org.bouncycastle.cms.jcajce.JceKeyTransEnvelopedRecipient
+import org.bouncycastle.cms.jcajce.JceKeyTransAuthEnvelopedRecipient
 import org.bouncycastle.cms.jcajce.JceKeyTransRecipientId
 import org.bouncycastle.cms.jcajce.JceKeyTransRecipientInfoGenerator
 import org.bouncycastle.jce.provider.BouncyCastleProvider
+import org.bouncycastle.asn1.ASN1Primitive
+import org.bouncycastle.asn1.cms.CMSObjectIdentifiers
+import org.bouncycastle.asn1.cms.ContentInfo
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
 import org.bouncycastle.operator.jcajce.JcaDigestCalculatorProviderBuilder
 import java.security.cert.X509Certificate
@@ -71,21 +77,55 @@ internal class BouncyCastleSmimeCms : SmimeCms {
         recipients.distinctBy { it.serialNumber to it.issuerX500Principal }.forEach { certificate ->
             generator.addRecipientInfoGenerator(JceKeyTransRecipientInfoGenerator(certificate).setProvider(provider))
         }
-        val encryptor = JceCMSContentEncryptorBuilder(CMSAlgorithm.AES256_GCM).setProvider(provider).build()
+        // AES-CBC EnvelopedData is the interoperable S/MIME baseline. GCM is only used
+        // for AuthEnvelopedData when receiving messages that explicitly carry that type.
+        val encryptor = JceCMSContentEncryptorBuilder(CMSAlgorithm.AES256_CBC).setProvider(provider).build()
         return generator.generate(CMSProcessableByteArray(entity), encryptor).encoded
     }
 
     override fun decrypt(envelopedData: ByteArray, identity: SmimeDecryptionIdentity): ByteArray {
-        val envelope = CMSEnvelopedData(envelopedData)
-        require(envelope.encryptionAlgOID == CMSAlgorithm.AES256_GCM.id) { "Unsupported S/MIME content-encryption algorithm" }
-        val recipientId = JceKeyTransRecipientId(identity.certificate)
-        val recipients = envelope.recipientInfos.getRecipients(recipientId)
-        require(recipients.size == 1) { "CMS message does not contain exactly one matching recipient" }
-        val recipient = recipients.single()
-        // Keep key recovery on the platform JCA provider for non-exportable Android KeyChain keys;
-        // use BC only for CMS content decryption (including AES-GCM AlgorithmParameters).
-        val content = recipient.getContent(JceKeyTransEnvelopedRecipient(identity.privateKey).setContentProvider(provider))
-        require(content.isNotEmpty()) { "CMS envelope has empty content" }
-        return content
+        val contentInfo = ContentInfo.getInstance(ASN1Primitive.fromByteArray(envelopedData))
+        return when (contentInfo.contentType) {
+            CMSObjectIdentifiers.envelopedData -> {
+                val envelope = CMSEnvelopedData(contentInfo)
+                val oid = envelope.encryptionAlgOID
+                rejectWeakEncryption(oid)
+                require(oid in setOf(CMSAlgorithm.AES128_CBC.id, CMSAlgorithm.AES192_CBC.id, CMSAlgorithm.AES256_CBC.id)) {
+                    "Unsupported S/MIME EnvelopedData content algorithm: $oid"
+                }
+                val recipient = matchingRecipient(envelope.recipientInfos, identity)
+                // Keep key recovery on the platform JCA provider for non-exportable Android KeyChain keys.
+                recipient.getContent(JceKeyTransEnvelopedRecipient(identity.privateKey).setContentProvider(provider))
+            }
+            CMSObjectIdentifiers.authEnvelopedData -> {
+                val envelope = CMSAuthEnvelopedData(contentInfo)
+                val oid = envelope.encryptionAlgOID
+                rejectWeakEncryption(oid)
+                require(oid in setOf(CMSAlgorithm.AES128_GCM.id, CMSAlgorithm.AES192_GCM.id, CMSAlgorithm.AES256_GCM.id)) {
+                    "Unsupported S/MIME AuthEnvelopedData content algorithm: $oid"
+                }
+                val recipient = matchingRecipient(envelope.recipientInfos, identity)
+                recipient.getContent(JceKeyTransAuthEnvelopedRecipient(identity.privateKey).setContentProvider(provider))
+            }
+            else -> error("Expected CMS EnvelopedData or AuthEnvelopedData")
+        }.also { require(it.isNotEmpty()) { "CMS envelope has empty content" } }
+    }
+
+    private fun matchingRecipient(
+        recipients: org.bouncycastle.cms.RecipientInformationStore,
+        identity: SmimeDecryptionIdentity,
+    ): org.bouncycastle.cms.RecipientInformation {
+        val matches = recipients.getRecipients(JceKeyTransRecipientId(identity.certificate))
+        require(matches.size == 1) { "CMS message does not contain exactly one matching recipient" }
+        return matches.single()
+    }
+
+    private fun rejectWeakEncryption(oid: String) {
+        if (oid in setOf(CMSAlgorithm.DES_CBC.id, CMSAlgorithm.DES_EDE3_CBC.id, CMSAlgorithm.RC2_CBC.id)) {
+            throw SmimeProtectionException(
+                SmimeFailure.WEAK_CONTENT_ENCRYPTION,
+                "S/MIME content encryption is too weak to decrypt safely",
+            )
+        }
     }
 }

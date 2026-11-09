@@ -12,6 +12,15 @@ import org.bouncycastle.asn1.x509.KeyPurposeId
 import org.bouncycastle.asn1.x509.KeyUsage
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
+import org.bouncycastle.cms.CMSAlgorithm
+import org.bouncycastle.cms.CMSAuthEnvelopedData
+import org.bouncycastle.cms.CMSAuthEnvelopedDataGenerator
+import org.bouncycastle.cms.CMSEnvelopedData
+import org.bouncycastle.cms.CMSEnvelopedDataGenerator
+import org.bouncycastle.cms.CMSProcessableByteArray
+import org.bouncycastle.cms.jcajce.JceCMSContentEncryptorBuilder
+import org.bouncycastle.cms.jcajce.JceKeyTransRecipientInfoGenerator
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -129,6 +138,18 @@ class SmimeEngineTest {
         assertTrue(verified.allTrustedAndValid)
     }
 
+    @Test fun `detached MIME parsing tolerates transport padding on boundary delimiters`() {
+        val signer = identity("sender@example.test")
+        val message = engine.build(mail().copy(bcc = emptyList()), SmimeMode.SIGN, signer = signer.signing()).first().mimeBytes
+        val parsed = parse(message)
+        val boundary = jakarta.mail.internet.ContentType(parsed.contentType).getParameter("boundary")
+        val padded = String(message, Charsets.ISO_8859_1)
+            .replace("--$boundary--\r\n", "--$boundary-- \t\r\n")
+            .replace("--$boundary\r\n", "--$boundary \t\r\n")
+            .toByteArray(Charsets.ISO_8859_1)
+        assertTrue(engine.verifySignedMime(padded, "sender@example.test").allTrustedAndValid)
+    }
+
     @Test fun `tampering with signed MIME entity makes signature invalid`() {
         val signer = identity("sender@example.test")
         val message = mail().copy(bcc = emptyList())
@@ -161,12 +182,76 @@ class SmimeEngineTest {
         val aliceMessage = parse(variants.first().mimeBytes)
         assertTrue(aliceMessage.getHeader("Bcc").orEmpty().isEmpty())
         assertTrue(aliceMessage.contentType.startsWith("application/pkcs7-mime", ignoreCase = true))
+        assertEquals(CMSAlgorithm.AES256_CBC.id, CMSEnvelopedData(aliceMessage.inputStream).encryptionAlgOID)
         val decrypted = engine.decryptMime(variants.first().mimeBytes, alice.decrypting())
         val rendered = Pgp.parseDecrypted(decrypted, mime = true)
         assertTrue(rendered.text.orEmpty().contains("plain body ✓"))
         assertTrue(rendered.html.orEmpty().contains("html body ✓"))
         assertTrue(rendered.attachments.any { it.name == "proof.txt" })
+        val sentCopy = Pgp.parseDecrypted(engine.decryptMime(variants.first().mimeBytes, sender.decrypting()), mime = true)
+        assertTrue("Sender's own KeyChain identity must decrypt the sent copy", sentCopy.text.orEmpty().contains("plain body ✓"))
         assertFalse(runCatching { engine.decryptMime(variants.first().mimeBytes, bob.decrypting()) }.isSuccess)
+    }
+
+    @Test fun `receives AES CBC EnvelopedData with 128 192 and 256 bit keys`() {
+        val recipient = identity("alice@example.test", signing = false)
+        val content = "CBC S/MIME interop".toByteArray()
+        listOf(CMSAlgorithm.AES128_CBC, CMSAlgorithm.AES192_CBC, CMSAlgorithm.AES256_CBC).forEach { algorithm ->
+            val cms = encryptCbc(content, recipient.certificate, algorithm)
+            val mime = SmimeMime.envelopedMessage(mail().copy(bcc = emptyList()), cms)
+            assertArrayEquals("CBC algorithm ${algorithm.id}", content, engine.decryptMime(mime, recipient.decrypting()))
+        }
+    }
+
+    @Test fun `receives AES GCM AuthEnvelopedData with all supported key sizes and MIME type`() {
+        val recipient = identity("alice@example.test", signing = false)
+        val content = "Authenticated S/MIME".toByteArray()
+        listOf(CMSAlgorithm.AES128_GCM, CMSAlgorithm.AES192_GCM, CMSAlgorithm.AES256_GCM).forEach { algorithm ->
+            val cms = encryptAuthEnveloped(content, recipient.certificate, algorithm)
+            assertEquals(algorithm.id, CMSAuthEnvelopedData(cms).encryptionAlgOID)
+            val mime = SmimeMime.envelopedMessage(mail().copy(bcc = emptyList()), cms, authenticated = true)
+            assertTrue(parse(mime).contentType.contains("smime-type=auth-enveloped-data", ignoreCase = true))
+            assertArrayEquals("GCM algorithm ${algorithm.id}", content, engine.decryptMime(mime, recipient.decrypting()))
+        }
+    }
+
+    @Test fun `rejects DES 3DES and RC2 EnvelopedData with a distinct weak encryption failure`() {
+        val recipient = identity("alice@example.test", signing = false)
+        listOf(CMSAlgorithm.DES_CBC, CMSAlgorithm.DES_EDE3_CBC, CMSAlgorithm.RC2_CBC).forEach { algorithm ->
+            val cms = encryptCbc("weak".toByteArray(), recipient.certificate, algorithm)
+            val mime = SmimeMime.envelopedMessage(mail().copy(bcc = emptyList()), cms)
+            val error = runCatching { engine.decryptMime(mime, recipient.decrypting()) }.exceptionOrNull() as SmimeProtectionException
+            assertEquals("weak algorithm ${algorithm.id}", SmimeFailure.WEAK_CONTENT_ENCRYPTION, error.failure)
+        }
+    }
+
+    private fun encryptCbc(
+        content: ByteArray,
+        certificate: X509Certificate,
+        algorithm: org.bouncycastle.asn1.ASN1ObjectIdentifier,
+    ): ByteArray {
+        val provider = BouncyCastleProvider()
+        val generator = CMSEnvelopedDataGenerator().apply {
+            addRecipientInfoGenerator(JceKeyTransRecipientInfoGenerator(certificate).setProvider(provider))
+        }
+        val encryptor = JceCMSContentEncryptorBuilder(algorithm).setProvider(provider).build()
+        return generator.generate(CMSProcessableByteArray(content), encryptor).encoded
+    }
+
+    private fun encryptAuthEnveloped(
+        content: ByteArray,
+        certificate: X509Certificate,
+        algorithm: org.bouncycastle.asn1.ASN1ObjectIdentifier,
+    ): ByteArray {
+        val provider = BouncyCastleProvider()
+        val generator = CMSAuthEnvelopedDataGenerator().apply {
+            addRecipientInfoGenerator(JceKeyTransRecipientInfoGenerator(certificate).setProvider(provider))
+        }
+        val encryptor = JceCMSContentEncryptorBuilder(algorithm).setProvider(provider).build()
+        return generator.generate(
+            CMSProcessableByteArray(content),
+            encryptor as org.bouncycastle.operator.OutputAEADEncryptor,
+        ).encoded
     }
 
     @Test fun `sign then encrypt decrypts to a verifiable detached signed MIME entity`() {
@@ -179,6 +264,7 @@ class SmimeEngineTest {
             SmimeMode.SIGN_AND_ENCRYPT,
             signer = sender.signing(),
             recipientCertificates = listOf(recipient.recipient(), cc.recipient(), bcc.recipient()),
+            senderDecryptionCertificate = sender.certificate,
         ).first()
         val decryptedSignedMime = engine.decryptMime(variant.mimeBytes, recipient.decrypting())
         val signed = parse(decryptedSignedMime)
@@ -190,6 +276,17 @@ class SmimeEngineTest {
         val mail = mail()
         val noCert = runCatching { engine.build(mail, SmimeMode.ENCRYPT) }.exceptionOrNull() as SmimeProtectionException
         assertEquals(SmimeFailure.RECIPIENT_CERTIFICATE_MISSING, noCert.failure)
+
+        val recipientWithCert = identity("alice@example.test", signing = false)
+        val ccWithCert = identity("bob@example.test", signing = false)
+        val bccWithCert = identity("hidden@example.test", signing = false)
+        val noSelfCopy = runCatching {
+            engine.build(
+                mail(), SmimeMode.ENCRYPT,
+                recipientCertificates = listOf(recipientWithCert.recipient(), ccWithCert.recipient(), bccWithCert.recipient()),
+            )
+        }.exceptionOrNull() as SmimeProtectionException
+        assertEquals(SmimeFailure.SENDER_DECRYPTION_CERTIFICATE_REQUIRED, noSelfCopy.failure)
 
         val recipient = identity("alice@example.test", signing = false)
         val unknownRevocation = SmimeEngine(certificatePolicy = object : SmimeCertificatePolicy {

@@ -65,7 +65,9 @@ enum class SmimeFailure {
     RECIPIENT_CERTIFICATE_AMBIGUOUS,
     RECIPIENT_CERTIFICATE_REJECTED,
     RECIPIENT_REVOCATION_UNKNOWN,
+    SENDER_DECRYPTION_CERTIFICATE_REQUIRED,
     UNSUPPORTED_CERTIFICATE_KEY,
+    WEAK_CONTENT_ENCRYPTION,
     INVALID_CMS,
     NO_SIGNATURE,
     SIGNATURE_CERTIFICATE_MISSING,
@@ -139,7 +141,11 @@ class SmimeEngine(
             address.email to cert
         } else emptyList()
 
-        val selfCertificate = if (encrypting) senderDecryptionCertificate?.also {
+        val selfCertificate = if (encrypting) (senderDecryptionCertificate
+            ?: throw SmimeProtectionException(
+                SmimeFailure.SENDER_DECRYPTION_CERTIFICATE_REQUIRED,
+                "A sender decryption certificate is required to encrypt a sent copy",
+            )).also {
             requireTrusted(it, mail.from.email, SmimeCertificateUse.ENCRYPTION, signer = false)
             requireKeyUsage(it, SmimeCertificateUse.ENCRYPTION)
             ensureSupportedRecipientKey(it)
@@ -208,6 +214,8 @@ class SmimeEngine(
     /** Decrypts only after a caller-selected private identity matches a CMS recipient. */
     fun decrypt(envelopedData: ByteArray, identity: SmimeDecryptionIdentity): ByteArray = try {
         cms.decrypt(envelopedData, identity)
+    } catch (e: SmimeProtectionException) {
+        throw e
     } catch (e: Exception) {
         throw SmimeProtectionException(SmimeFailure.INVALID_CMS, "The S/MIME envelope could not be decrypted", e)
     }
@@ -220,7 +228,9 @@ class SmimeEngine(
         )
         val contentType = jakarta.mail.internet.ContentType(message.contentType)
         require(contentType.baseType.equals("application/pkcs7-mime", ignoreCase = true)) { "Expected application/pkcs7-mime" }
-        require(contentType.getParameter("smime-type").equals("enveloped-data", ignoreCase = true)) { "Expected enveloped-data" }
+        val smimeType = contentType.getParameter("smime-type")
+        require(smimeType.equals("enveloped-data", ignoreCase = true) ||
+            smimeType.equals("auth-enveloped-data", ignoreCase = true)) { "Expected enveloped-data or auth-enveloped-data" }
         decrypt(message.inputStream.use { it.readBytes() }, identity)
     } catch (e: SmimeProtectionException) {
         throw e
