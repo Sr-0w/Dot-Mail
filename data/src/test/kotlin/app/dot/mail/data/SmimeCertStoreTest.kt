@@ -121,4 +121,38 @@ class SmimeCertStoreTest {
         graph.removeAccount(a)
         assertTrue(db.mail().smimeCerts(a, "alice@example.org").isEmpty())
     }
+
+    @Test fun theIntermediatesAreStoredWithTheLeafAndReturnedLeafFirst() = runBlocking<Unit> {
+        val a = account()
+        val leaf = cert("chain-leaf"); val inter = cert("chain-intermediate")
+        assertTrue(store.collect(a, "carol@example.org", leaf, true, intermediates = listOf(leaf, inter, inter, cert("alice-san")))) // leaf and duplicates are dropped
+        val chain = store.candidateChains(a, "carol@example.org").single()
+        assertEquals(leaf, chain.leaf)
+        assertEquals(listOf(inter, cert("alice-san")), chain.chain.drop(1))
+        assertEquals(leaf, chain.chain.first())
+        // The leaf still verifies against the stored intermediate: this is what PKIX path building needs.
+        leaf.verify(inter.publicKey)
+    }
+
+    @Test fun aLaterMessageMayAddMissingIntermediatesButNeverEraseThem() = runBlocking<Unit> {
+        val a = account()
+        val leaf = cert("chain-leaf"); val inter = cert("chain-intermediate")
+        store.collect(a, "carol@example.org", leaf, true) // first message carried no chain
+        assertTrue(store.candidateChains(a, "carol@example.org").single().intermediates.isEmpty())
+        store.collect(a, "carol@example.org", leaf, true, intermediates = listOf(inter))
+        assertEquals(listOf(inter), store.candidateChains(a, "carol@example.org").single().intermediates)
+        store.collect(a, "carol@example.org", leaf, true) // a later one without a chain
+        assertEquals(listOf(inter), store.candidateChains(a, "carol@example.org").single().intermediates)
+    }
+
+    @Test fun theStoredChainIsCapped() {
+        val leaf = cert("chain-leaf")
+        val many = List(20) { cert("alice-san") } // identical -> deduplicated to one
+        assertEquals(1, SmimeCertStore.decodeChain(SmimeCertStore.encodeChain(leaf, many)).size)
+        val distinct = listOf("alice-san", "alice-san-2", "bob-subject-only", "mallory", "expired", "future", "chain-intermediate").map(::cert)
+        assertEquals(distinct.size, SmimeCertStore.decodeChain(SmimeCertStore.encodeChain(leaf, distinct)).size)
+        assertTrue(SmimeCertStore.decodeChain(SmimeCertStore.encodeChain(leaf, distinct + distinct)).size <= SmimeCertStore.MAX_CHAIN_CERTS)
+        assertNull(SmimeCertStore.encodeChain(leaf, listOf(leaf)))
+        assertTrue(SmimeCertStore.decodeChain(byteArrayOf(0, 0, 0, 99, 1)).isEmpty()) // truncated/corrupt data is ignored
+    }
 }

@@ -43,7 +43,7 @@ class SmimeMigrationTest {
             assertEquals("ciphertext", upgraded.mail().account(1)!!.secret)
             assertEquals("friend@example.org", upgraded.mail().contacts("friend", 10).single().email)
             assertTrue(upgraded.mail().smimeCerts(1, "a@example.org").isEmpty())
-            upgraded.mail().putSmimeCert(SmimeRecipientCertRow(1, "a@example.org", "ab".repeat(32), byteArrayOf(1, 2), "CN=A", "CN=CA", 1, 2, 3, 3, "MANUAL", "ACTIVE", false))
+            upgraded.mail().putSmimeCert(SmimeRecipientCertRow(1, "a@example.org", "ab".repeat(32), byteArrayOf(1, 2), "CN=A", "CN=CA", 1, 2, 3, 3, "MANUAL", "ACTIVE", false, null))
             assertEquals(1, upgraded.mail().smimeCerts(1, "a@example.org").size)
             upgraded.mail().deleteAccount(1) // cascades
             assertTrue(upgraded.mail().smimeCerts(1, "a@example.org").isEmpty())

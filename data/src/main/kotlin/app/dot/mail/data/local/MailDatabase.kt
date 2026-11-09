@@ -55,6 +55,7 @@ interface MailDao {
     @Query("SELECT * FROM smime_recipient_certs WHERE accountId=:account AND state='ACTIVE' ORDER BY mailbox, pinned DESC, notAfter DESC, fingerprint") fun smimeCertsFlow(account: Long): kotlinx.coroutines.flow.Flow<List<SmimeRecipientCertRow>>
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putSmimeCert(row: SmimeRecipientCertRow)
     @Query("UPDATE smime_recipient_certs SET lastSeen=:seen WHERE accountId=:account AND mailbox=:mailbox AND fingerprint=:fingerprint") suspend fun touchSmimeCert(account: Long, mailbox: String, fingerprint: String, seen: Long)
+    @Query("UPDATE smime_recipient_certs SET chainDer=:chain WHERE accountId=:account AND mailbox=:mailbox AND fingerprint=:fingerprint") suspend fun setSmimeChain(account: Long, mailbox: String, fingerprint: String, chain: ByteArray?)
     @Query("UPDATE smime_recipient_certs SET pinned=0 WHERE accountId=:account AND mailbox=:mailbox") suspend fun unpinSmimeCerts(account: Long, mailbox: String)
     @Query("UPDATE smime_recipient_certs SET pinned=:pinned WHERE accountId=:account AND mailbox=:mailbox AND fingerprint=:fingerprint AND state='ACTIVE'") suspend fun pinSmimeCert(account: Long, mailbox: String, fingerprint: String, pinned: Boolean): Int
     @Query("UPDATE smime_recipient_certs SET state='IGNORED', pinned=0 WHERE accountId=:account AND mailbox=:mailbox AND fingerprint=:fingerprint") suspend fun ignoreSmimeCert(account: Long, mailbox: String, fingerprint: String): Int
@@ -270,6 +271,8 @@ class SmimeRecipientCertRow(
     val accountId: Long, val mailbox: String, val fingerprint: String, val der: ByteArray,
     val subject: String, val issuer: String, val notBefore: Long, val notAfter: Long,
     val firstSeen: Long, val lastSeen: Long, val source: String, val state: String, val pinned: Boolean,
+    /** Intermediate certificates that came with it (length-prefixed DER, leaf excluded), so path building works for CA-issued certificates. */
+    val chainDer: ByteArray? = null,
 )
 @Database(entities = [AccountRow::class, FolderRow::class, ThreadRow::class, ThreadKeyRow::class, MessageRow::class, AttachmentRow::class, DraftRow::class, OutboxRow::class, OperationRow::class, ContactRow::class, BodyTextRow::class, SearchMatchRow::class, SnoozeRow::class, DraftMirrorRow::class, SearchDocumentRow::class, MessageFtsRow::class, SearchPendingRow::class, CacheAccessRow::class, OfflineFolderRow::class, MessageSenderRow::class, DeviceContactRow::class, DeviceContactStateRow::class, ThreadRepairRow::class, RepairMuteRow::class, SmimeRecipientCertRow::class], version = 11, exportSchema = true)
 abstract class MailDatabase : RoomDatabase() { abstract fun mail(): MailDao }
@@ -368,7 +371,7 @@ internal val MIGRATION_9_10 = object : androidx.room.migration.Migration(9,10) {
 /** New table only: nothing existing is touched. */
 internal val MIGRATION_10_11 = object : androidx.room.migration.Migration(10, 11) {
     override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
-        db.execSQL("CREATE TABLE IF NOT EXISTS `smime_recipient_certs` (`accountId` INTEGER NOT NULL, `mailbox` TEXT NOT NULL, `fingerprint` TEXT NOT NULL, `der` BLOB NOT NULL, `subject` TEXT NOT NULL, `issuer` TEXT NOT NULL, `notBefore` INTEGER NOT NULL, `notAfter` INTEGER NOT NULL, `firstSeen` INTEGER NOT NULL, `lastSeen` INTEGER NOT NULL, `source` TEXT NOT NULL, `state` TEXT NOT NULL, `pinned` INTEGER NOT NULL, PRIMARY KEY(`accountId`, `mailbox`, `fingerprint`), FOREIGN KEY(`accountId`) REFERENCES `accounts`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
+        db.execSQL("CREATE TABLE IF NOT EXISTS `smime_recipient_certs` (`accountId` INTEGER NOT NULL, `mailbox` TEXT NOT NULL, `fingerprint` TEXT NOT NULL, `der` BLOB NOT NULL, `subject` TEXT NOT NULL, `issuer` TEXT NOT NULL, `notBefore` INTEGER NOT NULL, `notAfter` INTEGER NOT NULL, `firstSeen` INTEGER NOT NULL, `lastSeen` INTEGER NOT NULL, `source` TEXT NOT NULL, `state` TEXT NOT NULL, `pinned` INTEGER NOT NULL, `chainDer` BLOB, PRIMARY KEY(`accountId`, `mailbox`, `fingerprint`), FOREIGN KEY(`accountId`) REFERENCES `accounts`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_smime_recipient_certs_accountId_mailbox` ON `smime_recipient_certs` (`accountId`, `mailbox`)")
     }
 }
