@@ -438,9 +438,9 @@ fun ThreadScreen(
     val readerBackdrop = app.dot.design.components.rememberGlassBackdrop()
     // HTML bodies are captured too (the frosted top on every mail). Whenever a message WebView is torn down (Back, scrolled
     // out of the list, theme flip, next conversation) the recording is dropped first via LocalBeforeWebViewRelease, so the
-    // retained layer never replays a destroyed WebView's draw functor.
+    // retained layer never replays a destroyed WebView's draw functor. See [glassCanCapture] for the FR-21 switch.
     val density = androidx.compose.ui.platform.LocalDensity.current
-    val glass = readerBackdrop.takeIf { list != null }
+    val glass = readerBackdrop.takeIf { glassCanCapture(list) }
     Box(
         Modifier.fillMaxSize().background(c.background)
             .focusRequester(keyFocus).focusable()
@@ -1198,6 +1198,17 @@ internal object SwipeGuard {
         return if (quick && horizontal) dx < 0 else null
     }
 }
+
+/** FR-21 switch: record WebView content into the frosted backdrop. Flip to false if the device shows blank/black tiles in HTML mail. */
+internal const val CAPTURE_HTML_IN_BACKDROP = true
+
+/**
+ * Whether the reader body may be recorded into the glass backdrop. Plain-text mail always can. HTML (and bodies still
+ * loading, which may turn out to be HTML) only when [captureHtml]: a WebView draws through a GPU functor, and replaying
+ * it from a retained layer is the prime suspect for blank/black tiles while scrolling image-heavy mail.
+ */
+internal fun glassCanCapture(messages: List<Message>?, captureHtml: Boolean = CAPTURE_HTML_IN_BACKDROP): Boolean =
+    messages != null && (captureHtml || messages.all { message -> message.body?.let { it.html.isNullOrBlank() } == true })
 
 
 /**

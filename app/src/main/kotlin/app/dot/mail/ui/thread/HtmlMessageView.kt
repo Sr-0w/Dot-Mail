@@ -107,6 +107,7 @@ fun HtmlMessageView(
                     // Some WebView builds report the feature but throw when it is used: never let that end the reader.
                     runCatching { WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, dark) }
                 }
+                configureForTallContent(this)
                 webViewClient = SafeClient(allowRemote, inlineUris, ctx.contentResolver, linkHandler, ctx.resources)
                 tag = null
             }
@@ -130,6 +131,19 @@ fun HtmlMessageView(
     )
     }
     }
+}
+
+/**
+ * The WebView is as tall as the whole message (it sits inside the reader's own scroll), so image-heavy mail is several
+ * screens tall. Keep Chromium rastering tiles beyond the viewport, never force a software/hardware layer on it (a layer
+ * that size exceeds the GPU texture limit and renders black) and never let it overscroll on its own (vertical scrolling stays nested into the reader).
+ */
+internal fun configureForTallContent(web: WebView) {
+    runCatching {
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.OFF_SCREEN_PRERASTER)) WebSettingsCompat.setOffscreenPreRaster(web.settings, true)
+    }
+    web.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
+    web.overScrollMode = android.view.View.OVER_SCROLL_NEVER
 }
 
 /**
