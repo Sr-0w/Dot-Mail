@@ -35,10 +35,13 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
 - **FR-21 · P1 · Severe HTML email flicker / blanking while scrolling** — real-device regression (S25 Ultra, image-heavy
   mail such as AliExpress): large areas disappear to black/blank and reappear while header and floating buttons stay.
   Photosensitivity and usability issue, not cosmetic.
-  - [ ] No flicker, disappearing content, layout jumps or unstable rendering while scrolling, including with floating
-    headers and the top blur
-  - [ ] Verified on device with long image-heavy mails, fast/slow and repeated scrolling (not from screenshots or unit tests)
-  - Evidence: none yet. Related: FR-54 (top blur flicker).
+  - [x] No flicker, disappearing content, layout jumps or unstable rendering while scrolling, including with floating
+    headers and the top blur (#78 unlayered WebView placement + tall-content setup; #81 keeps `overflow`/`text-overflow`
+    so nowrap product titles no longer widen the AliExpress layout)
+  - [x] Verified on device (S25 Ultra, AliExpress mail, liquid-glass top band on): screen recording of fast, slow and
+    reverse scrolling, every frame checked — no black/blank tiles; the per-frame black fraction stays flat (only the
+    mail's own dark background)
+  - Evidence: #78, #81. Keep open for the owner's own daily-use confirmation. Related: FR-54 (top blur flicker).
 - **FR-22 · P1 · Android system Back crashes when leaving an open email** — repro on S25 Ultra: open a message, press
   Back/gesture; the app crashes instead of returning.
   - [ ] Real stack trace/logcat captured and inspected; root cause fixed
