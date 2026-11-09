@@ -1,7 +1,11 @@
 package app.dot.mail.engine
 
 import jakarta.mail.internet.MimeMessage
+import jakarta.mail.internet.MimeBodyPart
+import jakarta.mail.internet.ContentType
+import jakarta.mail.Session
 import java.io.ByteArrayOutputStream
+import java.io.ByteArrayInputStream
 import java.security.SecureRandom
 import java.util.Base64
 import java.util.Properties
@@ -25,6 +29,44 @@ internal object SmimeMime {
         out.write(Base64.getMimeEncoder(64, crlf.toByteArray(Charsets.US_ASCII)).encode(cms))
         out.write(crlf.toByteArray(Charsets.US_ASCII))
         return out.toByteArray()
+    }
+
+    /** Extracts the signed entity as transmitted; parsing and reserializing it would invalidate valid signatures. */
+    fun detachedParts(messageBytes: ByteArray): Pair<ByteArray, ByteArray> {
+        val message = MimeMessage(Session.getInstance(Properties()), messageBytes.inputStream())
+        val contentType = ContentType(message.contentType)
+        require(contentType.baseType.equals("multipart/signed", ignoreCase = true)) { "Expected multipart/signed" }
+        require(contentType.getParameter("protocol").equals("application/pkcs7-signature", ignoreCase = true) ||
+            contentType.getParameter("protocol").equals("application/x-pkcs7-signature", ignoreCase = true)) {
+            "Expected an S/MIME detached signature"
+        }
+        val boundary = contentType.getParameter("boundary")?.takeIf { it.isNotEmpty() }
+            ?: error("multipart/signed has no boundary")
+        val raw = String(messageBytes, Charsets.ISO_8859_1)
+        val headersEnd = raw.indexOf("\r\n\r\n")
+        require(headersEnd >= 0) { "MIME message has no header/body separator" }
+        val bodyStart = headersEnd + 4
+        val firstBoundary = "--$boundary\r\n"
+        val firstAt = raw.indexOf(firstBoundary, bodyStart)
+        require(firstAt >= 0) { "First signed MIME boundary is missing" }
+        val entityStart = firstAt + firstBoundary.length
+        val nextPartDelimiter = "\r\n--$boundary\r\n"
+        val secondAt = raw.indexOf(nextPartDelimiter, entityStart)
+        require(secondAt >= entityStart) { "Detached signature MIME part is missing" }
+        val signaturePartStart = secondAt + nextPartDelimiter.length
+        val closing = "\r\n--$boundary--"
+        val closingAt = raw.indexOf(closing, signaturePartStart)
+        require(closingAt >= signaturePartStart) { "Closing signed MIME boundary is missing" }
+
+        val entity = raw.substring(entityStart, secondAt).toByteArray(Charsets.ISO_8859_1)
+        val signaturePart = raw.substring(signaturePartStart, closingAt).toByteArray(Charsets.ISO_8859_1)
+        val parsedSignature = MimeBodyPart(ByteArrayInputStream(signaturePart))
+        val signatureType = ContentType(parsedSignature.contentType).baseType
+        require(signatureType.equals("application/pkcs7-signature", ignoreCase = true) ||
+            signatureType.equals("application/x-pkcs7-signature", ignoreCase = true)) {
+            "Second signed MIME part is not a PKCS#7 signature"
+        }
+        return entity to parsedSignature.inputStream.use { it.readBytes() }
     }
 
     /** Returns a complete multipart/signed MIME entity, suitable for nesting inside EnvelopedData. */

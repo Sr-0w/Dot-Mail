@@ -15,7 +15,7 @@ sealed interface SmimeCertificateVerdict {
     data class Rejected(val reason: String) : SmimeCertificateVerdict
 }
 
-fun interface SmimeCertificatePolicy {
+interface SmimeCertificatePolicy {
     fun validate(certificate: X509Certificate, mailbox: String, use: SmimeCertificateUse): SmimeCertificateVerdict
 
     /** Chain material is evidence for path building, never itself a trust anchor. */
@@ -23,8 +23,7 @@ fun interface SmimeCertificatePolicy {
         certificates: Collection<X509Certificate>,
         mailbox: String,
         use: SmimeCertificateUse,
-    ): SmimeCertificateVerdict = certificates.firstOrNull()?.let { validate(it, mailbox, use) }
-        ?: SmimeCertificateVerdict.Rejected("Certificate chain is empty")
+    ): SmimeCertificateVerdict = SmimeCertificateVerdict.Rejected("Certificate-chain validation is not configured")
 }
 
 data class SmimeSigningIdentity(
@@ -63,6 +62,7 @@ enum class SmimeFailure {
     SIGNER_CERTIFICATE_REJECTED,
     SIGNER_REVOCATION_UNKNOWN,
     RECIPIENT_CERTIFICATE_MISSING,
+    RECIPIENT_CERTIFICATE_AMBIGUOUS,
     RECIPIENT_CERTIFICATE_REJECTED,
     RECIPIENT_REVOCATION_UNKNOWN,
     UNSUPPORTED_CERTIFICATE_KEY,
@@ -124,9 +124,13 @@ class SmimeEngine(
         val recipientCerts = if (encrypting) recipients.map { address ->
             val email = normalize(address.email)
             val matches = certByMailbox[email].orEmpty().distinctBy { it.certificate.serialNumber to it.certificate.issuerX500Principal }
-            if (matches.size != 1) throw SmimeProtectionException(
+            if (matches.isEmpty()) throw SmimeProtectionException(
                 SmimeFailure.RECIPIENT_CERTIFICATE_MISSING,
-                if (matches.isEmpty()) "No unambiguous encryption certificate is available for ${address.email}" else "More than one encryption certificate matches ${address.email}",
+                "No encryption certificate is available for ${address.email}",
+            )
+            if (matches.size > 1) throw SmimeProtectionException(
+                SmimeFailure.RECIPIENT_CERTIFICATE_AMBIGUOUS,
+                "More than one encryption certificate matches ${address.email}",
             )
             val cert = matches.single().certificate
             requireTrusted(cert, address.email, SmimeCertificateUse.ENCRYPTION, signer = false)
@@ -185,11 +189,43 @@ class SmimeEngine(
         })
     }
 
+    /** Parses a detached S/MIME multipart/signed message before checking CMS integrity and certificate trust. */
+    fun verifySignedMime(
+        messageBytes: ByteArray,
+        expectedSignerMailbox: String,
+        certificateCandidates: Collection<X509Certificate> = emptyList(),
+    ): SmimeVerification = try {
+        // Keep the first MIME entity byte-for-byte. JavaMail's parsed part serialization can
+        // normalize headers/folding and thereby break signatures produced by other clients.
+        val (entity, signature) = SmimeMime.detachedParts(messageBytes)
+        verifyDetached(entity, signature, expectedSignerMailbox, certificateCandidates)
+    } catch (e: SmimeProtectionException) {
+        throw e
+    } catch (e: Exception) {
+        throw SmimeProtectionException(SmimeFailure.INVALID_CMS, "The S/MIME signed MIME message is malformed", e)
+    }
+
     /** Decrypts only after a caller-selected private identity matches a CMS recipient. */
     fun decrypt(envelopedData: ByteArray, identity: SmimeDecryptionIdentity): ByteArray = try {
         cms.decrypt(envelopedData, identity)
     } catch (e: Exception) {
         throw SmimeProtectionException(SmimeFailure.INVALID_CMS, "The S/MIME envelope could not be decrypted", e)
+    }
+
+    /** Parses the standard application/pkcs7-mime enveloped-data wrapper, then decrypts its CMS object. */
+    fun decryptMime(messageBytes: ByteArray, identity: SmimeDecryptionIdentity): ByteArray = try {
+        val message = jakarta.mail.internet.MimeMessage(
+            jakarta.mail.Session.getInstance(java.util.Properties()),
+            messageBytes.inputStream(),
+        )
+        val contentType = jakarta.mail.internet.ContentType(message.contentType)
+        require(contentType.baseType.equals("application/pkcs7-mime", ignoreCase = true)) { "Expected application/pkcs7-mime" }
+        require(contentType.getParameter("smime-type").equals("enveloped-data", ignoreCase = true)) { "Expected enveloped-data" }
+        decrypt(message.inputStream.use { it.readBytes() }, identity)
+    } catch (e: SmimeProtectionException) {
+        throw e
+    } catch (e: Exception) {
+        throw SmimeProtectionException(SmimeFailure.INVALID_CMS, "The S/MIME encrypted MIME message is malformed", e)
     }
 
     private fun requireTrusted(
@@ -252,4 +288,5 @@ class SmimeEngine(
     }
 
     private fun normalize(mailbox: String) = mailbox.trim().lowercase(java.util.Locale.ROOT)
+
 }
