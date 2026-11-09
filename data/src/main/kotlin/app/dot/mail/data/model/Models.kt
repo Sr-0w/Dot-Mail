@@ -16,6 +16,8 @@ data class Account(
     val syncState: SyncState = SyncState.Idle,
     /** When the last *complete, error-free* sync of this account finished; 0 = never. Persisted across restarts. */
     val lastSyncedAt: Long = 0L,
+    /** S/MIME key references (Android KeyChain aliases) and protection defaults; disabled when empty. */
+    val smime: SmimeAccountConfig = SmimeAccountConfig(),
 )
 
 data class Identity(
