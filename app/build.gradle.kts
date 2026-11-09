@@ -1,3 +1,5 @@
+import java.security.MessageDigest
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -75,3 +77,26 @@ kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarg
 tasks.withType<Test>().configureEach {
     systemProperty("dotmail.storeShots", providers.gradleProperty("dotmail.storeShots").orElse("false").get())
 }
+
+// Persisted notices must cover the exact resolved release graph, including platform constraints.
+val verifyReleaseNotices by tasks.registering {
+    val inventory = layout.projectDirectory.file("src/main/assets/third-party-components.json")
+    val bundle = layout.projectDirectory.file("src/main/assets/third-party-notices.txt")
+    inputs.files(inventory, bundle)
+    // Resolve each invocation so a new transitive dependency cannot reuse an old up-to-date result.
+    outputs.upToDateWhen { false }
+    doLast {
+        val manifest = groovy.json.JsonSlurper().parse(inventory.asFile) as Map<*, *>
+        val documented = (manifest["components"] as Map<*, *>).keys.map { it.toString() }.toSet()
+        val resolved = configurations.getByName("releaseRuntimeClasspath").incoming.resolutionResult.allComponents
+            .mapNotNull { it.id as? org.gradle.api.artifacts.component.ModuleComponentIdentifier }
+            .map { "${it.group}:${it.module}:${it.version}" }.toSet()
+        check(resolved == documented) {
+            "Release notices out of date. Missing: ${resolved - documented}; stale: ${documented - resolved}. See docs/THIRD_PARTY_NOTICES.md"
+        }
+        val hash = MessageDigest.getInstance("SHA-256").digest(bundle.asFile.readBytes())
+            .joinToString("") { "%02x".format(it) }
+        check(hash == manifest["bundle_sha256"]) { "Notices bundle hash differs from reviewed inventory" }
+    }
+}
+tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(verifyReleaseNotices) }

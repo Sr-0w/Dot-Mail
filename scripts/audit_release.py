@@ -77,6 +77,15 @@ def inspect(apk, mapping, manifest):
     classes = set(); constructors = {}; providers = set(); native = {}
     with zipfile.ZipFile(apk) as archive:
         assert "AndroidManifest.xml" in archive.namelist()
+        import hashlib
+        notice_bytes = archive.read("assets/third-party-notices.txt")
+        notice_manifest = json.loads(archive.read("assets/third-party-components.json"))
+        assert hashlib.sha256(notice_bytes).hexdigest() == notice_manifest["bundle_sha256"], "Bundled notices hash mismatch"
+        notice_text = notice_bytes.decode("utf-8")
+        for coordinate in notice_manifest["components"]:
+            assert coordinate in notice_text, "Missing bundled component: " + coordinate
+        assert "SIL OPEN FONT LICENSE Version 1.1" in notice_text
+        assert "Copyright (c) 2016 The Inter Project Authors" in notice_text
         for name in archive.namelist():
             if re.fullmatch(r"classes\d*\.dex", name):
                 found, ctors = dex_types_and_constructors(archive.read(name)); classes |= found; constructors.update(ctors)
@@ -101,6 +110,8 @@ def inspect(apk, mapping, manifest):
     descriptor = lambda name: "L" + name.replace(".", "/") + ";"
     for name in providers:
         assert descriptor(name) in classes, f"Missing service/mailcap provider: {name}"
+        expected = ["Ljakarta/mail/Session;", "Ljakarta/mail/URLName;"] if name.endswith(("Store", "Transport")) else []
+        assert any(c["public"] and c["parameters"] == expected for c in constructors.get(descriptor(name), [])), f"Provider reflection constructor missing: {name}"
     workers = {name: target for name, target in renamed.items() if name.startswith("app.dot.mail.") and name.endswith("Worker")}
     required = ("SyncWorker", "OutboxWorker", "SnoozeWorker", "DraftMirrorWorker", "SnippetRepairWorker", "SearchIndexWorker", "OfflineWorker", "StorageCleanupWorker", "ThreadRepairWorker", "WidgetRefreshWorker")
     for suffix in required:
@@ -114,7 +125,13 @@ def inspect(apk, mapping, manifest):
             assert descriptor(item["name"]) in classes, f"Manifest component missing: {item['name']}"
     for name in ("app.dot.mail.data.local.MailDatabase", "app.dot.mail.data.local.MailDatabase_Impl"):
         assert renamed.get(name) == name and descriptor(name) in classes, f"Room reflection name missing: {name}"
-    return {"workers": workers, "manifest_components": components, "provider_classes": sorted(providers), "native_elf_load_alignments": native,
+    serializers = {}
+    for route in ("AddAccountRoute", "ComposeRoute", "SearchRoute", "ThreadRoute"):
+        original = "app.dot.mail.ui." + route + "$$serializer"
+        target = renamed.get(original)
+        assert target and descriptor(target) in classes, "Missing navigation serializer: " + original
+        serializers[original] = target
+    return {"navigation_serializers": serializers, "bundled_notice_components": len(notice_manifest["components"]), "notices_sha256": notice_manifest["bundle_sha256"], "workers": workers, "manifest_components": components, "provider_classes": sorted(providers), "native_elf_load_alignments": native,
             "scope": "Static shrunk-artifact inspection; does not replace signed-device smoke or provider interoperability tests."}
 
 

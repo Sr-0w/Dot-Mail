@@ -10,7 +10,7 @@ TAG=${1:?tag like v0.1.0-alpha.2}; PRE=${2:-}
 ROOT=$(cd "$(dirname "$0")/.." && pwd); HOST=${BUILD_HOST:-srobin@192.168.0.232}
 REPO=${DOTMAIL_REPO:-https://github.com/Sr-0w/Dot-Mail.git}
 cd "$ROOT"
-[ -z "$(git status --porcelain --untracked-files=no)" ] || { echo "working tree not clean"; exit 1; }
+[ -z "$(git status --porcelain)" ] || { echo "working tree not clean"; exit 1; }
 git fetch -q origin
 [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || { echo "HEAD is not origin/main — push or pull first"; exit 1; }
 

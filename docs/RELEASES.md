@@ -16,9 +16,11 @@ Read the exact tag before rebuilding. At this candidate the pins are:
 | Build Tools | 36.0.0; Gradle and signing/alignment tooling agree |
 | Dependencies | Exact catalog versions plus module declarations; no dynamic version policy introduced |
 | R8 | Minification and resource shrinking enabled, with committed rules and upstream consumer rules |
-| OAuth | Public Google/Microsoft client-ID build properties must match the target binary; absence changes BuildConfig and redirect scheme |
+| OAuth | Public client-ID properties must match the target binary; absence changes BuildConfig/redirect scheme. First release: Gmail Testing only; Microsoft OAuth excluded |
 
 Keep SDK platform revisions, JDK and public OAuth inputs consistent when comparing builds. No signing password is a build input. Do not dump the host's Gradle properties or environment into a report.
+
+Gmail OAuth remains in Google Testing mode (listed test users only, 7-day grants) until restricted-scope verification. Where permitted by the account, a Gmail app password supports IMAP/SMTP instead. Microsoft/Outlook OAuth is excluded from the first release.
 
 Release Gradle builds now produce `app-release-unsigned.apk`. Developer builds still use their normal debug signing. The published project APK is signed externally; an F-Droid channel may use its own key. Different certificate identities are different Android update channels: never overwrite the owner's installation or recommend clearing its data as part of a release check.
 
@@ -46,7 +48,7 @@ AGP can embed VCS information by default. Preserve the same clean commit in both
 
 1. Choose the next versionName/versionCode and update Gradle. Current alpha.2's code is already published; do not reuse it for a new release.
 2. Review CHANGELOG.md's Unreleased section, then copy the reviewed localized notes from docs/releases/next into `fastlane/metadata/android/<locale>/changelogs/<versionCode>.txt` (at most 500 characters). Preserve historical notes.
-3. Run scripts/validate_store_metadata.py and the relevant scripts/gw checks, including release/R8. Use demo fixtures only for screenshots.
+3. Run scripts/validate_store_metadata.py and the relevant scripts/gw checks, including release/R8 and verifyReleaseNotices. Review/regenerate the bundled third-party notices when dependencies change (THIRD_PARTY_NOTICES.md). Use demo fixtures only for screenshots.
 4. Commit and merge the exact candidate, then rebuild/compare the final tagged source. A PR's earlier reproducibility result does not attest a later squash commit or different OAuth configuration.
 5. Follow [SIGNING.md](SIGNING.md). `scripts/release.sh <tag> [--prerelease]` is a publishing command: it checks version/tag state, runs tests, pushes a tag, builds from a fresh clone, aligns/verifies and signs externally, checks the public certificate, then uploads assets. It is never a readiness test or PR hook.
 6. Have the lead perform the approved signed-release device smoke checks. No phone installation is performed by the audit tooling.

@@ -4,7 +4,7 @@ The project already has an external signing identity. Its **public** SHA-256 cer
 
 ## Separation from compilation
 
-`scripts/gw :app:assembleRelease` builds an unsigned R8 payload. It cannot access a project signing password through Gradle configuration. Use the debug build for ordinary developer installs; signing the release payload is an explicit maintainer step after compilation and review.
+`scripts/gw :app:assembleRelease` builds an unsigned R8 payload. The project build scripts do not load the external signing environment or request a project signing password. Use the debug build for ordinary developer installs; signing the release payload is an explicit maintainer step after compilation and review.
 
 `scripts/release.sh` uses the existing host's external signing configuration only after Gradle exits. The trusted private environment supplies DOTMAIL_KEYSTORE (absolute external path), DOTMAIL_KEY_ALIAS, DOTMAIL_KEYSTORE_PASSWORD and, if different, DOTMAIL_KEY_PASSWORD. Keep that file owner-readable only (0600), outside the source/build worktrees, and load it with shell tracing disabled. Supply passwords through the signer's environment indirection, not command-line values. Do not paste their contents into a terminal log or ask an agent to inspect them.
 

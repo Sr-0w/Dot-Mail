@@ -55,6 +55,9 @@ build() {
     fi
     [ -f "$apk" ] || { echo 'Release APK missing' >&2; exit 1; }
     cp "$apk" "$work/artifacts/$name.apk"
+    cp app/build/outputs/mapping/release/mapping.txt "$work/artifacts/$name-mapping.txt"
+    cp app/build/outputs/mapping/release/configuration.txt "$work/artifacts/$name-r8-configuration.txt"
+    "$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" manifest print "$apk" > "$work/artifacts/$name-manifest.xml"
     cp app/build/outputs/apk/release/output-metadata.json "$work/artifacts/$name-metadata.json"
     cp gradle/wrapper/gradle-wrapper.properties "$work/artifacts/gradle-wrapper.properties"
     cp gradle/libs.versions.toml "$work/artifacts/libs.versions.toml"

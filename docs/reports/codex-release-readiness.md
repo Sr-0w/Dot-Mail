@@ -1,6 +1,6 @@
 # Release readiness audit
 
-Status: in progress on codex/release-readiness. No tag, release publication, signature operation, private signing-file read or phone access is authorized/performed by this audit. Base UI/runtime source: main a9313d6. The JMAP core-table migration remains explicitly deferred after release (reference proposal in PR #80).
+Status: in progress on codex/release-readiness. No tag, release publication, signature operation, private signing-file read or phone access was performed by this audit. Initial UI capture source: main a9313d6; runtime audit rebased onto b1c2486, then documentation decision #86 (9cf2ea3). The JMAP core-table migration remains explicitly deferred after release (reference proposal in PR #80).
 
 ## Changes prepared
 
@@ -12,14 +12,22 @@ Status: in progress on codex/release-readiness. No tag, release publication, sig
 - Nine current native UI captures use only DemoMailGraph in isolated Robolectric Application contexts (EN/FR/DE, inbox/thread/settings). They are test renders, not device smoke evidence. Provenance and hashes are in fastlane/screenshots.json; validation checks all text lengths, allowed HTML, PNG dimensions and absence of text/EXIF payload metadata.
 - RELEASES.md, SIGNING.md and FDROID.md describe the current toolchain, external signing, exact/diagnostic reproducibility distinction and distribution gates without any secret.
 
-## Validation in progress
+## Third-party notice blocker fixed
 
-- Python APK comparator regression tests: 5 passed.
+The initial inspection found license names in Settings but incomplete texts in the APK (META-INF duplicate exclusions and source-only font license). This was treated as a release blocker. The replacement is generated from all **206 resolved release runtime coordinates**, including transitives/BOMs, and scans binary JAR/AAR contents plus nested JARs. Complete upstream LICENSE/NOTICE/COPYING/COPYRIGHT texts retain source attribution; Apache-2.0 is shared, combined upstream texts remain intact. The bundle additionally carries Inter's copyright/OFL, project GPL and vendored OpenPGP license.
+
+The checked-in assets are opened offline from Settings → Licences; IO runs off the main thread and text uses lazy selectable paragraphs. Every preReleaseBuild verifies exact resolved coordinate coverage and the reviewed bundle hash. Generation refuses undeclared or incomplete non-Apache licenses. Existing META-INF exclusions remain. Details and regeneration: [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md). No new runtime dependency.
+
+## Validation
+
+- Python release tooling regression tests: 9 passed (strict APK comparison and notice generation, including nested AAR notices and refusal of incomplete non-Apache terms).
 - Store metadata validator: all three locales / nine demo images passed.
 - Demo capture fixture: 9 passed via scripts/gw; no real MailGraph or installed app.
 - Shell syntax checks for release/repro scripts passed. The publishing/signing script itself is intentionally not invoked.
-- Full release tests/lint/R8, merged-manifest/reflection/worker retention audit and clean two-build reproducibility: pending.
+- Initial full tests/lint/R8 build passed (5m35s). Rebased full :mail:test / :data:testDebugUnitTest / :app:testDebugUnitTest / :app:lintRelease passed (3m56s): 455 mail tests (5 skipped), 228 data tests (4 skipped), 256 app tests (9 opt-in screenshot tests skipped), zero failures. Skips include live-account tests; no live account used.
+- Initial shrunk artifact inspection passed: 10 persisted workers with unchanged names and public (Context, WorkerParameters) constructors; 24 META-INF service/mailcap/providers with matching DEX class definitions; Room database/implementation names; manifest components and 16-KiB native alignment. New final APK inspection also checks provider reflection constructors, route serializers and bundled notices.
+- Full final notices build/tests, final artifact retention and two-build reproducibility: pending.
 
 ## Release/distribution gates
 
-The next release version/code is a maintainer choice; alpha.2/code 2 is already published. Copy the reviewed next notes into the chosen numeric changelog files before tagging. The final tagged/squashed commit must be rebuilt and checked: a candidate's proof does not attest another commit or OAuth configuration. No F-Droid submission/Binaries claim is made without its own buildserver/signature-copy verification. Provider client registration/consent determines OAuth availability; no unconditional Gmail/Microsoft sign-in claim is made. Signed-device smoke remains lead-owned.
+The next release version/code is a maintainer choice; alpha.2/code 2 is already published. Copy the reviewed next notes into the chosen numeric changelog files before tagging. The final tagged/squashed commit must be rebuilt and checked: a candidate's proof does not attest another commit or OAuth configuration. No F-Droid submission/Binaries claim is made without its own buildserver/signature-copy verification. First-release Microsoft/Outlook OAuth is explicitly excluded per #86. Gmail OAuth is limited to registered Google test users with 7-day grants until restricted-scope verification; app passwords are a fallback only when permitted by the account. Signed-device smoke remains lead-owned.
