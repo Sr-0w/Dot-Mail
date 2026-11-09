@@ -74,8 +74,6 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
 
 ### Account and platform
 
-- **FR-14 · P3 · Optional JMAP support** next to IMAP/SMTP for compatible providers, never mandatory. Planned after storage
-  (Sol).
 - **FR-44b · P3 · S/MIME** — user-owned certificate/key (PKCS#12 or Android KeyChain), sign/encrypt/both for new mail,
   replies and forwards, per-account defaults, per-recipient certificate validation, no silent downgrade, validity info,
   interoperability tests with real S/MIME clients, audited libraries only. Evidence: none; OpenPGP is FR-44a.
@@ -85,6 +83,12 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
 ## In progress
 
 ### Accounts and sync
+
+- **FR-14 · P3 · Optional JMAP support** next to IMAP/SMTP, never mandatory (Sol).
+  - Design approved for the first read-only engine slice: Session/mailbox/query/get/changes behind MailClient;
+    fixture coverage and HTTPS credential boundaries in `docs/reports/codex-jmap-design.md`.
+  - Pending: approved normalized data/remote-identity mapping, opt-in setup, EventSource and submission.
+    No schema or account/UI change in the first engine PR; no live Fastmail check yet.
 
 - **FR-01 · P1 · "Continue with Google" on the first Add account screen** — Google sign-in without IMAP settings or app
   passwords; system browser + PKCE; clear loading/cancel/error states; manual IMAP stays a separate option.

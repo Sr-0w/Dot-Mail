@@ -12,6 +12,7 @@ dependencies {
     implementation("org.eclipse.angus:angus-activation:2.0.3")
     api("jakarta.activation:jakarta.activation-api:2.1.4")
     implementation(libs.jsoup)
+    implementation(libs.kotlinx.serialization.json) // JMAP JSON DOM; Apache-2.0, existing catalog version
     testImplementation(libs.junit)
     testImplementation(libs.truth)
     testImplementation(libs.kotlinx.coroutines.test)

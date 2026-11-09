@@ -1,5 +1,9 @@
 package app.dot.mail.engine
 
+import app.dot.mail.engine.jmap.HttpsJmapTransport
+import app.dot.mail.engine.jmap.JmapClient
+import app.dot.mail.engine.jmap.JmapConfig
+import app.dot.mail.engine.jmap.JmapHttpTransport
 import jakarta.mail.*
 import jakarta.mail.event.MessageCountAdapter
 import jakarta.mail.event.MessageCountEvent
@@ -17,6 +21,13 @@ import kotlin.math.max
 
 /** Each operation owns its connection. No shared selected folder or blocking calls on Main. */
 class MailClient(val timeoutMs: Int = 30_000, private val timing: (String,Long) -> Unit = { _,_ -> }) {
+    /** Explicit opt-in JMAP facade; existing IMAP/SMTP endpoints and accounts are unchanged. */
+    fun jmap(
+        config: JmapConfig,
+        credentials: Credentials,
+        transport: JmapHttpTransport = HttpsJmapTransport(timeoutMs),
+    ): JmapClient = JmapClient(config, credentials, transport)
+
     fun recordTiming(phase:String, millis:Long) { runCatching { timing(phase,millis) } }
     internal fun <T> timed(phase:String, block:()->T): T {
         val start=System.nanoTime()

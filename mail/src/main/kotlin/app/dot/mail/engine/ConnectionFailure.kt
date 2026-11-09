@@ -1,5 +1,7 @@
 package app.dot.mail.engine
 
+import app.dot.mail.engine.jmap.JmapException
+import app.dot.mail.engine.jmap.JmapErrorKind
 import jakarta.mail.AuthenticationFailedException
 import jakarta.mail.MessagingException
 import kotlinx.coroutines.CancellationException
@@ -36,7 +38,10 @@ enum class ConnectionFailure(val transient:Boolean,val humanMessage:String) {
             val chain=chain(error)
             return when {
                 chain.any { it is SSLException || it is CertificateException || it is CertPathBuilderException } -> TLS
-                chain.any { it is AuthenticationFailedException || it.javaClass.simpleName=="ReauthenticationRequired" } -> AUTH
+                chain.any { it is AuthenticationFailedException || it.javaClass.simpleName=="ReauthenticationRequired" || (it as? JmapException)?.kind==JmapErrorKind.AUTH } -> AUTH
+                chain.any { (it as? JmapException)?.kind==JmapErrorKind.RATE_LIMIT } -> THROTTLED
+                chain.any { (it as? JmapException)?.let { error -> error.kind==JmapErrorKind.TRANSIENT && error.status in setOf(408,504) }==true } -> TIMEOUT
+                chain.any { (it as? JmapException)?.kind==JmapErrorKind.TRANSIENT } -> NETWORK
                 chain.any { it is UnknownHostException } -> DNS
                 chain.any { it is SocketTimeoutException || it.javaClass.simpleName=="TimeoutCancellationException" } -> TIMEOUT
                 chain.any { (it.message.orEmpty().lowercase()).let { text -> listOf("throttl","too many","rate limit","connection limit","temporarily unavailable").any(text::contains) } } -> THROTTLED
