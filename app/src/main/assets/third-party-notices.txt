@@ -17,7 +17,6 @@ androidx.autofill:autofill:1.0.0 — The Apache Software License, Version 2.0
 androidx.biometric:biometric:1.1.0 — The Apache Software License, Version 2.0
 androidx.browser:browser:1.8.0 — The Apache Software License, Version 2.0
 androidx.collection:collection-jvm:1.5.0 — The Apache Software License, Version 2.0
-androidx.collection:collection-ktx:1.5.0 — The Apache Software License, Version 2.0
 androidx.compose.animation:animation-android:1.12.1 — The Apache Software License, Version 2.0
 androidx.compose.animation:animation-core-android:1.12.1 — The Apache Software License, Version 2.0
 androidx.compose.foundation:foundation-android:1.12.1 — The Apache Software License, Version 2.0
@@ -60,7 +59,6 @@ androidx.glance:glance-appwidget:1.2.0 — The Apache Software License, Version 
 androidx.glance:glance:1.2.0 — The Apache Software License, Version 2.0
 androidx.graphics:graphics-path:1.0.1 — The Apache Software License, Version 2.0
 androidx.interpolator:interpolator:1.0.0 — The Apache Software License, Version 2.0
-androidx.lifecycle:lifecycle-common-java8:2.11.0 — The Apache Software License, Version 2.0
 androidx.lifecycle:lifecycle-common-jvm:2.11.0 — The Apache Software License, Version 2.0
 androidx.lifecycle:lifecycle-livedata-core-ktx:2.11.0 — The Apache Software License, Version 2.0
 androidx.lifecycle:lifecycle-livedata-core:2.11.0 — The Apache Software License, Version 2.0
@@ -75,7 +73,6 @@ androidx.lifecycle:lifecycle-viewmodel-android:2.11.0 — The Apache Software Li
 androidx.lifecycle:lifecycle-viewmodel-compose-android:2.11.0 — The Apache Software License, Version 2.0
 androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.0 — The Apache Software License, Version 2.0
 androidx.lifecycle:lifecycle-viewmodel-savedstate-android:2.11.0 — The Apache Software License, Version 2.0
-androidx.lifecycle:lifecycle-viewmodel:2.11.0 — The Apache Software License, Version 2.0
 androidx.loader:loader:1.0.0 — The Apache Software License, Version 2.0
 androidx.navigation:navigation-common-android:2.10.2 — The Apache Software License, Version 2.0
 androidx.navigation:navigation-compose-android:2.10.2 — The Apache Software License, Version 2.0
@@ -83,7 +80,6 @@ androidx.navigation:navigation-runtime-android:2.10.2 — The Apache Software Li
 androidx.navigationevent:navigationevent-android:1.1.2 — The Apache Software License, Version 2.0
 androidx.navigationevent:navigationevent-compose-android:1.1.2 — The Apache Software License, Version 2.0
 androidx.paging:paging-common-android:3.5.3 — The Apache Software License, Version 2.0
-androidx.paging:paging-common-ktx:3.5.3 — The Apache Software License, Version 2.0
 androidx.paging:paging-compose-android:3.5.3 — The Apache Software License, Version 2.0
 androidx.paging:paging-runtime-ktx:3.5.3 — The Apache Software License, Version 2.0
 androidx.paging:paging-runtime:3.5.3 — The Apache Software License, Version 2.0
@@ -129,10 +125,7 @@ org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0 — Apache-2.0
 org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.11.0 — Apache-2.0
 org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.12.0 — Apache-2.0
 org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.12.0 — Apache-2.0
-org.jetbrains:annotations:23.0.0 — The Apache Software License, Version 2.0
-org.jetbrains:markdown-jvm:0.7.3 — The Apache Software License, Version 2.0
 org.jsoup:jsoup:1.18.3 — The MIT License
-org.jspecify:jspecify:1.0.0 — The Apache License, Version 2.0
 
 ========================================================================
 Text SHA-256: 1f884a046ad20026fc437e7e74db89c5d0c7c1e92bae5b02a55af5ddc7d47dab
@@ -1897,7 +1890,6 @@ androidx.activity:activity:1.13.0 / META-INF/androidx/activity/activity/LICENSE.
 androidx.annotation:annotation-experimental:1.5.0 / META-INF/androidx/annotation/annotation-experimental/LICENSE.txt
 androidx.annotation:annotation-jvm:1.10.0 / META-INF/androidx/annotation/annotation/LICENSE.txt
 androidx.collection:collection-jvm:1.5.0 / META-INF/androidx/collection/collection/LICENSE.txt
-androidx.collection:collection-ktx:1.5.0 / META-INF/androidx/collection/collection-ktx/LICENSE.txt
 androidx.compose.animation:animation-android:1.12.1 / META-INF/androidx/compose/animation/animation/LICENSE.txt
 androidx.compose.animation:animation-android:1.12.1 / lint.jar!/META-INF/androidx/compose/animation/animation-lint/LICENSE.txt
 androidx.compose.animation:animation-core-android:1.12.1 / META-INF/androidx/compose/animation/animation-core/LICENSE.txt
@@ -1933,7 +1925,6 @@ androidx.core:core:1.19.1 / META-INF/androidx/core/core/LICENSE.txt
 androidx.glance:glance-appwidget-proto:1.2.0 / META-INF/androidx/glance/glance-appwidget-proto/LICENSE.txt
 androidx.glance:glance-appwidget:1.2.0 / META-INF/androidx/glance/glance-appwidget/LICENSE.txt
 androidx.glance:glance:1.2.0 / META-INF/androidx/glance/glance/LICENSE.txt
-androidx.lifecycle:lifecycle-common-java8:2.11.0 / META-INF/androidx/lifecycle/lifecycle-common-java8/LICENSE.txt
 androidx.lifecycle:lifecycle-common-jvm:2.11.0 / META-INF/androidx/lifecycle/lifecycle-common/LICENSE.txt
 androidx.lifecycle:lifecycle-livedata-core-ktx:2.11.0 / META-INF/androidx/lifecycle/lifecycle-livedata-core-ktx/LICENSE.txt
 androidx.lifecycle:lifecycle-livedata-core:2.11.0 / META-INF/androidx/lifecycle/lifecycle-livedata-core/LICENSE.txt
@@ -1948,14 +1939,12 @@ androidx.lifecycle:lifecycle-viewmodel-android:2.11.0 / META-INF/androidx/lifecy
 androidx.lifecycle:lifecycle-viewmodel-compose-android:2.11.0 / META-INF/androidx/lifecycle/lifecycle-viewmodel-compose/LICENSE.txt
 androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.0 / META-INF/androidx/lifecycle/lifecycle-viewmodel-ktx/LICENSE.txt
 androidx.lifecycle:lifecycle-viewmodel-savedstate-android:2.11.0 / META-INF/androidx/lifecycle/lifecycle-viewmodel-savedstate/LICENSE.txt
-androidx.lifecycle:lifecycle-viewmodel:2.11.0 / META-INF/androidx/lifecycle/lifecycle-viewmodel/LICENSE.txt
 androidx.navigation:navigation-common-android:2.10.2 / META-INF/androidx/navigation/navigation-common/LICENSE.txt
 androidx.navigation:navigation-compose-android:2.10.2 / META-INF/androidx/navigation/navigation-compose/LICENSE.txt
 androidx.navigation:navigation-runtime-android:2.10.2 / META-INF/androidx/navigation/navigation-runtime/LICENSE.txt
 androidx.navigationevent:navigationevent-android:1.1.2 / META-INF/androidx/navigationevent/navigationevent/LICENSE.txt
 androidx.navigationevent:navigationevent-compose-android:1.1.2 / META-INF/androidx/navigationevent/navigationevent-compose/LICENSE.txt
 androidx.paging:paging-common-android:3.5.3 / META-INF/androidx/paging/paging-common/LICENSE.txt
-androidx.paging:paging-common-ktx:3.5.3 / META-INF/androidx/paging/paging-common-ktx/LICENSE.txt
 androidx.paging:paging-compose-android:3.5.3 / META-INF/androidx/paging/paging-compose/LICENSE.txt
 androidx.paging:paging-runtime-ktx:3.5.3 / META-INF/androidx/paging/paging-runtime-ktx/LICENSE.txt
 androidx.paging:paging-runtime:3.5.3 / META-INF/androidx/paging/paging-runtime/LICENSE.txt

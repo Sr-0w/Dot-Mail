@@ -180,11 +180,8 @@
           "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
         }
       ],
-      "status": "included",
-      "text_sha256": [
-        "283ea6cc2997a1a70da0049e09adf9317bb60ca1b51279b65196b83a69e1996b",
-        "4bf96504d6e83ce5c6fc7167f1795d9ceaa68e70ab86bc5d08ab93184262bbbe"
-      ]
+      "status": "stripped",
+      "text_sha256": []
     },
     "androidx.collection:collection:1.5.0": {
       "declared_licenses": [
@@ -941,11 +938,8 @@
           "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
         }
       ],
-      "status": "included",
-      "text_sha256": [
-        "283ea6cc2997a1a70da0049e09adf9317bb60ca1b51279b65196b83a69e1996b",
-        "4bf96504d6e83ce5c6fc7167f1795d9ceaa68e70ab86bc5d08ab93184262bbbe"
-      ]
+      "status": "stripped",
+      "text_sha256": []
     },
     "androidx.lifecycle:lifecycle-common-jvm:2.11.0": {
       "declared_licenses": [
@@ -1196,11 +1190,8 @@
           "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
         }
       ],
-      "status": "included",
-      "text_sha256": [
-        "283ea6cc2997a1a70da0049e09adf9317bb60ca1b51279b65196b83a69e1996b",
-        "4bf96504d6e83ce5c6fc7167f1795d9ceaa68e70ab86bc5d08ab93184262bbbe"
-      ]
+      "status": "stripped",
+      "text_sha256": []
     },
     "androidx.loader:loader:1.0.0": {
       "declared_licenses": [
@@ -1349,11 +1340,8 @@
           "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
         }
       ],
-      "status": "included",
-      "text_sha256": [
-        "283ea6cc2997a1a70da0049e09adf9317bb60ca1b51279b65196b83a69e1996b",
-        "4bf96504d6e83ce5c6fc7167f1795d9ceaa68e70ab86bc5d08ab93184262bbbe"
-      ]
+      "status": "stripped",
+      "text_sha256": []
     },
     "androidx.paging:paging-common:3.5.3": {
       "declared_licenses": [
@@ -2390,10 +2378,8 @@
           "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
         }
       ],
-      "status": "included",
-      "text_sha256": [
-        "283ea6cc2997a1a70da0049e09adf9317bb60ca1b51279b65196b83a69e1996b"
-      ]
+      "status": "stripped",
+      "text_sha256": []
     },
     "org.jetbrains:markdown-jvm:0.7.3": {
       "declared_licenses": [
@@ -2402,10 +2388,8 @@
           "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
         }
       ],
-      "status": "included",
-      "text_sha256": [
-        "283ea6cc2997a1a70da0049e09adf9317bb60ca1b51279b65196b83a69e1996b"
-      ]
+      "status": "stripped",
+      "text_sha256": []
     },
     "org.jetbrains:markdown:0.7.3": {
       "declared_licenses": [
@@ -2436,13 +2420,11 @@
           "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
         }
       ],
-      "status": "included",
-      "text_sha256": [
-        "283ea6cc2997a1a70da0049e09adf9317bb60ca1b51279b65196b83a69e1996b"
-      ]
+      "status": "stripped",
+      "text_sha256": []
     }
   },
-  "bundle_sha256": "b780956cdc85ca062fa61a21838fe2f2814985d4428733b183b32c5e1b1474e1",
+  "bundle_sha256": "56e37e70735475b93c600c7056e76daacae419fa4736c6ed98367c2b06ab61cc",
   "extra_sources": [
     "LICENSE",
     "openpgp/LICENSE",
