@@ -13,6 +13,9 @@ dependencies {
     api("jakarta.activation:jakarta.activation-api:2.1.4")
     implementation(libs.jsoup)
     implementation(libs.kotlinx.serialization.json) // JMAP JSON DOM; Apache-2.0, existing catalog version
+    // Isolated behind SmimeCms; keep both artifacts on exactly the same reviewed version.
+    implementation(libs.bouncycastle.bcprov)
+    implementation(libs.bouncycastle.bcpkix)
     testImplementation(libs.junit)
     testImplementation(libs.truth)
     testImplementation(libs.kotlinx.coroutines.test)

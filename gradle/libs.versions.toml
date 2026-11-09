@@ -20,6 +20,7 @@ angusMail = "2.0.5"
 jakartaMail = "2.1.3"
 jsoup = "1.18.3"
 greenmail = "2.1.2"
+bouncycastle = "1.86"
 junit = "4.13.2"
 truth = "1.4.4"
 robolectric = "4.17"
@@ -68,6 +69,8 @@ angus-mail = { module = "org.eclipse.angus:angus-mail", version.ref = "angusMail
 jakarta-mail-api = { module = "jakarta.mail:jakarta.mail-api", version.ref = "jakartaMail" }
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 greenmail = { module = "com.icegreen:greenmail", version.ref = "greenmail" }
+bouncycastle-bcprov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
+bouncycastle-bcpkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncycastle" }
 junit = { module = "junit:junit", version.ref = "junit" }
 truth = { module = "com.google.truth:truth", version.ref = "truth" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
