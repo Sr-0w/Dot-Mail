@@ -77,7 +77,7 @@ class SmimeSendTest {
         val id = graph.sendSmime(draft(), 0, builder)
         val dir = outboxDir(id)
         val manifest = SmimeOutbox.read(dir)
-        assertEquals(listOf("bob@example.org", "carol@example.org"), manifest.variants.map { it.to })
+        assertEquals(listOf(listOf("bob@example.org"), listOf("carol@example.org")), manifest.variants.map { it.to })
         for (v in manifest.variants) {
             val raw = File(dir, v.file).readText(Charsets.ISO_8859_1)
             val headers = raw.substringBefore("\r\n\r\n")
@@ -125,6 +125,25 @@ class SmimeSendTest {
         assertEquals(SmimeFailure.RECIPIENT_CERTIFICATE_MISSING, e.failure)
         assertTrue(graph.outbox.first().isEmpty())
         assertEquals(0, server.receivedMessages.size)
+    }
+
+    @Test fun toAndCcShareOneSubmissionSoTheSentFolderGetsOneCopy() = runBlocking<Unit> {
+        val id = graph.sendSmime(draft().copy(bcc = emptyList(), cc = listOf(EmailAddress("carol@example.org"))), 0, builder)
+        val manifest = SmimeOutbox.read(outboxDir(id))
+        assertEquals(listOf(listOf("bob@example.org", "carol@example.org")), manifest.variants.map { it.to })
+        assertTrue(graph.deliverOutbox(id))
+        assertEquals(1, inbox("bob@example.org").size)
+        assertEquals(1, inbox("carol@example.org").size)
+        val copy = bytes(inbox("carol@example.org").single())
+        engine.decryptMime(copy, SmimeDecryptionIdentity(cert("id-bob"), key("id-bob")))
+        engine.decryptMime(copy, SmimeDecryptionIdentity(cert("id-carol"), key("id-carol")))
+    }
+
+    @Test fun aManifestFromBeforeGroupingIsStillRead() {
+        val dir = java.io.File(System.getProperty("java.io.tmpdir"), "smime-legacy-${System.nanoTime()}").also { it.mkdirs() }
+        java.io.File(dir, SmimeOutbox.MANIFEST).writeText("""{"sentCopy":"v0.eml","variants":[{"to":"bob@example.org","file":"v0.eml","state":"PENDING"}]}""")
+        assertEquals(listOf(listOf("bob@example.org")), SmimeOutbox.read(dir).variants.map { it.to })
+        dir.deleteRecursively()
     }
 
     @Test fun aVanishedKeyBlocksTheSendInsteadOfSendingPlaintext() = runBlocking<Unit> {

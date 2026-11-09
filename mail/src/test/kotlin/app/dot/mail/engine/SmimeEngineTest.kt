@@ -117,10 +117,11 @@ class SmimeEngineTest {
         val signer = identity("sender@example.test")
         val message = mail()
         val variants = engine.build(message, SmimeMode.SIGN, signer = signer.signing())
-        assertEquals(3, variants.size)
+        assertEquals(2, variants.size) // To+Cc together, the Bcc recipient alone
         val variant = variants.first()
         val parsed = parse(variant.mimeBytes)
-        assertEquals("alice@example.test", variant.envelopeRecipient)
+        assertEquals(listOf("alice@example.test", "bob@example.test"), variant.envelopeRecipients)
+        assertEquals(listOf("hidden@example.test"), variants[1].envelopeRecipients)
         assertFalse(parsed.getHeader("Bcc").orEmpty().isNotEmpty())
         assertTrue(parsed.contentType.startsWith("multipart/signed", ignoreCase = true))
         val result = engine.verifySignedMime(variant.mimeBytes, expectedSignerMailbox = "sender@example.test")
@@ -184,7 +185,7 @@ class SmimeEngineTest {
             recipientCertificates = listOf(alice.recipient(), bob.recipient(), hidden.recipient()),
             senderDecryptionCertificate = sender.certificate,
         )
-        assertEquals(listOf("alice@example.test", "bob@example.test", "hidden@example.test"), variants.map { it.envelopeRecipient })
+        assertEquals(listOf(listOf("alice@example.test", "bob@example.test"), listOf("hidden@example.test")), variants.map { it.envelopeRecipients })
         val aliceMessage = parse(variants.first().mimeBytes)
         assertTrue(aliceMessage.getHeader("Bcc").orEmpty().isEmpty())
         assertTrue(aliceMessage.contentType.startsWith("application/pkcs7-mime", ignoreCase = true))
@@ -196,7 +197,12 @@ class SmimeEngineTest {
         assertTrue(rendered.attachments.any { it.name == "proof.txt" })
         val sentCopy = Pgp.parseDecrypted(engine.decryptMime(variants.first().mimeBytes, sender.decrypting()), mime = true)
         assertTrue("Sender's own KeyChain identity must decrypt the sent copy", sentCopy.text.orEmpty().contains("plain body ✓"))
-        assertFalse(runCatching { engine.decryptMime(variants.first().mimeBytes, bob.decrypting()) }.isSuccess)
+        // To and Cc share one envelope; the Bcc recipient can neither open it nor be seen in it, and has their own.
+        assertTrue(runCatching { engine.decryptMime(variants.first().mimeBytes, bob.decrypting()) }.isSuccess)
+        assertFalse(runCatching { engine.decryptMime(variants.first().mimeBytes, hidden.decrypting()) }.isSuccess)
+        assertTrue(runCatching { engine.decryptMime(variants[1].mimeBytes, hidden.decrypting()) }.isSuccess)
+        assertFalse(runCatching { engine.decryptMime(variants[1].mimeBytes, alice.decrypting()) }.isSuccess)
+        assertTrue(runCatching { engine.decryptMime(variants[1].mimeBytes, sender.decrypting()) }.isSuccess)
     }
 
     @Test fun `receives AES CBC EnvelopedData with 128 192 and 256 bit keys`() {

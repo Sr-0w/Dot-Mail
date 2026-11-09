@@ -44,8 +44,12 @@ data class SmimeCmsSignerResult(
     val cryptographicSignatureValid: Boolean,
 )
 
-/** Each variant is sent through SMTP to exactly [envelopeRecipient]; Bcc never appears in MIME headers. */
-data class SmimeMessageVariant(val envelopeRecipient: String, val mimeBytes: ByteArray)
+/**
+ * One SMTP submission: [mimeBytes] goes to exactly [envelopeRecipients]. To and Cc share one variant (they already see each
+ * other in the headers); every Bcc recipient gets a variant of their own, so neither the headers nor a CMS RecipientInfo
+ * set ever reveals a Bcc recipient to anyone else.
+ */
+data class SmimeMessageVariant(val envelopeRecipients: List<String>, val mimeBytes: ByteArray)
 
 data class SmimeSignerResult(
     val certificate: X509Certificate,
@@ -206,16 +210,20 @@ class SmimeEngine(
             SmimeMime.signedEntity(entity, detached)
         } else entity
 
-        return recipients.map { address ->
+        val visible = (mail.to + mail.cc).distinctBy { normalize(it.email) }
+        val visibleKeys = visible.map { normalize(it.email) }.toSet()
+        val hidden = mail.bcc.distinctBy { normalize(it.email) }.filter { normalize(it.email) !in visibleKeys }
+        val groups = (if (visible.isEmpty()) emptyList() else listOf(visible)) + hidden.map { listOf(it) }
+        return groups.map { group ->
             val finalEntity = if (encrypting) {
-                val recipient = recipientCerts.single { normalize(it.first) == normalize(address.email) }.second
-                val envelopeRecipients = listOfNotNull(recipient, selfCertificate).distinctBy { it.serialNumber to it.issuerX500Principal }
+                val certs = group.map { address -> recipientCerts.single { normalize(it.first) == normalize(address.email) }.second }
+                val envelopeRecipients = (certs + listOfNotNull(selfCertificate)).distinctBy { it.serialNumber to it.issuerX500Principal }
                 val enveloped = cms.encrypt(signedEntity, envelopeRecipients)
                 SmimeMime.envelopedMessage(visibleMail, enveloped)
             } else {
                 SmimeMime.signedMessage(visibleMail, signedEntity)
             }
-            SmimeMessageVariant(address.email, finalEntity)
+            SmimeMessageVariant(group.map { it.email }, finalEntity)
         }
     }
 
