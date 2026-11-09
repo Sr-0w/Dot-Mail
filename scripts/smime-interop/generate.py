@@ -40,6 +40,10 @@ IDENTITIES = {
     "carol-p256":  ("ec:prime256v1", "carol-p256@example.test", "digitalSignature,keyAgreement"),
     "dave-p384":   ("ec:secp384r1", "dave-p384@example.test", "digitalSignature,keyAgreement"),
     "erin-rsa":    ("rsa:2048", "erin-rsa@example.test", "digitalSignature,keyEncipherment"),
+    # Brainpool is common for German S/MIME; secp256k1 has a 256-bit field like P-256 but is NOT supported (must be refused, not guessed).
+    "frank-bp256": ("ec:brainpoolP256r1", "frank-bp256@example.test", "digitalSignature,keyAgreement"),
+    "gina-bp384":  ("ec:brainpoolP384r1", "gina-bp384@example.test", "digitalSignature,keyAgreement"),
+    "heidi-k1":    ("ec:secp256k1", "heidi-k1@example.test", "digitalSignature,keyAgreement"),
 }
 
 def make_identity(name, kind, email, usage):
@@ -156,6 +160,8 @@ def build():
     add("enc-ecdh-p256-aes128", openssl_cms("-encrypt", sec, *enc_args("carol-p256", cipher="-aes128"), frm=A["frm"], to="Carol <carol-p256@example.test>", subject="ecdh p256"), kind="encrypted", decrypt_with="carol-p256", from_="alice-rsa@example.test", text=body, attachments=["proof.txt"])
     add("enc-ecdh-p256-aes256-sha256kdf", openssl_cms("-encrypt", sec, *enc_args("carol-p256", more=("-keyopt", "ecdh_kdf_md:sha256")), frm=A["frm"], to="Carol <carol-p256@example.test>", subject="ecdh p256 kdf"), kind="encrypted", decrypt_with="carol-p256", from_="alice-rsa@example.test", text=body, attachments=["proof.txt"])
     add("enc-ecdh-p384-aes256", openssl_cms("-encrypt", sec, *enc_args("dave-p384"), frm=A["frm"], to="Dave <dave-p384@example.test>", subject="ecdh p384"), kind="encrypted", decrypt_with="dave-p384", from_="alice-rsa@example.test", text=body, attachments=["proof.txt"])
+    add("enc-ecdh-brainpool-p256", openssl_cms("-encrypt", sec, *enc_args("frank-bp256", cipher="-aes256"), frm=A["frm"], to="Frank <frank-bp256@example.test>", subject="ecdh brainpool 256"), kind="encrypted", decrypt_with="frank-bp256", from_="alice-rsa@example.test", text=body, attachments=["proof.txt"])
+    add("enc-ecdh-brainpool-p384", openssl_cms("-encrypt", sec, *enc_args("gina-bp384", cipher="-aes256"), frm=A["frm"], to="Gina <gina-bp384@example.test>", subject="ecdh brainpool 384"), kind="encrypted", decrypt_with="gina-bp384", from_="alice-rsa@example.test", text=body, attachments=["proof.txt"])
     add("enc-several-recipients-we-are-last", openssl_cms("-encrypt", sec, *enc_args("erin-rsa", "carol-p256", "bob-rsa"), frm=A["frm"], to="erin-rsa@example.test, carol-p256@example.test, bob-rsa@example.test", subject="three recipients"), kind="encrypted", decrypt_with="bob-rsa", from_="alice-rsa@example.test", text=body, attachments=["proof.txt"])
     add("enc-several-recipients-ec-not-first", openssl_cms("-encrypt", sec, *enc_args("bob-rsa", "carol-p256"), frm=A["frm"], to="bob-rsa@example.test, carol-p256@example.test", subject="rsa then ec"), kind="encrypted", decrypt_with="carol-p256", from_="alice-rsa@example.test", text=body, attachments=["proof.txt"])
     add("enc-legacy-x-pkcs7-mime", openssl_cms("-encrypt", sec, "-aes256", KEYS / "bob-rsa.crt.pem", tool="smime", **A, subject="legacy enc"), kind="encrypted", decrypt_with="bob-rsa", from_="alice-rsa@example.test", text=body, attachments=["proof.txt"])

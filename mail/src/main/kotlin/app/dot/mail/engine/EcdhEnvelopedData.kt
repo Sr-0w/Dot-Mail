@@ -85,12 +85,18 @@ internal object EcdhEnvelopedData {
         val receiverInfo = SubjectPublicKeyInfo.getInstance(identity.certificate.publicKey.encoded)
         // An originator key without curve parameters inherits the recipient's curve.
         val parameters = originator.algorithm.parameters ?: receiverInfo.algorithm.parameters
-        val senderKey: PublicKey = KeyFactory.getInstance("EC").generatePublic(
-            X509EncodedKeySpec(SubjectPublicKeyInfo(AlgorithmIdentifier(originator.algorithm.algorithm, parameters), originator.publicKey.bytes).encoded),
-        )
+        val senderSpec = X509EncodedKeySpec(SubjectPublicKeyInfo(AlgorithmIdentifier(originator.algorithm.algorithm, parameters), originator.publicKey.bytes).encoded)
+        // The platform knows the NIST curves; Brainpool needs Bouncy Castle's key factory.
+        val senderKey: PublicKey = runCatching { KeyFactory.getInstance("EC").generatePublic(senderSpec) }.getOrElse { KeyFactory.getInstance("EC", provider).generatePublic(senderSpec) }
 
         // The shared secret comes from the platform provider, so a hardware-backed key never leaves its keystore.
-        val z = KeyAgreement.getInstance("ECDH").run { init(identity.privateKey); doPhase(senderKey, true); generateSecret() }
+        val z = try {
+            KeyAgreement.getInstance("ECDH").run { init(identity.privateKey); doPhase(senderKey, true); generateSecret() }
+        } catch (e: java.security.GeneralSecurityException) {
+            // A platform without that curve (Brainpool): possible only for a software key, which Bouncy Castle can use directly.
+            if (identity.privateKey !is java.security.interfaces.ECPrivateKey) throw e
+            KeyAgreement.getInstance("ECDH", provider).run { init(identity.privateKey); doPhase(senderKey, true); generateSecret() }
+        }
         val kek = x963(kdf.digest, z, sharedInfo(wrapAlg, info.userKeyingMaterial, kekBits), kekBits / 8)
 
         val unwrap = Cipher.getInstance("AESWrap", provider).apply { init(Cipher.UNWRAP_MODE, SecretKeySpec(kek, "AES")) }

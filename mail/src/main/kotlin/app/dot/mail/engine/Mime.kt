@@ -109,7 +109,7 @@ object Mime {
         fun save(p: Part, name: String): java.io.File = java.io.File(directory,name).also { file ->
             p.inputStream.use { input -> output(file).use { target -> input.copyTo(target,8192) } }
         }
-        fun visit(p: Part, id: String, depth: Int,materialized:Boolean=false) {
+        fun visit(p: Part, id: String, depth: Int,materialized:Boolean=false,signedContent:Boolean=false) {
             checkCancelled()
             require(depth < 40) { "MIME nesting limit exceeded" }
             require(++partCount<=512) { "MIME part limit exceeded" }
@@ -148,7 +148,7 @@ object Mime {
                     output(raw).use { out -> multipart.getBodyPart(0).writeTo(out) }
                     raw.copyTo(java.io.File(directory,SmimeParts.SIGNED_FILE),overwrite=true)
                     save(multipart.getBodyPart(1), SmimeParts.SIGNATURE_FILE)
-                    jakarta.mail.util.SharedFileInputStream(raw).use { input -> visit(MimeBodyPart(input),"$id.0",depth+1,true) }
+                    jakarta.mail.util.SharedFileInputStream(raw).use { input -> visit(MimeBodyPart(input),"$id.0",depth+1,true,signedContent=true) }
                     raw.delete()
                 } else for (i in 0 until multipart.count) visit(multipart.getBodyPart(i), "$id.$i", depth+1,materialized)
             } else if (opaqueContent != null) {
@@ -159,14 +159,15 @@ object Mime {
                 java.io.File(directory,SmimeParts.OPAQUE_FILE).writeBytes(opaqueBytes)
                 val raw=java.io.File(directory,"smime-opaque-$id.tmp")
                 output(raw).use { out -> out.write(opaqueContent) }
-                jakarta.mail.util.SharedFileInputStream(raw).use { input -> visit(MimeBodyPart(input),"$id.0",depth+1,true) }
+                jakarta.mail.util.SharedFileInputStream(raw).use { input -> visit(MimeBodyPart(input),"$id.0",depth+1,true,signedContent=true) }
                 raw.delete()
             } else if (type.startsWith("multipart/")) {
                 val multipart = p.content as Multipart
                 for (i in 0 until multipart.count) visit(multipart.getBodyPart(i), "$id.$i", depth+1,materialized)
-            } else if (encryptionHintFromMime(runCatching { p.contentType }.getOrNull()) == EncryptionHint.SMIME) {
-                // An S/MIME envelope inside a signature (signed(enveloped(...)), "triple wrapping"): the outer signature files are
-                // kept as they are, the envelope is kept for the reader to decrypt in memory.
+            } else if (signedContent && encryptionHintFromMime(runCatching { p.contentType }.getOrNull()) == EncryptionHint.SMIME) {
+                // signed(enveloped(...)) ("triple wrapping"): ONLY when the envelope is itself the signed content (the whole signed
+                // entity of a multipart/signed, or the content of an opaque signature) is it this message's own ciphertext. An
+                // envelope anywhere else (a forwarded smime.p7m next to other parts) is somebody else's file and stays an attachment.
                 save(p, SmimeParts.ENCRYPTED_FILE)
             } else if (name != null || disposition.equals(Part.ATTACHMENT,true) || type !in setOf("text/plain","text/html") || cid != null) {
                 val filename=(name?.let { runCatching { MimeUtility.decodeText(it) }.getOrDefault(it) } ?: "attachment").let { raw -> if(raw.length<=1024) raw else raw.substring(0,if(Character.isHighSurrogate(raw[1023])) 1023 else 1024) }

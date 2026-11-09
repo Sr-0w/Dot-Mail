@@ -204,6 +204,28 @@
    ]
   },
   {
+   "name": "enc-ecdh-brainpool-p256",
+   "file": "cases/enc-ecdh-brainpool-p256.eml",
+   "kind": "encrypted",
+   "decrypt_with": "frank-bp256",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "attachments": [
+    "proof.txt"
+   ]
+  },
+  {
+   "name": "enc-ecdh-brainpool-p384",
+   "file": "cases/enc-ecdh-brainpool-p384.eml",
+   "kind": "encrypted",
+   "decrypt_with": "gina-bp384",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "attachments": [
+    "proof.txt"
+   ]
+  },
+  {
    "name": "enc-several-recipients-we-are-last",
    "file": "cases/enc-several-recipients-we-are-last.eml",
    "kind": "encrypted",

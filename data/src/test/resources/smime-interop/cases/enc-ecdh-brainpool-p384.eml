@@ -1,0 +1,25 @@
+To: Gina <gina-bp384@example.test>
+From: Alice <alice-rsa@example.test>
+Subject: ecdh brainpool 384
+MIME-Version: 1.0
+Content-Disposition: attachment; filename="smime.p7m"
+Content-Type: application/pkcs7-mime; smime-type=enveloped-data; name="smime.p7m"
+Content-Transfer-Encoding: base64
+
+MIIC2wYJKoZIhvcNAQcDoIICzDCCAsgCAQIxgfChge0CAQOgcaFvMAkGByqGSM49
+AgEDYgAEW1EHKmghhf0wz5aXBjZEW/KA6JmyPolpbF5frS2WxgLmbdR7rCxZzxXJ
+TZ96k0+DZIrxt+Z2HLmUeSuDLb24jil4qrsCQ4EIxyJ3Ycjj8vMMEfn84RvEn57X
+qDyQUSyQMBgGCSuBBRCGSD8AAjALBglghkgBZQMEAS0wWzBZMC0wFTETMBEGA1UE
+AwwKZ2luYS1icDM4NAIUQgIaikDthzwCNow6HvG7KVJf5UEEKPC48Z1shxE0xCK9
+wIgNEaJMWZCJJsCbyPxFMVryFTYFEpITlsb7ny8wggHOBgkqhkiG9w0BBwEwHQYJ
+YIZIAWUDBAEqBBAgV/FJDPnK+UXhdjiFOOL+gIIBoBCt21inbnJgWF5ZQiiykYGq
+T5ful1NoZon0fxGe8KGbtCGujIl/jnYTcsvV0vZcAeaTtLq1TtAHez4rF1jjldcN
+tfQ9RuSixDcEg4R8A687pn62aKaTbAQ4ZC7XZ1CoUUGTX9A8qthZVYOgX0kELF2/
+BA8h5tPAEZLz2Epa8saXH6TM0l+sgj5zMhE7ZVZcR7bO+TsDUDbmz6js/fZfHFyZ
+to0wLnhqnQrpDd7/xCEYKamEqPr67VXVxDse/9oOEx0q78tJkR6BRNp180RSSPv+
+wD2owGUJXZjUHpNz7nB77BqSbVfoToh05Pv8BlMCW41GME5oerN/nnTNGmtos0kx
+1FUND9iI9XyCW/AIqWbJjSNpR+epITBmzDxPIIBtC031IgKwXdTLAS/TOGrEj2Dg
+4RyQV1kdPBZeXDZMkmkHoDp32k5eqfIep44+7Y9XxWau64IKMeUVJPhVTQ58iHZ8
+TyoLQafCioMHwSUQ4iKI9eft8QSGTPzB8kFyWqimw06mUnnejX/UuuKfAYDbAJPv
+U6of0wtR9dDqnSSIrs9X
+

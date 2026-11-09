@@ -102,12 +102,9 @@ internal class BouncyCastleSmimeCms : SmimeCms {
         return generator.generate(CMSProcessableByteArray(entity), encryptor).encoded
     }
 
-    private fun curveName(certificate: X509Certificate): String = when ((certificate.publicKey as java.security.interfaces.ECKey).params.curve.field.fieldSize) {
-        256 -> "secp256r1"
-        384 -> "secp384r1"
-        521 -> "secp521r1"
-        else -> throw SmimeProtectionException(SmimeFailure.UNSUPPORTED_CERTIFICATE_KEY, "Unsupported EC curve for S/MIME encryption")
-    }
+    /** The recipient's own, supported curve; anything else is refused rather than guessed from the field size. */
+    private fun curveName(certificate: X509Certificate): String = SmimeCurves.name(certificate)
+        ?: throw SmimeProtectionException(SmimeFailure.UNSUPPORTED_CERTIFICATE_KEY, "Unsupported EC curve for S/MIME encryption")
 
     override fun decrypt(envelopedData: ByteArray, identity: SmimeDecryptionIdentity): ByteArray {
         val contentInfo = ContentInfo.getInstance(ASN1Primitive.fromByteArray(envelopedData))

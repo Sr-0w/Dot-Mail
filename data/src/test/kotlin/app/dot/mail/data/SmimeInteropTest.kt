@@ -158,16 +158,16 @@ class SmimeSendToOpenSslTest {
         org.junit.Assume.assumeTrue("openssl CLI not installed", opensslAvailable())
         val mail = app.dot.mail.engine.OutgoingMail(
             from = app.dot.mail.engine.Address("alice-rsa@example.test", "Alice"),
-            to = listOf("bob-rsa@example.test", "carol-p256@example.test", "dave-p384@example.test").map { app.dot.mail.engine.Address(it) },
+            to = listOf("bob-rsa@example.test", "carol-p256@example.test", "dave-p384@example.test", "frank-bp256@example.test", "gina-bp384@example.test").map { app.dot.mail.engine.Address(it) },
             subject = "Sent by Dot Mail", text = "text from dot mail é",
             attachments = listOf(app.dot.mail.engine.OutgoingAttachment("n.txt", "text/plain", "n".toByteArray())),
         )
-        val recipients = listOf("bob-rsa", "carol-p256", "dave-p384").map { app.dot.mail.engine.SmimeRecipientCertificate("$it@example.test", certificate(it)) }
+        val recipients = listOf("bob-rsa", "carol-p256", "dave-p384", "frank-bp256", "gina-bp384").map { app.dot.mail.engine.SmimeRecipientCertificate("$it@example.test", certificate(it)) }
         val variant = SmimeEngine(certificatePolicy = trusted).build(
             mail, SmimeMode.SIGN_AND_ENCRYPT, app.dot.mail.engine.SmimeSigningIdentity(certificate("alice-rsa"), privateKey("alice-rsa")), recipients, certificate("alice-rsa"),
         ).single()
         val message = file("ours.eml", variant.mimeBytes)
-        for (who in listOf("bob-rsa", "carol-p256", "dave-p384", "alice-rsa")) {
+        for (who in listOf("bob-rsa", "carol-p256", "dave-p384", "frank-bp256", "gina-bp384", "alice-rsa")) {
             val (code, plain) = openssl("cms", "-decrypt", "-in", message.path, "-inkey", key(who).path, "-recip", crt(who).path)
             assertEquals("$who: $plain", 0, code)
             val signed = file("$who.signed", plain.toByteArray(Charsets.ISO_8859_1))
@@ -187,5 +187,18 @@ class SmimeSendToOpenSslTest {
             val (code, out) = openssl("cms", "-verify", "-noverify", "-in", file("$who.eml", variant.mimeBytes).path, "-signer", File(tmp.root, "$who.signer").path)
             assertEquals("$who ($curveKey): $out", 0, code)
         }
+    }
+
+    @Test fun `a curve that only shares the field size with a supported one is refused, not guessed`() {
+        // secp256k1 has a 256-bit field like P-256: encrypting on P-256 would make mail nobody can open.
+        val mail = app.dot.mail.engine.OutgoingMail(
+            from = app.dot.mail.engine.Address("alice-rsa@example.test"), to = listOf(app.dot.mail.engine.Address("heidi-k1@example.test")), subject = "k1", text = "x",
+        )
+        val failure = runCatching {
+            SmimeEngine(certificatePolicy = trusted).build(
+                mail, SmimeMode.ENCRYPT, null, listOf(app.dot.mail.engine.SmimeRecipientCertificate("heidi-k1@example.test", certificate("heidi-k1"))), certificate("alice-rsa"),
+            )
+        }.exceptionOrNull() as app.dot.mail.engine.SmimeProtectionException
+        assertEquals(app.dot.mail.engine.SmimeFailure.UNSUPPORTED_CERTIFICATE_KEY, failure.failure)
     }
 }

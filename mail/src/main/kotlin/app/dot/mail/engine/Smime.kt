@@ -393,7 +393,7 @@ class SmimeEngine(
             "RSA" -> if ((certificate.publicKey as? java.security.interfaces.RSAKey)?.modulus?.bitLength() !in 2048..16384) {
                 throw SmimeProtectionException(SmimeFailure.UNSUPPORTED_CERTIFICATE_KEY, "RSA signing key must be at least 2048 bits")
             }
-            "EC", "ECDSA" -> if ((certificate.publicKey as? java.security.interfaces.ECKey)?.params?.curve?.field?.fieldSize != 256) {
+            "EC", "ECDSA" -> if (SmimeCurves.name(certificate) != "secp256r1") {
                 throw SmimeProtectionException(SmimeFailure.UNSUPPORTED_CERTIFICATE_KEY, "Only P-256 signing certificates are supported")
             }
             else -> throw SmimeProtectionException(SmimeFailure.UNSUPPORTED_CERTIFICATE_KEY, "Unsupported S/MIME signing key type")
@@ -403,13 +403,13 @@ class SmimeEngine(
     private fun ensureSupportedRecipientKey(certificate: X509Certificate) {
         if (!isSupportedRecipientKey(certificate)) throw SmimeProtectionException(
             SmimeFailure.UNSUPPORTED_CERTIFICATE_KEY,
-            "Recipient keys must be RSA of at least 2048 bits or EC on P-256, P-384 or P-521",
+            "Recipient keys must be RSA of at least 2048 bits or EC on P-256, P-384, P-521, brainpoolP256r1 or brainpoolP384r1",
         )
     }
 
     private fun isSupportedRecipientKey(certificate: X509Certificate): Boolean = when (certificate.publicKey.algorithm.uppercase()) {
         "RSA" -> ((certificate.publicKey as? java.security.interfaces.RSAKey)?.modulus?.bitLength() ?: 0) in 2048..16384
-        "EC", "ECDSA" -> (certificate.publicKey as? java.security.interfaces.ECKey)?.params?.curve?.field?.fieldSize in setOf(256, 384, 521)
+        "EC", "ECDSA" -> SmimeCurves.name(certificate) != null
         else -> false
     }
 
