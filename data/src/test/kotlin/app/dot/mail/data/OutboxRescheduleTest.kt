@@ -73,4 +73,23 @@ class OutboxRescheduleTest {
         assertEquals("hello", draft.bodyText)
         assertTrue(graph.outbox.first().none { it.id == outboxId })
     }
+
+    @Test fun aScheduledMessageSurvivesARestartUntouchedAndIsNeverDeliveredEarly() = runBlocking<Unit> {
+        val due = System.currentTimeMillis() + 3_600_000
+        val (outboxId, _) = queue(due)
+        graph.recoverOutbox() // what a process restart runs
+        graph.recoverOutbox() // and again: idempotent
+        val row = db.mail().outbox(outboxId)!!
+        assertEquals("PENDING", row.state); assertTrue(row.dueAt >= due)
+        assertFalse(graph.deliverOutbox(outboxId)) // a worker firing early (clock moved) leaves it queued...
+        assertEquals("PENDING", db.mail().outbox(outboxId)!!.state) // ...and does not send
+        assertEquals(1, graph.outbox.first().count { it.id == outboxId }) // no duplicate row
+    }
+
+    @Test fun reschedulingTwiceKeepsASingleQueuedItemAtTheLastTime() = runBlocking<Unit> {
+        val (outboxId, _) = queue(System.currentTimeMillis() + 3_600_000)
+        val a = System.currentTimeMillis() + 7_200_000; val b = System.currentTimeMillis() + 10_800_000
+        assertTrue(graph.rescheduleSend(outboxId, a)); assertTrue(graph.rescheduleSend(outboxId, b))
+        assertEquals(listOf(b), graph.outbox.first().map { it.sendAt })
+    }
 }

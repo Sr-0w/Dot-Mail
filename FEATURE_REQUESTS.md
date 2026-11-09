@@ -51,11 +51,13 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
 
 - **FR-11 · P2 · Complete delayed / scheduled sending ("Send later")** — only three presets exist today
   (this evening / tomorrow morning / Monday morning).
-  - [ ] Custom future date and time picker; show the scheduled time and timezone
-  - [ ] Queued messages can be viewed, edited, rescheduled and cancelled before SMTP submission (the Outbox lists them;
-    edit/reschedule is missing)
+  - [x] Custom future date and time picker; show the scheduled time and timezone (`ScheduleSheet`, #59)
+  - [x] Queued messages can be viewed, edited, rescheduled and cancelled before SMTP submission (Outbox Edit / Reschedule,
+    #59; claimed messages are locked)
   - [ ] Robust across restart, connectivity changes, background limits, clock/timezone/DST changes, retries, no duplicate send
-  - [ ] Honest about Android not guaranteeing second-exact delivery; separate from the Undo-send grace period
+    (due times are absolute epoch; DST/timezone resolution and restart/early-fire/no-duplicate are unit tested; real
+    background-limit and clock-change behaviour still needs the device)
+  - [x] Honest about Android not guaranteeing second-exact delivery; separate from the Undo-send grace period (`schedule_note`; `SendSchedule.MIN_LEAD_MS`)
   - [ ] End-to-end device verification
   - Evidence: presets + outbox due times exist (`WorkScheduling`); custom picker not implemented.
 
