@@ -32,6 +32,22 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
 
 ### Reading and HTML mail
 
+- **FR-79 · P1 · Broken image in a real HTML newsletter** — Galaxy S25 Ultra, inbox account
+  `robin@snyders.xyz`, sender **Red Hat Developer**, subject **“Red Hat Developer Weekly Newsletter”**,
+  received **2026-11-09 at 21:05 (Europe/Brussels)**; reader screenshot at 21:06. In the **“Build here”**
+  section beside the “Manage Java transitive dependencies with Lightwell rebuilds” article, an image is
+  replaced by a broken-image icon and visible alt/filename **“Repo icons-2-Repo rocket.png”**.
+  - [ ] Identify the exact MIME/HTML source: attached `cid:` image, data URL, relative URL or remote
+    resource; check sanitization, Content-ID/Content-Location resolution, message-part caching,
+    WebView interception and remote-image permission/loading. Do not assume all missing images are bugs
+    when remote loading is deliberately blocked.
+  - [ ] If locally embedded, render it without network access; if remote and blocked by default,
+    preserve privacy while providing the existing explicit **Load images** mechanism and a
+    comprehensible placeholder rather than an inexplicable broken-file glyph.
+  - [ ] Reproduce and verify on this exact newsletter, including after opening/reopening, and test
+    other multipart/related newsletters without permitting tracking pixels or arbitrary network requests.
+  - Evidence: owner-provided reader and inbox screenshots (2026-11-09); device fix pending.
+
 - **FR-21 · P1 · Severe HTML email flicker / blanking while scrolling** — real-device regression (S25 Ultra, image-heavy
   mail such as AliExpress): large areas disappear to black/blank and reappear while header and floating buttons stay.
   Photosensitivity and usability issue, not cosmetic.
@@ -53,6 +69,21 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
     detach). `0196e79` only fixes Back closing the drawer, which is unrelated.
 
 ### Inbox and lists
+
+- **FR-80 · P1 · HTML markup and raw tracking URLs leak into inbox previews** — Galaxy S25 Ultra,
+  owner screenshot 2026-11-09, Inbox at 21:06: **Red Hat Developer** (21:05) preview shows
+  `View email in browser <[[https://click.explore.redhat...`; **Kinepolis** (16:02) shows
+  `Cher/Chère M., <p>Des blockbusters...`; **Samsung** (17:32) shows a raw
+  `https://t6.m1.email.samsung.com/...` tracking link. These should be clean, human-readable summaries.
+  - [ ] Generate snippets from properly parsed/sanitized HTML-to-text or text/plain MIME alternatives,
+    not HTML/source/Markdown fragments; strip tags, link destinations, tracking URLs and markup
+    artifacts; decode HTML entities, normalize whitespace and preserve meaningful visible text.
+  - [ ] Fix both snippet generation on first receipt and existing **cached previews** (migration/
+    lazy re-generation); ensure previews remain correct after sync and across different providers,
+    plain-text mail, multipart/alternative, newsletters and HTML-only messages.
+  - [ ] Regression-test all three example messages and verify on the owner's phone; keep UI
+    truncation/ellipsis and privacy filtering intact.
+  - Evidence: owner-provided inbox screenshot (2026-11-09); device fix pending.
 
 - **FR-77 · P2 · Auto-reveal newly arrived messages when already at top** — when fresh mail is inserted at the start
   of the currently displayed inbox/message list (IMAP IDLE, background sync or manual refresh), and the user was
@@ -83,6 +114,18 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
   - Evidence: presets + outbox due times exist (`WorkScheduling`); custom picker not implemented.
 
 ### Appearance
+
+- **FR-78 · P1 · Settings entries overlap in Backup section** — Galaxy S25 Ultra, Settings screen
+  screenshot taken **2026-11-09 at 21:03**: under **BACKUP**, the “Export settings” row and another
+  settings row/description render on top of each other, with multiple lines visibly stacked/illegible.
+  - [ ] Reproduce by scrolling Settings to Storage → Backup → About; determine whether row measurements,
+    intrinsic height, LazyColumn keys, animation/transition, text wrapping or font scaling caused
+    the overlapping “Export settings”/“Import settings” labels and descriptions.
+  - [ ] Each settings entry needs its own measured height and non-overlapping label/subtitle/icon/tap
+    target, with correct vertical spacing and accessible touch area during and after scroll.
+  - [ ] Verify on-device in Light/Dark/OLED, standard and enlarged system font, including navigation
+    back to Settings, layout changes and rapid scrolling; add a relevant layout regression test.
+  - Evidence: owner-provided Settings screenshot (2026-11-09); device fix pending.
 
 - **FR-55 · P2 · Fully rounded Quiet UI shapes** — pill/capsule controls, chips and grouped actions must have true
   semicircular ends; icon-only controls truly circular; dialogs/sheets consistently and generously rounded.
@@ -335,6 +378,8 @@ Each entry: evidence in brackets. "Device ✓" = checked on the owner's phone an
   Never "finished" after one cleanup.
 
 ## Needs a device check (collected from the entries above)
+
+FR-78 Settings Backup overlap · FR-79 Red Hat newsletter image (21:05) · FR-80 HTML/plain-text inbox snippets ·
 
 FR-01 real Gmail end to end · FR-06 multi-device drafts · FR-07 Doze/battery · FR-08 storage UI + WorkManager · FR-21 flicker ·
 FR-22 Back crash · FR-25 reader swipe · FR-28 Inter in WebView + TalkBack · FR-29 remote images · FR-33 categories UI ·
