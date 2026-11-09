@@ -25,6 +25,13 @@ android {
             // Release payloads are unsigned. Maintainers/F-Droid sign them externally after verification.
             // Developer installs continue to use assembleDebug; no signing secret enters the build graph.
         }
+        // Release R8 configuration plus one self-test entry point (proguard-minified-check.pro), never published:
+        // proves on ART that the shrunk Bouncy Castle provider still works. See docs/R8_AUDIT.md.
+        create("minifiedCheck") {
+            initWith(getByName("release"))
+            proguardFile("proguard-minified-check.pro")
+            matchingFallbacks += "release"
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -56,6 +63,8 @@ dependencies {
     implementation(libs.work.runtime.ktx)
     implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.webkit)
+    "minifiedCheckImplementation"(libs.bouncycastle.bcprov) // same versions as :mail; only the self-test calls BC directly
+    "minifiedCheckImplementation"(libs.bouncycastle.bcpkix)
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
     testImplementation(libs.junit)

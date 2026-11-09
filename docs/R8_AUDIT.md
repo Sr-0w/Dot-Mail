@@ -20,11 +20,27 @@ It derives what to check from the sources (so new code is covered) and exits 1 l
 | WebView JavaScript interfaces | `addJavascriptInterface` | none: JavaScript is disabled in the message WebView |
 | Resources by name | `getIdentifier` | none used, so resource shrinking is safe |
 | Jakarta Mail / Angus | providers and handlers loaded reflectively | explicit keep rules in `app/proguard-rules.pro` (unchanged) |
+| Bouncy Castle provider (S/MIME) | `BouncyCastleProvider` loads `…$Mappings` tables and every SPI by class name | **keep rules added** in `app/proguard-rules.pro` (names + constructors of `org.bouncycastle.jcajce.provider.**`, `pqc.jcajce.provider.**`, the provider); everything else in BC shrinks normally |
 
-No keep rules were added. Not covered: runtime behaviour of the minified build on a device (smoke test the release APK).
+### S/MIME on ART after R8 (`minifiedCheck`)
+
+Static checks cannot see BC's string-built class names, so the shrunk engine is run on a real device. The `minifiedCheck`
+build type is `release` plus one entry point (`proguard-minified-check.pro`); it is never published and is not installed —
+`app_process` runs it from `/data/local/tmp`, so no app data is touched:
+
+```sh
+scripts/gw :app:assembleMinifiedCheck
+adb push build-out/apk/minifiedCheck/app-minifiedCheck-unsigned.apk /data/local/tmp/r8check.apk
+adb shell CLASSPATH=/data/local/tmp/r8check.apk app_process / app.dot.mail.check.SmimeR8Check   # prints SMIME_R8_CHECK OK
+```
+
+It signs + encrypts (AES-256-CBC), decrypts, verifies the detached signature, rejects a tampered one, decrypts AES-GCM
+AuthEnvelopedData and verifies an opaque signed-data fixture. Without the BC keep rules it fails 4 of 5
+(`NoSuchAlgorithmException: no such algorithm: SHA256 for provider BC`), i.e. S/MIME would be broken in every release
+build; with them it passes. Rerun it whenever R8 rules, AGP or BC change.
 
 ## DEX, constructors and release notices
 
 The complementary `scripts/audit_release.py <apk> <mapping.txt> <manifest.xml> --report <json>` reads actual DEX class definitions/public constructor prototypes. It verifies WorkerFactory signatures, mailcap/provider reflection, Room implementations, generated navigation serializers, merged manifest components/Startup constructors, bundled notices and ELF alignment. Extract the manifest from the same APK with apkanalyzer; keep R8 outputs with that exact APK. See docs/reports/codex-release-readiness.md for evidence and limitations.
 
-Every assembleRelease also runs verifyReleaseNotices (resolved-coordinate coverage) and verifyShippedNotices (current DEX/mapping/usage/resources versus reviewed exclusion statuses). Unknown attribution stays included. Newly reachable excluded dependencies block the build until full notices are restored; no package exclusion list or extra crypto keep rules are hidden in the auditor. See THIRD_PARTY_NOTICES.md. Final signed-device crypto/mail tests remain separate.
+Every assembleRelease also runs verifyReleaseNotices (resolved-coordinate coverage) and verifyShippedNotices (current DEX/mapping/usage/resources versus reviewed exclusion statuses). Unknown attribution stays included. Newly reachable excluded dependencies block the build until full notices are restored; no package exclusion list is hidden in the auditor (the only crypto keep rules are the visible BC provider rules above). See THIRD_PARTY_NOTICES.md. Final signed-device crypto/mail tests remain separate.
