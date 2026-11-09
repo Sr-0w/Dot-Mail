@@ -10,7 +10,10 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.viewinterop.AndroidView
@@ -50,9 +53,22 @@ fun HtmlMessageView(
     // WebView CSS pixels == dp. A fixed-width design wider than the space we have is laid out at its own
     // width and the overview mode scales it down to fit — like Gmail / Samsung Email — instead of clipping.
     val available = maxWidth.value.toInt().coerceAtLeast(1)
-    val viewportWidth = if (!responsive && layoutWidth > available) layoutWidth + 2 * BODY_MARGIN else 0
+    // What the sanitiser can't see (stylesheet rules such as `.wrap{min-width:600px}`, pt units…) can still overflow a
+    // device-width layout. The WebView reports the width it actually laid out; when a fixed-width design overflows anyway,
+    // its mobile rules have failed, so it is shown the way Samsung Email / Gmail show it: laid out as the desktop design
+    // (above its widest `max-width` breakpoint) and scaled down to fit. Prose without a fixed design is never shrunk.
+    val breakpoint = remember(html) { mediaMaxWidth.findAll(html).maxOfOrNull { it.groupValues[1].toInt() } ?: 0 }
+    var measured by remember(html, available, textZoom, font, lineHeightPercent) { mutableIntStateOf(0) }
+    val viewportWidth = when {
+        !responsive && layoutWidth > available -> layoutWidth + 2 * BODY_MARGIN
+        layoutWidth >= FIXED_DESIGN && measured > available + OVERFLOW_SLACK ->
+            maxOf(measured, layoutWidth, (breakpoint + 1).coerceAtMost(MAX_DESKTOP)) + 2 * BODY_MARGIN
+        else -> 0
+    }
+    val onOverflow by rememberUpdatedState<(Int) -> Unit> { css -> if (viewportWidth == 0 && css > measured) measured = css }
+    val beforeRelease = LocalBeforeWebViewRelease.current
     val document = remember(html, dark, textColor, linkColor, viewportWidth, font, lineHeightPercent) { wrap(html, dark, textColor, linkColor, viewportWidth, font, lineHeightPercent) }
-    val currentOnLink by androidx.compose.runtime.rememberUpdatedState(onLink)
+    val currentOnLink by rememberUpdatedState(onLink)
     val linkHandler: (String) -> Unit = remember { { url -> currentOnLink(url) } }
     // The WebView's theme (algorithmic darkening) is fixed at creation: recreate it when the theme flips.
     androidx.compose.runtime.key(dark) {
@@ -60,7 +76,8 @@ fun HtmlMessageView(
         modifier = Modifier.fillMaxWidth(),
         factory = { ctx ->
             val themed = ContextThemeWrapper(ctx, if (dark) android.R.style.Theme_Material else android.R.style.Theme_Material_Light)
-            WebView(themed).apply {
+            FitWebView(themed).apply {
+                onContentWidth = { css -> onOverflow(css) }
                 layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                 setBackgroundColor(Color.TRANSPARENT)
                 isVerticalScrollBarEnabled = false
@@ -104,11 +121,12 @@ fun HtmlMessageView(
             if (web.settings.textZoom != textZoom) web.settings.textZoom = textZoom
             if (web.tag != document) {
                 web.tag = document
+                (web as? FitWebView)?.rearm()
                 // Null base URL = opaque origin: the content can't reach anything relative.
                 web.loadDataWithBaseURL(null, document, "text/html", "utf-8", null)
             }
         },
-        onRelease = { releaseWebView(it) },
+        onRelease = { beforeRelease(); releaseWebView(it) },
     )
     }
     }
@@ -130,6 +148,50 @@ internal fun releaseWebView(web: WebView) {
 /** Breathing room (CSS px) kept around scaled-down fixed-width designs. */
 private const val BODY_MARGIN = 4
 
+/** A design with a fixed width at least this wide (CSS px) is a layout, not prose, and may be scaled to fit. */
+private const val FIXED_DESIGN = 480
+
+/** Desktop layout widths beyond this are not chased (a stray `max-width:2000px` breakpoint). */
+private const val MAX_DESKTOP = 1024
+
+private val mediaMaxWidth = Regex("(?i)@media[^{]*max-width\\s*:\\s*([0-9]{3,4})(?:\\.[0-9]+)?\\s*px")
+
+/**
+ * Called just before a message WebView is destroyed. The reader uses it to drop its backdrop recording, which may still
+ * hold this WebView's draw functor; a retained functor replayed after destroy() crashes RenderThread.
+ */
+val LocalBeforeWebViewRelease = androidx.compose.runtime.staticCompositionLocalOf<() -> Unit> { {} }
+
+/** Overflow (CSS px) tolerated before a device-width layout is refitted (sub-pixel rounding, a stray border). */
+private const val OVERFLOW_SLACK = 2
+
+/**
+ * A WebView that reports the width (CSS px) its content was laid out at whenever it is wider than the view, so the
+ * reader can refit the mail. The range is read while drawing, after layout, and only reported when it changes.
+ */
+private class FitWebView(context: android.content.Context) : WebView(context) {
+    var onContentWidth: ((Int) -> Unit)? = null
+    private var armed = false
+    private var reported = 0
+
+    /** A new document is loading: forget the old measurement and wait until the new one is on screen. */
+    fun rearm() { armed = false; reported = 0 }
+
+    /** The new document's first frame is committed: its layout is the one to measure. */
+    fun arm() { armed = true; reported = 0; invalidate() }
+
+    override fun onDraw(canvas: android.graphics.Canvas) {
+        super.onDraw(canvas)
+        if (!armed) return
+        val range = computeHorizontalScrollRange()
+        if (width > 0 && range > width && range != reported) {
+            reported = range
+            // Measured only for device-width layouts, where 1 CSS px is 1 dp.
+            onContentWidth?.invoke(kotlin.math.ceil(range / resources.displayMetrics.density).toInt())
+        }
+    }
+}
+
 private class SafeClient(
     val allowRemote: Boolean,
     val inline: Set<String>,
@@ -137,6 +199,8 @@ private class SafeClient(
     val onLink: (String) -> Unit,
     private val resources: android.content.res.Resources? = null,
 ) : WebViewClient() {
+    override fun onPageCommitVisible(view: WebView, url: String?) { (view as? FitWebView)?.arm() }
+
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
         if (request.isForMainFrame || request.hasGesture()) onLink(request.url.toString())
         return true

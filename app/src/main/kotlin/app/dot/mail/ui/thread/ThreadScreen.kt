@@ -137,6 +137,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import app.dot.design.components.DotFloatingCapsule
 import app.dot.design.components.glassBackdropSource
+import app.dot.design.components.clear
 import app.dot.design.components.DotCapsuleButton
 import app.dot.design.components.DotCapsuleDivider
 import androidx.compose.foundation.layout.WindowInsets
@@ -436,12 +437,12 @@ fun ThreadScreen(
     // Hardware keyboard shortcuts (tablets, Chromebooks, DeX), Gmail-style single keys.
     val keyFocus = remember { androidx.compose.ui.focus.FocusRequester() }
     LaunchedEffect(Unit) { runCatching { keyFocus.requestFocus() } }
-    // The backdrop records its entire source into a graphics layer. Recording an Android WebView's
-    // hardware draw functor can flash blank tiles and crash RenderThread when that retained
-    // layer outlives WebView.destroy() during Back. HTML (and still-loading bodies) must stay
-    // outside the capture path; capsules keep their neutral frosted fallback and edge gradient.
     val readerBackdrop = app.dot.design.components.rememberGlassBackdrop()
-    val glass = readerBackdrop.takeIf { list != null && list.all { message -> message.body?.let { it.html.isNullOrBlank() } == true } }
+    // HTML bodies are captured too (the frosted top on every mail). Whenever a message WebView is torn down (Back, scrolled
+    // out of the list, theme flip, next conversation) the recording is dropped first via LocalBeforeWebViewRelease, so the
+    // retained layer never replays a destroyed WebView's draw functor.
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val glass = readerBackdrop.takeIf { list != null }
     Box(
         Modifier.fillMaxSize().background(c.background)
             .focusRequester(keyFocus).focusable()
@@ -471,6 +472,8 @@ fun ThreadScreen(
                 }
             },
     ) {
+        val clearBackdrop: () -> Unit = remember(readerBackdrop, density) { { readerBackdrop.clear(density) } }
+        androidx.compose.runtime.CompositionLocalProvider(LocalBeforeWebViewRelease provides clearBackdrop) {
         Column(Modifier.fillMaxSize().nestedScroll(chromeConnection).glassBackdropSource(glass)) {
             when {
                 list == null -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -525,6 +528,7 @@ fun ThreadScreen(
                     }
                 } }
             }
+        }
         }
         ReaderChrome(
             visible = showChrome, reducedMotion = reducedMotionChrome,
