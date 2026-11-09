@@ -1155,4 +1155,18 @@
         <item quantity="one">%1$d stored</item>
         <item quantity="other">%1$d stored</item>
     </plurals>
+    <string name="compose_smime_label">S/MIME</string>
+    <string name="compose_smime_sign">Sign</string>
+    <string name="compose_smime_encrypt">Encrypt</string>
+    <string name="compose_smime_ready">%1$s: certificate ready</string>
+    <string name="compose_smime_missing">No certificate for %1$s. Ask them to send you a signed message, or turn encryption off.</string>
+    <string name="compose_smime_unusable">The certificate for %1$s is expired or not trusted. Turn encryption off to send without it.</string>
+    <string name="compose_smime_pinned_unavailable">The certificate you pinned for %1$s can no longer be used. Pick another in Settings, Contact certificates.</string>
+    <string name="compose_smime_err_missing">A recipient has no certificate. Nothing was sent.</string>
+    <string name="compose_smime_err_pinned">A pinned recipient certificate can no longer be used. Pick another in Settings. Nothing was sent.</string>
+    <string name="compose_smime_err_ambiguous">A recipient has several certificates. Pin one in Settings. Nothing was sent.</string>
+    <string name="compose_smime_err_untrusted">A recipient\'s certificate is expired or not trusted. Nothing was sent.</string>
+    <string name="compose_smime_err_signer">Your signing certificate can\'t be used. Pick again in Settings. Nothing was sent.</string>
+    <string name="compose_smime_err_own">Choose a decryption certificate in Settings to encrypt. Nothing was sent.</string>
+    <string name="compose_smime_err_failed">S/MIME couldn\'t protect this message. It was not sent.</string>
 </resources>

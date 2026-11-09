@@ -1155,4 +1155,18 @@
         <item quantity="one">%1$d enregistré</item>
         <item quantity="other">%1$d enregistrés</item>
     </plurals>
+    <string name="compose_smime_label">S/MIME</string>
+    <string name="compose_smime_sign">Signer</string>
+    <string name="compose_smime_encrypt">Chiffrer</string>
+    <string name="compose_smime_ready">%1$s : certificat prêt</string>
+    <string name="compose_smime_missing">Aucun certificat pour %1$s. Demandez-lui de vous envoyer un message signé, ou désactivez le chiffrement.</string>
+    <string name="compose_smime_unusable">Le certificat de %1$s est expiré ou non approuvé. Désactivez le chiffrement pour envoyer sans lui.</string>
+    <string name="compose_smime_pinned_unavailable">Le certificat épinglé pour %1$s n’est plus utilisable. Choisissez-en un autre dans Réglages, Certificats des contacts.</string>
+    <string name="compose_smime_err_missing">Un destinataire n’a pas de certificat. Rien n’a été envoyé.</string>
+    <string name="compose_smime_err_pinned">Un certificat de destinataire épinglé n’est plus utilisable. Choisissez-en un autre dans les réglages. Rien n’a été envoyé.</string>
+    <string name="compose_smime_err_ambiguous">Un destinataire a plusieurs certificats. Épinglez-en un dans les réglages. Rien n’a été envoyé.</string>
+    <string name="compose_smime_err_untrusted">Le certificat d’un destinataire est expiré ou non approuvé. Rien n’a été envoyé.</string>
+    <string name="compose_smime_err_signer">Votre certificat de signature est inutilisable. Choisissez-le à nouveau dans les réglages. Rien n’a été envoyé.</string>
+    <string name="compose_smime_err_own">Choisissez un certificat de déchiffrement dans les réglages pour chiffrer. Rien n’a été envoyé.</string>
+    <string name="compose_smime_err_failed">S/MIME n’a pas pu protéger ce message. Il n’a pas été envoyé.</string>
 </resources>

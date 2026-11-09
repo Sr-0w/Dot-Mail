@@ -1155,4 +1155,18 @@
         <item quantity="one">%1$d gespeichert</item>
         <item quantity="other">%1$d gespeichert</item>
     </plurals>
+    <string name="compose_smime_label">S/MIME</string>
+    <string name="compose_smime_sign">Signieren</string>
+    <string name="compose_smime_encrypt">Verschlüsseln</string>
+    <string name="compose_smime_ready">%1$s: Zertifikat bereit</string>
+    <string name="compose_smime_missing">Kein Zertifikat für %1$s. Bitten Sie um eine signierte Nachricht oder schalten Sie die Verschlüsselung aus.</string>
+    <string name="compose_smime_unusable">Das Zertifikat von %1$s ist abgelaufen oder nicht vertrauenswürdig. Schalten Sie die Verschlüsselung aus, um ohne es zu senden.</string>
+    <string name="compose_smime_pinned_unavailable">Das für %1$s angeheftete Zertifikat ist nicht mehr nutzbar. Wählen Sie ein anderes unter Einstellungen, Zertifikate der Kontakte.</string>
+    <string name="compose_smime_err_missing">Ein Empfänger hat kein Zertifikat. Es wurde nichts gesendet.</string>
+    <string name="compose_smime_err_pinned">Ein angeheftetes Empfängerzertifikat ist nicht mehr nutzbar. Wählen Sie ein anderes in den Einstellungen. Es wurde nichts gesendet.</string>
+    <string name="compose_smime_err_ambiguous">Ein Empfänger hat mehrere Zertifikate. Heften Sie eines in den Einstellungen an. Es wurde nichts gesendet.</string>
+    <string name="compose_smime_err_untrusted">Das Zertifikat eines Empfängers ist abgelaufen oder nicht vertrauenswürdig. Es wurde nichts gesendet.</string>
+    <string name="compose_smime_err_signer">Ihr Signaturzertifikat ist nicht nutzbar. Wählen Sie es in den Einstellungen erneut. Es wurde nichts gesendet.</string>
+    <string name="compose_smime_err_own">Wählen Sie in den Einstellungen ein Entschlüsselungszertifikat, um zu verschlüsseln. Es wurde nichts gesendet.</string>
+    <string name="compose_smime_err_failed">S/MIME konnte diese Nachricht nicht schützen. Sie wurde nicht gesendet.</string>
 </resources>

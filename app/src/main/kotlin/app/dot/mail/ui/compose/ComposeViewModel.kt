@@ -97,6 +97,13 @@ data class ComposeState(
     val pgpMissing: List<String> = emptyList(),
     val pgpOwnKeyMissing: Boolean = false,
     val pgpChecking: Boolean = false,
+    /** The sender's account has S/MIME set up (a KeyChain certificate): Sign/Encrypt are offered. */
+    val smimeAvailable: Boolean = false,
+    /** While encrypting: whether each recipient can be encrypted to right now (the lock state), keyed by lower-case address. */
+    val smimeRecipients: Map<String, app.dot.mail.data.RecipientCertStatus> = emptyMap(),
+    val smimeChecking: Boolean = false,
+    /** The account's KeyChain certificate is gone or unusable: "S/MIME unavailable, pick again". */
+    val smimeKeyProblem: Boolean = false,
     /** null means the alias picker is closed; an empty list is a visible loading/empty picker. */
     val aliasChoices: List<EmailAlias>? = null,
     val aliasLoading: Boolean = false,
@@ -122,6 +129,8 @@ data class ComposeState(
 
 /** The send was stopped before anything was queued (e.g. a recipient has no key). */
 private class PgpBlocked(message: String) : Exception(message)
+/** Encryption is on but a recipient cannot be encrypted to: nothing is sent, nothing is downgraded. */
+private class SmimeBlocked(message: String) : Exception(message)
 
 /** Hands an in-flight send to the root so the undo snackbar can outlive the compose screen. */
 object UndoSendBus {
@@ -146,6 +155,9 @@ class ComposeViewModel(
     /** (sign, encrypt) defaults of an account's settings for new messages. */
     private val pgpDefaults: (Long) -> Pair<Boolean, Boolean> = { false to false },
     private val aliasRepository: AliasRepository? = null,
+    /** S/MIME keys (Android KeyChain) and the trust policy used to send; null hides S/MIME. */
+    private val smimeKeys: app.dot.mail.data.SmimeKeyAccess? = null,
+    private val smimePolicy: app.dot.mail.engine.SmimeCertificatePolicy? = null,
 ) : ViewModel() {
     private fun str(resId: Int, fallback: String, vararg args: Any): String =
         strings?.invoke(resId, args) ?: fallback
@@ -166,6 +178,8 @@ class ComposeViewModel(
     /** Once the user removed/changed the signature by hand, From changes no longer re-apply the defaults. */
     private var signatureTouched = false
     private var pgpTouched = false
+    private var smimeTouched = false
+    private var smimeConfigs: Map<Long, app.dot.mail.data.model.SmimeAccountConfig> = emptyMap()
     private val keyCache = HashMap<String, Boolean>()
 
     init {
@@ -175,6 +189,7 @@ class ComposeViewModel(
                 a.identities.ifEmpty { listOf(Identity(a.id, a.id, a.displayName, a.email, isDefault = true)) }
                     .map { Sender(a.id, it.id, it.name, it.email, it.signature, it.signatureHtml, it.isDefault, it.signatureLogo, it.signatureOnNew, it.signatureOnReply) }
             }
+            smimeConfigs = accounts.associate { it.id to it.smime }
             val isExistingDraft = route.draftId != 0L
             val draft = when {
                 isExistingDraft -> graph.compose.loadDraft(route.draftId)
@@ -248,10 +263,14 @@ class ComposeViewModel(
                 draft = draft.copy(identityId = activeSender?.identityId ?: draft.identityId),
             )
             val pgpOn = base.pgpAvailable && !isExistingDraft
+            val smimeCfg = smimeConfigs[draft.accountId] ?: app.dot.mail.data.model.SmimeAccountConfig()
+            val smimeOn = smimeUsable(draft.accountId) && !isExistingDraft
             val pgpDefault = if (pgpOn) pgpDefaults(draft.accountId) else false to false
-            if (isExistingDraft) pgpTouched = true
+            if (isExistingDraft) { pgpTouched = true; smimeTouched = true }
             val prefilled = base.draft!!.copy(
                 pgpSign = if (pgpOn) pgpDefault.first else draft.pgpSign, pgpEncrypt = if (pgpOn) pgpDefault.second else draft.pgpEncrypt,
+                smimeSign = if (smimeOn && !(pgpDefault.first || pgpDefault.second)) smimeCfg.signByDefault else draft.smimeSign,
+                smimeEncrypt = if (smimeOn && !(pgpDefault.first || pgpDefault.second)) smimeCfg.encryptByDefault else draft.smimeEncrypt,
                 to = draft.to + route.to.map(::parseAddress),
                 cc = draft.cc + route.cc.map(::parseAddress),
                 bcc = draft.bcc + route.bcc.map(::parseAddress),
@@ -274,9 +293,11 @@ class ComposeViewModel(
                     signatureSourceKey = sigSource,
                     isReplyContext = isReply,
                     pgpAvailable = pgp?.available() == true,
+                    smimeAvailable = smimeUsable(prefilled.accountId),
                 )
             }
             watchPgpKeys()
+            watchSmime()
             // Autosave, debounced: a crash or process death never loses more than ~1.5 s of typing.
             _state.map { it.draft to it.bodyHtml }.distinctUntilChanged().drop(1).debounce(1_500).collect {
                 val s = _state.value
@@ -400,9 +421,11 @@ class ComposeViewModel(
             val (sign, encrypt) = pgpDefaults(sender.accountId)
             edit { it.copy(pgpSign = sign, pgpEncrypt = encrypt) }
         }
-        if (!pgpTouched && _state.value.pgpAvailable && d.accountId != sender.accountId) {
-            val (sign, encrypt) = pgpDefaults(sender.accountId)
-            edit { it.copy(pgpSign = sign, pgpEncrypt = encrypt) }
+        _state.update { it.copy(smimeAvailable = smimeUsable(sender.accountId)) }
+        if (!smimeTouched && d.accountId != sender.accountId) {
+            val cfg = smimeConfigs[sender.accountId]
+            val on = smimeUsable(sender.accountId) && _state.value.draft?.let { !it.pgpSign && !it.pgpEncrypt } == true
+            edit { it.copy(smimeSign = on && cfg?.signByDefault == true, smimeEncrypt = on && cfg?.encryptByDefault == true) }
         }
         // The signature lives outside the editor text, so the swap can never touch what the user wrote.
         _state.update { s ->
@@ -517,7 +540,40 @@ class ComposeViewModel(
 
     fun setPgp(sign: Boolean? = null, encrypt: Boolean? = null) {
         pgpTouched = true
-        edit { it.copy(pgpSign = sign ?: it.pgpSign, pgpEncrypt = encrypt ?: it.pgpEncrypt) }
+        // One protection scheme per message: turning OpenPGP on turns S/MIME off.
+        val on = sign == true || encrypt == true
+        edit { it.copy(pgpSign = sign ?: it.pgpSign, pgpEncrypt = encrypt ?: it.pgpEncrypt, smimeSign = if (on) false else it.smimeSign, smimeEncrypt = if (on) false else it.smimeEncrypt) }
+    }
+
+    /** S/MIME is offered only for an account with a KeyChain certificate set (Settings). */
+    private fun smimeUsable(accountId: Long): Boolean {
+        val cfg = smimeConfigs[accountId] ?: return false
+        return smimeKeys != null && smimePolicy != null && (cfg.signingKeyChainAlias != null || cfg.decryptionKeyChainAlias != null)
+    }
+
+    fun setSmime(sign: Boolean? = null, encrypt: Boolean? = null) {
+        smimeTouched = true
+        val on = sign == true || encrypt == true
+        edit { it.copy(smimeSign = sign ?: it.smimeSign, smimeEncrypt = encrypt ?: it.smimeEncrypt, pgpSign = if (on) false else it.pgpSign, pgpEncrypt = if (on) false else it.pgpEncrypt) }
+    }
+
+    /** While S/MIME is on: keeps the per-recipient lock state and the key check in step with the message (debounced). */
+    private fun watchSmime() {
+        val keys = smimeKeys ?: return
+        viewModelScope.launch {
+            _state.map { s -> listOf(s.draft?.smimeEncrypt == true, s.draft?.smimeSign == true, s.draft?.let(::recipientsOf).orEmpty(), s.draft?.accountId, s.smimeAvailable) }
+                .distinctUntilChanged().debounce(350).collect {
+                    val s = _state.value; val d = s.draft ?: return@collect
+                    if (!s.smimeAvailable || !(d.smimeEncrypt || d.smimeSign)) { _state.update { it.copy(smimeRecipients = emptyMap(), smimeChecking = false, smimeKeyProblem = false) }; return@collect }
+                    _state.update { it.copy(smimeChecking = true) }
+                    val recipients = if (d.smimeEncrypt) runCatching { graph.smime.recipientStatus(d.accountId, recipientsOf(d)) }.getOrDefault(emptyMap()) else emptyMap()
+                    val problem = runCatching {
+                        if (d.smimeSign) keys.signingIdentity(d.accountId)
+                        if (d.smimeEncrypt) keys.decryptionCertificate(d.accountId)
+                    }.isFailure
+                    _state.update { it.copy(smimeRecipients = recipients, smimeChecking = false, smimeKeyProblem = problem) }
+                }
+        }
     }
 
     private fun recipientsOf(d: Draft) = (d.to + d.cc + d.bcc).map { it.email }.distinctBy { it.lowercase() }
@@ -682,7 +738,9 @@ class ComposeViewModel(
                         scheduledAt = scheduledAt,
                     )
                     val saved = graph.compose.saveDraft(current)
-                    val queued = if (current.pgpSign || current.pgpEncrypt) {
+                    val queued = if (current.smimeSign || current.smimeEncrypt) {
+                        sendWithSmime(current.copy(localId = saved))
+                    } else if (current.pgpSign || current.pgpEncrypt) {
                         val service = requireNotNull(pgp) { "OpenPGP is not available" }
                         if (current.pgpEncrypt) {
                             val missing = recipientsOf(current).filterNot { hasKey(it) }
@@ -705,7 +763,9 @@ class ComposeViewModel(
                     it.copy(
                         sending = false,
                         error = when {
-                            e is PgpBlocked -> e.message
+                            e is PgpBlocked || e is SmimeBlocked -> e.message
+                            e is app.dot.mail.data.SmimeUnavailableException -> str(R.string.smime_key_unavailable, "S/MIME unavailable, pick again")
+                            e is app.dot.mail.engine.SmimeProtectionException -> smimeFailureText(e.failure)
                             e is app.dot.mail.ui.pgp.OpenKeychain.PgpException && e.cancelled -> str(R.string.compose_pgp_error_cancelled, "Sending was cancelled")
                             e is app.dot.mail.ui.pgp.OpenKeychain.PgpException -> str(R.string.compose_pgp_error_failed, "OpenPGP couldn't protect this message")
                             e is app.dot.mail.data.model.MailActionException -> app.dot.mail.ui.common.ErrorText.action(e, { id, args -> str(id, "", *args) }, { it.name.lowercase() })
@@ -716,6 +776,40 @@ class ComposeViewModel(
                 }
             }
         }
+    }
+
+    /** Builds and queues the S/MIME message; anything that stops encryption stops the send (no downgrade to plaintext). */
+    private suspend fun sendWithSmime(current: Draft): Long {
+        val keys = requireNotNull(smimeKeys) { "S/MIME is not available" }
+        val policy = requireNotNull(smimePolicy) { "S/MIME is not available" }
+        if (current.smimeEncrypt) {
+            val statuses = graph.smime.recipientStatus(current.accountId, recipientsOf(current))
+            _state.update { it.copy(smimeRecipients = statuses) }
+            val blocked = statuses.entries.firstOrNull { it.value != app.dot.mail.data.RecipientCertStatus.USABLE }
+            if (blocked != null) throw SmimeBlocked(smimeRecipientText(blocked.key, blocked.value))
+        }
+        return graph.compose.sendSmime(current, undoSeconds() * 1_000L, graph.compose.smimeBuilder(keys, policy))
+    }
+
+    /** Why [address] cannot be encrypted to, in the user's language. */
+    fun smimeRecipientText(address: String, status: app.dot.mail.data.RecipientCertStatus): String = when (status) {
+        app.dot.mail.data.RecipientCertStatus.MISSING -> str(R.string.compose_smime_missing, "No certificate for %s. Ask them to send you a signed message, or turn encryption off.", address)
+        app.dot.mail.data.RecipientCertStatus.UNUSABLE -> str(R.string.compose_smime_unusable, "The certificate for %s is expired or not trusted. Turn encryption off to send without it.", address)
+        app.dot.mail.data.RecipientCertStatus.PINNED_UNAVAILABLE -> str(R.string.compose_smime_pinned_unavailable, "The certificate you pinned for %s can no longer be used. Pick another in Settings, Contact certificates.", address)
+        app.dot.mail.data.RecipientCertStatus.USABLE -> address
+    }
+
+    private fun smimeFailureText(f: app.dot.mail.engine.SmimeFailure): String = when (f) {
+        app.dot.mail.engine.SmimeFailure.RECIPIENT_CERTIFICATE_MISSING -> str(R.string.compose_smime_err_missing, "A recipient has no certificate. Nothing was sent.")
+        app.dot.mail.engine.SmimeFailure.RECIPIENT_PINNED_CERTIFICATE_UNAVAILABLE -> str(R.string.compose_smime_err_pinned, "A pinned recipient certificate can no longer be used. Pick another in Settings. Nothing was sent.")
+        app.dot.mail.engine.SmimeFailure.RECIPIENT_CERTIFICATE_AMBIGUOUS -> str(R.string.compose_smime_err_ambiguous, "A recipient has several certificates. Pin one in Settings. Nothing was sent.")
+        app.dot.mail.engine.SmimeFailure.RECIPIENT_CERTIFICATE_REJECTED, app.dot.mail.engine.SmimeFailure.RECIPIENT_REVOCATION_UNKNOWN ->
+            str(R.string.compose_smime_err_untrusted, "A recipient's certificate is expired or not trusted. Nothing was sent.")
+        app.dot.mail.engine.SmimeFailure.SIGNER_REQUIRED, app.dot.mail.engine.SmimeFailure.SIGNER_CERTIFICATE_REJECTED, app.dot.mail.engine.SmimeFailure.SIGNER_REVOCATION_UNKNOWN ->
+            str(R.string.compose_smime_err_signer, "Your signing certificate can't be used. Pick again in Settings. Nothing was sent.")
+        app.dot.mail.engine.SmimeFailure.SENDER_DECRYPTION_CERTIFICATE_REQUIRED ->
+            str(R.string.compose_smime_err_own, "Choose a decryption certificate in Settings to encrypt. Nothing was sent.")
+        else -> str(R.string.compose_smime_err_failed, "S/MIME couldn't protect this message. It was not sent.")
     }
 
     /** Leaving with something written asks first (save or discard); an empty composer just closes. */

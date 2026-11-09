@@ -138,4 +138,27 @@ class SmimeKeysTest {
         val stored = Codec.config(db.mail().account(id)!!.config).smime
         assertEquals("sign", stored.signingKeyChainAlias); assertEquals("dec", stored.decryptionKeyChainAlias)
     }
+
+    @Test fun recipientStatusSeparatesMissingUnusableUsableAndPinnedUnavailable() = runBlocking<Unit> {
+        val cfg = AccountConfig("me@example.org", "Me", ServerConfig("h", 993, Security.SSL_TLS, "me"), ServerConfig("h", 465, Security.SSL_TLS, "me"))
+        val id = graph.addAccount(cfg, "pw")
+        graph.smimeCerts.collect(id, "alice@example.org", cert("alice-san"), true)
+        graph.smimeCerts.collect(id, "bob@example.org", cert("bob-subject-only"), true)
+        val rejectBob = object : SmimeCertificatePolicy {
+            override fun validate(certificate: X509Certificate, mailbox: String, use: SmimeCertificateUse) = validateChain(listOf(certificate), mailbox, use)
+            override fun validateChain(certificates: Collection<X509Certificate>, mailbox: String, use: SmimeCertificateUse) =
+                if (mailbox == "bob@example.org") SmimeCertificateVerdict.Rejected("not trusted") else SmimeCertificateVerdict.Trusted
+        }
+        graph.recipientPolicy = rejectBob
+        val boxes = listOf("Alice@example.org", "bob@example.org", "nobody@example.org")
+        assertEquals(mapOf("alice@example.org" to RecipientCertStatus.USABLE, "bob@example.org" to RecipientCertStatus.UNUSABLE, "nobody@example.org" to RecipientCertStatus.MISSING), graph.smime.recipientStatus(id, boxes))
+        // A pin on a certificate that stopped being usable is reported distinctly, never replaced by another one.
+        graph.smimeCerts.pin(id, "bob@example.org", SmimeCertStore.fingerprint(cert("bob-subject-only")))
+        assertEquals(RecipientCertStatus.PINNED_UNAVAILABLE, graph.smime.recipientStatus(id, listOf("bob@example.org")).getValue("bob@example.org"))
+        graph.recipientPolicy = object : SmimeCertificatePolicy {
+            override fun validate(certificate: X509Certificate, mailbox: String, use: SmimeCertificateUse) = SmimeCertificateVerdict.Trusted
+            override fun validateChain(certificates: Collection<X509Certificate>, mailbox: String, use: SmimeCertificateUse) = SmimeCertificateVerdict.Trusted
+        }
+        assertEquals(RecipientCertStatus.USABLE, graph.smime.recipientStatus(id, listOf("bob@example.org")).getValue("bob@example.org")) // trust is judged again at every call
+    }
 }

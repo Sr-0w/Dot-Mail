@@ -48,6 +48,9 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import kotlinx.coroutines.flow.first
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.automirrored.outlined.Subject
@@ -178,6 +181,8 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
             pgp = app.dot.mail.ui.pgp.OpenKeychainService(appContext),
             pgpDefaults = { id -> app.dot.mail.data.AccountSettingsStore.get(appContext).current(id).let { it.pgpSignDefault to it.pgpEncryptDefault } },
             aliasRepository = AndroidAliasRepository(appContext),
+            smimeKeys = app.dot.mail.data.KeyChainSmimeKeys(appContext, { id -> graph.accounts.accounts.first().firstOrNull { it.id == id }?.smime ?: app.dot.mail.data.model.SmimeAccountConfig() }),
+            smimePolicy = app.dot.mail.data.SmimeTrustPolicy(),
         )
     }
     // OpenKeychain's own screens (passphrase, key choice) during an encrypted/signed send.
@@ -417,6 +422,7 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
             }
             Hairline()
             if (state.pgpAvailable) PgpRow(state, vm)
+            if (state.smimeAvailable) SmimeRow(state, vm)
             state.error?.let {
                 Text(it, style = Dot.type.caption, color = c.danger, modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s))
             }
@@ -1246,6 +1252,40 @@ private fun SignatureRow(state: ComposeState, vm: ComposeViewModel) {
             others.forEach { o ->
                 DotMenuItem(stringResource(R.string.compose_signature_use, o.email), null) { menu = false; vm.useSignatureOf(o) }
             }
+        }
+    }
+}
+
+/** S/MIME Sign / Encrypt (shown only for an account with a KeyChain certificate), with a lock per recipient while encrypting. */
+@Composable
+private fun SmimeRow(state: ComposeState, vm: ComposeViewModel) {
+    val c = Dot.colors
+    val draft = state.draft ?: return
+    Column(Modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter)) {
+        Text(stringResource(R.string.compose_smime_label), style = Dot.type.caption, color = c.textTertiary, modifier = Modifier.padding(top = DotSpacing.xs))
+        Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(DotSpacing.s), verticalAlignment = Alignment.CenterVertically) {
+            app.dot.design.components.DotFilterChip(stringResource(R.string.compose_smime_sign), draft.smimeSign, { vm.setSmime(sign = !draft.smimeSign) })
+            app.dot.design.components.DotFilterChip(stringResource(R.string.compose_smime_encrypt), draft.smimeEncrypt, { vm.setSmime(encrypt = !draft.smimeEncrypt) })
+        }
+        if (state.smimeKeyProblem) {
+            Text(stringResource(R.string.smime_key_unavailable), style = Dot.type.caption, color = c.danger, modifier = Modifier.padding(bottom = DotSpacing.xs))
+        }
+        if (draft.smimeEncrypt) {
+            if (state.smimeChecking && state.smimeRecipients.isEmpty()) Text(stringResource(R.string.compose_pgp_checking), style = Dot.type.caption, color = c.textTertiary)
+            state.smimeRecipients.forEach { (address, status) ->
+                val ok = status == app.dot.mail.data.RecipientCertStatus.USABLE
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
+                    Icon(
+                        if (ok) androidx.compose.material.icons.Icons.Outlined.Lock else androidx.compose.material.icons.Icons.Outlined.LockOpen,
+                        contentDescription = null, tint = if (ok) c.textSecondary else c.danger, modifier = Modifier.size(14.dp),
+                    )
+                    Text(
+                        if (ok) stringResource(R.string.compose_smime_ready, address) else vm.smimeRecipientText(address, status),
+                        style = Dot.type.caption, color = if (ok) c.textSecondary else c.danger, modifier = Modifier.padding(start = DotSpacing.xs),
+                    )
+                }
+            }
+            Text(stringResource(R.string.compose_pgp_draft_local), style = Dot.type.caption, color = c.textTertiary, modifier = Modifier.padding(bottom = DotSpacing.xs))
         }
     }
 }
