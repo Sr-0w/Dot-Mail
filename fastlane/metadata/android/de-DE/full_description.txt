@@ -26,6 +26,6 @@
 </ul>
 
 <h3>Status</h3>
-<p>Dot Mail ist jung: verwendbar und getestet, aber noch nicht auf Tausenden von Postfächern abgehärtet. Die Anmeldung mit Passwort und App-Passwort funktioniert heute; die OAuth-Anmeldung (nötig für Outlook/Hotmail-Personalkonten) ist noch nicht implementiert, ebenso wenig OpenPGP/S-MIME oder mehrere Absender-Aliase pro Konto. Die Synchronisierung im Hintergrund läuft alle 15 Minuten, dazu Live-Updates (IDLE), während die App geöffnet ist.</p>
+<p>Dot Mail ist jung: verwendbar und getestet, aber noch nicht auf Tausenden von Postfächern abgehärtet. Die Anmeldung mit Passwort, App-Passwort und Google funktioniert heute. Microsoft-Konten (Outlook, Hotmail, Live) werden nicht unterstützt, und S/MIME ist noch nicht implementiert. Die Synchronisierung im Hintergrund läuft alle 15 Minuten, dazu Live-Updates (IDLE), während die App geöffnet ist.</p>
 
 <p>100&nbsp;% Kotlin und Jetpack Compose, ohne plattformübergreifende Schicht. Dot Mail ist die erste einer geplanten Familie unabhängiger, die Privatsphäre respektierender „Dot"-Apps mit gemeinsamem Design.</p>

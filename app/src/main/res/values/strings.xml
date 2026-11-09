@@ -107,7 +107,7 @@
     <string name="setup_status_signing_in">Signing in to %1$s…</string>
     <string name="setup_status_setting_up">Setting up your mailbox…</string>
     <string name="setup_error_not_found">We couldn\'t find settings for this address. Check them below.</string>
-    <string name="setup_error_oauth_only">%1$s requires browser sign-in (OAuth), which isn\'t available in this version yet.</string>
+    <string name="setup_error_oauth_only">%1$s requires browser sign-in (OAuth), which Dot Mail doesn\'t support for this provider.</string>
     <string name="setup_this_provider">This provider</string>
     <string name="setup_error_unencrypted">This provider only advertises unencrypted settings. Review the security options below before continuing.</string>
     <string name="setup_error_save_failed">Couldn\'t save the account.</string>
@@ -1096,4 +1096,10 @@
     <string name="action_error_draft_account_change">Start a new draft to use another account.</string>
     <string name="thread_action_next_conversation">Next conversation</string>
     <string name="thread_action_previous_conversation">Previous conversation</string>
+    <string name="setup_hint_gmail">Gmail: use an app password (Google Account → Security → App passwords).</string>
+    <string name="setup_hint_yahoo">Yahoo: use an app password (Yahoo Account → Account security → App passwords).</string>
+    <string name="setup_hint_icloud">iCloud: use an app-specific password (appleid.apple.com → Sign-In &amp; Security → App-Specific Passwords).</string>
+    <string name="setup_hint_proton">Proton Mail doesn\'t offer IMAP access on Android (Proton Mail Bridge is desktop-only). Use the Proton Mail app instead.</string>
+    <string name="setup_hint_microsoft">Microsoft accounts (Outlook, Hotmail, Live, Microsoft 365) can\'t be added: Microsoft no longer allows password sign-in for them.</string>
+    <string name="setup_hint_insecure">This provider advertised unencrypted settings (no TLS). Confirm in manual setup before signing in.</string>
 </resources>

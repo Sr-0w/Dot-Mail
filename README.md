@@ -103,11 +103,11 @@ Here is exactly where it stands — see [docs/FEATURES.md](docs/FEATURES.md) for
 
 | Works today | Not yet |
 |---|---|
-| IMAP/SMTP with password or app password | OAuth sign-in (needed for Outlook/Hotmail; optional for Gmail) |
+| IMAP/SMTP with password or app password, Google sign-in | Microsoft (Outlook/Hotmail/Live) accounts: not supported |
 | Unified inbox, threads, search, folder management | Push while the app is closed (sync every 15 min instead) |
 | Offline cache, queued actions, background sync, IDLE while open | Calendar invitation UI (the .ics parser is done) |
-| Rich-text or plain-text composing, aliases with signatures | OpenPGP / S/MIME |
-| Undo / scheduled send, drafts, attachments | Translations (French and German first) |
+| Rich-text or plain-text composing, aliases with signatures | S/MIME |
+| Undo / scheduled send, drafts, attachments | Second-exact scheduled delivery (Android may delay background work) |
 | Remote images per message, sender or domain — remembered | |
 | Notifications with actions, app lock, home-screen widget | |
 
