@@ -466,7 +466,7 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                     Column {
                         if (state.aliasLoading) {
                             Row(Modifier.fillMaxWidth().padding(vertical = DotSpacing.m), horizontalArrangement = Arrangement.Center) {
-                                androidx.compose.material3.CircularProgressIndicator(color = c.textTertiary, strokeWidth = 1.5.dp)
+                                app.dot.design.components.DotSpinner(size = 22.dp, color = c.textTertiary)
                             }
                         }
                         if (state.aliasProviderErrors.isNotEmpty()) {
@@ -480,7 +480,7 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                                 title = alias.email,
                                 onClick = if (state.aliasUsing == null) ({ vm.useAlias(alias) }) else null,
                                 trailing = if (state.aliasUsing == alias.email) ({
-                                    androidx.compose.material3.CircularProgressIndicator(Modifier.size(18.dp), color = c.textTertiary, strokeWidth = 1.5.dp)
+                                    app.dot.design.components.DotSpinner(size = 18.dp, color = c.textTertiary)
                                 }) else null,
                             )
                         }

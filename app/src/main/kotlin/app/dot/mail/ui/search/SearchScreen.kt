@@ -16,7 +16,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material.icons.outlined.WifiOff
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
@@ -211,7 +210,7 @@ fun SearchScreen(onBack: () -> Unit, onOpenThread: (Long) -> Unit, folderId: Lon
             SearchDisplayState.IDLE -> SearchHints()
             SearchDisplayState.SEARCHING ->
                 Box(Modifier.fillMaxSize().padding(top = 64.dp), contentAlignment = Alignment.TopCenter) {
-                    CircularProgressIndicator(Modifier.size(22.dp), color = c.textTertiary, strokeWidth = 1.5.dp)
+                    app.dot.design.components.DotSpinner(size = 22.dp, color = c.textTertiary)
                 }
             SearchDisplayState.ERROR ->
                 EmptyState(Icons.Outlined.WifiOff, stringResource(R.string.search_error_title), (results.loadState.refresh as LoadState.Error).error.message ?: stringResource(R.string.search_error_body))
