@@ -139,6 +139,7 @@ fun AttachmentsScreen(onBack: () -> Unit) {
     val kind by vm.kind.collectAsStateWithLifecycle()
     val items = vm.items.collectAsLazyPagingItems()
     val context = LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val snackbar = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
     val c = Dot.colors
@@ -163,7 +164,7 @@ fun AttachmentsScreen(onBack: () -> Unit) {
                     val intent = if (e.share) Intent(Intent.ACTION_SEND).setType(e.mime).putExtra(Intent.EXTRA_STREAM, uri)
                     else Intent(Intent.ACTION_VIEW).setDataAndType(uri, e.mime)
                     try { context.startActivity(Intent.createChooser(intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), e.name)) }
-                    catch (_: ActivityNotFoundException) { snackbar.showSnackbar(context.getString(R.string.thread_no_app_to_open, e.name)) }
+                    catch (_: ActivityNotFoundException) { snackbar.showSnackbar(resources.getString(R.string.thread_no_app_to_open, e.name)) }
                 }
             }
         }
@@ -228,7 +229,7 @@ private fun label(k: AttachmentKind) = when (k) {
 private fun MonthHeader(month: YearMonth) {
     val text = remember(month) { DateTimeFormatter.ofPattern(android.text.format.DateFormat.getBestDateTimePattern(Locale.getDefault(), "LLLL yyyy"), Locale.getDefault()).format(month).replaceFirstChar { it.titlecase(Locale.getDefault()) } }
     Text(
-        text.uppercase(Locale.getDefault()), style = Dot.type.overline, color = Dot.colors.textTertiary,
+        text.uppercase(androidx.compose.ui.text.intl.Locale.current.platformLocale), style = Dot.type.overline, color = Dot.colors.textTertiary,
         modifier = Modifier.fillMaxWidth().padding(start = DotSpacing.gutter, end = DotSpacing.gutter, top = DotSpacing.l, bottom = DotSpacing.xs)
             .androidxHeading(),
     )

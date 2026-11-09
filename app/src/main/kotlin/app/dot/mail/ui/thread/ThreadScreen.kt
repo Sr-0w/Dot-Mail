@@ -350,6 +350,7 @@ fun ThreadScreen(
     val remoteRules by remotePolicy.rules.collectAsStateWithLifecycle()
     val prefs by LocalSettings.current.ui.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val snackbar = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
     var pendingLink by remember { mutableStateOf<String?>(null) }
@@ -359,7 +360,8 @@ fun ThreadScreen(
     var pdfPreview by remember { mutableStateOf<ThreadEvent.OpenUri?>(null) }
     var menu by remember { mutableStateOf(false) }
     var snoozing by remember { mutableStateOf(false) }
-    val muted by remember(graph, threadId) { graph.mail.mutedThreads() }.collectAsStateWithLifecycle(emptySet()).let { s -> androidx.compose.runtime.derivedStateOf { threadId in s.value || (messages?.firstOrNull()?.threadId?.let { it in s.value } == true) } }
+    val mutedThreads by remember(graph, threadId) { graph.mail.mutedThreads() }.collectAsStateWithLifecycle(emptySet())
+    val muted = threadId in mutedThreads || (messages?.firstOrNull()?.threadId?.let { it in mutedThreads } == true)
     var showMove by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var confirmTrash by remember { mutableStateOf(false) }
@@ -399,7 +401,7 @@ fun ThreadScreen(
                     try {
                         context.startActivity(Intent.createChooser(intent, e.name))
                     } catch (_: ActivityNotFoundException) {
-                        scope.launch { snackbar.showSnackbar(context.getString(R.string.thread_no_app_to_open, e.name)) }
+                        scope.launch { snackbar.showSnackbar(resources.getString(R.string.thread_no_app_to_open, e.name)) }
                     }
                 }
             }
@@ -628,7 +630,7 @@ fun ThreadScreen(
             val intent = (if (share) Intent(Intent.ACTION_SEND).setType(pdf.mime).putExtra(Intent.EXTRA_STREAM, uri)
             else Intent(Intent.ACTION_VIEW).setDataAndType(uri, pdf.mime)).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             try { context.startActivity(Intent.createChooser(intent, pdf.name)) }
-            catch (_: ActivityNotFoundException) { scope.launch { snackbar.showSnackbar(context.getString(R.string.thread_no_app_to_open, pdf.name)) } }
+            catch (_: ActivityNotFoundException) { scope.launch { snackbar.showSnackbar(resources.getString(R.string.thread_no_app_to_open, pdf.name)) } }
         }
         app.dot.mail.ui.pdf.PdfViewerDialog(
             uri = pdf.uri, name = pdf.name,
@@ -1050,6 +1052,7 @@ private fun CalendarInvites(message: Message) {
     if (parts.isEmpty()) return
     val graph = LocalMailGraph.current
     val context = LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val invites by androidx.compose.runtime.produceState(emptyList<app.dot.mail.engine.calendar.Ics.CalendarInvite>(), parts) {
         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             parts.flatMap { a ->
@@ -1100,7 +1103,7 @@ private fun CalendarInvites(message: Message) {
                 }
             },
             onAddToCalendar = {
-                try { context.startActivity(app.dot.mail.ui.calendar.insertEventIntent(invite, context.getString(R.string.calendar_event_fallback))) }
+                try { context.startActivity(app.dot.mail.ui.calendar.insertEventIntent(invite, resources.getString(R.string.calendar_event_fallback))) }
                 catch (_: ActivityNotFoundException) { }
             },
             use24h = use24h,

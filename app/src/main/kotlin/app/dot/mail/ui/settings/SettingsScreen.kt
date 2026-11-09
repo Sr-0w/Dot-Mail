@@ -127,6 +127,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
     val prefs by settings.ui.collectAsStateWithLifecycle()
     val accounts by graph.accounts.accounts.collectAsStateWithLifecycle(emptyList())
     val context = LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val scope = rememberCoroutineScope()
     val scroll = rememberScrollState()
     var removing by remember { mutableStateOf<Account?>(null) }
@@ -369,7 +370,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             ) { v ->
                 scope.launch {
                     if (!graph.mail.setInstantNotificationsEnabled(v) && v) {
-                        android.widget.Toast.makeText(context, context.getString(R.string.settings_instant_failed), android.widget.Toast.LENGTH_LONG).show()
+                        android.widget.Toast.makeText(context, resources.getString(R.string.settings_instant_failed), android.widget.Toast.LENGTH_LONG).show()
                     }
                 }
             }
