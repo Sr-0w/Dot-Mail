@@ -31,7 +31,7 @@ internal class StorageBodies(private val graph:RealMailGraph,private val manager
     suspend fun ensure(id:Long,automatic:Boolean=false,attachments:Boolean=false) = withContext(Dispatchers.IO) { locked(id) {
         val message=graph.dao.message(id) ?: return@locked
         if(!automatic) touch(id)
-        val valid=message.bodyLoaded && (message.bodyPath==null || File(message.bodyPath).let { File(it,".complete").exists() || File(it,"plain.txt").exists() || File(it,"body.html").exists() })
+        val valid=message.bodyLoaded && (message.bodyPath==null || File(message.bodyPath).let { File(it,".complete").exists() || File(it,"plain.txt").exists() || File(it,"body.html").exists() }) && (message.bodyPath==null || !graph.bodyStore.legacySmime(id,File(message.bodyPath)))
         if(valid) return@locked
         val (folder,account,credentials)=source(message); val config=Codec.config(account.config)
         graph.client.withImapSession(config.imap.endpoint(),credentials) {
@@ -55,7 +55,7 @@ internal class StorageBodies(private val graph:RealMailGraph,private val manager
                 val old=previous[part.partId]
                 AttachmentRow(id=old?.id ?: 0,messageId=id,partId=part.partId,name=part.name,mime=part.mimeType,size=saved[part.partId]?.let { files.uriFile(it)?.length() } ?: part.size,cid=part.contentId,inline=part.inline,localUri=saved[part.partId] ?: old?.localUri?.takeIf(files::exists))
             }
-            File(directory,".complete").writeText("")
+            File(directory,".complete").writeText(""); File(directory,BodyStore.FORMAT_MARKER).writeText("")
             val temporary=message.copy(bodyLoaded=true,bodyPath=directory.absolutePath)
             val preview=graph.bodyStore.read(temporary)
             val remote=preview?.html?.let { HtmlSanitizer.sanitize(it).hasRemoteImages } ?: false
