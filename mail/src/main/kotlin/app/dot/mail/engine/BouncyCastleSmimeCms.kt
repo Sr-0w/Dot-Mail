@@ -55,6 +55,18 @@ internal class BouncyCastleSmimeCms : SmimeCms {
     ): List<SmimeCmsSignerResult> {
         val signed = CMSSignedData(CMSProcessableByteArray(entity), signature)
         require(signed.isDetachedSignature) { "Expected detached CMS SignedData" }
+        return verifySigners(signed, certificateCandidates)
+    }
+
+    override fun verifyEncapsulated(cms: ByteArray, certificateCandidates: Collection<X509Certificate>): SmimeCmsEncapsulated {
+        val signed = CMSSignedData(cms)
+        require(!signed.isDetachedSignature) { "Expected CMS SignedData with encapsulated content" }
+        val content = signed.signedContent?.content as? ByteArray ?: throw SmimeProtectionException(SmimeFailure.INVALID_CMS, "The CMS object has no signed content")
+        // BouncyCastle digests the encapsulated content itself when each signer is verified below.
+        return SmimeCmsEncapsulated(content, verifySigners(signed, certificateCandidates))
+    }
+
+    private fun verifySigners(signed: CMSSignedData, certificateCandidates: Collection<X509Certificate>): List<SmimeCmsSignerResult> {
         val embedded = signed.certificates.getMatches(null).toList()
         val external = certificateCandidates.map(::JcaX509CertificateHolder)
         val available = (embedded + external).distinctBy { it.issuer.toString() to it.serialNumber }

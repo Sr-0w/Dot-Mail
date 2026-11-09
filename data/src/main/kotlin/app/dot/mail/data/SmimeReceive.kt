@@ -28,7 +28,19 @@ internal suspend fun verifySmimeSignature(
     policy: SmimeCertificatePolicy,
     certs: SmimeCertStore?,
 ): SmimeSignatureView? {
-    val signed = message.body?.smime as? SmimeContent.Signed ?: return null
+    val content = message.body?.smime
+    if (content is SmimeContent.Opaque) return withContext(Dispatchers.IO) {
+        val file = File(content.cms)
+        if (!file.isFile || file.length() > MAX_SIGNED_ENTITY) return@withContext SmimeSignatureView(State.UNREADABLE)
+        val from = SmimeCertStore.normalize(message.from.email)
+        val verification = try {
+            SmimeEngine(certificatePolicy = policy).verifyOpaque(file.readBytes(), from).verification
+        } catch (e: Exception) {
+            return@withContext SmimeSignatureView(State.UNREADABLE)
+        }
+        summarize(verification, from, message.accountId, certs)
+    }
+    val signed = content as? SmimeContent.Signed ?: return null
     return withContext(Dispatchers.IO) {
         val entityFile = File(signed.signedEntity); val signatureFile = File(signed.signature)
         if (!entityFile.isFile || !signatureFile.isFile || entityFile.length() > MAX_SIGNED_ENTITY || signatureFile.length() > MAX_SIGNATURE) {
@@ -108,13 +120,27 @@ internal suspend fun decryptSmimeMessage(
             }
         }
         val from = SmimeCertStore.normalize(message.from.email)
-        val signature = if (isDetachedSigned(plain)) {
-            runCatching { summarize(engine.verifySignedMime(plain, from), from, message.accountId, certs) }.getOrElse { SmimeSignatureView(State.UNREADABLE) }
-        } else null
-        val parsed = app.dot.mail.engine.Pgp.parseDecrypted(plain, mime = true)
+        // Sign-then-encrypt: the decrypted entity may carry a detached signature or be opaque-signed (Outlook).
+        var content = plain
+        val signature = when {
+            isDetachedSigned(plain) -> runCatching { summarize(engine.verifySignedMime(plain, from), from, message.accountId, certs) }.getOrElse { SmimeSignatureView(State.UNREADABLE) }
+            opaqueCms(plain) != null -> runCatching {
+                val opaque = engine.verifyOpaque(opaqueCms(plain)!!, from)
+                content = opaque.content
+                summarize(opaque.verification, from, message.accountId, certs)
+            }.getOrElse { SmimeSignatureView(State.UNREADABLE) }
+            else -> null
+        }
+        val parsed = app.dot.mail.engine.Pgp.parseDecrypted(content, mime = true)
         app.dot.mail.data.model.SmimeDecryption.Done(app.dot.mail.data.model.MessageBody(parsed.text, parsed.html, hasRemoteImages = false), signature)
     }
 }
+
+/** The CMS bytes of an opaque-signed entity (application/pkcs7-mime; smime-type=signed-data), transfer encoding removed, else null. */
+private fun opaqueCms(entity: ByteArray): ByteArray? = runCatching {
+    val part = jakarta.mail.internet.MimeBodyPart(entity.inputStream())
+    if (app.dot.mail.engine.SmimeParts.isOpaqueSigned(part.contentType)) part.inputStream.use { it.readBytes() } else null
+}.getOrNull()
 
 private fun isDetachedSigned(entity: ByteArray): Boolean = runCatching {
     val type = jakarta.mail.internet.MimeBodyPart(entity.inputStream()).contentType

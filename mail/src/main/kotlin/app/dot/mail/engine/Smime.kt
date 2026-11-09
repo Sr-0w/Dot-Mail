@@ -44,6 +44,12 @@ data class SmimeCmsSignerResult(
     val cryptographicSignatureValid: Boolean,
 )
 
+/** Content carried inside an opaque (encapsulated) CMS SignedData, with the per-signer outcome of verifying it. */
+class SmimeCmsEncapsulated(val content: ByteArray, val signers: List<SmimeCmsSignerResult>)
+
+/** Result of [SmimeEngine.verifyOpaque]: the signed MIME entity that was inside the signature, and its verification. */
+class SmimeOpaqueResult(val content: ByteArray, val verification: SmimeVerification)
+
 /**
  * One SMTP submission: [mimeBytes] goes to exactly [envelopeRecipients]. To and Cc share one variant (they already see each
  * other in the headers); every Bcc recipient gets a variant of their own, so neither the headers nor a CMS RecipientInfo
@@ -95,6 +101,13 @@ interface SmimeCms {
         signature: ByteArray,
         certificateCandidates: Collection<X509Certificate>,
     ): List<SmimeCmsSignerResult>
+
+    /**
+     * Verifies an opaque signature (`application/pkcs7-mime; smime-type=signed-data`): the signed content travels inside the
+     * CMS object. Returns that content with the signers' results. A detached signature is not accepted here.
+     */
+    fun verifyEncapsulated(cms: ByteArray, certificateCandidates: Collection<X509Certificate>): SmimeCmsEncapsulated =
+        throw SmimeProtectionException(SmimeFailure.INVALID_CMS, "Opaque signatures are not supported by this CMS implementation")
 
     fun encrypt(entity: ByteArray, recipients: Collection<X509Certificate>): ByteArray
     fun decrypt(envelopedData: ByteArray, identity: SmimeDecryptionIdentity): ByteArray
@@ -240,15 +253,39 @@ class SmimeEngine(
             throw SmimeProtectionException(SmimeFailure.INVALID_CMS, "The S/MIME signature could not be parsed or verified", e)
         }
         if (signers.isEmpty()) throw SmimeProtectionException(SmimeFailure.NO_SIGNATURE, "The CMS object contains no signer")
-        return SmimeVerification(signers.map { signer ->
+        return verification(signers, expectedSignerMailbox)
+    }
+
+    private fun verification(signers: List<SmimeCmsSignerResult>, expectedSignerMailbox: String): SmimeVerification =
+        SmimeVerification(signers.map { signer ->
             val certificate = signer.certificate
             val valid = signer.cryptographicSignatureValid
             val verdict = if (valid) {
                 runCatching { certificatePolicy.validateChain(signer.certificateCandidates, expectedSignerMailbox, SmimeCertificateUse.SIGNING) }
                     .getOrElse { SmimeCertificateVerdict.Rejected("Certificate validation failed") }
             } else null
-            SmimeSignerResult(certificate, valid, verdict, signer.certificateCandidates)
+            SmimeSignerResult(certificate, valid, verdict)
         })
+
+    /**
+     * Verifies an opaque-signed message body (the CMS bytes of an `application/pkcs7-mime` part with smime-type=signed-data,
+     * as Outlook sends with "opaque signing") and returns the signed content with the same cryptographic / trust split as
+     * [verifyDetached]. The content is not secret (it was only signed), so callers may show it as the message body.
+     */
+    fun verifyOpaque(
+        cms: ByteArray,
+        expectedSignerMailbox: String,
+        certificateCandidates: Collection<X509Certificate> = emptyList(),
+    ): SmimeOpaqueResult {
+        val encapsulated = try {
+            this.cms.verifyEncapsulated(cms, certificateCandidates)
+        } catch (e: SmimeProtectionException) {
+            throw e
+        } catch (e: Exception) {
+            throw SmimeProtectionException(SmimeFailure.INVALID_CMS, "The opaque S/MIME signature could not be parsed or verified", e)
+        }
+        if (encapsulated.signers.isEmpty()) throw SmimeProtectionException(SmimeFailure.NO_SIGNATURE, "The CMS object contains no signer")
+        return SmimeOpaqueResult(encapsulated.content, verification(encapsulated.signers, expectedSignerMailbox))
     }
 
     /** Parses a detached S/MIME multipart/signed message before checking CMS integrity and certificate trust. */

@@ -138,4 +138,69 @@ class SmimeReceiveTest {
         assertEquals(app.dot.mail.data.model.SmimeDecryption.NoKey, decryptSmimeMessage(encryptedMessage(dir), { throw SmimeUnavailableException(SmimeUnavailableException.Reason.NOT_CONFIGURED, "none") }, trusted, null))
         assertEquals(app.dot.mail.data.model.SmimeDecryption.NotForThisKey, decryptSmimeMessage(encryptedMessage(dir), identity("id-carol"), trusted, null))
     }
+
+    // ---- Opaque signing: application/pkcs7-mime; smime-type=signed-data (Outlook) ----
+
+    private fun fixture(name: String) = javaClass.classLoader!!.getResourceAsStream("smime/$name")!!.use { it.readBytes() }
+
+    /** The outer message exactly as a mail server delivers it: the CMS base64 encoded in a pkcs7-mime body. */
+    private fun opaqueMessage(cms: ByteArray = fixture("opaque-valid.der")): ByteArray = (
+        "From: Alice <alice@example.org>\r\nTo: bob@example.org\r\nSubject: Opaque\r\nMIME-Version: 1.0\r\n" +
+            "Content-Type: application/pkcs7-mime; smime-type=signed-data; name=\"smime.p7m\"\r\n" +
+            "Content-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename=\"smime.p7m\"\r\n\r\n" +
+            Base64.getMimeEncoder(76, "\r\n".toByteArray()).encodeToString(cms) + "\r\n"
+        ).toByteArray(Charsets.ISO_8859_1)
+
+    private fun cacheOpaque(cms: ByteArray = fixture("opaque-valid.der")): Pair<File, app.dot.mail.engine.CachedBody> {
+        val dir = tmp.newFolder()
+        val parsed = jakarta.mail.internet.MimeMessage(jakarta.mail.Session.getInstance(java.util.Properties()), opaqueMessage(cms).inputStream())
+        return dir to Mime.cache(parsed, dir)
+    }
+
+    private fun opaqueMsg(dir: File, from: String = "alice@example.org") = message(dir, from).copy(body = MessageBody("x", null, false, smime = SmimeContent.Opaque(File(dir, SmimeParts.OPAQUE_FILE).path)))
+
+    @Test fun `an opaque signed message shows the signed content as its body and lists its attachments, not smime p7m`() {
+        val (dir, cached) = cacheOpaque()
+        assertTrue(File(dir, SmimeParts.OPAQUE_FILE).isFile)
+        assertTrue(cached.text!!.readText().contains("opaque signed body text"))
+        assertEquals(listOf("proof.bin"), cached.attachments.map { it.name })
+        assertEquals("attached bytes", cached.attachments.single().file.readText())
+        assertFalse(cached.attachments.any { it.name.contains("p7m") })
+    }
+
+    @Test fun `opaque signature from a trusted certificate for the sender`() = runBlocking {
+        val (dir, _) = cacheOpaque()
+        val view = verifySmimeSignature(opaqueMsg(dir), trusted, null)!!
+        assertEquals(State.VALID_TRUSTED, view.state)
+        assertEquals(setOf("alice@example.org"), view.signer!!.mailboxes)
+        assertEquals(State.VALID_UNTRUSTED, verifySmimeSignature(opaqueMsg(dir), policy(SmimeCertificateVerdict.Rejected("unknown CA")), null)!!.state)
+    }
+
+    @Test fun `opaque signature by a certificate for another address than From is a mismatch`() = runBlocking {
+        val (dir, _) = cacheOpaque()
+        assertEquals(State.SENDER_MISMATCH, verifySmimeSignature(opaqueMsg(dir, from = "ceo@example.org"), trusted, null)!!.state)
+    }
+
+    @Test fun `a tampered opaque message is invalid even though its body is shown`() = runBlocking {
+        val cms = fixture("opaque-valid.der")
+        val at = String(cms, Charsets.ISO_8859_1).indexOf("opaque signed body")
+        cms[at] = (cms[at].toInt() xor 1).toByte()
+        val (dir, cached) = cacheOpaque(cms)
+        assertTrue(cached.text != null) // shown as received, but never as verified
+        assertEquals(State.INVALID, verifySmimeSignature(opaqueMsg(dir), trusted, null)!!.state)
+    }
+
+    @Test fun `an opaque part that is not readable CMS stays an ordinary attachment`() {
+        val (dir, cached) = cacheOpaque(ByteArray(64) { it.toByte() })
+        assertFalse(File(dir, SmimeParts.OPAQUE_FILE).exists())
+        assertEquals(listOf("smime.p7m"), cached.attachments.map { it.name })
+    }
+
+    @Test fun `the opaque part type check is exact`() {
+        assertTrue(SmimeParts.isOpaqueSigned("application/pkcs7-mime; smime-type=signed-data; name=smime.p7m"))
+        assertTrue(SmimeParts.isOpaqueSigned("application/x-pkcs7-mime; smime-type=Signed-Data"))
+        assertFalse(SmimeParts.isOpaqueSigned("application/pkcs7-mime; smime-type=enveloped-data"))
+        assertFalse(SmimeParts.isOpaqueSigned("application/pkcs7-signature"))
+        assertFalse(SmimeParts.isOpaqueSigned(null))
+    }
 }

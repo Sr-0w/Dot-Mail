@@ -406,4 +406,67 @@ class SmimeEngineTest {
         return entity to multipart.getBodyPart(1).inputStream.use { it.readBytes() }
     }
 
+
+    // ---- Opaque signing (Outlook "opaque signing"): application/pkcs7-mime; smime-type=signed-data ----
+
+    private fun opaque(signer: Identity, entity: ByteArray): ByteArray {
+        val provider = BouncyCastleProvider()
+        val generator = org.bouncycastle.cms.CMSSignedDataGenerator().apply {
+            addSignerInfoGenerator(
+                org.bouncycastle.cms.jcajce.JcaSignerInfoGeneratorBuilder(org.bouncycastle.operator.jcajce.JcaDigestCalculatorProviderBuilder().setProvider(provider).build())
+                    .build(JcaContentSignerBuilder("SHA256withRSA").build(signer.pair.private), signer.certificate),
+            )
+            addCertificates(org.bouncycastle.cert.jcajce.JcaCertStore(listOf(signer.certificate)))
+        }
+        return generator.generate(CMSProcessableByteArray(entity), true).encoded
+    }
+
+    private fun entity() = PgpMime.entity(mail().copy(bcc = emptyList()))
+
+    @Test fun `an opaque signature yields the signed entity and a trusted verdict`() {
+        val signer = identity("sender@example.test")
+        val entity = entity()
+        val result = engine.verifyOpaque(opaque(signer, entity), "sender@example.test")
+        assertArrayEquals(entity, result.content)
+        assertTrue(result.verification.allCryptographicallyValid)
+        assertTrue(result.verification.allTrustedAndValid)
+        assertEquals(signer.certificate, result.verification.signers.single().certificate)
+    }
+
+    @Test fun `a tampered opaque message is cryptographically invalid and never trusted`() {
+        val signer = identity("sender@example.test")
+        val entity = entity()
+        val cms = opaque(signer, entity)
+        val at = cms.indexOfSlice("plain body".toByteArray())
+        assertTrue(at > 0)
+        cms[at] = (cms[at].toInt() xor 1).toByte()
+        val result = engine.verifyOpaque(cms, "sender@example.test")
+        assertFalse(result.verification.allCryptographicallyValid)
+        assertFalse(result.verification.allTrustedAndValid)
+        assertEquals(null, result.verification.signers.single().certificateVerdict)
+    }
+
+    @Test fun `an opaque signature by a certificate for another address is valid but not trusted for that sender`() {
+        val signer = identity("other@example.test")
+        val result = engine.verifyOpaque(opaque(signer, entity()), "sender@example.test")
+        assertTrue(result.verification.allCryptographicallyValid)
+        assertFalse(result.verification.allTrustedAndValid)
+        assertTrue(result.verification.signers.single().certificateVerdict is SmimeCertificateVerdict.Rejected)
+    }
+
+    @Test fun `a detached signature or garbage is not accepted as opaque`() {
+        val signer = identity("sender@example.test")
+        val detached = BouncyCastleSmimeCms().signDetached(entity(), signer.signing())
+        assertEquals(SmimeFailure.INVALID_CMS, assertThrowsSmime { engine.verifyOpaque(detached, "sender@example.test") })
+        assertEquals(SmimeFailure.INVALID_CMS, assertThrowsSmime { engine.verifyOpaque(ByteArray(40) { it.toByte() }, "sender@example.test") })
+        assertEquals(SmimeFailure.INVALID_CMS, assertThrowsSmime { engine.verifyOpaque(ByteArray(0), "sender@example.test") })
+    }
+
+    private fun assertThrowsSmime(block: () -> Unit): SmimeFailure =
+        try { block(); error("expected SmimeProtectionException") } catch (e: SmimeProtectionException) { e.failure }
+
+    private fun ByteArray.indexOfSlice(needle: ByteArray): Int {
+        outer@ for (i in 0..size - needle.size) { for (j in needle.indices) if (this[i + j] != needle[j]) continue@outer; return i }
+        return -1
+    }
 }
