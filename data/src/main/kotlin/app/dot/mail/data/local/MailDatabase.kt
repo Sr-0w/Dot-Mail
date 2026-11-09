@@ -105,6 +105,25 @@ interface MailDao {
     @Insert suspend fun putMessageFts(row: MessageFtsRow)
     @RawQuery(observedEntities = [SearchDocumentRow::class, MessageRow::class, ThreadRow::class, FolderRow::class, SearchMatchRow::class]) fun searchPage(query: SupportSQLiteQuery): PagingSource<Int, IndexedSearchRow>
 
+    @Query("DELETE FROM thread_repairs WHERE state='PENDING' AND threadId IN(SELECT t.id FROM threads t WHERE t.accountId=:account AND (SELECT COUNT(*) FROM messages m WHERE m.threadId=t.id)<=1 AND (NOT EXISTS(SELECT 1 FROM messages m WHERE m.threadId=t.id) OR EXISTS(SELECT 1 FROM messages m WHERE m.threadId=t.id AND (m.messageIdKey IS NOT NULL OR instr(m.header,'\"messageId\"')>0))))") suspend fun finishSingletonRepairs(account:Long)
+    @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun queueThreadRepair(row: ThreadRepairRow)
+    @Query("SELECT r.* FROM thread_repairs r JOIN threads t ON t.id=r.threadId WHERE r.state='PENDING' AND t.accountId=:account AND t.id>:after ORDER BY t.id LIMIT 1") suspend fun nextThreadRepair(account:Long,after:Long):ThreadRepairRow?
+    @Query("INSERT OR REPLACE INTO thread_repairs(threadId,state) SELECT :target,'PENDING' FROM thread_repairs WHERE threadId=:source") suspend fun transferThreadRepair(source:Long,target:Long)
+    @Query("""SELECT EXISTS(SELECT 1 FROM messages m JOIN thread_repairs r ON r.threadId=m.threadId WHERE m.accountId=:account AND r.state='PENDING' AND instr(m.header,'"threadingRevision"')=0)""") suspend fun legacyThreadRepairs(account:Long):Boolean
+    @Query("SELECT EXISTS(SELECT 1 FROM thread_repairs WHERE state='PENDING')") suspend fun hasThreadRepairs():Boolean
+    @Query("DELETE FROM thread_repairs WHERE threadId=:id") suspend fun finishThreadRepair(id:Long)
+    @Query("UPDATE thread_repairs SET state=:state WHERE threadId=:id") suspend fun threadRepairState(id:Long,state:String)
+    @Query("SELECT id,folderId,uid,header,subject,sentAt FROM messages WHERE threadId=:thread AND id>:after ORDER BY id LIMIT 100") suspend fun threadRepairMessages(thread:Long,after:Long):List<RepairMessage>
+    @Query("UPDATE messages SET threadId=:target WHERE id IN(:ids) AND threadId=:source") suspend fun splitMessages(source:Long,target:Long,ids:List<Long>)
+    @Query("DELETE FROM thread_keys WHERE threadId=:id") suspend fun clearThreadKeys(id:Long)
+    @Query("SELECT * FROM snoozed WHERE threadId=:id") suspend fun threadSnoozes(id:Long):List<SnoozeRow>
+    @Query("UPDATE snoozed SET threadId=:target WHERE messageId IN(:ids) AND threadId=:source") suspend fun splitMessageSnoozes(source:Long,target:Long,ids:List<Long>)
+    @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun queueRepairMute(row:RepairMuteRow)
+    @Query("SELECT threadId FROM repair_mutes WHERE threadId>:after ORDER BY threadId LIMIT 200") suspend fun repairMutes(after:Long=0):List<Long>
+    @Query("SELECT threadId FROM repair_mutes") fun observeRepairMutes():Flow<List<Long>>
+    @Query("SELECT EXISTS(SELECT 1 FROM repair_mutes WHERE threadId=:id)") suspend fun hasRepairMute(id:Long):Boolean
+    @Query("DELETE FROM repair_mutes WHERE threadId IN(:ids)") suspend fun finishRepairMutes(ids:List<Long>)
+
     @Query("SELECT * FROM accounts ORDER BY id") fun observeAccounts(): Flow<List<AccountRow>>
     @Query("SELECT * FROM accounts ORDER BY id") suspend fun accounts(): List<AccountRow>
     @Query("SELECT * FROM accounts WHERE id=:id") suspend fun account(id: Long): AccountRow?
@@ -230,7 +249,7 @@ interface MailDao {
     @Query("SELECT email, name, MAX(lastSeen) AS lastSeen, accountId, MAX(corresponded) AS corresponded FROM contacts WHERE email LIKE :prefix ESCAPE '!' OR name LIKE :prefix ESCAPE '!' GROUP BY email ORDER BY lastSeen DESC LIMIT :limit") suspend fun contacts(prefix: String, limit: Int): List<ContactRow>
 }
 
-@Database(entities = [AccountRow::class, FolderRow::class, ThreadRow::class, ThreadKeyRow::class, MessageRow::class, AttachmentRow::class, DraftRow::class, OutboxRow::class, OperationRow::class, ContactRow::class, BodyTextRow::class, SearchMatchRow::class, SnoozeRow::class, DraftMirrorRow::class, SearchDocumentRow::class, MessageFtsRow::class, SearchPendingRow::class, CacheAccessRow::class, OfflineFolderRow::class, MessageSenderRow::class, DeviceContactRow::class, DeviceContactStateRow::class], version = 9, exportSchema = true)
+@Database(entities = [AccountRow::class, FolderRow::class, ThreadRow::class, ThreadKeyRow::class, MessageRow::class, AttachmentRow::class, DraftRow::class, OutboxRow::class, OperationRow::class, ContactRow::class, BodyTextRow::class, SearchMatchRow::class, SnoozeRow::class, DraftMirrorRow::class, SearchDocumentRow::class, MessageFtsRow::class, SearchPendingRow::class, CacheAccessRow::class, OfflineFolderRow::class, MessageSenderRow::class, DeviceContactRow::class, DeviceContactStateRow::class, ThreadRepairRow::class, RepairMuteRow::class], version = 10, exportSchema = true)
 abstract class MailDatabase : RoomDatabase() { abstract fun mail(): MailDao }
 
 internal val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
@@ -312,5 +331,14 @@ internal val MIGRATION_8_9 = object : androidx.room.migration.Migration(8,9) {
         db.execSQL("CREATE INDEX IF NOT EXISTS index_attachments_localUri ON attachments(localUri)")
         db.execSQL("CREATE TABLE IF NOT EXISTS cache_access (messageId INTEGER NOT NULL PRIMARY KEY, accessedAt INTEGER NOT NULL, offlineSaved INTEGER NOT NULL, failureAt INTEGER NOT NULL, downloadError TEXT, FOREIGN KEY(messageId) REFERENCES messages(id) ON DELETE CASCADE)")
         db.execSQL("CREATE TABLE IF NOT EXISTS offline_folders (folderId INTEGER NOT NULL PRIMARY KEY, validity INTEGER NOT NULL, beforeUid INTEGER NOT NULL, scanThrough INTEGER NOT NULL, completedThrough INTEGER NOT NULL, complete INTEGER NOT NULL, visitedAt INTEGER NOT NULL, headerFailures INTEGER NOT NULL, FOREIGN KEY(folderId) REFERENCES folders(id) ON DELETE CASCADE)")
+    }
+}
+
+/** Targets are seeded only on upgrade: new databases and newly created threads need no repair. */
+internal val MIGRATION_9_10 = object : androidx.room.migration.Migration(9,10) {
+    override fun migrate(db:androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS thread_repairs (threadId INTEGER NOT NULL, state TEXT NOT NULL, PRIMARY KEY(threadId), FOREIGN KEY(threadId) REFERENCES threads(id) ON UPDATE NO ACTION ON DELETE CASCADE)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS repair_mutes (threadId INTEGER NOT NULL, PRIMARY KEY(threadId), FOREIGN KEY(threadId) REFERENCES threads(id) ON UPDATE NO ACTION ON DELETE CASCADE)")
+        db.execSQL("INSERT INTO thread_repairs(threadId,state) SELECT id,'PENDING' FROM threads")
     }
 }

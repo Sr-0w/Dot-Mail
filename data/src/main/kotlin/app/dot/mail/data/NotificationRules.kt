@@ -37,6 +37,14 @@ class NotificationRules private constructor(context: Context) {
         prefs.edit { putString("muted", next.joinToString(",")) }
     }
 
+    /** Used by the repair journal: publish only after the preference file is durable. Never evict a copied mute. */
+    @Synchronized internal fun setMutedDurably(threadIds:Collection<Long>,muted:Boolean) {
+        val next = LinkedHashSet(_muted.value)
+        if(muted) next.addAll(threadIds.filter { it>0 }) else next.removeAll(threadIds.toSet())
+        check(prefs.edit().putString("muted",next.joinToString(",")).commit()) { "Could not save notification preferences" }
+        _muted.value=next
+    }
+
     fun notifyForFolder(folderId: Long, role: String): Boolean = effective(_folders.value, folderId, role)
 
     @Synchronized fun setFolderNotify(folderId: Long, role: String, on: Boolean) {

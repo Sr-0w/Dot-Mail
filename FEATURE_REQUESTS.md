@@ -97,12 +97,6 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
   - [x] Google client IDs registered, per-build-type (release/debug) client (`af45ecf`, `docs/OAUTH.md`)
   - [ ] Microsoft client ID not registered (maintainer decision, `docs/OAUTH.md`); Outlook/Hotmail cannot sign in meanwhile
   - [ ] Real-account verification (see FR-01); Google restricted-scope verification for a public release
-- **FR-04 · P1 · Harden IMAP sync and message operations** — threading collisions, cross-folder archive/move, large-body
-  storage, IDLE reconnect loops, global sync-lock contention, plus network-failure tests.
-  - Forward closeout prepared: conservative threading, message-scoped SmartFolder actions, batched aggregation and
-    bounded metadata/preview queries; regression and network tests in `docs/reports/codex-imap-hardening-closeout.md`.
-    Awaiting forward PR review/merge. Lead-approved retroactive split/repair follows as a separate idempotent pass
-    (oldest message retains the original thread ID; snooze/mute copied to split groups).
 - **FR-05 · P1 · Real-device regressions: slow refresh, inconsistent HTML fit, connection errors**
   - [x] Refresh 18 s → ~3 s (Inbox ~1.6 s), logins 30 → 4 (PR #34), measured on device
   - [x] Connection errors classified and explained in EN/FR/DE with Retry (PR #34 + `de22513`)
@@ -230,6 +224,14 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
 Each entry: evidence in brackets. "Device ✓" = checked on the owner's phone and recorded in the PR or commit.
 
 ### Mail core
+
+- **FR-04 · P1 · Harden IMAP sync and message operations** — threading collisions, cross-folder archive/move, large-body
+  storage, IDLE reconnect loops, global sync-lock contention, plus network-failure tests.
+  - Forward fixes merged in #67: conservative threading, message-scoped SmartFolder actions, batched aggregation and
+    bounded metadata/preview queries; regression/network evidence in `docs/reports/codex-imap-hardening-closeout.md`.
+  - Retroactive repair: Room v10 upgrade queue, recovered legacy threading headers, idempotent splits keeping the
+    oldest message's thread ID, durable snooze/mute preservation. Evidence and actual unrecoverable-header cases:
+    `docs/reports/codex-thread-repair.md`. Awaiting separate PR review/merge.
 - **FR-03 · P1 · Secure TLS in discovery and verification** — no silent plaintext fallback; plaintext-only providers need
   explicit confirmation; TLS 1.2+ with certificate-failure reporting [PR #2, #17; regression tests].
 - **FR-09 · P1 · IMAP folder management** — create, rename, nest, delete; queued offline ops, server-wins reconciliation

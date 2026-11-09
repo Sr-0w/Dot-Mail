@@ -27,7 +27,7 @@ internal object GraphRegistry {
     @Volatile private var graph: RealMailGraph? = null
     fun get(context: Context): RealMailGraph = graph ?: synchronized(this) {
         graph ?: RealMailGraph(context.applicationContext,
-            Room.databaseBuilder(context.applicationContext, MailDatabase::class.java, "dotmail.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9).build(),
+            Room.databaseBuilder(context.applicationContext, MailDatabase::class.java, "dotmail.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10).build(),
             KeystoreCredentialVault()).also { graph = it; it.start() }
     }
 }
@@ -52,6 +52,8 @@ internal class RealMailGraph(
     internal val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     internal val syncLock = Mutex()
     internal val outboxLock = Mutex()
+    internal val muteLock = Mutex()
+    internal val threadRepair = ThreadRepair(this)
     internal val searchIndex = SearchIndex(this)
     internal val fullSearch = FullContentSearch(this)
     override val searchIndexProgress: Flow<SearchIndexProgress> get() = searchIndex.progress
@@ -112,7 +114,7 @@ internal class RealMailGraph(
     internal val foregroundIdle by lazy { ForegroundIdle(this) }
     override val instantNotifications: Flow<Boolean> = AccountSettingsStore.get(context).sync.map { it.instantNotifications }.distinctUntilChanged()
     override suspend fun setInstantNotificationsEnabled(enabled: Boolean): Boolean = changeInstantNotifications(enabled)
-    internal fun start() { if (scheduling) { addressBook.start(); scope.launch { dao.accounts().forEach { account -> if(storage.preferences.configured(account.id) && !storage.preferences.paused(account.id) && storage.preferences.progress(account.id).state !in setOf(OfflineState.COMPLETE,OfflineState.PARTIAL)) WorkScheduling.offline(context,account.id,storage.preferences.policy(account.id)) } }; scope.launch { searchIndex.ensure(); dao.observeSearchPendingCount().collect { if(it>0) WorkScheduling.searchIndex(context) } }; WorkScheduling.periodic(context); foregroundIdle.start(); scope.launch { recoverOutbox(); dao.accounts().forEach { account -> if(dao.draftMirrors(account.id).isNotEmpty()) WorkScheduling.drafts(context,account.id) } }; scope.launch { resurfaceDue() }; scope.launch { recoverSnippetRepairs() } } }
+    internal fun start() { if (scheduling) { addressBook.start(); scope.launch { maintainThreadRepair() }; scope.launch { dao.accounts().forEach { account -> if(storage.preferences.configured(account.id) && !storage.preferences.paused(account.id) && storage.preferences.progress(account.id).state !in setOf(OfflineState.COMPLETE,OfflineState.PARTIAL)) WorkScheduling.offline(context,account.id,storage.preferences.policy(account.id)) } }; scope.launch { searchIndex.ensure(); dao.observeSearchPendingCount().collect { if(it>0) WorkScheduling.searchIndex(context) } }; WorkScheduling.periodic(context); foregroundIdle.start(); scope.launch { recoverOutbox(); dao.accounts().forEach { account -> if(dao.draftMirrors(account.id).isNotEmpty()) WorkScheduling.drafts(context,account.id) } }; scope.launch { resurfaceDue(); restoreSnoozeWork() }; scope.launch { recoverSnippetRepairs() } } }
     internal suspend fun credentials(row: AccountRow): Credentials = withContext(Dispatchers.IO) {
         if (Codec.config(row.config).authType == AuthType.OAUTH2) oauth.credentials(row.id) else try { Credentials(vault.decrypt(row.email, row.secret)) }
         catch(e:java.security.GeneralSecurityException) { dao.syncError(row.id,"Saved credentials are unavailable. Sign in again.",true); throw ReauthenticationRequired(e) }
@@ -285,7 +287,7 @@ internal class RealMailGraph(
         val exact = keys.mapNotNull { dao.threadKey(folder.accountId, it) }.distinct()
         val fallback = if (exact.isEmpty() && Threading.mayFallback(header)) Threading.fallbackKey(header)?.let { dao.threadKey(folder.accountId, it) }?.takeIf { id -> !dao.threadHasIdentifiedMessages(id) && dao.threadRow(id)?.let { kotlin.math.abs(header.sentAt - it.lastAt) <= 30L * 24 * 60 * 60 * 1000 } == true } else null
         val threadId = exact.firstOrNull() ?: fallback ?: dao.insertThread(ThreadRow(accountId = folder.accountId, subject = header.subject, lastAt=header.sentAt))
-        exact.filter { it != threadId }.forEach { other -> dao.mergeMessages(other, threadId); dao.mergeKeys(other, threadId); dao.deleteThread(other) }
+        exact.filter { it != threadId }.forEach { other -> dao.transferThreadRepair(other,threadId); if(isThreadMuted(other)) dao.queueRepairMute(RepairMuteRow(threadId)); dao.mergeMessages(other, threadId); dao.mergeKeys(other, threadId); dao.deleteThread(other) }
         keys.forEach { dao.insertKey(ThreadKeyRow(folder.accountId, it, threadId)) }
         if (Threading.mayFallback(header)) Threading.fallbackKey(header)?.let { key ->
             val previous = dao.threadKey(folder.accountId, key)?.let { dao.threadRow(it) }
@@ -425,9 +427,12 @@ internal class RealMailGraph(
     }
     override suspend fun setMuted(threadIds: Collection<Long>, muted: Boolean) = withContext(Dispatchers.IO) {
         val real = threadIds.mapNotNull { id -> if (ConversationIds.isMessage(id)) dao.message(ConversationIds.messageIdOf(id))?.threadId else id.takeIf { it > 0 } }
-        NotificationRules.get(context).setMuted(real, muted)
+        muteLock.withLock {
+            NotificationRules.get(context).setMutedDurably(real, muted)
+            real.chunked(100).forEach { dao.finishRepairMutes(it) }
+        }
     }
-    override fun mutedThreads(): Flow<Set<Long>> = NotificationRules.get(context).muted
+    override fun mutedThreads(): Flow<Set<Long>> = combine(NotificationRules.get(context).muted,dao.observeRepairMutes()) { _,pending -> NotificationRules.get(context).muted.value + pending }
     override suspend fun snooze(threadIds: Collection<Long>, untilMillis: Long) = snoozeLocal(threadIds, untilMillis)
     override suspend fun unsnooze(threadIds: Collection<Long>) = unsnoozeLocal(threadIds)
     override fun snoozedCount(): Flow<Int> = dao.observeSnoozedCount()

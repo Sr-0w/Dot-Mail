@@ -7,3 +7,6 @@
 -keep class org.eclipse.angus.activation.** { public <init>(...); }
 -keep class app.dot.mail.data.SyncWorker { public <init>(...); }
 -keep class app.dot.mail.data.OutboxWorker { public <init>(...); }
+
+# Persistent upgrade repair work is restored by class name after process death/app updates.
+-keep class app.dot.mail.data.ThreadRepairWorker { public <init>(...); }

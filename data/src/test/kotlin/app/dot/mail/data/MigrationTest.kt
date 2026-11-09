@@ -13,6 +13,7 @@ import app.dot.mail.data.local.MIGRATION_3_4
 import app.dot.mail.data.local.MIGRATION_4_5
 import app.dot.mail.data.local.MIGRATION_6_7
 import app.dot.mail.data.local.MIGRATION_8_9
+import app.dot.mail.data.local.MIGRATION_9_10
 import app.dot.mail.data.local.MIGRATION_7_8
 import app.dot.mail.data.local.MIGRATION_5_6
 import kotlinx.coroutines.runBlocking
@@ -47,7 +48,7 @@ class MigrationTest {
             override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) = error("Room owns the upgrade")
         }).build())
         helper.writableDatabase; helper.close()
-        val upgraded = Room.databaseBuilder(context, MailDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9).allowMainThreadQueries().build()
+        val upgraded = Room.databaseBuilder(context, MailDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10).allowMainThreadQueries().build()
         try {
             assertEquals("a@example.org", upgraded.mail().account(1)!!.email)
             val cursor = upgraded.openHelper.writableDatabase.query("PRAGMA table_info(messages)")
@@ -79,7 +80,7 @@ class MigrationTest {
             override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion:Int,newVersion:Int)=error("Room owns upgrade")
         }).build())
         helper.writableDatabase; helper.close()
-        val upgraded=Room.databaseBuilder(context,MailDatabase::class.java,name).addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9).allowMainThreadQueries().build()
+        val upgraded=Room.databaseBuilder(context,MailDatabase::class.java,name).addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10).allowMainThreadQueries().build()
         try {
             val mirror=upgraded.mail().draftMirror(9)!!
             assertEquals(1L,mirror.revision); assertEquals(0L,mirror.syncedRevision)
