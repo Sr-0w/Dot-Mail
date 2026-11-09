@@ -178,14 +178,14 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
   - [ ] Device validation in all four modes; known limits: one charcoal frame at cold start (static starting window),
     WebView algorithmic darkening leaves dark grey for mails with their own white background
 - **FR-53 · P1 · Glass controls must be real, translucent, blurred** (reopened after the owner saw opaque controls) —
-  Haze backdrop blur exists (`0992640`) for the Compose pill, reader capsules and snackbars.
+  Backdrop blur now runs on liquid-glass (PR #70, Haze removed) for the Compose pill, reader capsules and snackbars.
   - [ ] Audit every intended glass control in light/dark/OLED on device: background perceptible and blurred live while
     scrolling, neutral graphite tint (no blue/purple), no solid fallback where blur is supported
   - [ ] Primary blue buttons and flat secondary controls stay non-glass
-- **FR-54 · P1 · Top-edge scroll blur/fade** (separate from glass capsules) — PR #54 open (progressive Haze blur +
-  gradient, scroll-interpolated, reduced-motion fallback, inbox/search/settings/compose/reader scrim). Owner-reported bugs
-  that must be verified fixed on device:
-  - [ ] Blur flickers/flashes while scrolling
+- **FR-54 · P1 · Top-edge scroll blur/fade** (separate from glass capsules) — PR #70 merged (supersedes #54): frosted
+  header on liquid-glass, band bleeding off the screen edge, opaque page-colour gradient from the edge, one shared blur
+  radius. Owner-reported bugs:
+  - [x] Blur flickers/flashes while scrolling — owner accepted on device 2026-11-09 ("good enough")
   - [ ] Band height/position does not follow the inbox filter row when it collapses/expands (must track the real header
     bounds)
   - [ ] No separate dark fade before the blur (content goes sharp → progressively blurred, no dark strip or seam)
