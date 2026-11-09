@@ -299,6 +299,9 @@ interface MailGraph {
     val smime: SmimeRepository get() = SmimeRepository.None
 }
 
+/** Can mail to this address be S/MIME-encrypted? [PINNED_UNAVAILABLE]: the certificate the user pinned is expired, untrusted or gone. */
+enum class RecipientCertStatus { USABLE, MISSING, UNUSABLE, PINNED_UNAVAILABLE }
+
 /** The stored recipient certificates of an account. A stored certificate is a cache, never trust: the policy decides when sending. */
 interface SmimeRepository {
     fun certificates(accountId: Long): Flow<List<StoredSmimeCert>>
@@ -308,6 +311,10 @@ interface SmimeRepository {
     suspend fun pinnedFingerprint(accountId: Long, mailbox: String): String?
     /** Stored certificates per normalized mailbox, for deciding which recipients can be encrypted to. */
     suspend fun certificatesFor(accountId: Long, mailboxes: List<String>): Map<String, List<java.security.cert.X509Certificate>>
+
+    /** Whether each address can be encrypted to right now: the certificate policy is evaluated at the call, not cached. */
+    suspend fun recipientStatus(accountId: Long, mailboxes: List<String>): Map<String, RecipientCertStatus> =
+        mailboxes.associate { SmimeCertStore.normalize(it) to RecipientCertStatus.MISSING }
 
     object None : SmimeRepository {
         override fun certificates(accountId: Long) = kotlinx.coroutines.flow.flowOf(emptyList<StoredSmimeCert>())

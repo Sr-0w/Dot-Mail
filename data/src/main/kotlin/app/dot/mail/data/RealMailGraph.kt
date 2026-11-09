@@ -64,7 +64,21 @@ internal class RealMailGraph(
     internal val addressBook=AddressBookIndex(this)
     /** Recipient S/MIME certificates (a cache, not trust). */
     internal val smimeCerts = SmimeCertStore(dao)
+    /** Judges stored recipient certificates for the lock state in Compose; replaceable in tests. */
+    internal var recipientPolicy: app.dot.mail.engine.SmimeCertificatePolicy = SmimeTrustPolicy()
     val smime: SmimeRepository = object : SmimeRepository {
+        override suspend fun recipientStatus(accountId: Long, mailboxes: List<String>): Map<String, RecipientCertStatus> = mailboxes.associate { raw ->
+            val box = SmimeCertStore.normalize(raw)
+            val chains = smimeCerts.candidateChains(accountId, box)
+            val pin = smimeCerts.pinnedFingerprint(accountId, box)
+            fun usable(c: SmimeCandidateChain) = runCatching { recipientPolicy.validateChain(c.chain, box, app.dot.mail.engine.SmimeCertificateUse.ENCRYPTION) == app.dot.mail.engine.SmimeCertificateVerdict.Trusted }.getOrDefault(false)
+            box to when {
+                pin != null -> if (chains.any { SmimeCertStore.fingerprint(it.leaf) == pin && usable(it) }) RecipientCertStatus.USABLE else RecipientCertStatus.PINNED_UNAVAILABLE
+                chains.isEmpty() -> RecipientCertStatus.MISSING
+                chains.any(::usable) -> RecipientCertStatus.USABLE
+                else -> RecipientCertStatus.UNUSABLE
+            }
+        }
         override fun certificates(accountId: Long) = smimeCerts.observe(accountId)
         override suspend fun pin(accountId: Long, mailbox: String, fingerprint: String) = smimeCerts.pin(accountId, mailbox, fingerprint)
         override suspend fun unpin(accountId: Long, mailbox: String, fingerprint: String) = smimeCerts.unpin(accountId, mailbox, fingerprint)
