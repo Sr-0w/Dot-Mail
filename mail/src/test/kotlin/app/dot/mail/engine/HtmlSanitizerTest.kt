@@ -5,6 +5,16 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class HtmlSanitizerTest {
+    @Test fun remoteImagesAreOnlyFetchedOverTls() {
+        val html = HtmlSanitizer.sanitize(
+            "<img src=\"http://img.example.org/logo.png\" width=\"200\"><table><tr><td background=\"http://img.example.org/bg.png\">x</td></tr></table>",
+            allowRemoteImages = true,
+        ).html
+        assertTrue(html, "https://img.example.org/logo.png" in html)
+        assertTrue(html, "https://img.example.org/bg.png" in html)
+        assertFalse(html, "http://img.example.org" in html)
+    }
+
     @Test fun rejectsExecutableMarkupAndSchemes() {
         val vectors = listOf(
             "<SCRIPT SRC=https://evil.invalid/a></SCRIPT>",
