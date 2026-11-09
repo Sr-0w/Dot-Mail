@@ -138,7 +138,7 @@ internal class RealMailGraph(
     internal val foregroundIdle by lazy { ForegroundIdle(this) }
     override val instantNotifications: Flow<Boolean> = AccountSettingsStore.get(context).sync.map { it.instantNotifications }.distinctUntilChanged()
     override suspend fun setInstantNotificationsEnabled(enabled: Boolean): Boolean = changeInstantNotifications(enabled)
-    internal fun start() { if (scheduling) { addressBook.start(); scope.launch { maintainThreadRepair() }; scope.launch { dao.accounts().forEach { account -> if(storage.preferences.configured(account.id) && !storage.preferences.paused(account.id) && storage.preferences.progress(account.id).state !in setOf(OfflineState.COMPLETE,OfflineState.PARTIAL)) WorkScheduling.offline(context,account.id,storage.preferences.policy(account.id)) } }; scope.launch { searchIndex.ensure(); dao.observeSearchPendingCount().collect { if(it>0) WorkScheduling.searchIndex(context) } }; WorkScheduling.periodic(context); foregroundIdle.start(); scope.launch { recoverOutbox(); dao.accounts().forEach { account -> if(dao.draftMirrors(account.id).isNotEmpty()) WorkScheduling.drafts(context,account.id) } }; scope.launch { resurfaceDue(); restoreSnoozeWork() }; scope.launch { recoverSnippetRepairs() } } }
+    internal fun start() { if (scheduling) { decryptedFiles.clearAll(); addressBook.start(); scope.launch { maintainThreadRepair() }; scope.launch { dao.accounts().forEach { account -> if(storage.preferences.configured(account.id) && !storage.preferences.paused(account.id) && storage.preferences.progress(account.id).state !in setOf(OfflineState.COMPLETE,OfflineState.PARTIAL)) WorkScheduling.offline(context,account.id,storage.preferences.policy(account.id)) } }; scope.launch { searchIndex.ensure(); dao.observeSearchPendingCount().collect { if(it>0) WorkScheduling.searchIndex(context) } }; WorkScheduling.periodic(context); foregroundIdle.start(); scope.launch { recoverOutbox(); dao.accounts().forEach { account -> if(dao.draftMirrors(account.id).isNotEmpty()) WorkScheduling.drafts(context,account.id) } }; scope.launch { resurfaceDue(); restoreSnoozeWork() }; scope.launch { recoverSnippetRepairs() } } }
     internal suspend fun credentials(row: AccountRow): Credentials = withContext(Dispatchers.IO) {
         if (Codec.config(row.config).authType == AuthType.OAUTH2) oauth.credentials(row.id) else try { Credentials(vault.decrypt(row.email, row.secret)) }
         catch(e:java.security.GeneralSecurityException) { dao.syncError(row.id,"Saved credentials are unavailable. Sign in again.",true); throw ReauthenticationRequired(e) }
@@ -302,6 +302,9 @@ internal class RealMailGraph(
         }
         return result.toString().takeUnless { it.isBlank() || it=="." || it==".." } ?: "attachment"
     }
+    private val decryptedFiles by lazy { DecryptedFiles(context.filesDir, ::uri) }
+    override suspend fun decryptedFileUri(token: String, attachment: Attachment): String = withContext(Dispatchers.IO) { decryptedFiles.write(token, attachment, ::safeFileName) }
+    override fun clearDecryptedFiles(token: String) { decryptedFiles.clear(token) }
     internal fun uri(file: File): String = FileProvider.getUriForFile(context, "${context.packageName}.attachments", file).toString()
     override suspend fun loadBody(messageId:Long) { storage.ensureBody(messageId) }
     override suspend fun openAttachment(attachment:Attachment):String = storage.open(attachment.id)

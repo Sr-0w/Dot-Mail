@@ -132,7 +132,7 @@ internal suspend fun decryptSmimeMessage(
             else -> null
         }
         val parsed = app.dot.mail.engine.Pgp.parseDecrypted(content, mime = true)
-        app.dot.mail.data.model.SmimeDecryption.Done(app.dot.mail.data.model.MessageBody(parsed.text, parsed.html, hasRemoteImages = false), signature)
+        app.dot.mail.data.model.SmimeDecryption.Done(app.dot.mail.data.model.MessageBody(parsed.text, parsed.html, hasRemoteImages = false, decryptedAttachments = parsed.toDecryptedAttachments(message.id)), signature)
     }
 }
 

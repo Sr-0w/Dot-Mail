@@ -308,9 +308,17 @@ class ThreadViewModel(
         }
     }
 
+    /** Names the private files written for this reader's decrypted attachments, so closing it removes exactly those. */
+    val decryptedToken: String = java.util.UUID.randomUUID().toString()
+
+    /** content:// URI of an attachment (or inline image) of a decrypted message; written on demand, removed in [onCleared]. */
+    suspend fun decryptedUri(a: Attachment): String? = runCatching { graph.mail.decryptedFileUri(decryptedToken, a) }.getOrNull()
+
+    override fun onCleared() { graph.mail.clearDecryptedFiles(decryptedToken) }
+
     fun openAttachment(a: Attachment, share: Boolean) {
         viewModelScope.launch {
-            runCatching { graph.mail.openAttachment(a) }
+            runCatching { if (a.memory != null) graph.mail.decryptedFileUri(decryptedToken, a) else graph.mail.openAttachment(a) }
                 .onSuccess { _events.send(ThreadEvent.OpenUri(it, a.mimeType, a.fileName, share)) }
                 .onFailure { _events.send(ThreadEvent.Message(str(R.string.thread_error_open_attachment, a.fileName))) }
         }
@@ -516,6 +524,7 @@ fun ThreadScreen(
                                 else openUrl(context, app.dot.mail.engine.text.Links.stripTracking(url))
                             },
                             onAttachment = vm::openAttachment,
+                            decryptedUri = vm::decryptedUri,
                             onSender = { onComposeTo(it.email) },
                             readingScale = prefs.readingTextPercent / 100f,
                             readerFont = prefs.readerFont,
@@ -750,6 +759,7 @@ private fun MessageCard(
     onLink: (String) -> Unit,
     onSuspiciousLinks: (Map<String, String>) -> Unit = {},
     onAttachment: (Attachment, Boolean) -> Unit,
+    decryptedUri: suspend (Attachment) -> String? = { null },
     onSender: (EmailAddress) -> Unit,
     readingScale: Float = 1f,
     readerFont: app.dot.mail.ReaderFont = app.dot.mail.ReaderFont.INTER,
@@ -816,8 +826,13 @@ private fun MessageCard(
                 app.dot.design.components.DotDotsLoader(color = c.textTertiary)
             }
         } else {
-            val cids = remember(message.attachments) {
-                message.attachments.mapNotNull { a -> a.contentId?.let { id -> a.localUri?.let { id.trim('<', '>') to it } } }.toMap()
+            // Inline images of a decrypted message exist only in memory: they get a short-lived private file when shown.
+            val inlineDecrypted by androidx.compose.runtime.produceState(emptyMap<String, String>(), body.decryptedAttachments) {
+                value = body.decryptedAttachments.filter { it.isInline && it.contentId != null && it.mimeType.startsWith("image/") }
+                    .mapNotNull { a -> decryptedUri(a)?.let { a.contentId!! to it } }.toMap()
+            }
+            val cids = remember(message.attachments, inlineDecrypted) {
+                message.attachments.mapNotNull { a -> a.contentId?.let { id -> a.localUri?.let { id.trim('<', '>') to it } } }.toMap() + inlineDecrypted
             }
             val html = body.html
             val blockPixels = app.dot.mail.LocalSettings.current.ui.collectAsStateWithLifecycle().value.blockTrackingPixels
@@ -871,7 +886,9 @@ private fun MessageCard(
             // An S/MIME .p7s is verification data (see SmimeBar), never a file to open; older caches still list it.
             val files = message.attachments.filter { (!it.isInline || it.contentId == null) && !app.dot.mail.engine.SmimeParts.isSignaturePart(it.mimeType) }
             CalendarInvites(message)
-            if (files.isNotEmpty()) AttachmentStrip(files, onAttachment)
+            // Attachments found inside a decrypted message join the strip; opening one writes a short-lived private file.
+            val allFiles = files + body.decryptedAttachments.filter { !it.isInline || it.contentId == null }
+            if (allFiles.isNotEmpty()) AttachmentStrip(allFiles, onAttachment)
         }
         Spacer(Modifier.height(DotSpacing.m))
     }
