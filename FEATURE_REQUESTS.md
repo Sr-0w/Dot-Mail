@@ -47,8 +47,10 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
   - [ ] Real stack trace/logcat captured and inspected; root cause fixed
   - [ ] Back returns to the previous screen in every case: after HTML scrolling/loading, attachment views,
     swipe-between-conversations, with keyboard or a modal open; in-app Back arrow too
-  - [ ] Regression tests for the navigation/lifecycle/WebView-disposal paths, then device verification
-  - Evidence: none (`0196e79` only fixes Back closing the drawer, which is unrelated).
+  - [x] Regression tests for the navigation/lifecycle/WebView-disposal paths (`LeaveReaderTest`: double Back, late swipe,
+    release while loading, throwing backdrop clear, use-after-release, attachment viewer Back); device verification pending
+  - Evidence: no crash reproduced; hardening in the fr22-back PR (guarded backdrop clear, `popFrom`/`isOnTop`, FitWebView
+    detach). `0196e79` only fixes Back closing the drawer, which is unrelated.
 
 ### Sending
 

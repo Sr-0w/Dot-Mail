@@ -127,7 +127,8 @@ fun HtmlMessageView(
                 web.loadDataWithBaseURL(null, document, "text/html", "utf-8", null)
             }
         },
-        onRelease = { beforeRelease(); releaseWebView(it) },
+        // beforeRelease touches a graphics layer that may already be gone when the whole screen leaves: never let it block the release.
+        onRelease = { runCatching { beforeRelease() }; releaseWebView(it) },
     )
     }
     }
@@ -153,6 +154,7 @@ internal fun configureForTallContent(web: WebView) {
  * never take the app down on the way out.
  */
 internal fun releaseWebView(web: WebView) {
+    (web as? FitWebView)?.detach()
     runCatching { web.stopLoading() }
     runCatching { web.webViewClient = WebViewClient() }
     runCatching { (web.parent as? ViewGroup)?.removeView(web) }
@@ -183,20 +185,24 @@ private const val OVERFLOW_SLACK = 2
  * A WebView that reports the width (CSS px) its content was laid out at whenever it is wider than the view, so the
  * reader can refit the mail. The range is read while drawing, after layout, and only reported when it changes.
  */
-private class FitWebView(context: android.content.Context) : WebView(context) {
+internal class FitWebView(context: android.content.Context) : WebView(context) {
     var onContentWidth: ((Int) -> Unit)? = null
     private var armed = false
     private var reported = 0
+
+    /** Released: no measurement may reach the (possibly already disposed) composition, and nothing is drawn or armed again. */
+    fun detach() { onContentWidth = null; armed = false; released = true }
+    private var released = false
 
     /** A new document is loading: forget the old measurement and wait until the new one is on screen. */
     fun rearm() { armed = false; reported = 0 }
 
     /** The new document's first frame is committed: its layout is the one to measure. */
-    fun arm() { armed = true; reported = 0; invalidate() }
+    fun arm() { if (released) return; armed = true; reported = 0; invalidate() }
 
     override fun onDraw(canvas: android.graphics.Canvas) {
         super.onDraw(canvas)
-        if (!armed) return
+        if (!armed || released) return
         val range = computeHorizontalScrollRange()
         if (width > 0 && range > width && range != reported) {
             reported = range

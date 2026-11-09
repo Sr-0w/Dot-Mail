@@ -470,7 +470,7 @@ fun ThreadScreen(
                 }
             },
     ) {
-        val clearBackdrop: () -> Unit = remember(readerBackdrop, density) { { readerBackdrop.clear(density) } }
+        val clearBackdrop: () -> Unit = remember(readerBackdrop, density) { { runCatching { readerBackdrop.clear(density) } } }
         androidx.compose.runtime.CompositionLocalProvider(LocalBeforeWebViewRelease provides clearBackdrop) {
         Column(Modifier.fillMaxSize().glassBackdropSource(glass)) {
             when {
