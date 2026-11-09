@@ -196,9 +196,13 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
 - **FR-56 · P1 · Full-app Quiet UI visual audit (light + dark)** — PR #35, #48, #49 reviewed Demo renders of categories,
   smart folders, search, composer, account setup, attachments, outbox; fixes applied.
   - [ ] Not auditable on the JVM: snooze sheet, dialogs, menus, bottom sheets → device pass
-  - [ ] Remaining Material remnants (e.g. `CircularProgressIndicator` in the search loading state); Quiet spinners/dots/
-    shimmer are used in most screens but the rollout is not complete
-  - [ ] Before/after screenshots and a list of intended exceptions
+  - [x] Remaining Material remnants: the three `CircularProgressIndicator`s (search loading, alias picker loading and
+    per-alias row) are now `DotSpinner`; the reader's tracking-strip `Checkbox` is the new `DotCheckbox`. A source guard
+    (`QuietRemnantsTest`) fails if a Material progress indicator or check box returns.
+  - [ ] Before/after screenshots (device/Demo) · intended exceptions, kept on purpose as Material behaviour re-skinned
+    with Quiet tokens: `AlertDialog`, `ModalBottomSheet`, `DropdownMenu` (inside `DotMenu`), `DatePicker`/`TimePicker`
+    (+ `DatePickerDialog`), `SwipeToDismissBox` (inbox swipe), `ModalNavigationDrawer`, `SnackbarHost` (content is
+    `DotSnackbar`), `Switch` (via `DotSwitch`) and `Slider` (settings), `Icon`/`Text` primitives.
 - **FR-58 · P2 · Polish animations across meaningful actions** — done: screen transitions, selection mode, menus/dialogs,
   Cc/Bcc reveal, reduced-motion lists, Outbox removal, reader capsules (PR #33), shared haptics (PR #37), folder-switch
   ease-in, search open/close, expand/collapse polish, swipe reveal (PR #46). Device: feel/timing pending; reduced-motion
