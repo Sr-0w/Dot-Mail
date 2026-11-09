@@ -49,7 +49,7 @@ class StorageMigrationTest {
             override fun onUpgrade(db:SupportSQLiteDatabase,oldVersion:Int,newVersion:Int)=error("Room owns migration")
         }).build())
         helper.writableDatabase; helper.close()
-        val upgraded=Room.databaseBuilder(context,MailDatabase::class.java,name).addMigrations(MIGRATION_8_9).allowMainThreadQueries().build()
+        val upgraded=Room.databaseBuilder(context,MailDatabase::class.java,name).addMigrations(MIGRATION_8_9, MIGRATION_9_10).allowMainThreadQueries().build()
         try {
             assertEquals("ciphertext",upgraded.mail().account(1)!!.secret)
             assertEquals(2,upgraded.mail().cachedMessageCount(1))

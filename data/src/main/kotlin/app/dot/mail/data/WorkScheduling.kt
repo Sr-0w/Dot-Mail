@@ -7,6 +7,11 @@ import java.util.concurrent.TimeUnit
 
 internal object WorkScheduling {
     private val network = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+    fun threadRepair(context:Context) {
+        val constraints=Constraints.Builder().setRequiredNetworkType(if(AccountSettingsStore.get(context).sync.value.wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED).build()
+        WorkManager.getInstance(context).enqueueUniqueWork("dotmail.thread-repair",ExistingWorkPolicy.KEEP,
+            OneTimeWorkRequestBuilder<ThreadRepairWorker>().setConstraints(constraints).setBackoffCriteria(BackoffPolicy.EXPONENTIAL,30,TimeUnit.SECONDS).build())
+    }
     fun searchIndex(context: Context) {
         WorkManager.getInstance(context).enqueueUniqueWork("dotmail.search-index",ExistingWorkPolicy.KEEP,
             OneTimeWorkRequestBuilder<SearchIndexWorker>().setBackoffCriteria(BackoffPolicy.EXPONENTIAL,10,TimeUnit.SECONDS).build())

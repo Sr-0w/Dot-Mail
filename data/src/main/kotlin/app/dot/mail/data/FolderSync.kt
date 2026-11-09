@@ -57,7 +57,7 @@ internal suspend fun RealMailGraph.syncOneFolder(account:AccountRow,config:Accou
         stage="Header database commit"
         val notifications=applyFolderHeaders(account,folder,remote,result)
         if(remote.role==Role.DRAFTS) database.withTransaction { linkDraftCopies(dao.folder(folder.id)!!) }
-        notifications.distinctBy { it.first }.forEach { (id, subject, folderId) -> MailNotifications.newMail(context, account, id, subject, folderId) }
+        notifications.distinctBy { it.first }.forEach { (id, subject, folderId) -> if(!isThreadMuted(id)) MailNotifications.newMail(context, account, id, subject, folderId) }
         ready(success && headerWarning==null,headerWarning)
         prefetchFolderPreviews(account,config,creds,folder,remote,result.cursor.uidValidity)
         return MailboxSyncOutcome(success,headerWarning,deferredExpunge)
@@ -145,7 +145,7 @@ internal suspend fun RealMailGraph.applyFolderHeaders(account:AccountRow,folder:
             val (thread, fresh) = upsertHeader(folder.copy(validity = result.cursor.uidValidity), header, rebuild=false)
             changedThreads+=thread
             if (fresh && !result.reset) dao.deleteThreadSnooze(thread) // new mail in a snoozed conversation wakes it
-            if (fresh && !result.reset && !header.flags.seen && notificationRules.notifyForFolder(folder.id, remote.role.name) && !notificationRules.isMuted(thread)) notifications += Triple(thread, header.subject, folder.id)
+            if (fresh && !result.reset && !header.flags.seen && notificationRules.notifyForFolder(folder.id, remote.role.name) && !isThreadMuted(thread)) notifications += Triple(thread, header.subject, folder.id)
         }
         result.flags.filter { it.uid !in pending }.forEach { flag ->
             val state=oldByUid[flag.uid] ?: dao.byUid(folder.id,flag.uid)?.let { FolderMessageState(it.id,it.uid,it.threadId,it.unread,it.starred) }
