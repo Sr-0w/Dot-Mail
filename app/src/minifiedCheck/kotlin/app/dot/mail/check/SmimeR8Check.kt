@@ -35,7 +35,7 @@ import kotlin.system.exitProcess
 object SmimeR8Check {
     private fun res(name: String) = SmimeR8Check::class.java.classLoader!!.getResourceAsStream("r8check/$name")!!.readBytes()
     private fun cert(name: String) = CertificateFactory.getInstance("X.509").generateCertificate(res("$name.crt.pem").inputStream()) as X509Certificate
-    private fun key(name: String): PrivateKey = KeyFactory.getInstance("RSA").generatePrivate(PKCS8EncodedKeySpec(
+    private fun key(name: String, algorithm: String = "RSA"): PrivateKey = KeyFactory.getInstance(algorithm).generatePrivate(PKCS8EncodedKeySpec(
         Base64.getMimeDecoder().decode(String(res("$name.key.pem")).lines().filterNot { it.startsWith("-----") }.joinToString(""))))
     private val trusted = object : SmimeCertificatePolicy {
         override fun validate(certificate: X509Certificate, mailbox: String, use: SmimeCertificateUse) = SmimeCertificateVerdict.Trusted
@@ -77,6 +77,16 @@ object SmimeR8Check {
         check("opaque signed-data verifies") {
             val result = engine.verifyOpaque(res("opaque-valid.der"), "alice@example.org")
             result.verification.allCryptographicallyValid && String(result.content, Charsets.ISO_8859_1).contains("opaque signed body")
+        }
+        // ECDH key agreement (RFC 5753) with a P-256 software key: our own ephemeral-static send, then a message made by OpenSSL.
+        val carol = cert("carol-p256"); val carolId = SmimeDecryptionIdentity(carol, key("carol-p256", "EC"))
+        check("ECDH P-256: our encrypted message decrypts with the recipient's EC key") {
+            val variant = engine.build(mail.copy(to = listOf(Address("carol-p256@example.test"))), SmimeMode.ENCRYPT, null,
+                listOf(SmimeRecipientCertificate("carol-p256@example.test", carol)), alice).single()
+            String(engine.decryptMime(variant.mimeBytes, carolId), Charsets.ISO_8859_1).contains("minified round trip")
+        }
+        check("ECDH P-256: an OpenSSL-made message decrypts (X9.63 KDF + AES key wrap)") {
+            String(engine.decrypt(res("ecdh-openssl.der"), carolId), Charsets.ISO_8859_1).contains("interop body")
         }
         println(if (failures == 0) "SMIME_R8_CHECK OK" else "SMIME_R8_CHECK FAILED $failures")
         exitProcess(if (failures == 0) 0 else 1)
