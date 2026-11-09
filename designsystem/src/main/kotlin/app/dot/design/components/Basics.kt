@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -305,6 +306,7 @@ fun DotFrostedPill(
         modifier
             .minimumInteractiveComponentSize()
             .heightIn(min = 48.dp)
+            .widthIn(min = 48.dp)
             .shadow(
                 elevation = 3.dp,
                 shape = DotShapes.circle,
@@ -328,7 +330,8 @@ fun DotFrostedPill(
                     this.contentDescription = contentDescription
                 }
             }
-            .padding(horizontal = if (showLabel) 16.dp else 14.dp, vertical = 10.dp),
+            // Icon only (collapsed): no side padding, so the 48dp minimum makes it a true circle; with its label: a pill.
+            .padding(horizontal = if (showLabel) 16.dp else 0.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
