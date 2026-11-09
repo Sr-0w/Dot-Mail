@@ -1244,11 +1244,12 @@ private fun BoxScope.ReaderChrome(
     // (clock and icons stay readable over images) and grows under the capsules when they are shown. It fades in as content
     // scrolls under it, so at the top of a conversation the subject stays clear.
     val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val small = statusBar + 24.dp
-    val band by androidx.compose.animation.core.animateDpAsState(if (visible) topScrim + 56.dp else small, label = "readerBand")
+    // A long, gentle fade below the solid part: a short one reads as a hard edge.
+    val band by androidx.compose.animation.core.animateDpAsState(if (visible) topScrim + 96.dp else statusBar + 72.dp, label = "readerBand")
+    val solid = if (visible) topScrim else statusBar + 4.dp
     app.dot.design.components.TopEdgeFade(
         backdrop, topProgress(), Modifier.align(Alignment.TopCenter), height = band,
-        solidUntil = ((statusBar + 4.dp) / band).coerceIn(0.3f, 0.6f).let { if (visible) 0.6f else it },
+        solidUntil = (solid / band).coerceIn(0.2f, 0.7f),
     )
     AnimatedVisibility(visible, Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = DotSpacing.s, top = DotSpacing.xs), enter = enter(true), exit = exit(true)) { back() }
     AnimatedVisibility(visible, Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = DotSpacing.s, top = DotSpacing.xs), enter = enter(true), exit = exit(true)) { actions() }
