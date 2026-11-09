@@ -409,11 +409,15 @@ class MailClient(val timeoutMs: Int = 30_000, private val timing: (String,Long) 
             if (id == null || opened.search(HeaderTerm("Message-ID", id)).isEmpty()) opened.appendMessages(arrayOf(message))
         }
     }
-    suspend fun send(endpoint: Endpoint, credentials: Credentials, message: MimeMessage, envelopeFrom: String? = null) = withContext(Dispatchers.IO) {
+    /**
+     * Submits [message]. [recipients] overrides the SMTP envelope (default: the message's To/Cc/Bcc); S/MIME sends one
+     * message per envelope recipient, so the headers never decide who receives which copy.
+     */
+    suspend fun send(endpoint: Endpoint, credentials: Credentials, message: MimeMessage, envelopeFrom: String? = null, recipients: Array<jakarta.mail.Address>? = null) = withContext(Dispatchers.IO) {
         session(endpoint, credentials, true, envelopeFrom).getTransport("smtp").use { transport ->
             try { transport.connect(endpoint.host, endpoint.port, endpoint.username, credentials.secret) }
             catch (e: Exception) { throw SubmissionNotStartedException(e) }
-            transport.sendMessage(message, message.allRecipients)
+            transport.sendMessage(message, recipients ?: message.allRecipients)
         }
     }
     suspend fun search(endpoint: Endpoint, credentials: Credentials, path: String, query: String, limit: Int = 500): List<Header> = searchBatch(endpoint,credentials,path,query,limit).headers

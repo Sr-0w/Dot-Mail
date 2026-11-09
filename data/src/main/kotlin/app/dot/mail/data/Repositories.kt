@@ -256,6 +256,18 @@ interface ComposeRepository {
     suspend fun sendProtected(draft: Draft, undoWindowMs: Long = 5_000, protector: PgpProtector): Long =
         throw UnsupportedOperationException("OpenPGP is not available")
 
+    /**
+     * Sends with S/MIME: [builder] signs/encrypts the message into one protected variant per SMTP envelope recipient, which
+     * the outbox stores and delivers. Requires [Draft.smimeSign] or [Draft.smimeEncrypt]. Throws (and queues nothing) when
+     * the key or a recipient certificate is unusable: there is no downgrade to plaintext.
+     */
+    suspend fun sendSmime(draft: Draft, undoWindowMs: Long = 5_000, builder: SmimeBuilder): Long =
+        throw UnsupportedOperationException("S/MIME is not available")
+
+    /** A builder backed by the S/MIME engine, the account's KeyChain keys ([keys]) and the stored recipient certificates. */
+    fun smimeBuilder(keys: SmimeKeyAccess, policy: app.dot.mail.engine.SmimeCertificatePolicy): SmimeBuilder =
+        throw UnsupportedOperationException("S/MIME is not available")
+
     /** True if it was cancelled in time; the draft is restored. */
     suspend fun cancelSend(outboxId: Long): Boolean
 }

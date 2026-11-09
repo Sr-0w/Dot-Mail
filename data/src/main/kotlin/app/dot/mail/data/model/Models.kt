@@ -253,6 +253,9 @@ data class Draft(
     /** OpenPGP (via OpenKeychain): sign / encrypt this message when sending. Encrypted drafts are never mirrored to the server. */
     val pgpSign: Boolean = false,
     val pgpEncrypt: Boolean = false,
+    /** S/MIME: sign / encrypt this message when sending. Encrypted drafts are never mirrored to the server. */
+    val smimeSign: Boolean = false,
+    val smimeEncrypt: Boolean = false,
 )
 
 // ---------- Account setup ----------
