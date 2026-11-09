@@ -205,12 +205,12 @@ class MailClient(val timeoutMs: Int = 30_000, private val timing: (String,Long) 
         )
     }
     /** Bounded metadata backfill for cached messages written by builds predating classification. */
-    suspend fun headers(endpoint: Endpoint, credentials: Credentials, path: String, uids: LongArray, expectedValidity: Long): List<Header> = store(endpoint,credentials) { s -> folder(s,path) { f ->
+    suspend fun headers(endpoint: Endpoint, credentials: Credentials, path: String, uids: LongArray, expectedValidity: Long, strict: Boolean = false): List<Header> = store(endpoint,credentials) { s -> folder(s,path) { f ->
         require(uids.size<=200 && uids.all { it>0 })
         require(f.uidValidity==expectedValidity) { "Folder UIDVALIDITY changed" }
         val messages=f.getMessagesByUID(uids).filterNotNull().toTypedArray()
         fetchHeaders(f,messages,s.hasCapability("X-GM-EXT-1"))
-        messages.mapNotNull { runCatching { header(f,it) }.getOrNull() }
+        messages.mapNotNull { if(strict) header(f,it) else runCatching { header(f,it) }.getOrNull() }
     } }
     private fun envelopeHeader(f: IMAPFolder, m: Message): Header = Header(
         f.getUID(m), m.getHeader("Message-ID")?.firstOrNull(), Threading.ids(m.getHeader("References")?.joinToString(" ")), Threading.ids(m.getHeader("In-Reply-To")?.firstOrNull()).firstOrNull(),

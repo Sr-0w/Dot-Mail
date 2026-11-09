@@ -19,6 +19,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Visibility
@@ -228,4 +229,21 @@ fun DotSwitch(
             disabledUncheckedBorderColor = c.border,
         ),
     )
+}
+
+/**
+ * Quiet check box: a round 22 dp mark that fills with the inverse tone when checked. It is purely visual - put it in a
+ * row that is `toggleable(role = Role.Checkbox)` so the row carries the semantics and the whole row is the touch target.
+ */
+@Composable
+fun DotCheckbox(checked: Boolean, modifier: Modifier = Modifier) {
+    val c = Dot.colors
+    val fill by animateColorAsState(if (checked) c.inverse else Color.Transparent, label = "dotCheckFill")
+    Box(
+        modifier.size(22.dp).clip(DotShapes.circle).background(fill)
+            .border(1.5.dp, if (checked) c.inverse else c.borderStrong, DotShapes.circle),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (checked) Icon(androidx.compose.material.icons.Icons.Outlined.Check, contentDescription = null, tint = c.onInverse, modifier = Modifier.size(14.dp))
+    }
 }

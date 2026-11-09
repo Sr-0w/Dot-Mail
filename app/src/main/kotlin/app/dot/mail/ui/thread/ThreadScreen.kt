@@ -37,6 +37,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.defaultMinSize
@@ -81,7 +83,6 @@ import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.Unsubscribe
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -722,13 +723,13 @@ private fun LinkDialog(url: String, shownText: String?, onDismiss: () -> Unit, o
                 if (hasTracking) {
                     Spacer(Modifier.height(DotSpacing.s))
                     Row(
-                        Modifier.fillMaxWidth().clip(DotShapes.medium).clickable { strip = !strip }.padding(vertical = DotSpacing.xs),
+                        Modifier.fillMaxWidth().clip(DotShapes.medium)
+                            .toggleable(value = strip, role = androidx.compose.ui.semantics.Role.Checkbox, onValueChange = { strip = it })
+                            .heightIn(min = 48.dp).padding(vertical = DotSpacing.xs),
                         verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(DotSpacing.m),
                     ) {
-                        androidx.compose.material3.Checkbox(
-                            checked = strip, onCheckedChange = { strip = it },
-                            colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = c.accent, uncheckedColor = c.textTertiary),
-                        )
+                        app.dot.design.components.DotCheckbox(strip)
                         Text(stringResource(R.string.thread_link_strip_tracking), style = Dot.type.callout, color = c.textPrimary)
                     }
                 }

@@ -101,6 +101,7 @@ private suspend fun RealMailGraph.syncAccount(
             if(success && warning==null) {
                 settings.markWindowApplied(account.id,preferences.syncWindowDays)
                 settings.markSynced(account.id)
+                if(scheduling && dao.hasThreadRepairs()) WorkScheduling.threadRepair(context)
                 if(scheduling && storage.preferences.configured(account.id) && !storage.preferences.paused(account.id)) WorkScheduling.offline(context,account.id,storage.preferences.policy(account.id))
             }
             val operationError=dao.operations(account.id).firstNotNullOfOrNull { it.error }
