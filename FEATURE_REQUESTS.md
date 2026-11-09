@@ -9,6 +9,7 @@ The owner's backlog and the team's tracker. The owner edits this file on GitHub:
 - **Done means verified.** A merged PR alone is not Done. Each Done item names its evidence (PR/commit, tests, device check).
   Anything not proven stays In progress with the exact gap. Never claim a device check that nobody did.
 - **Reopen** a Done item when it regresses or turns out incomplete; say what is missing and link the evidence.
+- **Issue-first work**: when a feature/bug has a linked GitHub issue, agents should use that issue as the **canonical task**: record root cause, progress, linked fix PR, tests and real-device verification there, and keep this backlog status synchronized. Close the issue only once the complete acceptance criteria are verified; do not treat an agent claim or merged PR alone as closure.
 - **Format** of an item (keep it this short, no inline diaries; put long detail in a PR, an issue or `docs/reports/`):
 
   ```
@@ -32,7 +33,7 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
 
 ### Reading and HTML mail
 
-- **FR-79 · P1 · Broken image in a real HTML newsletter** — Galaxy S25 Ultra, inbox account
+- **FR-79 · P1 · Broken image in a real HTML newsletter** — **[Issue #107](https://github.com/Sr-0w/Dot-Mail/issues/107)** — Galaxy S25 Ultra, inbox account
   `robin@snyders.xyz`, sender **Red Hat Developer**, subject **“Red Hat Developer Weekly Newsletter”**,
   received **2026-11-09 at 21:05 (Europe/Brussels)**; reader screenshot at 21:06. In the **“Build here”**
   section beside the “Manage Java transitive dependencies with Lightwell rebuilds” article, an image is
@@ -70,7 +71,7 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
 
 ### Inbox and lists
 
-- **FR-80 · P1 · HTML markup and raw tracking URLs leak into inbox previews** — Galaxy S25 Ultra,
+- **FR-80 · P1 · HTML markup and raw tracking URLs leak into inbox previews** — **[Issue #108](https://github.com/Sr-0w/Dot-Mail/issues/108)** — Galaxy S25 Ultra,
   owner screenshot 2026-11-09, Inbox at 21:06: **Red Hat Developer** (21:05) preview shows
   `View email in browser <[[https://click.explore.redhat...`; **Kinepolis** (16:02) shows
   `Cher/Chère M., <p>Des blockbusters...`; **Samsung** (17:32) shows a raw
@@ -115,7 +116,7 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
 
 ### Appearance
 
-- **FR-78 · P1 · Settings entries overlap in Backup section** — Galaxy S25 Ultra, Settings screen
+- **FR-78 · P1 · Settings entries overlap in Backup section** — **[Issue #106](https://github.com/Sr-0w/Dot-Mail/issues/106)** — Galaxy S25 Ultra, Settings screen
   screenshot taken **2026-11-09 at 21:03**: under **BACKUP**, the “Export settings” row and another
   settings row/description render on top of each other, with multiple lines visibly stacked/illegible.
   - [ ] Reproduce by scrolling Settings to Storage → Backup → About; determine whether row measurements,
