@@ -15,7 +15,9 @@ Google requires a homepage and a privacy policy on a verified domain, linked fro
 
 - Pages to publish: [`site/index.html`](../site/index.html) (homepage) and [`site/privacy.html`](../site/privacy.html)
   (privacy policy). They are self-contained (no external resources).
-- Host them on a domain the maintainer controls, for example `dotmail.snyders.xyz` (`/` and `/privacy.html`).
+- Live at <https://dotmail.snyders.xyz/> and <https://dotmail.snyders.xyz/privacy.html>, served from the build host
+  (nginx container in `/opt/docker-containers/dotmail-site`, Traefik file rule `rules/30-dotmail-site.yml`,
+  Let's Encrypt). To update: copy `site/*.html` into the container's `site/` folder; no restart needed.
 - Verify that domain in [Google Search Console](https://search.google.com/search-console) (DNS TXT record) with the same
   Google account that owns the Cloud project.
 
