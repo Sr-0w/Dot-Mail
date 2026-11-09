@@ -280,6 +280,16 @@ data class AccountConfig(
     val authType: AuthType = AuthType.PASSWORD,
     /** Shown in setup, e.g. "Gmail requires an app password". */
     val providerHint: String? = null,
+    /** References Android KeyChain entries; private keys and certificates never live in Room/account JSON. */
+    val smime: SmimeAccountConfig = SmimeAccountConfig(),
+)
+
+/** Account-scoped S/MIME defaults. Missing this object in older account JSON means S/MIME is disabled. */
+data class SmimeAccountConfig(
+    val signingKeyChainAlias: String? = null,
+    val decryptionKeyChainAlias: String? = null,
+    val signByDefault: Boolean = false,
+    val encryptByDefault: Boolean = false,
 )
 
 sealed interface VerifyResult {

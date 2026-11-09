@@ -33,7 +33,11 @@ data class SmimeSigningIdentity(
     val certificateChain: List<X509Certificate> = listOf(certificate),
 )
 data class SmimeDecryptionIdentity(val certificate: X509Certificate, val privateKey: PrivateKey)
-data class SmimeRecipientCertificate(val mailbox: String, val certificate: X509Certificate)
+data class SmimeRecipientCertificate(
+    val mailbox: String,
+    val certificate: X509Certificate,
+    val certificateChain: List<X509Certificate> = listOf(certificate),
+)
 data class SmimeCmsSignerResult(
     val certificate: X509Certificate,
     val certificateCandidates: List<X509Certificate>,
@@ -62,6 +66,7 @@ enum class SmimeFailure {
     SIGNER_CERTIFICATE_REJECTED,
     SIGNER_REVOCATION_UNKNOWN,
     RECIPIENT_CERTIFICATE_MISSING,
+    RECIPIENT_PINNED_CERTIFICATE_UNAVAILABLE,
     RECIPIENT_CERTIFICATE_AMBIGUOUS,
     RECIPIENT_CERTIFICATE_REJECTED,
     RECIPIENT_REVOCATION_UNKNOWN,
@@ -104,6 +109,8 @@ class SmimeEngine(
         signer: SmimeSigningIdentity? = null,
         recipientCertificates: Collection<SmimeRecipientCertificate> = emptyList(),
         senderDecryptionCertificate: X509Certificate? = null,
+        pinnedRecipientCertificateFingerprints: Map<String, String> = emptyMap(),
+        now: java.util.Date = java.util.Date(),
     ): List<SmimeMessageVariant> {
         if (mode == SmimeMode.NONE) throw SmimeProtectionException(SmimeFailure.PROTECTION_NOT_SELECTED, "S/MIME protection was not selected")
         val recipients = (mail.to + mail.cc + mail.bcc).distinctBy { normalize(it.email) }
@@ -123,6 +130,7 @@ class SmimeEngine(
         }
 
         val certByMailbox = recipientCertificates.groupBy { normalize(it.mailbox) }
+        val normalizedPins = pinnedRecipientCertificateFingerprints.mapKeys { normalize(it.key) }
         val recipientCerts = if (encrypting) recipients.map { address ->
             val email = normalize(address.email)
             val matches = certByMailbox[email].orEmpty().distinctBy { it.certificate.serialNumber to it.certificate.issuerX500Principal }
@@ -130,12 +138,50 @@ class SmimeEngine(
                 SmimeFailure.RECIPIENT_CERTIFICATE_MISSING,
                 "No encryption certificate is available for ${address.email}",
             )
-            if (matches.size > 1) throw SmimeProtectionException(
-                SmimeFailure.RECIPIENT_CERTIFICATE_AMBIGUOUS,
-                "More than one encryption certificate matches ${address.email}",
-            )
-            val cert = matches.single().certificate
-            requireTrusted(cert, address.email, SmimeCertificateUse.ENCRYPTION, signer = false)
+            val evaluated = matches.map { candidate ->
+                val certificate = candidate.certificate
+                val validNow = !certificate.notBefore.after(now) && !certificate.notAfter.before(now)
+                val verdict = if (validNow) {
+                    runCatching {
+                        certificatePolicy.validateChain(candidate.certificateChain, address.email, SmimeCertificateUse.ENCRYPTION)
+                    }.getOrElse { SmimeCertificateVerdict.Rejected("Certificate validation failed") }
+                } else SmimeCertificateVerdict.Rejected("Certificate is outside its validity period")
+                Triple(candidate, validNow && verdict == SmimeCertificateVerdict.Trusted, verdict)
+            }
+            val eligible = evaluated.mapNotNull { (candidate, trusted, _) ->
+                candidate.takeIf {
+                    trusted && permitsUse(it.certificate, SmimeCertificateUse.ENCRYPTION) &&
+                        isSupportedRecipientKey(it.certificate)
+                }
+            }
+            val pin = normalizedPins[email]
+            val selected = if (pin != null) {
+                eligible.firstOrNull { certificateFingerprint(it.certificate).equals(pin, ignoreCase = true) }
+                    ?: throw SmimeProtectionException(
+                        SmimeFailure.RECIPIENT_PINNED_CERTIFICATE_UNAVAILABLE,
+                        "The pinned encryption certificate is unavailable or not eligible for ${address.email}",
+                    )
+            } else eligible.sortedWith(
+                    compareByDescending<SmimeRecipientCertificate> { it.certificate.notAfter.time }
+                        .thenBy { certificateFingerprint(it.certificate) },
+                ).firstOrNull()
+            val cert = selected?.certificate ?: run {
+                if (evaluated.any { it.third == SmimeCertificateVerdict.RevocationUnknown }) {
+                    throw SmimeProtectionException(
+                        SmimeFailure.RECIPIENT_REVOCATION_UNKNOWN,
+                        "Certificate revocation status is unknown for ${address.email}",
+                    )
+                }
+                val trustedButUnsupported = evaluated.firstOrNull { (_, trusted, _) -> trusted }?.first?.certificate
+                if (trustedButUnsupported != null) {
+                    requireKeyUsage(trustedButUnsupported, SmimeCertificateUse.ENCRYPTION)
+                    ensureSupportedRecipientKey(trustedButUnsupported)
+                }
+                throw SmimeProtectionException(
+                    SmimeFailure.RECIPIENT_CERTIFICATE_REJECTED,
+                    "No currently-valid trusted encryption certificate is available for ${address.email}",
+                )
+            }
             requireKeyUsage(cert, SmimeCertificateUse.ENCRYPTION)
             ensureSupportedRecipientKey(cert)
             address.email to cert
@@ -261,20 +307,21 @@ class SmimeEngine(
     }
 
     private fun requireKeyUsage(certificate: X509Certificate, use: SmimeCertificateUse) {
-        val usage = certificate.keyUsage ?: throw SmimeProtectionException(
+        if (!permitsUse(certificate, use)) throw SmimeProtectionException(
             if (use == SmimeCertificateUse.SIGNING) SmimeFailure.SIGNER_CERTIFICATE_REJECTED else SmimeFailure.RECIPIENT_CERTIFICATE_REJECTED,
-            "Certificate has no key-usage extension",
+            "Certificate usage does not permit S/MIME ${use.name.lowercase()}",
         )
+    }
+
+    /** Shared eligibility/final gate: absent EKU is unrestricted, but a present EKU must allow email protection. */
+    private fun permitsUse(certificate: X509Certificate, use: SmimeCertificateUse): Boolean {
+        val usage = certificate.keyUsage ?: return false
         val permitted = when (use) {
             SmimeCertificateUse.SIGNING -> usage.getOrNull(0) == true
             SmimeCertificateUse.ENCRYPTION -> usage.getOrNull(2) == true || usage.getOrNull(4) == true
         }
         val eku = certificate.extendedKeyUsage
-        val emailProtection = "1.3.6.1.5.5.7.3.4" in (eku ?: emptyList())
-        if (!permitted || (eku != null && !emailProtection)) throw SmimeProtectionException(
-            if (use == SmimeCertificateUse.SIGNING) SmimeFailure.SIGNER_CERTIFICATE_REJECTED else SmimeFailure.RECIPIENT_CERTIFICATE_REJECTED,
-            "Certificate usage does not permit S/MIME ${use.name.lowercase()}",
-        )
+        return permitted && (eku == null || "1.3.6.1.5.5.7.3.4" in eku)
     }
 
     private fun ensureSupportedSigningKey(certificate: X509Certificate) {
@@ -290,13 +337,24 @@ class SmimeEngine(
     }
 
     private fun ensureSupportedRecipientKey(certificate: X509Certificate) {
-        if (!certificate.publicKey.algorithm.equals("RSA", ignoreCase = true)) {
-            throw SmimeProtectionException(SmimeFailure.UNSUPPORTED_CERTIFICATE_KEY, "Only RSA recipient certificates are currently supported")
+        if (!isSupportedRecipientKey(certificate)) {
+            if (!certificate.publicKey.algorithm.equals("RSA", ignoreCase = true)) {
+                throw SmimeProtectionException(SmimeFailure.UNSUPPORTED_CERTIFICATE_KEY, "Only RSA recipient certificates are currently supported")
+            }
+            throw SmimeProtectionException(SmimeFailure.UNSUPPORTED_CERTIFICATE_KEY, "RSA recipient key must be at least 2048 bits")
         }
+    }
+
+    private fun isSupportedRecipientKey(certificate: X509Certificate): Boolean {
+        if (!certificate.publicKey.algorithm.equals("RSA", ignoreCase = true)) return false
         val bits = (certificate.publicKey as? java.security.interfaces.RSAKey)?.modulus?.bitLength() ?: 0
-        if (bits !in 2048..16384) throw SmimeProtectionException(SmimeFailure.UNSUPPORTED_CERTIFICATE_KEY, "RSA recipient key must be at least 2048 bits")
+        return bits in 2048..16384
     }
 
     private fun normalize(mailbox: String) = mailbox.trim().lowercase(java.util.Locale.ROOT)
+
+    private fun certificateFingerprint(certificate: X509Certificate): String =
+        java.security.MessageDigest.getInstance("SHA-256").digest(certificate.encoded)
+            .joinToString("") { "%02X".format(it) }
 
 }

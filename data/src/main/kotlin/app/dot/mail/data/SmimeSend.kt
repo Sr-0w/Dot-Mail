@@ -5,6 +5,7 @@ import app.dot.mail.engine.OutgoingMail
 import app.dot.mail.engine.SmimeEngine
 import app.dot.mail.engine.SmimeMessageVariant
 import app.dot.mail.engine.SmimeMode
+import app.dot.mail.engine.SmimeRecipientCertificate
 import app.dot.mail.engine.SmimeSigningIdentity
 import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
@@ -44,12 +45,14 @@ internal class EngineSmimeBuilder(
         val encrypting = mode == SmimeMode.ENCRYPT || mode == SmimeMode.SIGN_AND_ENCRYPT
         val signer = if (signing) keys.signingIdentity(accountId) else null
         val own = if (encrypting) keys.decryptionCertificate(accountId) else null
-        val recipients = if (encrypting) (mail.to + mail.cc + mail.bcc).map { SmimeCertStore.normalize(it.email) }.distinct().flatMap { box ->
-            val all = certs.candidates(accountId, box)
-            val pinned = certs.pinnedFingerprint(accountId, box)
-            if (pinned != null) all.filter { SmimeCertStore.fingerprint(it.certificate) == pinned } else all
-        } else emptyList()
-        return engine.build(mail, mode, signer, recipients, own)
+        val boxes = if (encrypting) (mail.to + mail.cc + mail.bcc).map { SmimeCertStore.normalize(it.email) }.distinct() else emptyList()
+        // Every stored candidate with its intermediates (needed for path building); the engine applies pins itself and
+        // fails distinctly when a pinned certificate is no longer usable, instead of switching keys behind the user's back.
+        val recipients = boxes.flatMap { box ->
+            certs.candidateChains(accountId, box).map { SmimeRecipientCertificate(it.mailbox, it.leaf, it.chain) }
+        }
+        val pins = boxes.mapNotNull { box -> certs.pinnedFingerprint(accountId, box)?.let { box to it } }.toMap()
+        return engine.build(mail, mode, signer, recipients, own, pinnedRecipientCertificateFingerprints = pins)
     }
 }
 
