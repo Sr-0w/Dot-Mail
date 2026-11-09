@@ -27,7 +27,7 @@ internal object GraphRegistry {
     @Volatile private var graph: RealMailGraph? = null
     fun get(context: Context): RealMailGraph = graph ?: synchronized(this) {
         graph ?: RealMailGraph(context.applicationContext,
-            Room.databaseBuilder(context.applicationContext, MailDatabase::class.java, "dotmail.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10).build(),
+            Room.databaseBuilder(context.applicationContext, MailDatabase::class.java, "dotmail.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11).build(),
             KeystoreCredentialVault()).also { graph = it; it.start() }
     }
 }
@@ -62,6 +62,8 @@ internal class RealMailGraph(
 
     internal val storage=StorageManager(this)
     internal val addressBook=AddressBookIndex(this)
+    /** Recipient S/MIME certificates (a cache, not trust). */
+    internal val smimeCerts = SmimeCertStore(dao)
     override suspend fun refreshKnownContacts() { addressBook.refresh(force=true) }
     override val globalStorageLimit:Flow<Long> = storage.preferences.version.map { storage.preferences.globalLimit() }.distinctUntilChanged()
     override suspend fun setGlobalStorageLimit(bytes:Long) { storage.globalLimit(bytes) }

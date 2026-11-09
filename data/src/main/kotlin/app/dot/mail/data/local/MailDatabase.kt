@@ -50,6 +50,14 @@ internal const val MESSAGE_META = "id,accountId,folderId,threadId,uid,header,sub
 
 @Dao
 interface MailDao {
+    @Query("SELECT * FROM smime_recipient_certs WHERE accountId=:account AND mailbox=:mailbox AND fingerprint=:fingerprint") suspend fun smimeCert(account: Long, mailbox: String, fingerprint: String): SmimeRecipientCertRow?
+    @Query("SELECT * FROM smime_recipient_certs WHERE accountId=:account AND mailbox=:mailbox AND state='ACTIVE' ORDER BY pinned DESC, notAfter DESC, fingerprint") suspend fun smimeCerts(account: Long, mailbox: String): List<SmimeRecipientCertRow>
+    @Query("SELECT * FROM smime_recipient_certs WHERE accountId=:account AND state='ACTIVE' ORDER BY mailbox, pinned DESC, notAfter DESC, fingerprint") fun smimeCertsFlow(account: Long): kotlinx.coroutines.flow.Flow<List<SmimeRecipientCertRow>>
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putSmimeCert(row: SmimeRecipientCertRow)
+    @Query("UPDATE smime_recipient_certs SET lastSeen=:seen WHERE accountId=:account AND mailbox=:mailbox AND fingerprint=:fingerprint") suspend fun touchSmimeCert(account: Long, mailbox: String, fingerprint: String, seen: Long)
+    @Query("UPDATE smime_recipient_certs SET pinned=0 WHERE accountId=:account AND mailbox=:mailbox") suspend fun unpinSmimeCerts(account: Long, mailbox: String)
+    @Query("UPDATE smime_recipient_certs SET pinned=:pinned WHERE accountId=:account AND mailbox=:mailbox AND fingerprint=:fingerprint AND state='ACTIVE'") suspend fun pinSmimeCert(account: Long, mailbox: String, fingerprint: String, pinned: Boolean): Int
+    @Query("UPDATE smime_recipient_certs SET state='IGNORED', pinned=0 WHERE accountId=:account AND mailbox=:mailbox AND fingerprint=:fingerprint") suspend fun ignoreSmimeCert(account: Long, mailbox: String, fingerprint: String): Int
     @Query("DELETE FROM message_senders WHERE messageId=:id") suspend fun clearMessageSenders(id:Long)
     @Insert(onConflict=OnConflictStrategy.IGNORE) suspend fun putMessageSender(row:MessageSenderRow)
     @Insert(onConflict=OnConflictStrategy.IGNORE) suspend fun putDeviceContacts(rows:List<DeviceContactRow>)
@@ -249,7 +257,21 @@ interface MailDao {
     @Query("SELECT email, name, MAX(lastSeen) AS lastSeen, accountId, MAX(corresponded) AS corresponded FROM contacts WHERE email LIKE :prefix ESCAPE '!' OR name LIKE :prefix ESCAPE '!' GROUP BY email ORDER BY lastSeen DESC LIMIT :limit") suspend fun contacts(prefix: String, limit: Int): List<ContactRow>
 }
 
-@Database(entities = [AccountRow::class, FolderRow::class, ThreadRow::class, ThreadKeyRow::class, MessageRow::class, AttachmentRow::class, DraftRow::class, OutboxRow::class, OperationRow::class, ContactRow::class, BodyTextRow::class, SearchMatchRow::class, SnoozeRow::class, DraftMirrorRow::class, SearchDocumentRow::class, MessageFtsRow::class, SearchPendingRow::class, CacheAccessRow::class, OfflineFolderRow::class, MessageSenderRow::class, DeviceContactRow::class, DeviceContactStateRow::class, ThreadRepairRow::class, RepairMuteRow::class], version = 10, exportSchema = true)
+/**
+ * A recipient's S/MIME certificate seen in mail whose signature verified cryptographically (or added by hand), per account.
+ * Keyed by the normalized mailbox and the SHA-256 fingerprint of the DER bytes. Having a row is NOT trust: the certificate
+ * policy is re-evaluated whenever it is about to be used. [state] ACTIVE rows are candidates; IGNORED is a tombstone left
+ * by "Forget" so the same certificate is not collected again from the next signed message. At most one row per mailbox is pinned.
+ */
+@Entity(tableName = "smime_recipient_certs", primaryKeys = ["accountId", "mailbox", "fingerprint"],
+    foreignKeys = [ForeignKey(entity = AccountRow::class, parentColumns = ["id"], childColumns = ["accountId"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index("accountId", "mailbox")])
+class SmimeRecipientCertRow(
+    val accountId: Long, val mailbox: String, val fingerprint: String, val der: ByteArray,
+    val subject: String, val issuer: String, val notBefore: Long, val notAfter: Long,
+    val firstSeen: Long, val lastSeen: Long, val source: String, val state: String, val pinned: Boolean,
+)
+@Database(entities = [AccountRow::class, FolderRow::class, ThreadRow::class, ThreadKeyRow::class, MessageRow::class, AttachmentRow::class, DraftRow::class, OutboxRow::class, OperationRow::class, ContactRow::class, BodyTextRow::class, SearchMatchRow::class, SnoozeRow::class, DraftMirrorRow::class, SearchDocumentRow::class, MessageFtsRow::class, SearchPendingRow::class, CacheAccessRow::class, OfflineFolderRow::class, MessageSenderRow::class, DeviceContactRow::class, DeviceContactStateRow::class, ThreadRepairRow::class, RepairMuteRow::class, SmimeRecipientCertRow::class], version = 11, exportSchema = true)
 abstract class MailDatabase : RoomDatabase() { abstract fun mail(): MailDao }
 
 internal val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
@@ -340,5 +362,13 @@ internal val MIGRATION_9_10 = object : androidx.room.migration.Migration(9,10) {
         db.execSQL("CREATE TABLE IF NOT EXISTS thread_repairs (threadId INTEGER NOT NULL, state TEXT NOT NULL, PRIMARY KEY(threadId), FOREIGN KEY(threadId) REFERENCES threads(id) ON UPDATE NO ACTION ON DELETE CASCADE)")
         db.execSQL("CREATE TABLE IF NOT EXISTS repair_mutes (threadId INTEGER NOT NULL, PRIMARY KEY(threadId), FOREIGN KEY(threadId) REFERENCES threads(id) ON UPDATE NO ACTION ON DELETE CASCADE)")
         db.execSQL("INSERT INTO thread_repairs(threadId,state) SELECT id,'PENDING' FROM threads")
+    }
+}
+
+/** New table only: nothing existing is touched. */
+internal val MIGRATION_10_11 = object : androidx.room.migration.Migration(10, 11) {
+    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS `smime_recipient_certs` (`accountId` INTEGER NOT NULL, `mailbox` TEXT NOT NULL, `fingerprint` TEXT NOT NULL, `der` BLOB NOT NULL, `subject` TEXT NOT NULL, `issuer` TEXT NOT NULL, `notBefore` INTEGER NOT NULL, `notAfter` INTEGER NOT NULL, `firstSeen` INTEGER NOT NULL, `lastSeen` INTEGER NOT NULL, `source` TEXT NOT NULL, `state` TEXT NOT NULL, `pinned` INTEGER NOT NULL, PRIMARY KEY(`accountId`, `mailbox`, `fingerprint`), FOREIGN KEY(`accountId`) REFERENCES `accounts`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_smime_recipient_certs_accountId_mailbox` ON `smime_recipient_certs` (`accountId`, `mailbox`)")
     }
 }

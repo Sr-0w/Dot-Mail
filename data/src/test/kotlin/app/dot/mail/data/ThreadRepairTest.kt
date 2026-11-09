@@ -535,7 +535,7 @@ class ThreadRepairTest {
             helper.close()
             fun open() =
                 Room.databaseBuilder(context, MailDatabase::class.java, name)
-                    .addMigrations(MIGRATION_9_10)
+                    .addMigrations(MIGRATION_9_10, MIGRATION_10_11)
                     .allowMainThreadQueries()
                     .build()
             db = open()
