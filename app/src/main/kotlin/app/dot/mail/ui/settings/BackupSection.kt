@@ -49,6 +49,7 @@ private class PendingImport(val parsed: SettingsBackup.Parsed, val lines: List<S
 @Composable
 internal fun BackupSettings() {
     val context = LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val graph = LocalMailGraph.current
     val settings = LocalSettings.current
     val scope = rememberCoroutineScope()
@@ -106,20 +107,20 @@ internal fun BackupSettings() {
             busy = false
             if (text == null) { notice = importFailedTitle to listOf(readFailed); return@launch }
             val (parsed, error) = SettingsBackup.parse(text)
-            if (parsed == null) { notice = importFailedTitle to listOf(error?.let { context.getString(it) } ?: unusable); return@launch }
+            if (parsed == null) { notice = importFailedTitle to listOf(error?.let { resources.getString(it) } ?: unusable); return@launch }
             val accountPreview: BackupPreview = graph.accounts.previewBackup(parsed.dataSection)
             if (accountPreview.error != null) { notice = importFailedTitle to listOf(accountPreview.error!!); return@launch }
             val lines = buildList {
                 accountPreview.items.forEach { i ->
-                    add(if (!i.added) context.getString(R.string.backup_preview_account_update, i.email)
-                    else context.getString(if (i.oauth) R.string.backup_preview_account_add_oauth else R.string.backup_preview_account_add, i.email, i.host))
+                    add(if (!i.added) resources.getString(R.string.backup_preview_account_update, i.email)
+                    else resources.getString(if (i.oauth) R.string.backup_preview_account_add_oauth else R.string.backup_preview_account_add, i.email, i.host))
                 }
-                accountPreview.warnings.forEach { add(context.getString(R.string.backup_skipped_prefix, it)) }
-                if (parsed.prefs != null) add(context.getString(R.string.backup_preview_prefs))
-                parsed.rules?.let { add(context.resources.getQuantityString(R.plurals.backup_preview_rules, it.size, it.size)) }
-                parsed.templates?.let { add(context.resources.getQuantityString(R.plurals.backup_preview_templates, it.size, it.size)) }
-                parsed.smartFolders?.let { add(context.resources.getQuantityString(R.plurals.backup_preview_smart, it.size, it.size)) }
-                if (isEmpty()) add(context.getString(R.string.backup_preview_nothing))
+                accountPreview.warnings.forEach { add(resources.getString(R.string.backup_skipped_prefix, it)) }
+                if (parsed.prefs != null) add(resources.getString(R.string.backup_preview_prefs))
+                parsed.rules?.let { add(resources.getQuantityString(R.plurals.backup_preview_rules, it.size, it.size)) }
+                parsed.templates?.let { add(resources.getQuantityString(R.plurals.backup_preview_templates, it.size, it.size)) }
+                parsed.smartFolders?.let { add(resources.getQuantityString(R.plurals.backup_preview_smart, it.size, it.size)) }
+                if (isEmpty()) add(resources.getString(R.string.backup_preview_nothing))
             }
             pending = PendingImport(parsed, lines, accountPreview.accountsNeedingSignIn)
         }

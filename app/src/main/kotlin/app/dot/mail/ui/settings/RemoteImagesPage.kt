@@ -1,5 +1,6 @@
 package app.dot.mail.ui.settings
 
+import app.dot.design.components.backdropSource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -61,9 +62,14 @@ internal fun RemoteImagesPage(accounts: List<Account>, onBack: () -> Unit) {
     var confirmReset by remember { mutableStateOf(false) }
     val scroll = rememberScrollState()
 
-    Column(Modifier.fillMaxSize().background(c.background)) {
-        DotTopBar(title = stringResource(R.string.remote_images_title), elevated = scroll.value > 0, navigation = { BackButton(onBack) })
-        Column(Modifier.verticalScroll(scroll).navigationBarsPadding()) {
+    val frostedSource=app.dot.design.components.rememberGlassBackdrop()
+    app.dot.design.components.FrostedHeaderLayout(
+        backdrop=frostedSource,modifier=Modifier.fillMaxSize().background(c.background),
+        header={ DotTopBar(title = stringResource(R.string.remote_images_title), elevated = scroll.value > 0, navigation = { BackButton(onBack) }) },
+    ) { topPadding ->
+        Column(Modifier.fillMaxSize().backdropSource(frostedSource).verticalScroll(scroll).navigationBarsPadding()) {
+            androidx.compose.foundation.layout.Spacer(Modifier.height(topPadding.calculateTopPadding()))
+
             Text(
                 stringResource(R.string.remote_images_intro),
                 style = Dot.type.callout, color = c.textSecondary,
@@ -100,6 +106,7 @@ internal fun RemoteImagesPage(accounts: List<Account>, onBack: () -> Unit) {
                 onClick = if (approvals.isEmpty()) null else ({ policy.forgetAllMessages() }),
             )
             Spacer(Modifier.height(DotSpacing.xl))
+
         }
     }
 

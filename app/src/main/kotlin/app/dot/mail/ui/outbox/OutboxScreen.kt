@@ -1,5 +1,6 @@
 package app.dot.mail.ui.outbox
 
+import app.dot.design.components.backdropSource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -66,13 +67,15 @@ fun OutboxScreen(onBack: () -> Unit, onEdit: (Long) -> Unit = {}) {
     val editUnavailable = stringResource(R.string.outbox_edit_unavailable)
     val c = Dot.colors
     Box(Modifier.fillMaxSize().background(c.background)) {
-    Column(Modifier.fillMaxSize()) {
-        DotTopBar(title = stringResource(R.string.outbox_title), elevated = listState.canScrollBackward, navigation = { BackButton(onBack) })
+        val frostedSource=app.dot.design.components.rememberGlassBackdrop()
+        app.dot.design.components.FrostedHeaderLayout(backdrop=frostedSource,header={ Column { DotTopBar(title = stringResource(R.string.outbox_title), elevated = listState.canScrollBackward, navigation = { BackButton(onBack) }) } }) { headerPadding ->
+
         if (items.isEmpty()) {
-            EmptyState(Icons.Outlined.Outbox, stringResource(R.string.outbox_empty_title), stringResource(R.string.outbox_empty_body))
-            return@Column
+            Box(Modifier.padding(headerPadding)) { EmptyState(Icons.Outlined.Outbox, stringResource(R.string.outbox_empty_title), stringResource(R.string.outbox_empty_body))
+            }
+            return@FrostedHeaderLayout
         }
-        LazyColumn(state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp), modifier = Modifier.navigationBarsPadding()) {
+        LazyColumn(state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(top=headerPadding.calculateTopPadding(),bottom = 24.dp), modifier = Modifier.fillMaxSize().backdropSource(frostedSource).navigationBarsPadding()) {
             items(items, key = { it.id }) { item ->
                 Column(
                     Modifier.then(if (reducedMotion) Modifier else Modifier.animateItem()).fillMaxWidth().padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.l),
@@ -119,7 +122,8 @@ fun OutboxScreen(onBack: () -> Unit, onEdit: (Long) -> Unit = {}) {
                 Hairline(Modifier.padding(horizontal = DotSpacing.gutter))
             }
         }
-    }
+
+        }
     SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 8.dp)) { DotSnackbar(it) }
     }
     rescheduling?.let { item ->

@@ -1,5 +1,6 @@
 package app.dot.mail.ui.account
 
+import app.dot.design.components.backdropSource
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -368,11 +369,17 @@ fun AddAccountScreen(onBack: () -> Unit, onDone: () -> Unit) {
     val c = Dot.colors
     val passwordFocus = remember { FocusRequester() }
 
-    Column(Modifier.fillMaxSize().background(c.background).imePadding()) {
-        DotTopBar(navigation = { BackButton(onBack) })
+    val frostedSource=app.dot.design.components.rememberGlassBackdrop()
+    app.dot.design.components.FrostedHeaderLayout(
+        backdrop=frostedSource,modifier=Modifier.fillMaxSize().background(c.background).imePadding(),
+        header={ DotTopBar(navigation = { BackButton(onBack) }) },
+    ) { topPadding ->
+        Column(Modifier.fillMaxSize()) {
         Column(
-            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = DotSpacing.gutter),
+            Modifier.fillMaxSize().weight(1f).backdropSource(frostedSource).verticalScroll(rememberScrollState()).padding(horizontal = DotSpacing.gutter),
         ) {
+            androidx.compose.foundation.layout.Spacer(Modifier.height(topPadding.calculateTopPadding()))
+
             Text(stringResource(R.string.setup_title), style = Dot.type.display, color = c.textPrimary)
             Spacer(Modifier.height(DotSpacing.s))
             Text(
@@ -440,7 +447,9 @@ fun AddAccountScreen(onBack: () -> Unit, onDone: () -> Unit) {
                 )
             }
             Spacer(Modifier.height(DotSpacing.xl))
+
         }
+
         DotButton(
             text = stringResource(if (state.busy && state.google == SetupState.GooglePhase.Idle) R.string.setup_connecting else R.string.setup_continue),
             onClick = vm::connect,
@@ -450,6 +459,8 @@ fun AddAccountScreen(onBack: () -> Unit, onDone: () -> Unit) {
             enabled = state.emailValid && state.password.isNotEmpty() && !state.oauthOnly,
             modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(DotSpacing.gutter),
         )
+
+        }
     }
 }
 

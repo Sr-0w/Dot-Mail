@@ -1,5 +1,7 @@
 package app.dot.mail.ui.attachments
 
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import app.dot.design.components.backdropSource
 import androidx.compose.runtime.setValue
 
 import androidx.compose.runtime.mutableStateOf
@@ -137,6 +139,7 @@ fun AttachmentsScreen(onBack: () -> Unit) {
     val kind by vm.kind.collectAsStateWithLifecycle()
     val items = vm.items.collectAsLazyPagingItems()
     val context = LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val snackbar = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
     val c = Dot.colors
@@ -161,20 +164,27 @@ fun AttachmentsScreen(onBack: () -> Unit) {
                     val intent = if (e.share) Intent(Intent.ACTION_SEND).setType(e.mime).putExtra(Intent.EXTRA_STREAM, uri)
                     else Intent(Intent.ACTION_VIEW).setDataAndType(uri, e.mime)
                     try { context.startActivity(Intent.createChooser(intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), e.name)) }
-                    catch (_: ActivityNotFoundException) { snackbar.showSnackbar(context.getString(R.string.thread_no_app_to_open, e.name)) }
+                    catch (_: ActivityNotFoundException) { snackbar.showSnackbar(resources.getString(R.string.thread_no_app_to_open, e.name)) }
                 }
             }
         }
     }
 
     Box(Modifier.fillMaxSize().background(c.background)) {
-        Column(Modifier.fillMaxSize()) {
-            DotTopBar(title = stringResource(R.string.attachments_title), subtitle = stringResource(R.string.inbox_all_accounts), elevated = listState.canScrollBackward, navigation = { BackButton(onBack) })
+        val headerControls=app.dot.design.components.rememberHeaderControls()
+        val reduced=app.dot.design.rememberReducedMotion()
+        val frostedSource=app.dot.design.components.rememberGlassBackdrop()
+        app.dot.design.components.FrostedHeaderLayout(backdrop=frostedSource,reserveExpandedHeight=true,header={ Column { DotTopBar(title = stringResource(R.string.attachments_title), subtitle = stringResource(R.string.inbox_all_accounts), elevated = listState.canScrollBackward, navigation = { BackButton(onBack) })
             SearchField(
                 value = query, onValueChange = { vm.query.value = it },
                 placeholder = stringResource(R.string.attachments_search_placeholder),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter),
             )
+            androidx.compose.animation.AnimatedVisibility(
+                visible=headerControls.expanded || !listState.canScrollBackward,
+                enter=if(reduced) androidx.compose.animation.EnterTransition.None else androidx.compose.animation.expandVertically()+androidx.compose.animation.fadeIn(),
+                exit=if(reduced) androidx.compose.animation.ExitTransition.None else androidx.compose.animation.shrinkVertically()+androidx.compose.animation.fadeOut(),
+            ) {
             LazyRow(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = DotSpacing.gutter, vertical = DotSpacing.s),
                 horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(DotSpacing.s),
@@ -182,14 +192,16 @@ fun AttachmentsScreen(onBack: () -> Unit) {
                 item { app.dot.design.components.DotFilterChip(stringResource(R.string.attachments_filter_all), kind == null, { vm.kind.value = null }, radio = true) }
                 items(AttachmentKind.entries.toList()) { k -> app.dot.design.components.DotFilterChip(stringResource(label(k)), kind == k, { vm.kind.value = if (kind == k) null else k }, radio = true) }
             }
+            }
+ } }) { headerPadding ->
             if (items.itemCount == 0 && items.loadState.refresh is androidx.paging.LoadState.NotLoading) {
-                EmptyState(
+                Box(Modifier.padding(headerPadding)) {                 EmptyState(
                     Icons.Outlined.AttachFile,
                     stringResource(if (query.isBlank() && kind == null) R.string.attachments_empty_title else R.string.attachments_no_match_title),
                     stringResource(if (query.isBlank() && kind == null) R.string.attachments_empty_body else R.string.attachments_no_match_body),
-                )
+                ) }
             } else {
-                LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp)) {
+                LazyColumn(Modifier.fillMaxSize().nestedScroll(headerControls.connection).backdropSource(frostedSource), state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(top=headerPadding.calculateTopPadding(),bottom = 24.dp)) {
                     items(items.itemCount, key = items.itemKey { it.attachment.id }) { index ->
                         val item = items[index] ?: return@items
                         val month = remember(item.sentAt) { YearMonth.from(Instant.ofEpochMilli(item.sentAt).atZone(ZoneId.systemDefault())) }
@@ -200,6 +212,7 @@ fun AttachmentsScreen(onBack: () -> Unit) {
                     }
                 }
             }
+
         }
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 8.dp)) { DotSnackbar(it) }
     }
@@ -216,7 +229,7 @@ private fun label(k: AttachmentKind) = when (k) {
 private fun MonthHeader(month: YearMonth) {
     val text = remember(month) { DateTimeFormatter.ofPattern(android.text.format.DateFormat.getBestDateTimePattern(Locale.getDefault(), "LLLL yyyy"), Locale.getDefault()).format(month).replaceFirstChar { it.titlecase(Locale.getDefault()) } }
     Text(
-        text.uppercase(Locale.getDefault()), style = Dot.type.overline, color = Dot.colors.textTertiary,
+        text.uppercase(androidx.compose.ui.text.intl.Locale.current.platformLocale), style = Dot.type.overline, color = Dot.colors.textTertiary,
         modifier = Modifier.fillMaxWidth().padding(start = DotSpacing.gutter, end = DotSpacing.gutter, top = DotSpacing.l, bottom = DotSpacing.xs)
             .androidxHeading(),
     )

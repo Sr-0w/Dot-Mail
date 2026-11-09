@@ -141,6 +141,21 @@ class DemoMailGraph(now: Long = System.currentTimeMillis()) : MailGraph {
             if (!f.any) data else data.filter { t -> (!f.unread || t.unreadCount > 0) && (!f.starred || t.isStarred) && (!f.attachments || t.hasAttachments) }
         }
 
+        override fun search(query:String,scope:app.dot.mail.data.model.SearchScope):Flow<PagingData<app.dot.mail.data.model.SearchResult>> = messages.map { all ->
+            val words=query.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+            val matching=all.filter { m ->
+                (scope.accountIds.isEmpty() || m.accountId in scope.accountIds) &&
+                (scope.folderIds.isEmpty() || m.folderId in scope.folderIds) && words.all { word ->
+                    listOf(m.subject,m.from.displayName,m.snippet,m.body?.plainText.orEmpty(),m.body?.html.orEmpty(),m.attachments.joinToString(" ") { it.fileName }).any { it.contains(word,true) }
+                }
+            }
+            val rows=summaries(matching).map { thread ->
+                val message=matching.filter { it.threadId==thread.threadId }.maxBy { it.sentAt }
+                app.dot.mail.data.model.SearchResult(thread,message.id,message.folderId,thread.subject,emptyList(),message.snippet,emptyList(),message.body!=null,false)
+            }
+            PagingData.from(if(scope.sort==app.dot.mail.data.model.SearchSort.OLDEST) rows.sortedBy { it.thread.lastMessageAt } else rows.sortedByDescending { it.thread.lastMessageAt })
+        }
+
         override fun search(query: String, accountId: Long?): Flow<PagingData<ThreadSummary>> = messages.map { msgs ->
             val q = query.lowercase()
             PagingData.from(

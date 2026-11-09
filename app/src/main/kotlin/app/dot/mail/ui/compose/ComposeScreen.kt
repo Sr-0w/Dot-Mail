@@ -42,6 +42,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import app.dot.design.components.backdropSource
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -270,14 +271,15 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
     }
 
     val draft = state.draft
-    Column(
-        Modifier
+    val edgeState=app.dot.design.components.rememberGlassBackdrop()
+    val bodyScroll=rememberScrollState()
+    app.dot.design.components.FrostedHeaderLayout(
+        backdrop=edgeState,modifier=Modifier
             .fillMaxSize()
             .background(c.background)
             .windowInsetsPadding(WindowInsets.navigationBars)
             .imePadding(),
-    ) {
-        DotTopBar(
+        header={ DotTopBar(
             navigation = { DotIconButton(Icons.Outlined.Close, stringResource(R.string.compose_close), onClick = requestClose) },
             title = if (route.replyMode != null) replyTitle(route.replyMode) else stringResource(R.string.compose_new_message),
             actions = {
@@ -308,9 +310,12 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                 }
                 SendButton(enabled = state.loaded && !state.sending && state.hasRecipients, onClick = { vm.send() })
             },
-        )
-        if (draft == null) return@Column
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+        ) },
+    ) { headerPadding ->
+        if(draft!=null) {
+        Column(Modifier.fillMaxSize()) {
+        Column(Modifier.weight(1f).fillMaxWidth().backdropSource(edgeState).verticalScroll(bodyScroll)) { Spacer(Modifier.height(headerPadding.calculateTopPadding()))
+
             // From
             if (state.senders.isNotEmpty()) {
                 Box {
@@ -448,6 +453,7 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                     onToggle = vm::toggleQuoteExpanded,
                 )
             }
+
         }
         state.aliasChoices?.let { choices ->
             AlertDialog(
@@ -498,6 +504,8 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                 richTextState = richTextState,
                 onLinkClick = { showLinkDialog = true },
             )
+        }
+        }
         }
     }
 

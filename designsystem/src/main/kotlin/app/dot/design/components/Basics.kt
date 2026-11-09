@@ -78,7 +78,7 @@ enum class ButtonStyle { Primary, Secondary, Ghost, Danger }
 
 /** Solid fill of primary actions: Accent Blue with >= 4.7:1 contrast against a white label in both themes. */
 @Composable
-internal fun primaryFill(): Color = if (Dot.colors.isDark) Color(0xFF476CE8) else Dot.colors.accent
+internal fun primaryFill(): Color = Dot.colors.accentFill
 
 /**
  * The one button. Primary is a solid Accent Blue fill (priority, never glass); Secondary a hairline outline;
@@ -169,7 +169,7 @@ fun DotPrimaryButton(
     val pressed by interaction.collectIsPressedAsState()
     val reduceMotion = rememberReducedMotion()
     // Solid Accent Blue fill with >= 4.7:1 WCAG AA contrast against white foreground in both themes.
-    val accentFill = if (c.isDark) Color(0xFF476CE8) else c.accent
+    val accentFill = c.accentFill
     val bgAnimated by animateColorAsState(
         when {
             !enabled -> accentFill.copy(alpha = 0.35f)
@@ -229,7 +229,7 @@ fun DotPrimaryButton(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val reduceMotion = rememberReducedMotion()
-    val accentFill = if (c.isDark) Color(0xFF476CE8) else c.accent
+    val accentFill = c.accentFill
     val bgAnimated by animateColorAsState(
         when {
             !enabled -> accentFill.copy(alpha = 0.35f)
@@ -280,7 +280,7 @@ fun DotFrostedPill(
     enabled: Boolean = true,
     contentDescription: String? = label,
     /** Content scrolling underneath, for a real backdrop blur ([rememberGlassBackdrop]); null = opaque frosted. */
-    backdrop: dev.chrisbanes.haze.HazeState? = null,
+    backdrop: app.dot.design.components.Backdrop? = null,
 ) {
     val c = Dot.colors
     val haptics = LocalHapticFeedback.current
@@ -363,6 +363,13 @@ fun DotIconButton(
     tint: Color = Dot.colors.textPrimary,
     enabled: Boolean = true,
 ) {
+    val header=LocalHeaderGlass.current
+    if(header!=null && contentDescription!=null) {
+        DotFloatingCapsule(modifier=modifier,backdrop=header.backdrop) {
+            DotCapsuleButton(icon,contentDescription,onClick,enabled=enabled,tint=tint)
+        }
+        return
+    }
     Box(
         modifier
             .size(48.dp)
@@ -506,18 +513,18 @@ fun ListRow(
 /** Translucent graphite (dark) / pearl (light) gradient shared by every floating surface: compose pill, snackbars. */
 @Composable
 internal fun frostedSurfaceBrush(pressed: Boolean): Brush = if (Dot.colors.isDark) {
-    val top = if (pressed) Color(0xEB313138) else Color(0xE02A2A30)
-    val bottom = if (pressed) Color(0xEB232328) else Color(0xE01C1C21)
+    val top = if (pressed) Color(0xEB323232) else Color(0xE02A2A2A)
+    val bottom = if (pressed) Color(0xEB242424) else Color(0xE01D1D1D)
     Brush.verticalGradient(listOf(top, bottom))
 } else {
-    val top = if (pressed) Color(0xEDEAEAEF) else Color(0xEBF5F5F8)
-    val bottom = if (pressed) Color(0xEDDFDFE6) else Color(0xEBE8E8EE)
+    val top = if (pressed) Color(0xEDEBEBEB) else Color(0xEBF6F6F6)
+    val bottom = if (pressed) Color(0xEDE0E0E0) else Color(0xEBEAEAEA)
     Brush.verticalGradient(listOf(top, bottom))
 }
 
 @Composable
 internal fun frostedBorderBrush(): Brush = if (Dot.colors.isDark) {
-    Brush.verticalGradient(listOf(Color(0xFF42424A), Color(0xFF2B2B31)))
+    Brush.verticalGradient(listOf(Color(0xFF444444), Color(0xFF2C2C2C)))
 } else {
-    Brush.verticalGradient(listOf(Color(0xFFFFFFFF), Color(0xFFD2D2DA)))
+    Brush.verticalGradient(listOf(Color(0xFFFFFFFF), Color(0xFFD4D4D4)))
 }

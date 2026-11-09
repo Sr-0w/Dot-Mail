@@ -77,6 +77,17 @@ class OledThemeTest {
         check(OledColors)
     }
 
+    @Test fun `electric accent and primary action labels keep WCAG AA in every theme`(): Unit {
+        for (c in listOf(LightColors, DarkColors, OledColors)) {
+            for (surface in listOf(c.background, c.surface, c.surfaceRaised)) {
+                assertThat(contrast(c.accent, surface)).isAtLeast(4.5)
+            }
+            assertThat(contrast(c.accentFill, Color.White)).isAtLeast(4.5)
+        }
+        assertThat(DarkColors.accent).isNotEqualTo(Color(0xFF7C9CFF))
+        assertThat(LightColors.accent).isNotEqualTo(Color(0xFF3D63E0))
+    }
+
     @Test fun `the window background follows the theme before compose exists`(): Unit {
         val dark = Configuration().apply { uiMode = Configuration.UI_MODE_NIGHT_YES }
         val light = Configuration().apply { uiMode = Configuration.UI_MODE_NIGHT_NO }

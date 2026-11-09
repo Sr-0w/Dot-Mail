@@ -350,6 +350,7 @@ fun ThreadScreen(
     val remoteRules by remotePolicy.rules.collectAsStateWithLifecycle()
     val prefs by LocalSettings.current.ui.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val snackbar = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
     var pendingLink by remember { mutableStateOf<String?>(null) }
@@ -359,7 +360,8 @@ fun ThreadScreen(
     var pdfPreview by remember { mutableStateOf<ThreadEvent.OpenUri?>(null) }
     var menu by remember { mutableStateOf(false) }
     var snoozing by remember { mutableStateOf(false) }
-    val muted by remember(graph, threadId) { graph.mail.mutedThreads() }.collectAsStateWithLifecycle(emptySet()).let { s -> androidx.compose.runtime.derivedStateOf { threadId in s.value || (messages?.firstOrNull()?.threadId?.let { it in s.value } == true) } }
+    val mutedThreads by remember(graph, threadId) { graph.mail.mutedThreads() }.collectAsStateWithLifecycle(emptySet())
+    val muted = threadId in mutedThreads || (messages?.firstOrNull()?.threadId?.let { it in mutedThreads } == true)
     var showMove by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var confirmTrash by remember { mutableStateOf(false) }
@@ -399,7 +401,7 @@ fun ThreadScreen(
                     try {
                         context.startActivity(Intent.createChooser(intent, e.name))
                     } catch (_: ActivityNotFoundException) {
-                        scope.launch { snackbar.showSnackbar(context.getString(R.string.thread_no_app_to_open, e.name)) }
+                        scope.launch { snackbar.showSnackbar(resources.getString(R.string.thread_no_app_to_open, e.name)) }
                     }
                 }
             }
@@ -434,8 +436,12 @@ fun ThreadScreen(
     // Hardware keyboard shortcuts (tablets, Chromebooks, DeX), Gmail-style single keys.
     val keyFocus = remember { androidx.compose.ui.focus.FocusRequester() }
     LaunchedEffect(Unit) { runCatching { keyFocus.requestFocus() } }
-    // The message scrolls under the floating capsules; they blur exactly what passes behind them.
-    val glass = app.dot.design.components.rememberGlassBackdrop()
+    // The backdrop records its entire source into a graphics layer. Recording an Android WebView's
+    // hardware draw functor can flash blank tiles and crash RenderThread when that retained
+    // layer outlives WebView.destroy() during Back. HTML (and still-loading bodies) must stay
+    // outside the capture path; capsules keep their neutral frosted fallback and edge gradient.
+    val readerBackdrop = app.dot.design.components.rememberGlassBackdrop()
+    val glass = readerBackdrop.takeIf { list != null && list.all { message -> message.body?.let { it.html.isNullOrBlank() } == true } }
     Box(
         Modifier.fillMaxSize().background(c.background)
             .focusRequester(keyFocus).focusable()
@@ -522,7 +528,7 @@ fun ThreadScreen(
         }
         ReaderChrome(
             visible = showChrome, reducedMotion = reducedMotionChrome,
-            topScrim = chromeTop, bottomScrim = chromeBottom,
+            topScrim = chromeTop, bottomScrim = chromeBottom, backdrop = glass,
             back = { DotFloatingCapsule(backdrop = glass) { DotCapsuleButton(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(app.dot.design.R.string.ds_back), onClick = onBack) } },
             actions = {
                 DotFloatingCapsule(backdrop = glass) {
@@ -624,7 +630,7 @@ fun ThreadScreen(
             val intent = (if (share) Intent(Intent.ACTION_SEND).setType(pdf.mime).putExtra(Intent.EXTRA_STREAM, uri)
             else Intent(Intent.ACTION_VIEW).setDataAndType(uri, pdf.mime)).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             try { context.startActivity(Intent.createChooser(intent, pdf.name)) }
-            catch (_: ActivityNotFoundException) { scope.launch { snackbar.showSnackbar(context.getString(R.string.thread_no_app_to_open, pdf.name)) } }
+            catch (_: ActivityNotFoundException) { scope.launch { snackbar.showSnackbar(resources.getString(R.string.thread_no_app_to_open, pdf.name)) } }
         }
         app.dot.mail.ui.pdf.PdfViewerDialog(
             uri = pdf.uri, name = pdf.name,
@@ -1046,6 +1052,7 @@ private fun CalendarInvites(message: Message) {
     if (parts.isEmpty()) return
     val graph = LocalMailGraph.current
     val context = LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val invites by androidx.compose.runtime.produceState(emptyList<app.dot.mail.engine.calendar.Ics.CalendarInvite>(), parts) {
         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             parts.flatMap { a ->
@@ -1096,7 +1103,7 @@ private fun CalendarInvites(message: Message) {
                 }
             },
             onAddToCalendar = {
-                try { context.startActivity(app.dot.mail.ui.calendar.insertEventIntent(invite, context.getString(R.string.calendar_event_fallback))) }
+                try { context.startActivity(app.dot.mail.ui.calendar.insertEventIntent(invite, resources.getString(R.string.calendar_event_fallback))) }
                 catch (_: ActivityNotFoundException) { }
             },
             use24h = use24h,
@@ -1203,6 +1210,8 @@ private fun BoxScope.ReaderChrome(
     reducedMotion: Boolean,
     topScrim: androidx.compose.ui.unit.Dp,
     bottomScrim: androidx.compose.ui.unit.Dp,
+    /** Lets the top scrim blur plain-text messages passing under it (WebView content cannot be captured: gradient only). */
+    backdrop: app.dot.design.components.Backdrop? = null,
     back: @Composable () -> Unit,
     actions: @Composable () -> Unit,
     reply: (@Composable () -> Unit)?,
@@ -1231,7 +1240,7 @@ private fun BoxScope.ReaderChrome(
     )
     // Scrims only make sense while the capsules are there; they are plain gradients of the page colour.
     AnimatedVisibility(visible, Modifier.align(Alignment.TopCenter), enter = androidx.compose.animation.fadeIn(), exit = androidx.compose.animation.fadeOut()) {
-        Box(Modifier.fillMaxWidth().height(topScrim - 8.dp).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(c.background, c.background.copy(alpha = 0f)))))
+        app.dot.design.components.TopEdgeFade(backdrop, 1f, Modifier, height = topScrim + 56.dp)
     }
     AnimatedVisibility(visible, Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = DotSpacing.s, top = DotSpacing.xs), enter = enter(true), exit = exit(true)) { back() }
     AnimatedVisibility(visible, Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = DotSpacing.s, top = DotSpacing.xs), enter = enter(true), exit = exit(true)) { actions() }

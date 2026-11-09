@@ -1,5 +1,6 @@
 package app.dot.mail.ui.inbox
 
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.focusable
 
 import androidx.compose.ui.focus.focusRequester
@@ -18,6 +19,7 @@ import androidx.compose.ui.input.key.key
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.horizontalScroll
+import app.dot.design.components.backdropSource
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.foundation.rememberScrollState
 import app.dot.design.components.DotButton
@@ -263,8 +265,11 @@ fun InboxScreen(
             val screenHaptics = app.dot.design.rememberDotHaptics()
             // The list scrolls under the Compose pill, which blurs what passes behind it.
             val glass = app.dot.design.components.rememberGlassBackdrop()
-            Column(Modifier.fillMaxSize().glassBackdropSource(glass)) {
-                val accountsNow by vm.accounts.collectAsStateWithLifecycle()
+            val accountsNow by vm.accounts.collectAsStateWithLifecycle()
+            val headerControls=app.dot.design.components.rememberHeaderControls()
+            app.dot.design.components.FrostedHeaderLayout(
+                backdrop=glass,reserveExpandedHeight=true,
+                header={ Column {
                 AnimatedContent(
                     targetState = selection.isNotEmpty(),
                     transitionSpec = {
@@ -357,8 +362,16 @@ fun InboxScreen(
                 if (selection.isEmpty() && header.role != FolderRole.SNOOZED && header.role != FolderRole.DRAFTS) {
                     val filters by vm.filters.collectAsStateWithLifecycle()
                     val sort by vm.sort.collectAsStateWithLifecycle()
+                    AnimatedVisibility(
+                        visible=headerControls.expanded || !listState.canScrollBackward,
+                        enter=if(reducedMotion) EnterTransition.None else androidx.compose.animation.expandVertically(tween(180))+fadeIn(tween(140)),
+                        exit=if(reducedMotion) ExitTransition.None else androidx.compose.animation.shrinkVertically(tween(180))+fadeOut(tween(120)),
+                    ) {
                     FilterBar(filters, sort, onFilters = vm::setFilters, onSort = vm::setSort, onClear = vm::clearFilters)
+                    }
                 }
+                } },
+            ) { headerPadding ->
                 val filtersActive by vm.filters.collectAsStateWithLifecycle()
                 // Folder switch: the new list eases in instead of popping (no second list is composed, so no flicker).
                 val listAlpha = remember { androidx.compose.animation.core.Animatable(1f) }
@@ -367,14 +380,18 @@ fun InboxScreen(
                     if (firstFolder) { firstFolder = false; return@LaunchedEffect }
                     if (!reducedMotion) { listAlpha.snapTo(0.4f); listAlpha.animateTo(1f, tween(DotMotion.medium, easing = DotMotion.decelerate)) }
                 }
+                // The list fades and blurs softly into the header as it scrolls under it (see TopEdgeFade).
+                Box(Modifier.fillMaxSize()) {
                 PullToRefreshBox(
                     isRefreshing = refreshing,
                     onRefresh = vm::refresh,
-                    modifier = Modifier.weight(1f).graphicsLayer { alpha = listAlpha.value },
+                    modifier = Modifier.fillMaxSize().then(Modifier.nestedScroll(headerControls.connection)).graphicsLayer { alpha = listAlpha.value },
                     state = pullState,
-                    indicator = { QuietRefreshIndicator(pullState, refreshing, Modifier.align(Alignment.TopCenter)) },
+                    indicator = { QuietRefreshIndicator(pullState, refreshing, Modifier.align(Alignment.TopCenter).padding(top=headerPadding.calculateTopPadding())) },
                 ) {
                     ThreadList(
+                        edge = Modifier.glassBackdropSource(glass),
+                        contentPadding = headerPadding,
                         myAddresses = remember(accountsNow) { accountsNow.map { it.email.lowercase() }.toSet() },
                         threads = threads,
                         mutedThreads = mutedThreads,
@@ -400,6 +417,7 @@ fun InboxScreen(
                             if (action == MessageAction.TRASH && prefs.confirmDelete) pendingTrash = listOf(t.threadId) else vm.act(action, listOf(t.threadId))
                         },
                     )
+                }
                 }
             }
             app.dot.design.components.DotFrostedPill(
@@ -453,6 +471,8 @@ fun InboxScreen(
 
 @Composable
 private fun ThreadList(
+    edge: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(),
     myAddresses: Set<String>,
     threads: LazyPagingItems<ThreadSummary>,
     mutedThreads: Set<Long>,
@@ -473,11 +493,11 @@ private fun ThreadList(
     val listReducedMotion = rememberReducedMotion()
     val refresh = threads.loadState.refresh
     when {
-        threads.itemCount == 0 && refresh is LoadState.Loading -> SkeletonList()
-        threads.itemCount == 0 && refresh is LoadState.Error -> EmptyState(
+        threads.itemCount == 0 && refresh is LoadState.Loading -> Box(Modifier.padding(top=contentPadding.calculateTopPadding())) { SkeletonList() }
+        threads.itemCount == 0 && refresh is LoadState.Error -> Box(Modifier.padding(top=contentPadding.calculateTopPadding())) { EmptyState(
             Icons.Outlined.WifiOff, stringResource(R.string.inbox_error_load_title), refresh.error.message ?: stringResource(R.string.inbox_error_load_body),
-        )
-        threads.itemCount == 0 -> LazyColumn(Modifier.fillMaxSize()) {
+        ) }
+        threads.itemCount == 0 -> LazyColumn(edge.fillMaxSize(),contentPadding=contentPadding) {
             // Must be scrollable for pull-to-refresh to work on an empty list.
             item { EmptyFor(role, filtered, smart) }
         }
@@ -485,8 +505,8 @@ private fun ThreadList(
             LaunchedEffect(mailbox, threads.itemSnapshotList.items) { app.dot.mail.ui.thread.ThreadOrder.record(mailbox, threads.itemSnapshotList.items.map { it.threadId }) }
             LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 112.dp),
+            modifier = edge.fillMaxSize(),
+            contentPadding = PaddingValues(top=contentPadding.calculateTopPadding(),bottom = 112.dp),
         ) {
             items(threads.itemCount, key = threads.itemKey { it.threadId }, contentType = { "thread" }) { index ->
                 val t = threads[index] ?: return@items

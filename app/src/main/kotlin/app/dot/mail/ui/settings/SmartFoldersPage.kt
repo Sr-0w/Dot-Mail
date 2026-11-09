@@ -1,5 +1,6 @@
 package app.dot.mail.ui.settings
 
+import app.dot.design.components.backdropSource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -76,9 +77,14 @@ internal fun SmartFoldersPage(onBack: () -> Unit) {
         return
     }
     val scroll = rememberScrollState()
-    Column(Modifier.fillMaxSize().background(c.background)) {
-        DotTopBar(title = stringResource(R.string.smart_title), elevated = scroll.value > 0, navigation = { BackButton(onBack) })
-        Column(Modifier.verticalScroll(scroll).navigationBarsPadding()) {
+    val frostedSource=app.dot.design.components.rememberGlassBackdrop()
+    app.dot.design.components.FrostedHeaderLayout(
+        backdrop=frostedSource,modifier=Modifier.fillMaxSize().background(c.background),
+        header={ DotTopBar(title = stringResource(R.string.smart_title), elevated = scroll.value > 0, navigation = { BackButton(onBack) }) },
+    ) { topPadding ->
+        Column(Modifier.fillMaxSize().backdropSource(frostedSource).verticalScroll(scroll).navigationBarsPadding()) {
+            androidx.compose.foundation.layout.Spacer(Modifier.height(topPadding.calculateTopPadding()))
+
             Text(
                 stringResource(R.string.smart_intro), style = Dot.type.callout, color = c.textSecondary,
                 modifier = Modifier.padding(horizontal = DotSpacing.gutter, vertical = DotSpacing.s),
@@ -102,6 +108,7 @@ internal fun SmartFoldersPage(onBack: () -> Unit) {
             }
             ListRow(stringResource(R.string.smart_add), icon = Icons.Outlined.Add, onClick = { editing = SmartFolder(UUID.randomUUID().toString(), "") })
             Spacer(Modifier.height(DotSpacing.xl))
+
         }
     }
 }
@@ -129,9 +136,15 @@ internal fun SmartFolderEditor(initial: SmartFolder, isNew: Boolean, onBack: () 
     val dateFormat = remember { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM) }
     fun label(millis: Long?) = millis?.let { dateFormat.format(Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()) } ?: ""
 
-    Column(Modifier.fillMaxSize().background(c.background).imePadding()) {
-        DotTopBar(title = stringResource(if (isNew) R.string.smart_add else R.string.smart_edit), elevated = scroll.value > 0, navigation = { BackButton(onBack) })
-        Column(Modifier.weight(1f).verticalScroll(scroll)) {
+    val frostedSource=app.dot.design.components.rememberGlassBackdrop()
+    app.dot.design.components.FrostedHeaderLayout(
+        backdrop=frostedSource,modifier=Modifier.fillMaxSize().background(c.background).imePadding(),
+        header={ DotTopBar(title = stringResource(if (isNew) R.string.smart_add else R.string.smart_edit), elevated = scroll.value > 0, navigation = { BackButton(onBack) }) },
+    ) { topPadding ->
+        Column(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().weight(1f).backdropSource(frostedSource).verticalScroll(scroll)) {
+            androidx.compose.foundation.layout.Spacer(Modifier.height(topPadding.calculateTopPadding()))
+
             Column(Modifier.padding(horizontal = DotSpacing.gutter), verticalArrangement = Arrangement.spacedBy(DotSpacing.m)) {
                 DotTextField(name, { name = it }, label = stringResource(R.string.smart_name))
                 DotTextField(from, { from = it }, label = stringResource(R.string.smart_from))
@@ -164,7 +177,9 @@ internal fun SmartFolderEditor(initial: SmartFolder, isNew: Boolean, onBack: () 
                 DotButton(stringResource(R.string.smart_delete), { confirmDelete = true }, style = ButtonStyle.Danger, modifier = Modifier.fillMaxWidth().padding(horizontal = DotSpacing.gutter))
             }
             Spacer(Modifier.height(DotSpacing.l))
+
         }
+
         DotButton(
             text = stringResource(R.string.smart_save), enabled = name.isNotBlank(),
             modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(DotSpacing.gutter),
@@ -173,6 +188,8 @@ internal fun SmartFolderEditor(initial: SmartFolder, isNew: Boolean, onBack: () 
                 onBack()
             },
         )
+
+        }
     }
 
     picking?.let { isFrom ->

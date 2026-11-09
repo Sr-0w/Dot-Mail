@@ -110,8 +110,9 @@ class SmartFolderQueryTest {
         val messages=db.mail().pageMessages(androidx.sqlite.db.SimpleSQLiteQuery("SELECT $MESSAGE_META FROM messages WHERE "+ThreadQuery.messageFilters(filters,emptyList())!!.text))
         threads.load(androidx.paging.PagingSource.LoadParams.Refresh(null,40,false))
         messages.load(androidx.paging.PagingSource.LoadParams.Refresh(null,40,false))
-        graph.markCorresponded(account,listOf(EmailAddress("amy@x.org")))
-        withTimeout(5000) { while(!threads.invalid || !messages.invalid) kotlinx.coroutines.delay(10) }
+        // Room 2.7+ installs the invalidation triggers asynchronously once a source observes, so a write racing that
+        // setup can go unseen: keep writing (a fresh timestamp each time) until both sources report it.
+        withTimeout(5000) { var at=1L; while(!threads.invalid || !messages.invalid) { graph.markCorresponded(account,listOf(EmailAddress("amy@x.org")),at++); kotlinx.coroutines.delay(20) } }
         assertTrue(threads.invalid); assertTrue(messages.invalid)
     }
 

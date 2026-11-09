@@ -1,13 +1,12 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
 android {
     namespace = "app.dot.mail"
-    compileSdk = 35
-    buildToolsVersion = "35.0.0"
+    compileSdk = 37
+    buildToolsVersion = "36.0.0"
     defaultConfig {
         applicationId = "app.dot.mail"
         minSdk = 26
@@ -30,7 +29,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true; buildConfig = true }
     testOptions { unitTests.isIncludeAndroidResources = true }
     packaging { resources.excludes += setOf("META-INF/LICENSE.md", "META-INF/NOTICE.md", "META-INF/*.SF") }
@@ -71,3 +69,5 @@ dependencies {
     androidTestImplementation(libs.truth)
     androidTestImplementation(libs.espresso.core)
 }
+
+kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }

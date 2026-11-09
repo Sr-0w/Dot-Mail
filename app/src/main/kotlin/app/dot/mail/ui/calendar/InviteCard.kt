@@ -127,8 +127,8 @@ fun InviteCard(
                     invite.organizer.name?.let { "${it} · ${invite.organizer.email}" } ?: invite.organizer.email,
                 )
                 invite.rruleParts?.let { parts ->
-                    val resources = androidx.compose.ui.platform.LocalContext.current.resources
-                    MetaLine(Icons.Outlined.Repeat, remember(parts, resources.configuration) { RRuleText.format(parts, resources) })
+                    val resources = androidx.compose.ui.platform.LocalResources.current
+                    MetaLine(Icons.Outlined.Repeat, remember(parts, resources, androidx.compose.ui.platform.LocalConfiguration.current) { RRuleText.format(parts, resources) })
                 }
             }
         }

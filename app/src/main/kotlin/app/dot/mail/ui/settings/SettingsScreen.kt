@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.rememberScrollState
+import app.dot.design.components.backdropSource
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
@@ -126,6 +127,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
     val prefs by settings.ui.collectAsStateWithLifecycle()
     val accounts by graph.accounts.accounts.collectAsStateWithLifecycle(emptyList())
     val context = LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val scope = rememberCoroutineScope()
     val scroll = rememberScrollState()
     var removing by remember { mutableStateOf<Account?>(null) }
@@ -143,13 +145,14 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
     val pageAccount = accounts.firstOrNull { it.id == accountPage }
     // Settings search: a field on top of the page; while it has text, matching settings replace the sections.
     var query by rememberSaveable { mutableStateOf("") }
+    var headerInsetPx by remember { mutableIntStateOf(0) }
     var pendingSection by remember { mutableStateOf<SettingsSection?>(null) }
     val anchors = remember { androidx.compose.runtime.mutableStateMapOf<SettingsSection, Int>() }
     fun Modifier.anchor(section: SettingsSection) = onGloballyPositioned { anchors[section] = it.positionInParent().y.toInt() }
     LaunchedEffect(pendingSection) {
         val section = pendingSection ?: return@LaunchedEffect
         val y = androidx.compose.runtime.snapshotFlow { anchors[section] }.filterNotNull().first()
-        scroll.animateScrollTo((y - 8).coerceAtLeast(0))
+        scroll.animateScrollTo((y - headerInsetPx - 8).coerceAtLeast(0))
         pendingSection = null
     }
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
@@ -204,9 +207,12 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
         IdentityEditorPage(pageAccount, identityPage, onBack = { identityPage = -1 })
     } else if (pageAccount != null) {
         AccountPage(pageAccount, onBack = { accountPage = 0 }, onEditIdentity = { identityPage = it }, onRemove = { removing = pageAccount })
-    } else Column(Modifier.fillMaxSize().background(c.background)) {
-        DotTopBar(title = stringResource(R.string.settings_title), elevated = scroll.value > 0, navigation = { BackButton(onBack) })
-        Column(Modifier.verticalScroll(scroll)) {
+    } else { val edgeState=app.dot.design.components.rememberGlassBackdrop()
+        app.dot.design.components.FrostedHeaderLayout(backdrop=edgeState,modifier=Modifier.fillMaxSize().background(c.background),header={ DotTopBar(title = stringResource(R.string.settings_title), elevated = scroll.value > 0, navigation = { BackButton(onBack) }) }) { headerPadding ->
+        val headerInset=with(androidx.compose.ui.platform.LocalDensity.current) { headerPadding.calculateTopPadding().roundToPx() }
+        androidx.compose.runtime.SideEffect { headerInsetPx=headerInset }
+        Column(Modifier.fillMaxSize().backdropSource(edgeState).verticalScroll(scroll)) { Spacer(Modifier.height(headerPadding.calculateTopPadding()))
+
             app.dot.design.components.SearchField(
                 value = query,
                 onValueChange = { query = it },
@@ -364,7 +370,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             ) { v ->
                 scope.launch {
                     if (!graph.mail.setInstantNotificationsEnabled(v) && v) {
-                        android.widget.Toast.makeText(context, context.getString(R.string.settings_instant_failed), android.widget.Toast.LENGTH_LONG).show()
+                        android.widget.Toast.makeText(context, resources.getString(R.string.settings_instant_failed), android.widget.Toast.LENGTH_LONG).show()
                     }
                 }
             }
@@ -461,6 +467,8 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             }
             Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
             Spacer(Modifier.height(DotSpacing.xl))
+
+        }
         }
     }
 
@@ -527,10 +535,10 @@ private val LICENCES = listOf(
     "Inter typeface" to "SIL Open Font License 1.1",
     "AndroidX, Jetpack Compose, Glance, Room, WorkManager, Paging" to "Apache License 2.0",
     "Kotlin and kotlinx libraries" to "Apache License 2.0",
+    "liquid-glass (Nadeem Iqbal)" to "Apache License 2.0",
     "Jakarta Mail (Eclipse Angus)" to "EPL 2.0 / GPL 2.0 with Classpath Exception",
     "jsoup" to "MIT License",
     "AndroidSVG" to "Apache License 2.0",
-    "Haze (backdrop blur)" to "Apache License 2.0",
 )
 
 @Composable
