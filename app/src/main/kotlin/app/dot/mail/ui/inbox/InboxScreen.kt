@@ -556,7 +556,8 @@ private fun FilterBar(
     onClear: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = DotSpacing.s), verticalAlignment = Alignment.CenterVertically) {
+    // Same side inset as DotTopBar, so the sort button sits on the menu button's vertical axis.
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = DotSpacing.xs), verticalAlignment = Alignment.CenterVertically) {
         Box {
             DotIconButton(Icons.Outlined.SwapVert, stringResource(R.string.inbox_sort), onClick = { menu = true })
             DotMenu(menu, { menu = false }) {

@@ -56,6 +56,14 @@ fun rememberBackdrop(): Backdrop {
     return remember(glass) { Backdrop(glass) }
 }
 
+/**
+ * Drops whatever the backdrop last recorded. A recording can hold a WebView's hardware draw functor; call this before
+ * such content is destroyed (e.g. when the reader leaves) so the retained layer never outlives it.
+ */
+fun Backdrop.clear(density: Density) {
+    glass.backdrop?.record(density, LayoutDirection.Ltr, androidx.compose.ui.unit.IntSize(1, 1)) {}
+}
+
 /** Marks the content that glass and the frosted header blur. */
 fun Modifier.backdropSource(backdrop: Backdrop): Modifier =
     onPlaced { backdrop.sourceInRoot = it.positionInRoot() }.liquidGlassSource(backdrop.glass)

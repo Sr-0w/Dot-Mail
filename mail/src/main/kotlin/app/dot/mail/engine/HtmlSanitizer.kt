@@ -218,7 +218,7 @@ object HtmlSanitizer {
                 remote = true
                 when {
                     blockTrackers && isTrackerUrl(bgUrl) -> trackers++
-                    allowRemoteImages -> { el.addClass("$BG_MARKER${backgrounds.size}"); backgrounds += bgUrl }
+                    allowRemoteImages -> { el.addClass("$BG_MARKER${backgrounds.size}"); backgrounds += httpsOnly(bgUrl) }
                     else -> blocked++
                 }
             } else if (el.hasAttr("background")) { remote = true; blocked++ }
@@ -244,6 +244,7 @@ object HtmlSanitizer {
                     remote = true
                     if (blockTrackers && isTrackingPixel(el, src)) { el.remove(); trackers++; continue }
                     if (!allowRemoteImages || !Regex("(?i)^https?://[^\\s]+$").matches(src)) { el.removeAttr("src"); blocked++ }
+                    else el.attr("src", httpsOnly(src))
                 }
             }
             el.removeAttr("srcset").removeAttr("background")
@@ -353,6 +354,13 @@ object HtmlSanitizer {
     }
     private const val BG_MARKER = "dotbg-"
     private val backgroundTags = setOf("table", "thead", "tbody", "tfoot", "tr", "td", "th", "div")
+    /**
+     * Remote images are only ever fetched over TLS: a plain `http://` URL is upgraded to `https://` (most mail image hosts
+     * serve both). Cleartext would let anyone on the network see what is being read; the app does not allow it anyway,
+     * so without the upgrade such images simply never load. If the host has no TLS, the image stays broken.
+     */
+    internal fun httpsOnly(url: String): String = if (url.startsWith("http://", ignoreCase = true)) "https://" + url.substring(7) else url
+
     private val plainHttpUrl = Regex("(?i)^https?://[a-z0-9._~:/?#@!$&*+,;=%-]+$")
     private val styleUrl = Regex("(?i)background(?:-image)?\\s*:[^;]*?url\\(\\s*(['\"]?)([^'\")\\s]+)\\1\\s*\\)")
 

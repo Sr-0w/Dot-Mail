@@ -135,9 +135,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import app.dot.design.components.DotFloatingCapsule
 import app.dot.design.components.glassBackdropSource
+import app.dot.design.components.clear
 import app.dot.design.components.DotCapsuleButton
 import app.dot.design.components.DotCapsuleDivider
 import androidx.compose.foundation.layout.WindowInsets
@@ -354,6 +354,12 @@ fun ThreadScreen(
     val resources = androidx.compose.ui.platform.LocalResources.current
     val snackbar = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
+    val fadeDistance = with(androidx.compose.ui.platform.LocalDensity.current) { 48.dp.toPx() }
+    val topProgress by remember(listState, fadeDistance) {
+        androidx.compose.runtime.derivedStateOf {
+            if (listState.firstVisibleItemIndex > 0) 1f else (listState.firstVisibleItemScrollOffset / fadeDistance).coerceIn(0f, 1f)
+        }
+    }
     var pendingLink by remember { mutableStateOf<String?>(null) }
     // href → visible text of links whose text names another site (collected from each sanitised message).
     val suspiciousLinks = remember { androidx.compose.runtime.mutableStateMapOf<String, String>() }
@@ -416,16 +422,8 @@ fun ThreadScreen(
 
     // Floating chrome (Back, actions, reply capsules): hides while reading downwards, returns on any scroll up,
     // and is always shown at the very top and at the end of the mail.
-    var chromeVisible by remember { mutableStateOf(true) }
-    val chromeConnection = remember {
-        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
-            override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
-                if (available.y < -CHROME_SCROLL_THRESHOLD) chromeVisible = false else if (available.y > CHROME_SCROLL_THRESHOLD) chromeVisible = true
-                return androidx.compose.ui.geometry.Offset.Zero
-            }
-        }
-    }
-    val showChrome = chromeVisible || !listState.canScrollBackward || !listState.canScrollForward
+    // The capsules stay on screen while reading (owner's choice): no hide-on-scroll.
+    val showChrome = true
     val reducedMotionChrome = app.dot.design.rememberReducedMotion()
     val nextLabel = stringResource(R.string.thread_action_next_conversation)
     val previousLabel = stringResource(R.string.thread_action_previous_conversation)
@@ -437,12 +435,12 @@ fun ThreadScreen(
     // Hardware keyboard shortcuts (tablets, Chromebooks, DeX), Gmail-style single keys.
     val keyFocus = remember { androidx.compose.ui.focus.FocusRequester() }
     LaunchedEffect(Unit) { runCatching { keyFocus.requestFocus() } }
-    // The backdrop records its entire source into a graphics layer. Recording an Android WebView's
-    // hardware draw functor can flash blank tiles and crash RenderThread when that retained
-    // layer outlives WebView.destroy() during Back. HTML (and still-loading bodies) must stay
-    // outside the capture path; capsules keep their neutral frosted fallback and edge gradient.
     val readerBackdrop = app.dot.design.components.rememberGlassBackdrop()
-    val glass = readerBackdrop.takeIf { list != null && list.all { message -> message.body?.let { it.html.isNullOrBlank() } == true } }
+    // HTML bodies are captured too (the frosted top on every mail). Whenever a message WebView is torn down (Back, scrolled
+    // out of the list, theme flip, next conversation) the recording is dropped first via LocalBeforeWebViewRelease, so the
+    // retained layer never replays a destroyed WebView's draw functor.
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val glass = readerBackdrop.takeIf { list != null }
     Box(
         Modifier.fillMaxSize().background(c.background)
             .focusRequester(keyFocus).focusable()
@@ -472,7 +470,9 @@ fun ThreadScreen(
                 }
             },
     ) {
-        Column(Modifier.fillMaxSize().nestedScroll(chromeConnection).glassBackdropSource(glass)) {
+        val clearBackdrop: () -> Unit = remember(readerBackdrop, density) { { readerBackdrop.clear(density) } }
+        androidx.compose.runtime.CompositionLocalProvider(LocalBeforeWebViewRelease provides clearBackdrop) {
+        Column(Modifier.fillMaxSize().glassBackdropSource(glass)) {
             when {
                 list == null -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     app.dot.design.components.DotSpinner(size = 22.dp, color = c.textTertiary)
@@ -527,9 +527,10 @@ fun ThreadScreen(
                 } }
             }
         }
+        }
         ReaderChrome(
             visible = showChrome, reducedMotion = reducedMotionChrome,
-            topScrim = chromeTop, bottomScrim = chromeBottom, backdrop = glass,
+            topScrim = chromeTop, bottomScrim = chromeBottom, backdrop = glass, topProgress = { topProgress },
             back = { DotFloatingCapsule(backdrop = glass) { DotCapsuleButton(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(app.dot.design.R.string.ds_back), onClick = onBack) } },
             actions = {
                 DotFloatingCapsule(backdrop = glass) {
@@ -1198,7 +1199,6 @@ internal object SwipeGuard {
     }
 }
 
-private const val CHROME_SCROLL_THRESHOLD = 6f
 
 /**
  * Soft frosted capsules floating over the message: Back (top left), one grouped action capsule (top right) and one
@@ -1211,8 +1211,10 @@ private fun BoxScope.ReaderChrome(
     reducedMotion: Boolean,
     topScrim: androidx.compose.ui.unit.Dp,
     bottomScrim: androidx.compose.ui.unit.Dp,
-    /** Lets the top scrim blur plain-text messages passing under it (WebView content cannot be captured: gradient only). */
+    /** Lets the top scrim blur the message passing under it. */
     backdrop: app.dot.design.components.Backdrop? = null,
+    /** How far content has scrolled under the top scrim, 0 (at the top: the subject stays clear) to 1. */
+    topProgress: () -> Float = { 1f },
     back: @Composable () -> Unit,
     actions: @Composable () -> Unit,
     reply: (@Composable () -> Unit)?,
@@ -1228,21 +1230,17 @@ private fun BoxScope.ReaderChrome(
         else androidx.compose.animation.fadeOut(tween(DotMotion.fast)) +
             androidx.compose.animation.slideOutVertically(tween(DotMotion.fast, easing = DotMotion.accelerate)) { if (toTop) -it / 2 else it / 2 }
     }
-    // Always: the status bar area never shows message content underneath (clock and icons stay readable over images),
-    // even while the capsules are hidden. Solid up to the bar's bottom edge, then a short fade.
+    // One frosted band from the screen top, like the list headers: it covers the status bar while the capsules are hidden
+    // (clock and icons stay readable over images) and grows under the capsules when they are shown. It fades in as content
+    // scrolls under it, so at the top of a conversation the subject stays clear.
     val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val fade = 10.dp
-    Box(
-        Modifier.align(Alignment.TopCenter).fillMaxWidth().height(statusBar + fade).background(
-            androidx.compose.ui.graphics.Brush.verticalGradient(
-                0f to c.background, (statusBar / (statusBar + fade)).coerceIn(0f, 1f) to c.background, 1f to c.background.copy(alpha = 0f),
-            ),
-        ),
+    // A long, gentle fade below the solid part: a short one reads as a hard edge.
+    val band by androidx.compose.animation.core.animateDpAsState(if (visible) topScrim + 96.dp else statusBar + 72.dp, label = "readerBand")
+    val solid = if (visible) topScrim else statusBar + 4.dp
+    app.dot.design.components.TopEdgeFade(
+        backdrop, topProgress(), Modifier.align(Alignment.TopCenter), height = band,
+        solidUntil = (solid / band).coerceIn(0.2f, 0.7f),
     )
-    // Scrims only make sense while the capsules are there; they are plain gradients of the page colour.
-    AnimatedVisibility(visible, Modifier.align(Alignment.TopCenter), enter = androidx.compose.animation.fadeIn(), exit = androidx.compose.animation.fadeOut()) {
-        app.dot.design.components.TopEdgeFade(backdrop, 1f, Modifier, height = topScrim + 56.dp)
-    }
     AnimatedVisibility(visible, Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = DotSpacing.s, top = DotSpacing.xs), enter = enter(true), exit = exit(true)) { back() }
     AnimatedVisibility(visible, Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = DotSpacing.s, top = DotSpacing.xs), enter = enter(true), exit = exit(true)) { actions() }
     if (reply != null) {

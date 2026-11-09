@@ -47,8 +47,9 @@ fun DotFloatingCapsule(
             .shadow(3.dp, CircleShape, ambientColor = Color(0x26000000), spotColor = Color(0x33000000))
             .clip(CircleShape)
             .glassSurface(backdrop, pressed = false)
-            .border(DotSpacing.hairline * 2, frostedBorderBrush(), CircleShape)
-            .padding(horizontal = 2.dp),
+            // No side padding: the 48dp buttons sit flush in the semicircular ends, so a capsule holding a single
+            // action (Back, a header icon) is a true 48dp circle, never a slightly wider pill.
+            .border(DotSpacing.hairline * 2, frostedBorderBrush(), CircleShape),
         verticalAlignment = Alignment.CenterVertically,
         content = content,
     )
