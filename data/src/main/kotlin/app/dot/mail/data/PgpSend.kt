@@ -60,7 +60,7 @@ internal suspend fun RealMailGraph.queueProtected(draft: Draft, undoWindowMs: Lo
     }
 }
 
-private suspend fun RealMailGraph.pgpOutgoing(accountEmail: String, accountName: String, draft: Draft, identity: app.dot.mail.data.model.Identity, messageId: String): OutgoingMail {
+internal suspend fun RealMailGraph.pgpOutgoing(accountEmail: String, accountName: String, draft: Draft, identity: app.dot.mail.data.model.Identity, messageId: String): OutgoingMail {
     val attachments = draft.attachmentUris.map { value ->
         val uri = Uri.parse(value)
         val known = dao.attachmentUri(value)

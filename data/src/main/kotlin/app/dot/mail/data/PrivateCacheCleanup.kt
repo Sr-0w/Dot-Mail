@@ -21,7 +21,7 @@ internal class PrivateCacheCleanup(private val context: Context, private val dao
         dao.attachmentUris().forEach(::retainUri)
         var offset=0
         while(true) { val rows=dao.draftBatch(offset,20); if(rows.isEmpty()) break; rows.forEach { Codec.draft(it.json).attachmentUris.forEach(::retainUri) }; offset+=rows.size }
-        dao.activeOutbox().forEach { row -> Codec.draft(row.draft).attachmentUris.forEach(::retainUri); row.mimePath?.let { retained+=File(it).canonicalPath } }
+        dao.activeOutbox().forEach { row -> Codec.draft(row.draft).attachmentUris.forEach(::retainUri); row.mimePath?.let { path -> File(path).let { f -> if (f.isDirectory) f.walkTopDown().filter(File::isFile).forEach { retained+=it.canonicalPath } else retained+=f.canonicalPath } } }
         val bodyDirs=dao.bodyPaths().map { File(it).canonicalPath }.toSet()
         val cutoff=now-3_600_000
         for(name in listOf("attachments","outbox")) {

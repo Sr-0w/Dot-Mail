@@ -123,6 +123,19 @@ internal suspend fun RealMailGraph.deliverOutbox(id: Long): Boolean = outboxLock
     if (row.dueAt > System.currentTimeMillis()) return@withLock false
     val account = dao.account(row.accountId) ?: return@withLock true
     val config = Codec.config(account.config); val creds = credentials(account)
+    val smimeDir = SmimeOutbox.dir(row.mimePath)
+    if (row.state == "PENDING" && smimeDir != null) {
+        if (dao.transitionOutbox(id, "PENDING", "SUBMITTING") != 1) return@withLock true
+        when (submitSmimeVariants(row, account, config, creds, smimeDir)) {
+            SmimeSubmit.RETRY_LATER -> return@withLock false
+            SmimeSubmit.STOPPED -> return@withLock true
+            SmimeSubmit.DONE -> Unit
+        }
+        val autoSent = config.smtp.host.equals("smtp.gmail.com", true) || config.smtp.host.equals("smtp.googlemail.com", true)
+        dao.transitionOutbox(id, "SUBMITTING", if (autoSent) "SENT" else "APPEND")
+        row = requireNotNull(dao.outbox(id))
+        if (row.state == "SENT") { SmimeOutbox.delete(row.mimePath); dao.clearOutboxMime(id) }
+    }
     if (row.state == "PENDING") {
         // All local preparation happens before claiming submission, so preparation failures are retryable.
         val draft = Codec.draft(row.draft)
@@ -146,6 +159,7 @@ internal suspend fun RealMailGraph.deliverOutbox(id: Long): Boolean = outboxLock
         require(calendarSender==null || calendarSender.equals(identity.email,true)) { "Invited identity is no longer available" }
         // A signed/encrypted message exists only as the already protected file; never rebuild it in plain form.
         require(!(draft.pgpSign || draft.pgpEncrypt) || saved != null) { "Protected message file is missing" }
+        require(!(draft.smimeSign || draft.smimeEncrypt)) { "Protected S/MIME messages are missing" } // never rebuilt in plain form
         val mime = saved?.let { StoredMimeMessage(it) } ?: Mime.build(OutgoingMail(Address(identity.email, identity.name.ifBlank { account.name }), draft.to.map { Address(it.email, it.name) }, draft.cc.map { Address(it.email, it.name) }, draft.bcc.map { Address(it.email, it.name) }, draft.subject,
             // Formatted drafts: text/plain alternative + email-safe HTML (inline styles, sanitised) as multipart/alternative.
             draft.bodyHtml?.let { draft.bodyText.ifBlank { app.dot.mail.engine.text.EmailHtml.toPlainText(it) } } ?: draft.bodyText,
@@ -185,12 +199,12 @@ internal suspend fun RealMailGraph.deliverOutbox(id: Long): Boolean = outboxLock
         if (dao.transitionOutbox(id, "APPEND", "APPENDING") != 1) return@withLock true
         try {
             val sent = dao.folders(account.id).firstOrNull { it.role == Role.SENT.name }?.path ?: "Sent"
-            StoredMimeMessage(File(requireNotNull(row.mimePath))).use { mime ->
+            StoredMimeMessage(SmimeOutbox.sentCopy(requireNotNull(row.mimePath))).use { mime ->
                 mime.removeHeader("Bcc")
                 client.append(config.imap.endpoint(), creds, sent, mime)
             }
             dao.transitionOutbox(id, "APPENDING", "SENT")
-            File(requireNotNull(row.mimePath)).delete(); dao.clearOutboxMime(id)
+            SmimeOutbox.delete(row.mimePath); dao.clearOutboxMime(id)
         } catch (e: Exception) {
             SyncDiagnostics.warn("Outbox Sent copy id=$id", e, setOf(creds.secret, account.email))
             withContext(NonCancellable) { dao.transitionOutbox(id, "APPENDING", "APPEND", "Message sent; its Sent copy could not be saved. Retry will only save the copy.") }
@@ -204,3 +218,44 @@ internal suspend fun RealMailGraph.deliverOutbox(id: Long): Boolean = outboxLock
 /** Background-sync schedule of one account: never for "manual only", else when its own interval has elapsed (1 minute of slack for WorkManager jitter). */
 internal fun isScheduledSyncDue(settings: AccountSettings, lastSyncedAt: Long, now: Long = System.currentTimeMillis()): Boolean =
     settings.syncIntervalMinutes > 0 && now - lastSyncedAt >= settings.syncIntervalMinutes * 60_000L - 60_000L
+
+internal enum class SmimeSubmit { DONE, RETRY_LATER, STOPPED }
+
+/**
+ * Submits each not-yet-sent S/MIME variant to its own envelope recipient and records progress after every step. The row is
+ * SUBMITTING on entry. A connection that failed before anything was submitted puts the row back to PENDING (the variants
+ * already delivered stay delivered); a failure after submission started leaves that variant, and the row, UNCERTAIN.
+ */
+private suspend fun RealMailGraph.submitSmimeVariants(row: app.dot.mail.data.local.OutboxRow, account: app.dot.mail.data.local.AccountRow, config: app.dot.mail.data.model.AccountConfig, creds: Credentials, dir: File): SmimeSubmit {
+    val id = row.id
+    val manifest = SmimeOutbox.read(dir)
+    for (variant in manifest.variants) {
+        if (variant.state == SmimeOutbox.SENT) continue
+        if (variant.state != SmimeOutbox.PENDING) { // an interrupted submission nobody confirmed: never repeat it silently
+            dao.transitionOutbox(id, "SUBMITTING", "UNCERTAIN", "Submission was interrupted. Check Sent before retrying.")
+            return SmimeSubmit.STOPPED
+        }
+        variant.state = SmimeOutbox.SUBMITTING; SmimeOutbox.write(dir, manifest)
+        val mime = StoredMimeMessage(File(dir, variant.file))
+        try {
+            client.send(config.smtp.endpoint(), creds, mime, envelopeFrom = account.email, recipients = arrayOf(jakarta.mail.internet.InternetAddress(variant.to)))
+        } catch (e: SubmissionNotStartedException) {
+            SyncDiagnostics.warn("Outbox SMTP connect id=$id", e, setOf(creds.secret, account.email))
+            if (e.cause is jakarta.mail.AuthenticationFailedException) dao.syncError(account.id, "Sign in again to reconnect this account", true)
+            variant.state = SmimeOutbox.PENDING; SmimeOutbox.write(dir, manifest)
+            dao.transitionOutbox(id, "SUBMITTING", "PENDING", "Connection failed before submission; will retry")
+            return SmimeSubmit.RETRY_LATER
+        } catch (e: CancellationException) {
+            withContext(NonCancellable) { SmimeOutbox.write(dir, manifest); dao.transitionOutbox(id, "SUBMITTING", "UNCERTAIN", "Submission was interrupted. Check Sent before retrying.") }
+            throw e
+        } catch (e: Exception) {
+            SyncDiagnostics.warn("Outbox SMTP submission id=$id", e, setOf(creds.secret, account.email))
+            // The variant stays SUBMITTING: whether the server took it is unknown, and only the user may resend it.
+            dao.transitionOutbox(id, "SUBMITTING", "UNCERTAIN", "Delivery could not be confirmed. Check Sent before retrying.")
+            dao.syncError(account.id, "A queued send could not be confirmed. Check Sent before retrying.")
+            return SmimeSubmit.STOPPED
+        } finally { runCatching { (mime as? java.io.Closeable)?.close() }.onFailure { SyncDiagnostics.warn("Close outbox MIME id=$id", it) } }
+        variant.state = SmimeOutbox.SENT; SmimeOutbox.write(dir, manifest)
+    }
+    return SmimeSubmit.DONE
+}

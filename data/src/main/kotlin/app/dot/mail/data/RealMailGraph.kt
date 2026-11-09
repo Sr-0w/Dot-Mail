@@ -507,7 +507,7 @@ internal class RealMailGraph(
             val id = dao.putDraft(DraftRow(draft.localId, draft.accountId, json, maxOf(System.currentTimeMillis(),(previous?.updatedAt ?: 0)+1), previous?.sourceMessageId))
             // An encrypted message is never uploaded as a server draft (it would sit there as plaintext). If an earlier,
             // unencrypted copy was already mirrored, that copy is removed.
-            if (draft.pgpEncrypt) dao.draftMirror(id)?.let { dao.putDraftMirror(it.copy(deleted = true, dueAt = 0)) } else queueDraftMirror(id,draft.accountId)
+            if (draft.pgpEncrypt || draft.smimeEncrypt) dao.draftMirror(id)?.let { dao.putDraftMirror(it.copy(deleted = true, dueAt = 0)) } else queueDraftMirror(id,draft.accountId)
             id
         }
         if (scheduling) WorkScheduling.drafts(context,draft.accountId)
@@ -552,7 +552,7 @@ internal class RealMailGraph(
         val folders = dao.folders(draft.accountId)
         val drafts = folders.firstOrNull { it.role == "DRAFTS" }
         // An encrypted draft never goes to the server, not even to its Trash: it is deleted on the device.
-        if (drafts == null || folders.none { it.role == "TRASH" } || Codec.draft(draft.json).pgpEncrypt) { removeDraftAndSource(localId); return }
+        if (drafts == null || folders.none { it.role == "TRASH" } || Codec.draft(draft.json).let { it.pgpEncrypt || it.smimeEncrypt }) { removeDraftAndSource(localId); return }
         if (dao.draftMirror(localId) == null) queueDraftMirror(localId, draft.accountId)
         // Upload and move only after the Undo window, so Undo never races the server.
         dao.draftMirror(localId)?.let { dao.putDraftMirror(it.copy(dueAt = System.currentTimeMillis() + DRAFT_TRASH_GRACE_MS)) }
@@ -591,6 +591,8 @@ internal class RealMailGraph(
         id
     }
     override suspend fun sendProtected(draft: Draft, undoWindowMs: Long, protector: PgpProtector): Long = queueProtected(draft, undoWindowMs, protector)
+    override suspend fun sendSmime(draft: Draft, undoWindowMs: Long, builder: SmimeBuilder): Long = queueSmime(draft, undoWindowMs, builder)
+    override fun smimeBuilder(keys: SmimeKeyAccess, policy: app.dot.mail.engine.SmimeCertificatePolicy): SmimeBuilder = EngineSmimeBuilder(app.dot.mail.engine.SmimeEngine(certificatePolicy = policy), keys, smimeCerts)
     override suspend fun rescheduleSend(outboxId: Long, sendAt: Long): Boolean = withContext(Dispatchers.IO) {
         if (SendSchedule.validate(sendAt, System.currentTimeMillis()) != SendSchedule.Validity.OK) return@withContext false
         // Only a message nobody has claimed yet: the state check is part of the UPDATE, so it cannot race with delivery.
@@ -605,11 +607,12 @@ internal class RealMailGraph(
             if(org.json.JSONObject(row.draft).optString("calendarReply").isBlank()) {
                 val draft=Codec.draft(row.draft)
                 val id = dao.putDraft(DraftRow(draft.localId,row.accountId,row.draft,System.currentTimeMillis()))
-                queueDraftMirror(id,row.accountId)
+                // Taking an encrypted message back for editing must not upload its plaintext as a server draft.
+                if(!(draft.pgpEncrypt || draft.smimeEncrypt)) queueDraftMirror(id,row.accountId)
             }
             row
         } ?: return@withContext false
-        cancelled.mimePath?.let { File(it).delete() }; dao.clearOutboxMime(outboxId)
+        SmimeOutbox.delete(cancelled.mimePath); dao.clearOutboxMime(outboxId)
         if(scheduling && org.json.JSONObject(cancelled.draft).optString("calendarReply").isBlank()) WorkScheduling.drafts(context,cancelled.accountId)
         true
     }
@@ -624,7 +627,7 @@ internal class RealMailGraph(
                     "PENDING" -> if (row.error != null) "PENDING" else return@withTransaction null
                     else -> return@withTransaction null
                 }
-                if (dao.transitionOutbox(outboxId, row.state, next) != 1) null else row.copy(state = next, error = null)
+                if (dao.transitionOutbox(outboxId, row.state, next) != 1) null else { if (row.state == "UNCERTAIN") SmimeOutbox.confirmRetry(row.mimePath); row.copy(state = next, error = null) }
             } ?: return@withContext false
             if (scheduling) WorkScheduling.outbox(context, outboxId, retry.dueAt, replace = true)
             true
@@ -637,7 +640,7 @@ internal class RealMailGraph(
             if (dao.transitionOutbox(outboxId, row.state, "DISCARDED") == 1) row else null
         } ?: return@withContext false
         if (scheduling) androidx.work.WorkManager.getInstance(context).cancelUniqueWork("dotmail.outbox.$outboxId")
-        deleted.mimePath?.let { File(it).delete() }
+        SmimeOutbox.delete(deleted.mimePath)
         true
     }
     internal suspend fun recoverOutbox() = outboxLock.withLock {
