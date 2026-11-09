@@ -123,7 +123,8 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
   - [ ] Real-device checks (storage pressure, WorkManager constraints, large first download)
 - **FR-12 · P2 · Native Android Contacts integration** — partly done: system contact picker needs no permission; contact
   photos are an opt-in avatar source; "From contacts" filter uses Sent/outbox correspondents or the permission-gated
-  address book (PR #55). Gaps: recipient autocomplete uses mail history only, not the address book.
+  address book (PR #55). Recipient autocomplete also suggests address-book contacts only while READ_CONTACTS is already granted (#63; never
+  prompts from Compose; history first, deduped, limited, off the main thread, degrades to history if revoked).
 - **FR-13 · P3 · SimpleLogin / addy.io alias discovery and management** — PR #47 open (Luna); independent of either service.
 
 ### Reading and HTML mail

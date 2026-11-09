@@ -79,4 +79,22 @@ class ContactSuggestionsTest {
         assertThat(graph.suggestContacts("ann", 1).map { it.email }).containsExactly("ann@x.org")
         assertThat(searches).isEqualTo(0)
     }
+
+    @Test fun permissionRevokedMidSessionFallsBackToHistoryOnTheNextKeystroke() = runBlocking<Unit> {
+        history()
+        var granted = true
+        graph.addressBook.hasPermission = { granted }
+        assertThat(graph.suggestContacts("ann", 8).map { it.email }).containsExactly("ann@x.org", "ann.book@x.org").inOrder()
+        assertThat(searches).isEqualTo(1)
+        granted = false // the user withdrew it in system settings while the composer was open
+        assertThat(graph.suggestContacts("ann", 8).map { it.email }).containsExactly("ann@x.org")
+        assertThat(searches).isEqualTo(1) // the address book was not queried again
+    }
+
+    @Test fun duplicatesAreMatchedOnTheNormalizedAddress() = runBlocking<Unit> {
+        history()
+        graph.addressBook.hasPermission = { true }
+        graph.addressBook.searcher = DeviceContactSearcher { _, _ -> listOf(EmailAddress(" ANN@X.ORG ", "Ann Book"), EmailAddress("new@x.org", "New")) }
+        assertThat(graph.suggestContacts("a", 8).map { it.email.trim().lowercase() }).containsExactly("ann@x.org", "new@x.org").inOrder()
+    }
 }
