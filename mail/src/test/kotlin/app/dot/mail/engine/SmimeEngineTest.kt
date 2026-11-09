@@ -514,4 +514,24 @@ class SmimeEngineTest {
         val failure = assertThrowsSmime { engine.build(mail().copy(cc = emptyList(), bcc = emptyList()), SmimeMode.ENCRYPT, recipientCertificates = listOf(signOnly.recipient()), senderDecryptionCertificate = sender.certificate) }
         assertEquals(SmimeFailure.RECIPIENT_CERTIFICATE_REJECTED, failure)
     }
+
+    /**
+     * Device regression: our own multipart/alternative signed mail showed "changed after signing". JavaMail's writeTo of
+     * part 0 appended a CRLF after the nested multipart's closing delimiter. The cache must keep the transmitted bytes.
+     */
+    @Test fun `own signed multipart message verifies after send and cache`() {
+        val signer = identity("sender@example.test")
+        val plain = OutgoingMail(from = Address("sender@example.test"), to = listOf(Address("sender@example.test")), subject = "Dot Mail S/MIME test",
+            text = "Signed test from Dot Mail.", html = "<p style=\"margin: 0 0 1em\">Signed test from Dot Mail.</p>")
+        val variant = engine.build(plain, SmimeMode.SIGN, signer = signer.signing()).single()
+        val file = java.io.File.createTempFile("outbox", ".eml").apply { writeBytes(variant.mimeBytes); deleteOnExit() }
+        val wire = java.io.ByteArrayOutputStream().also { out -> StoredMimeMessage(file).use { it.writeTo(out) } }.toByteArray()
+        assertTrue(engine.verifySignedMime(wire, "sender@example.test").allCryptographicallyValid)
+        val dir = java.nio.file.Files.createTempDirectory("cache").toFile().apply { deleteOnExit() }
+        Mime.cache(parse(wire), dir)
+        val entity = java.io.File(dir, SmimeParts.SIGNED_FILE).readBytes()
+        val signature = java.io.File(dir, SmimeParts.SIGNATURE_FILE).readBytes()
+        assertArrayEquals(SmimeMime.detachedParts(wire).first, entity)
+        assertTrue(engine.verifyDetached(entity, signature, "sender@example.test").allCryptographicallyValid)
+    }
 }

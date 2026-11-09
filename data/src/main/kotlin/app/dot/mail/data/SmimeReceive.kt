@@ -75,6 +75,12 @@ private suspend fun summarize(verification: app.dot.mail.engine.SmimeVerificatio
         // Remember certificates from intact signatures for encrypted replies (the store re-checks the mailbox; cache != trust).
         if (certs != null) verification.signers.filter { it.cryptographicSignatureValid }.forEach { signer ->
             runCatching { certs.collect(accountId, from, signer.certificate, true, signerIntermediates(signer.certificate, signer.certificateCandidates)) }
+            // Many organisations (the European Commission among them) use one key pair to sign and another to encrypt: the
+            // signer certificate cannot receive encrypted mail, and the encryption certificate travels in the same message.
+            // Keep the sender's other end-entity certificates that allow encryption; trust is still decided when sending.
+            if (from in signer.certificate.info().mailboxes) encryptionCompanions(signer.certificate, signer.certificateCandidates, from).forEach { companion ->
+                runCatching { certs.collect(accountId, from, companion, true, signerIntermediates(companion, signer.certificateCandidates)) }
+            }
         }
     return views.maxByOrNull { severity(it.state) } ?: SmimeSignatureView(State.UNREADABLE)
 }
@@ -86,6 +92,14 @@ private fun severity(state: State) = when (state) {
     State.UNREADABLE -> 3
     State.INVALID -> 4
 }
+
+/** End-entity certificates in [all], other than [signer], issued for [from] and usable for key transport or agreement. */
+internal fun encryptionCompanions(signer: X509Certificate, all: List<X509Certificate>, from: String): List<X509Certificate> =
+    all.filter { candidate ->
+        candidate != signer && candidate.basicConstraints < 0 &&
+            SmimeCertStore.normalize(from) in SmimeCertStore.certificateMailboxes(candidate) &&
+            candidate.keyUsage.let { usage -> usage == null || usage.getOrNull(2) == true || usage.getOrNull(4) == true }
+    }
 
 private fun signerIntermediates(leaf: X509Certificate, all: List<X509Certificate>): List<X509Certificate> =
     all.filter { it != leaf && it.basicConstraints >= 0 }

@@ -189,7 +189,15 @@ internal class RealMailGraph(
         smimeConfigLock.withLock {
             val row = dao.account(accountId) ?: return@withLock
             val config = Codec.config(row.config)
-            dao.accountConfig(accountId, Codec.config(config.copy(smime = transform(config.smime))))
+            val updated = transform(config.smime)
+            dao.accountConfig(accountId, Codec.config(config.copy(smime = updated)))
+            // Writing to yourself (or to another device of yours) encrypts to your own certificate: keep it with the contact
+            // certificates of the account's address, as if it had arrived in a signed message. Trust is still checked on send.
+            val alias = updated.decryptionKeyChainAlias
+            if (alias != null) runCatching {
+                val chain = android.security.KeyChain.getCertificateChain(context, alias)?.toList().orEmpty()
+                chain.firstOrNull()?.let { leaf -> smimeCerts.collect(accountId, row.email, leaf, true, chain.drop(1)) }
+            }
         }
     }
     override suspend fun renameAccount(accountId: Long, displayName: String) = withContext(Dispatchers.IO) { dao.accountName(accountId, displayName.trim().ifEmpty { return@withContext }) }
