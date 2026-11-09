@@ -47,6 +47,8 @@ dependencies {
     implementation(libs.paging.compose)
     implementation(libs.paging.runtime) // AsyncPagingDataDiffer: the widget materialises one page of PagingData
     implementation(libs.biometric)
+    // biometric 1.1.0 drags in fragment 1.2.5, whose FragmentActivity predates the activity-result registry (requestCode crash on any launcher).
+    implementation(libs.androidx.fragment)
     implementation(libs.glance.appwidget)
     implementation(libs.androidsvg) // Apache-2.0; renders BIMI brand logos (SVG Tiny PS) to a bitmap
     implementation(libs.richeditor.compose) // Apache-2.0; rich-text email composer
