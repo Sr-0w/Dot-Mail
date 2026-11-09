@@ -51,6 +51,7 @@ import app.dot.design.components.DotButton
 import app.dot.design.components.dotSurfaceEnter
 import app.dot.mail.R
 import app.dot.mail.data.model.MessageBody
+import app.dot.mail.data.toDecryptedAttachments
 import app.dot.mail.data.model.PgpContent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -98,7 +99,7 @@ fun rememberPgpReader(messageId: Long, body: MessageBody?): PgpReaderState {
                         val parsed = withContext(Dispatchers.Default) {
                             app.dot.mail.engine.Pgp.parseDecrypted(outcome.output, mime = pgp is PgpContent.Encrypted)
                         }
-                        state.decrypted = MessageBody(parsed.text, parsed.html, hasRemoteImages = false)
+                        state.decrypted = MessageBody(parsed.text, parsed.html, hasRemoteImages = false, decryptedAttachments = parsed.toDecryptedAttachments(messageId))
                     }
                     state.status = PgpReaderState.Status.Done
                 }

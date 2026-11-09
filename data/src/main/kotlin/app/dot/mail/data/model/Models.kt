@@ -174,7 +174,12 @@ data class Attachment(
     val isInline: Boolean,
     /** content:// or file:// URI once downloaded, else null. */
     val localUri: String?,
+    /** Set only for an attachment of a decrypted message: its bytes live in memory, nothing is cached. See [DecryptedBytes]. */
+    val memory: DecryptedBytes? = null,
 )
+
+/** Plaintext of an attachment found inside a decrypted message. Held in memory only; compared by identity. */
+class DecryptedBytes(val bytes: ByteArray)
 
 data class Message(
     val id: Long,
@@ -216,6 +221,8 @@ data class MessageBody(
     val pgp: PgpContent? = null,
     /** S/MIME content to verify; null for ordinary mail. */
     val smime: SmimeContent? = null,
+    /** Attachments found inside a decrypted message (in memory only, ids are negative); empty for ordinary mail. */
+    val decryptedAttachments: List<Attachment> = emptyList(),
 )
 
 /** S/MIME shapes of a message body. Paths point into the app-private body directory. */

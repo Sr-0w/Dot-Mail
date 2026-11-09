@@ -87,6 +87,17 @@ interface AccountRepository {
 
 interface MailRepository {
     /**
+     * Makes an attachment of a decrypted message ([Attachment.memory]) available to other apps and to inline cid images: writes it
+     * to a short-lived private file and returns its content:// URI. [token] identifies the reader; [clearDecryptedFiles] removes
+     * everything written for it. Nothing else of a decrypted message is ever stored.
+     */
+    suspend fun decryptedFileUri(token: String, attachment: app.dot.mail.data.model.Attachment): String =
+        throw UnsupportedOperationException("Decrypted attachments are not available")
+
+    /** Deletes the files written for [token] (called when the reader closes). */
+    fun clearDecryptedFiles(token: String) {}
+
+    /**
      * Decrypts [message]'s S/MIME envelope in memory with the account's KeyChain decryption key; the plaintext is never
      * written to disk. Null when the message is not S/MIME encrypted.
      */
