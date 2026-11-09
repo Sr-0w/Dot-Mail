@@ -174,11 +174,20 @@ data class DotTypography(
     val overline: TextStyle = style(11, 14, FontWeight.Medium, 0.06),
 )
 
+/**
+ * The one set of Quiet UI shapes. Controls the user taps (buttons, chips, capsules, grouped actions) are [pill]: true
+ * semicircular ends at any height or font scale. Icon-only controls are [circle]. Containers keep rounded rectangles
+ * ([small] inline blocks, [medium] fields, [large] cards, [dialog] dialogs, [sheet] bottom sheets). Clip, border and
+ * background of a control must all use the same token so no state shows a squarer edge than another.
+ */
 object DotShapes {
     val small = RoundedCornerShape(8.dp)
     val medium = RoundedCornerShape(12.dp)
     val large = RoundedCornerShape(18.dp)
-    val sheet = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    val dialog = RoundedCornerShape(28.dp)
+    val sheet = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    val pill = RoundedCornerShape(percent = 50)
+    val circle = androidx.compose.foundation.shape.CircleShape
 }
 
 object DotSpacing {

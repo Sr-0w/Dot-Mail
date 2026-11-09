@@ -608,7 +608,7 @@ fun ThreadScreen(
     }
     if (confirmTrash) {
         AlertDialog(
-            onDismissRequest = { confirmTrash = false }, containerColor = c.surface, shape = DotShapes.large,
+            onDismissRequest = { confirmTrash = false }, containerColor = c.surface, shape = DotShapes.dialog,
             title = { Text(stringResource(R.string.thread_confirm_trash_title), style = Dot.type.title, color = c.textPrimary) },
             confirmButton = { DotButton(stringResource(R.string.inbox_delete), { confirmTrash = false; act(MessageAction.TRASH) }, style = ButtonStyle.Danger, compact = true) },
             dismissButton = { DotButton(stringResource(R.string.inbox_cancel), { confirmTrash = false }, style = ButtonStyle.Ghost, compact = true) },
@@ -616,7 +616,7 @@ fun ThreadScreen(
     }
     if (confirmDelete) {
         AlertDialog(
-            onDismissRequest = { confirmDelete = false }, containerColor = c.surface, shape = DotShapes.large,
+            onDismissRequest = { confirmDelete = false }, containerColor = c.surface, shape = DotShapes.dialog,
             title = { Text(stringResource(R.string.thread_confirm_delete_title), style = Dot.type.title, color = c.textPrimary) },
             text = { Text(stringResource(R.string.thread_confirm_delete_body), style = Dot.type.callout, color = c.textSecondary) },
             confirmButton = { DotButton(stringResource(R.string.inbox_delete), { confirmDelete = false; act(MessageAction.DELETE_FOREVER) }, style = ButtonStyle.Danger, compact = true) },
@@ -643,7 +643,7 @@ fun ThreadScreen(
         AlertDialog(
             onDismissRequest = { confirmUnsubscribe = null },
             containerColor = c.surface,
-            shape = DotShapes.large,
+            shape = DotShapes.dialog,
             title = { Text(stringResource(R.string.thread_unsub_title), style = Dot.type.title, color = c.textPrimary) },
             text = {
                 Text(
@@ -681,7 +681,7 @@ private fun LinkDialog(url: String, shownText: String?, onDismiss: () -> Unit, o
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = c.surface,
-        shape = DotShapes.large,
+        shape = DotShapes.dialog,
         title = { Text(stringResource(R.string.thread_link_title), style = Dot.type.title, color = c.textPrimary) },
         text = {
             Column {
@@ -962,7 +962,7 @@ private fun RemoteContentBanner(
         AlertDialog(
             onDismissRequest = { confirm = null },
             containerColor = c.surface,
-            shape = DotShapes.large,
+            shape = DotShapes.dialog,
             title = { Text(stringResource(R.string.thread_remote_confirm_title, target), style = Dot.type.title, color = c.textPrimary) },
             text = {
                 Text(
@@ -993,7 +993,7 @@ private fun RemoteImagesLoadedRow(reason: app.dot.mail.ui.settings.LoadReason, s
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(stringResource(R.string.thread_images_loaded, why), style = Dot.type.caption, color = c.textTertiary, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Box(Modifier.defaultMinSize(minHeight = 48.dp).clip(DotShapes.small).clickable(role = androidx.compose.ui.semantics.Role.Button, onClickLabel = stopLabel) { onStop() }.padding(horizontal = DotSpacing.m), contentAlignment = Alignment.Center) {
+        Box(Modifier.defaultMinSize(minHeight = 48.dp).clip(DotShapes.pill).clickable(role = androidx.compose.ui.semantics.Role.Button, onClickLabel = stopLabel) { onStop() }.padding(horizontal = DotSpacing.m), contentAlignment = Alignment.Center) {
             Text(stringResource(R.string.thread_stop), style = Dot.type.label, color = c.textSecondary)
         }
     }
@@ -1012,7 +1012,7 @@ private fun PlainTextBody(text: String, onLink: (String) -> Unit, textScale: Flo
         val quoted = split.quoted
         if (!quoted.isNullOrBlank()) {
             Box(
-                Modifier.padding(top = DotSpacing.s).minimumInteractiveComponentSize().clip(DotShapes.small).background(c.surface)
+                Modifier.padding(top = DotSpacing.s).minimumInteractiveComponentSize().clip(DotShapes.pill).background(c.surface)
                     .clickable(role = androidx.compose.ui.semantics.Role.Button) { showQuoted = !showQuoted }.padding(horizontal = 10.dp, vertical = 2.dp),
             ) { Icon(Icons.Outlined.MoreHoriz, stringResource(if (showQuoted) R.string.compose_hide_quoted else R.string.compose_show_quoted), tint = c.textSecondary) }
             AnimatedVisibility(showQuoted) {

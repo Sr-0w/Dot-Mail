@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -130,9 +129,9 @@ fun DotButton(
             }
             .minimumInteractiveComponentSize()
             .heightIn(min = if (compact) 36.dp else 48.dp)
-            .clip(DotShapes.medium)
+            .clip(DotShapes.pill)
             .background(bgAnimated)
-            .border(DotSpacing.hairline * 2, if (enabled || outline == Color.Transparent) outline else c.border, DotShapes.medium)
+            .border(DotSpacing.hairline * 2, if (enabled || outline == Color.Transparent) outline else c.border, DotShapes.pill)
             .padding(horizontal = if (compact) 14.dp else 20.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
@@ -150,7 +149,7 @@ fun DotButton(
 
 /**
  * Primary / confirmatory action button (Send, Save, Confirm): solid Accent Blue fill with
- * high-contrast foreground, rounded geometry ([DotShapes.medium]), and >= 48dp touch target.
+ * high-contrast foreground, rounded geometry ([DotShapes.pill]), and >= 48dp touch target.
  */
 @Composable
 fun DotPrimaryButton(
@@ -193,7 +192,7 @@ fun DotPrimaryButton(
             .then(if (contentDescription != null) Modifier.semantics { this.contentDescription = contentDescription } else Modifier)
             .minimumInteractiveComponentSize()
             .heightIn(min = if (compact) 36.dp else 48.dp)
-            .clip(DotShapes.medium)
+            .clip(DotShapes.pill)
             .background(bgAnimated)
             .padding(horizontal = if (compact) 14.dp else 20.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.Center,
@@ -212,7 +211,7 @@ fun DotPrimaryButton(
 
 /**
  * Icon-only variant of [DotPrimaryButton] (e.g., top-bar Send action): solid Accent Blue fill,
- * rounded geometry ([DotShapes.medium]), and >= 48dp interactive touch target.
+ * rounded geometry ([DotShapes.pill]), and >= 48dp interactive touch target.
  */
 @Composable
 fun DotPrimaryButton(
@@ -253,7 +252,7 @@ fun DotPrimaryButton(
             }
             .minimumInteractiveComponentSize()
             .size(visualSize)
-            .clip(DotShapes.medium)
+            .clip(DotShapes.pill)
             .background(bgAnimated),
         contentAlignment = Alignment.Center,
     ) {
@@ -309,13 +308,13 @@ fun DotFrostedPill(
             .heightIn(min = 48.dp)
             .shadow(
                 elevation = 3.dp,
-                shape = CircleShape,
+                shape = DotShapes.circle,
                 ambientColor = Color(0x26000000),
                 spotColor = Color(0x33000000),
             )
-            .clip(CircleShape)
+            .clip(DotShapes.circle)
             .glassSurface(backdrop, pressed)
-            .border(DotSpacing.hairline * 2, borderBrush, CircleShape)
+            .border(DotSpacing.hairline * 2, borderBrush, DotShapes.circle)
             .clickable(
                 interactionSource = interaction,
                 indication = ripple(bounded = true, color = c.textPrimary),
@@ -373,7 +372,7 @@ fun DotIconButton(
     Box(
         modifier
             .size(48.dp)
-            .clip(CircleShape)
+            .clip(DotShapes.circle)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(bounded = true, color = Dot.colors.textPrimary),
@@ -402,7 +401,7 @@ fun Avatar(name: String, seed: String, modifier: Modifier = Modifier, size: Dp =
     val fill = if (!colorful) c.surfaceRaised else if (c.isDark) tone.darkFill else tone.lightFill
     val text = if (!colorful) c.textSecondary else if (c.isDark) tone.darkText else tone.lightText
     Box(
-        modifier.size(size).clip(CircleShape).background(fill),
+        modifier.size(size).clip(DotShapes.circle).background(fill),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -429,7 +428,7 @@ fun initials(name: String): String {
 /** Small accent dot: unread / new. */
 @Composable
 fun UnreadDot(modifier: Modifier = Modifier, size: Dp = 8.dp) {
-    Box(modifier.size(size).clip(CircleShape).background(Dot.colors.accent))
+    Box(modifier.size(size).clip(DotShapes.circle).background(Dot.colors.accent))
 }
 
 /** Uppercase tracking header for list groups. */
@@ -457,7 +456,7 @@ fun EmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
-            Modifier.size(56.dp).clip(CircleShape).border(DotSpacing.hairline * 2, Dot.colors.border, CircleShape),
+            Modifier.size(56.dp).clip(DotShapes.circle).border(DotSpacing.hairline * 2, Dot.colors.border, DotShapes.circle),
             contentAlignment = Alignment.Center,
         ) { Icon(icon, null, Modifier.size(24.dp), tint = Dot.colors.textSecondary) }
         Spacer(Modifier.height(DotSpacing.xl))

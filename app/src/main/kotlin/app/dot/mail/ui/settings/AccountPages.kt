@@ -340,7 +340,7 @@ internal fun IdentityEditorPage(account: Account, identityId: Long, onBack: () -
             onDismissRequest = { confirmDiscard = false },
             modifier = Modifier.dotSurfaceEnter(),
             containerColor = c.surface,
-            shape = DotShapes.large,
+            shape = DotShapes.dialog,
             title = { Text(stringResource(R.string.identity_discard_title), style = Dot.type.title, color = c.textPrimary) },
             text = { Text(stringResource(R.string.identity_discard_body), style = Dot.type.callout, color = c.textSecondary) },
             confirmButton = { DotButton(stringResource(R.string.identity_keep_editing), { confirmDiscard = false }, compact = true) },
@@ -353,7 +353,7 @@ internal fun IdentityEditorPage(account: Account, identityId: Long, onBack: () -
             onDismissRequest = { confirmDelete = false },
             modifier = Modifier.dotSurfaceEnter(),
             containerColor = c.surface,
-            shape = DotShapes.large,
+            shape = DotShapes.dialog,
             title = { Text(stringResource(R.string.identity_delete_title, existing?.email.orEmpty()), style = Dot.type.title, color = c.textPrimary) },
             text = { Text(stringResource(R.string.identity_delete_body), style = Dot.type.callout, color = c.textSecondary) },
             confirmButton = {
@@ -375,7 +375,7 @@ private fun RenameAccountDialog(account: Account, onDismiss: () -> Unit) {
     var name by remember { mutableStateOf(account.displayName) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = c.surface, shape = DotShapes.large,
+        containerColor = c.surface, shape = DotShapes.dialog,
         title = { Text(stringResource(R.string.account_name_title), style = Dot.type.title, color = c.textPrimary) },
         text = { DotTextField(name, { name = it }, label = stringResource(R.string.identity_name), supporting = stringResource(R.string.account_name_note)) },
         confirmButton = {

@@ -78,7 +78,7 @@ fun UpdatePasswordDialog(account: Account, onDismiss: () -> Unit, onSuccess: () 
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
         containerColor = c.surface,
-        shape = DotShapes.large,
+        shape = DotShapes.dialog,
         title = { Text(stringResource(R.string.signin_title), style = Dot.type.title, color = c.textPrimary) },
         text = {
             Column {

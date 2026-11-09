@@ -477,7 +477,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             onDismissRequest = { removing = null },
             modifier = Modifier.dotSurfaceEnter(),
             containerColor = c.surface,
-            shape = DotShapes.large,
+            shape = DotShapes.dialog,
             icon = { Avatar(a.displayName, a.email) },
             title = { Text(a.email, style = Dot.type.title, color = c.textPrimary) },
             text = { Text(stringResource(R.string.settings_remove_account_text), style = Dot.type.callout, color = c.textSecondary) },
@@ -499,7 +499,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             onDismissRequest = { about = false },
             modifier = Modifier.dotSurfaceEnter(),
             containerColor = c.surface,
-            shape = DotShapes.large,
+            shape = DotShapes.dialog,
             title = { Text(stringResource(R.string.settings_about_title, BuildConfig.VERSION_NAME), style = Dot.type.title, color = c.textPrimary) },
             text = {
                 Text(
@@ -515,7 +515,7 @@ fun SettingsScreen(onBack: () -> Unit, onAddAccount: () -> Unit, onAllAccountsRe
             onDismissRequest = { licences = false },
             modifier = Modifier.dotSurfaceEnter(),
             containerColor = c.surface,
-            shape = DotShapes.large,
+            shape = DotShapes.dialog,
             title = { Text(stringResource(R.string.settings_licences_title), style = Dot.type.title, color = c.textPrimary) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {

@@ -342,7 +342,7 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                         Modifier
                             .minimumInteractiveComponentSize()
                             .heightIn(min = 32.dp)
-                            .clip(DotShapes.small)
+                            .clip(DotShapes.pill)
                             .clickable(
                                 role = Role.Button,
                                 onClickLabel = ccBccToggleLabel,
@@ -460,7 +460,7 @@ fun ComposeScreen(route: ComposeRoute, onClose: () -> Unit) {
                 onDismissRequest = vm::dismissAliasPicker,
                 modifier = Modifier.dotSurfaceEnter(),
                 containerColor = c.surface,
-                shape = DotShapes.large,
+                shape = DotShapes.dialog,
                 title = { Text(stringResource(R.string.compose_use_alias), style = Dot.type.title, color = c.textPrimary) },
                 text = {
                     Column {
@@ -734,7 +734,7 @@ private fun FormatButton(
         tint = if (active) c.textPrimary else c.textSecondary,
         modifier = Modifier
             .padding(horizontal = 2.dp)
-            .clip(DotShapes.small)
+            .clip(DotShapes.pill)
             .background(if (active) c.surfaceRaised else Color.Transparent)
             .semantics { selected = active },
     )
@@ -753,9 +753,9 @@ private fun QuotedReplySection(
         Box(
             Modifier
                 .minimumInteractiveComponentSize()
-                .clip(DotShapes.small)
+                .clip(DotShapes.pill)
                 .background(c.surfaceRaised)
-                .border(DotSpacing.hairline * 2, c.border, DotShapes.small)
+                .border(DotSpacing.hairline * 2, c.border, DotShapes.pill)
                 .clickable(
                     role = Role.Button,
                     onClickLabel = quoteToggleLabel,
@@ -804,7 +804,7 @@ private fun ConfirmCloseDialog(onDismiss: () -> Unit, onDiscard: () -> Unit, onS
         onDismissRequest = onDismiss,
         modifier = Modifier.dotSurfaceEnter(),
         containerColor = c.surface,
-        shape = DotShapes.large,
+        shape = DotShapes.dialog,
         title = { Text(stringResource(R.string.compose_close_title), style = Dot.type.title, color = c.textPrimary) },
         text = { Text(stringResource(R.string.compose_close_body), style = Dot.type.callout, color = c.textSecondary) },
         confirmButton = { DotPrimaryButton(stringResource(R.string.compose_save_draft), onClick = onSave, compact = true) },
@@ -827,7 +827,7 @@ private fun ConfirmPlainTextDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.dotSurfaceEnter(),
         containerColor = c.surface,
-        shape = DotShapes.large,
+        shape = DotShapes.dialog,
         title = { Text(stringResource(R.string.compose_plain_text), style = Dot.type.title, color = c.textPrimary) },
         text = { Text(stringResource(R.string.compose_plain_text_confirm_body), style = Dot.type.callout, color = c.textSecondary) },
         confirmButton = { DotPrimaryButton(stringResource(R.string.compose_convert), onClick = onConfirm, compact = true) },
@@ -853,7 +853,7 @@ private fun InsertLinkDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.dotSurfaceEnter(),
         containerColor = c.surface,
-        shape = DotShapes.large,
+        shape = DotShapes.dialog,
         title = {
             Text(
                 stringResource(if (isEditing) R.string.compose_edit_link else R.string.compose_insert_link),
@@ -1123,9 +1123,9 @@ private fun RecipientChip(a: EmailAddress, onRemove: () -> Unit) {
     Row(
         Modifier
             .heightIn(min = 32.dp)
-            .clip(DotShapes.small)
+            .clip(DotShapes.pill)
             .background(c.surfaceRaised)
-            .border(1.dp, if (valid) c.surfaceRaised else c.danger, DotShapes.small)
+            .border(1.dp, if (valid) c.surfaceRaised else c.danger, DotShapes.pill)
             .clickable(onClickLabel = removeLabel, role = Role.Button, onClick = onRemove)
             .padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,

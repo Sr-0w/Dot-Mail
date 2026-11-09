@@ -121,7 +121,7 @@ private fun ImportHtmlDialog(onPickFile: ((String) -> Unit) -> Unit, onDismiss: 
     var empty by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = c.surface, shape = DotShapes.large,
+        containerColor = c.surface, shape = DotShapes.dialog,
         title = { Text(stringResource(R.string.identity_signature_import_title), style = Dot.type.title, color = c.textPrimary) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(DotSpacing.s)) {

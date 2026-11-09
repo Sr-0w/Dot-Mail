@@ -235,7 +235,7 @@ internal fun StoragePage(onBack: () -> Unit) {
     clearing?.let { clearingAccount ->
         AlertDialog(
             onDismissRequest = { clearing = null },
-            shape = DotShapes.large,
+            shape = DotShapes.dialog,
             containerColor = c.surface,
             modifier = Modifier.dotSurfaceEnter(),
             title = {

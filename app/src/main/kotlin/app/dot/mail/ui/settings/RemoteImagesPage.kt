@@ -114,7 +114,7 @@ internal fun RemoteImagesPage(accounts: List<Account>, onBack: () -> Unit) {
         AlertDialog(
             onDismissRequest = { confirmReset = false },
             modifier = Modifier.dotSurfaceEnter(),
-            containerColor = c.surface, shape = DotShapes.large,
+            containerColor = c.surface, shape = DotShapes.dialog,
             title = { Text(stringResource(R.string.remote_images_reset_title), style = Dot.type.title, color = c.textPrimary) },
             text = { Text(stringResource(R.string.remote_images_reset_body), style = Dot.type.callout, color = c.textSecondary) },
             confirmButton = { DotButton(stringResource(R.string.remote_images_reset_confirm), style = ButtonStyle.Danger, compact = true, onClick = { confirmReset = false; policy.resetRules() }) },
@@ -135,7 +135,7 @@ private fun AddRuleDialog(accounts: List<Account>, onDismiss: () -> Unit, onAdd:
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.dotSurfaceEnter(),
-        containerColor = c.surface, shape = DotShapes.large,
+        containerColor = c.surface, shape = DotShapes.dialog,
         title = { Text(stringResource(R.string.remote_images_add_title), style = Dot.type.title, color = c.textPrimary) },
         text = {
             Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(DotSpacing.m)) {
