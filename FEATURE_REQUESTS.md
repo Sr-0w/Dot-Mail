@@ -99,13 +99,15 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
   passwords; system browser + PKCE; clear loading/cancel/error states; manual IMAP stays a separate option.
   - [x] Button, states, redirect handling, translated errors, honest message instead of a dead button when the build has
     no Google client ID (PR #57, merged; VM tests)
-  - [ ] End-to-end with a real Gmail account on the phone (consent screen is in Testing mode: listed test users only,
-    grants expire after 7 days)
+  - [x] End-to-end with a real Gmail account on the phone — confirmed by the owner 2026-11-09 (consent screen is in
+    Testing mode: listed test users only, grants expire after 7 days)
 - **FR-02 · P1 · OAuth2 sign-in and token refresh for Google and Microsoft, no Google Play Services** — PKCE, system
   browser, encrypted tokens, refresh, XOAUTH2 are implemented (Codex).
   - [x] Google client IDs registered, per-build-type (release/debug) client (`af45ecf`, `docs/OAUTH.md`)
-  - [ ] Microsoft client ID not registered (maintainer decision, `docs/OAUTH.md`); Outlook/Hotmail cannot sign in meanwhile
-  - [ ] Real-account verification (see FR-01); Google restricted-scope verification for a public release
+  - Microsoft sign-in: **dropped for now** (owner, 2026-11-09). No client ID is registered and no Microsoft button is
+    shown; Outlook/Hotmail users use manual IMAP where their provider allows it. Revisit after the first release.
+  - [x] Real-account verification with Gmail (see FR-01)
+  - [ ] Google restricted-scope verification before Gmail OAuth can leave Testing mode for a public release
 - **FR-05 · P1 · Real-device regressions: slow refresh, inconsistent HTML fit, connection errors**
   - [x] Refresh 18 s → ~3 s (Inbox ~1.6 s), logins 30 → 4 (PR #34), measured on device
   - [x] Connection errors classified and explained in EN/FR/DE with Retry (PR #34 + `de22513`)
