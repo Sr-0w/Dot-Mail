@@ -135,7 +135,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import app.dot.design.components.DotFloatingCapsule
 import app.dot.design.components.glassBackdropSource
 import app.dot.design.components.clear
@@ -423,16 +422,8 @@ fun ThreadScreen(
 
     // Floating chrome (Back, actions, reply capsules): hides while reading downwards, returns on any scroll up,
     // and is always shown at the very top and at the end of the mail.
-    var chromeVisible by remember { mutableStateOf(true) }
-    val chromeConnection = remember {
-        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
-            override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
-                if (available.y < -CHROME_SCROLL_THRESHOLD) chromeVisible = false else if (available.y > CHROME_SCROLL_THRESHOLD) chromeVisible = true
-                return androidx.compose.ui.geometry.Offset.Zero
-            }
-        }
-    }
-    val showChrome = chromeVisible || !listState.canScrollBackward || !listState.canScrollForward
+    // The capsules stay on screen while reading (owner's choice): no hide-on-scroll.
+    val showChrome = true
     val reducedMotionChrome = app.dot.design.rememberReducedMotion()
     val nextLabel = stringResource(R.string.thread_action_next_conversation)
     val previousLabel = stringResource(R.string.thread_action_previous_conversation)
@@ -481,7 +472,7 @@ fun ThreadScreen(
     ) {
         val clearBackdrop: () -> Unit = remember(readerBackdrop, density) { { readerBackdrop.clear(density) } }
         androidx.compose.runtime.CompositionLocalProvider(LocalBeforeWebViewRelease provides clearBackdrop) {
-        Column(Modifier.fillMaxSize().nestedScroll(chromeConnection).glassBackdropSource(glass)) {
+        Column(Modifier.fillMaxSize().glassBackdropSource(glass)) {
             when {
                 list == null -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     app.dot.design.components.DotSpinner(size = 22.dp, color = c.textTertiary)
@@ -1208,7 +1199,6 @@ internal object SwipeGuard {
     }
 }
 
-private const val CHROME_SCROLL_THRESHOLD = 6f
 
 /**
  * Soft frosted capsules floating over the message: Back (top left), one grouped action capsule (top right) and one
