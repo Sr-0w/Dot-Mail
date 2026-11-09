@@ -55,7 +55,8 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
   - [x] Queued messages can be viewed, edited, rescheduled and cancelled before SMTP submission (Outbox Edit / Reschedule,
     #59; claimed messages are locked)
   - [ ] Robust across restart, connectivity changes, background limits, clock/timezone/DST changes, retries, no duplicate send
-    (due times are absolute epoch; DST/timezone resolution and restart/early-fire/no-duplicate are unit tested; real
+    (due times are absolute epoch; DST/timezone resolution and restart/early-fire/no-duplicate are unit tested; clock,
+    timezone and boot broadcasts re-queue pending sends via `OutboxClockReceiver`; real
     background-limit and clock-change behaviour still needs the device)
   - [x] Honest about Android not guaranteeing second-exact delivery; separate from the Undo-send grace period (`schedule_note`; `SendSchedule.MIN_LEAD_MS`)
   - [ ] End-to-end device verification

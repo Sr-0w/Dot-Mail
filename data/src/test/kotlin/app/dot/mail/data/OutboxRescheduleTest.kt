@@ -92,4 +92,24 @@ class OutboxRescheduleTest {
         assertTrue(graph.rescheduleSend(outboxId, a)); assertTrue(graph.rescheduleSend(outboxId, b))
         assertEquals(listOf(b), graph.outbox.first().map { it.sendAt })
     }
+
+    @Test fun aClockOrTimezoneChangeRequeuesEveryPendingItemFromItsAbsoluteDueTime() = runBlocking<Unit> {
+        val (a, _) = queue(System.currentTimeMillis() + 3_600_000)
+        val dueA = db.mail().outbox(a)!!.dueAt
+        val calls = mutableListOf<Pair<Long, Long>>()
+        assertEquals(1, graph.requeueOutbox { id, due -> calls += id to due })
+        assertEquals(listOf(a to dueA), calls) // the stored absolute time, not a recomputed delay
+        db.mail().transitionOutbox(a, "PENDING", "SUBMITTING") // a claimed or finished item is never requeued
+        calls.clear()
+        assertEquals(0, graph.requeueOutbox { id, due -> calls += id to due })
+        assertTrue(calls.isEmpty())
+    }
+
+    @Test fun theReceiverReactsToExactlyTheClockTimezoneAndBootBroadcasts() {
+        assertTrue(OutboxClockReceiver.handles(android.content.Intent.ACTION_TIME_CHANGED))
+        assertTrue(OutboxClockReceiver.handles(android.content.Intent.ACTION_TIMEZONE_CHANGED))
+        assertTrue(OutboxClockReceiver.handles(android.content.Intent.ACTION_BOOT_COMPLETED))
+        assertFalse(OutboxClockReceiver.handles(android.content.Intent.ACTION_DATE_CHANGED))
+        assertFalse(OutboxClockReceiver.handles(null))
+    }
 }
