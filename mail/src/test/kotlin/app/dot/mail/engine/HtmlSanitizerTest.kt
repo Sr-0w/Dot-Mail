@@ -15,6 +15,15 @@ class HtmlSanitizerTest {
         assertFalse(html, "http://img.example.org" in html)
     }
 
+    @Test fun keepsKeywordClippingSoNowrapTitlesEllipsize() {
+        val html = HtmlSanitizer.sanitize("<div style=\"white-space:nowrap;overflow:hidden;text-overflow:ellipsis\">Long product title</div>").html
+        assertTrue(html, "overflow:hidden" in html)
+        assertTrue(html, "text-overflow:ellipsis" in html)
+        val scroll = HtmlSanitizer.sanitize("<div style=\"overflow:scroll;text-overflow:'x'\">y</div>").html
+        assertFalse(scroll, "overflow:scroll" in scroll)
+        assertFalse(scroll, "text-overflow" in scroll)
+    }
+
     @Test fun rejectsExecutableMarkupAndSchemes() {
         val vectors = listOf(
             "<SCRIPT SRC=https://evil.invalid/a></SCRIPT>",

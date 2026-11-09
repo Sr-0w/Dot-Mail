@@ -43,6 +43,17 @@ object HtmlSanitizer {
         "display", "float", "clear", "table-layout", "box-sizing", "direction", "list-style-type",
         "background-size", "background-position", "background-repeat",
     )
+    /**
+     * `overflow` and `text-overflow` with keyword values: newsletters pair `white-space:nowrap` with `overflow:hidden;
+     * text-overflow:ellipsis` on product titles. Without them the titles spill over their neighbours and widen the
+     * layout. No scroll containers, no custom strings.
+     */
+    private val clippingProperties = mapOf(
+        "overflow" to setOf("hidden", "visible", "clip"),
+        "overflow-x" to setOf("hidden", "visible", "clip"),
+        "overflow-y" to setOf("hidden", "visible", "clip"),
+        "text-overflow" to setOf("ellipsis", "clip"),
+    )
     private val colourFunction = Regex("(?i)rgba?\\(\\s*[0-9.]+%?\\s*[, ]\\s*[0-9.]+%?\\s*[, ]\\s*[0-9.]+%?\\s*([,/]\\s*[0-9.]+%?\\s*)?\\)")
     private val safeValue = Regex("[a-zA-Z0-9#.,%\\s'\"+/-]+")
     private val negativeNumber = Regex("(?<![a-zA-Z0-9_-])-\\s*\\.?[0-9]")
@@ -126,6 +137,10 @@ object HtmlSanitizer {
         var value = pair[1].trim()
         val important = value.endsWith("!important", ignoreCase = true)
         if (important) value = value.dropLast("!important".length).trim()
+        if (key in clippingProperties) {
+            // Clipping only ever hides overflow inside the element's own box; keyword values only.
+            return if (value.lowercase(Locale.ROOT) in clippingProperties.getValue(key)) "$key:${value.lowercase(Locale.ROOT)}" + if (important) " !important" else "" else null
+        }
         if (key !in properties || value.isEmpty() || value.length > MAX_VALUE_CHARS) return null
         if ('"' in value || '\'' in value) {
             if (key != "font-family" && key != "font") return null
