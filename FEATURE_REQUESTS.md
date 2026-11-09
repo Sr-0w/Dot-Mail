@@ -52,6 +52,21 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
   - Evidence: no crash reproduced; hardening in the fr22-back PR (guarded backdrop clear, `popFrom`/`isOnTop`, FitWebView
     detach). `0196e79` only fixes Back closing the drawer, which is unrelated.
 
+### Inbox and lists
+
+- **FR-77 · P2 · Auto-reveal newly arrived messages when already at top** — when fresh mail is inserted at the start
+  of the currently displayed inbox/message list (IMAP IDLE, background sync or manual refresh), and the user was
+  already scrolled all the way to the top, automatically keep/scroll the list at position 0 so the new messages
+  become visible immediately. Do not preserve the old first item's position and accidentally push new messages
+  offscreen above it.
+  - [ ] Detect the top state *before* applying incoming list updates, accounting for header/filter chips, lazy-list
+    content padding and small scroll offsets.
+  - [ ] Smoothly reveal new items without a jarring jump; multiple arrivals should not trigger repeated scroll
+    animations.
+  - [ ] When the user has scrolled down to read older mail, **preserve their reading position** and do not steal
+    scroll focus; optionally show a discreet “New messages” affordance to jump to the top.
+  - [ ] Respect current mailbox, active filters/sorting and reduced-motion settings; verify on a real device.
+
 ### Sending
 
 - **FR-11 · P2 · Complete delayed / scheduled sending ("Send later")** — only three presets exist today
