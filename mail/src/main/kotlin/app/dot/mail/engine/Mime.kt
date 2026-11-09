@@ -164,6 +164,10 @@ object Mime {
             } else if (type.startsWith("multipart/")) {
                 val multipart = p.content as Multipart
                 for (i in 0 until multipart.count) visit(multipart.getBodyPart(i), "$id.$i", depth+1,materialized)
+            } else if (encryptionHintFromMime(runCatching { p.contentType }.getOrNull()) == EncryptionHint.SMIME) {
+                // An S/MIME envelope inside a signature (signed(enveloped(...)), "triple wrapping"): the outer signature files are
+                // kept as they are, the envelope is kept for the reader to decrypt in memory.
+                save(p, SmimeParts.ENCRYPTED_FILE)
             } else if (name != null || disposition.equals(Part.ATTACHMENT,true) || type !in setOf("text/plain","text/html") || cid != null) {
                 val filename=(name?.let { runCatching { MimeUtility.decodeText(it) }.getOrDefault(it) } ?: "attachment").let { raw -> if(raw.length<=1024) raw else raw.substring(0,if(Character.isHighSurrogate(raw[1023])) 1023 else 1024) }
                 val inline=disposition.equals(Part.INLINE,true) || (cid != null && !disposition.equals(Part.ATTACHMENT,true))

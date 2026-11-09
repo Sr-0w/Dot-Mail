@@ -86,13 +86,27 @@ internal class BouncyCastleSmimeCms : SmimeCms {
     override fun encrypt(entity: ByteArray, recipients: Collection<X509Certificate>): ByteArray {
         require(recipients.isNotEmpty()) { "CMS EnvelopedData requires at least one recipient" }
         val generator = CMSEnvelopedDataGenerator()
-        recipients.distinctBy { it.serialNumber to it.issuerX500Principal }.forEach { certificate ->
-            generator.addRecipientInfoGenerator(JceKeyTransRecipientInfoGenerator(certificate).setProvider(provider))
+        val distinct = recipients.distinctBy { it.serialNumber to it.issuerX500Principal }
+        val (ec, rsa) = distinct.partition { it.publicKey.algorithm.equals("EC", true) || it.publicKey.algorithm.equals("ECDSA", true) }
+        rsa.forEach { certificate -> generator.addRecipientInfoGenerator(JceKeyTransRecipientInfoGenerator(certificate).setProvider(provider)) }
+        // EC recipients get ephemeral-static ECDH (RFC 5753) with the SHA-256 KDF and AES-256 key wrap; one ephemeral key per curve.
+        ec.groupBy { curveName(it) }.forEach { (curve, certificates) ->
+            val pair = java.security.KeyPairGenerator.getInstance("EC", provider).apply { initialize(java.security.spec.ECGenParameterSpec(curve)) }.generateKeyPair()
+            val agreement = org.bouncycastle.cms.jcajce.JceKeyAgreeRecipientInfoGenerator(CMSAlgorithm.ECDH_SHA256KDF, pair.private, pair.public, CMSAlgorithm.AES256_WRAP).setProvider(provider)
+            certificates.forEach { agreement.addRecipient(it) }
+            generator.addRecipientInfoGenerator(agreement)
         }
         // AES-CBC EnvelopedData is the interoperable S/MIME baseline. GCM is only used
         // for AuthEnvelopedData when receiving messages that explicitly carry that type.
         val encryptor = JceCMSContentEncryptorBuilder(CMSAlgorithm.AES256_CBC).setProvider(provider).build()
         return generator.generate(CMSProcessableByteArray(entity), encryptor).encoded
+    }
+
+    private fun curveName(certificate: X509Certificate): String = when ((certificate.publicKey as java.security.interfaces.ECKey).params.curve.field.fieldSize) {
+        256 -> "secp256r1"
+        384 -> "secp384r1"
+        521 -> "secp521r1"
+        else -> throw SmimeProtectionException(SmimeFailure.UNSUPPORTED_CERTIFICATE_KEY, "Unsupported EC curve for S/MIME encryption")
     }
 
     override fun decrypt(envelopedData: ByteArray, identity: SmimeDecryptionIdentity): ByteArray {
@@ -104,6 +118,10 @@ internal class BouncyCastleSmimeCms : SmimeCms {
                 rejectWeakEncryption(oid)
                 require(oid in setOf(CMSAlgorithm.AES128_CBC.id, CMSAlgorithm.AES192_CBC.id, CMSAlgorithm.AES256_CBC.id)) {
                     "Unsupported S/MIME EnvelopedData content algorithm: $oid"
+                }
+                if (identity.certificate.publicKey.algorithm.equals("EC", true) || identity.certificate.publicKey.algorithm.equals("ECDSA", true)) {
+                    // ECDH key agreement: the shared secret is computed by the platform provider (see EcdhEnvelopedData).
+                    return EcdhEnvelopedData.decrypt(contentInfo, identity, provider).also { require(it.isNotEmpty()) { "CMS envelope has empty content" } }
                 }
                 val recipient = matchingRecipient(envelope.recipientInfos, identity)
                 // Keep key recovery on the platform JCA provider for non-exportable Android KeyChain keys.

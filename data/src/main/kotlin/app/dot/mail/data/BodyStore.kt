@@ -39,10 +39,14 @@ internal class BodyStore(private val context: Context, private val dao: MailDao)
     private fun smime(dir: File): app.dot.mail.data.model.SmimeContent? {
         val signed = File(dir, app.dot.mail.engine.SmimeParts.SIGNED_FILE); val signature = File(dir, app.dot.mail.engine.SmimeParts.SIGNATURE_FILE)
         val envelope = File(dir, app.dot.mail.engine.SmimeParts.ENCRYPTED_FILE)
-        if (envelope.isFile) return app.dot.mail.data.model.SmimeContent.Encrypted(envelope.path)
         val opaque = File(dir, app.dot.mail.engine.SmimeParts.OPAQUE_FILE)
-        if (opaque.isFile) return app.dot.mail.data.model.SmimeContent.Opaque(opaque.path)
-        return if (signed.isFile && signature.isFile) app.dot.mail.data.model.SmimeContent.Signed(signed.path, signature.path) else null
+        val outer: app.dot.mail.data.model.SmimeContent? = when {
+            opaque.isFile -> app.dot.mail.data.model.SmimeContent.Opaque(opaque.path)
+            signed.isFile && signature.isFile -> app.dot.mail.data.model.SmimeContent.Signed(signed.path, signature.path)
+            else -> null
+        }
+        if (envelope.isFile) return app.dot.mail.data.model.SmimeContent.Encrypted(envelope.path, outer)
+        return outer
     }
 
     private fun pgp(dir: File, text: String?): app.dot.mail.data.model.PgpContent? {

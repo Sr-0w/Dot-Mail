@@ -247,13 +247,30 @@ class SmimeEngine(
         expectedSignerMailbox: String,
         certificateCandidates: Collection<X509Certificate> = emptyList(),
     ): SmimeVerification {
-        val signers = try {
+        var signers = try {
             cms.verifyDetached(entity, signature, certificateCandidates)
         } catch (e: Exception) {
             throw SmimeProtectionException(SmimeFailure.INVALID_CMS, "The S/MIME signature could not be parsed or verified", e)
         }
+        // Signatures are over the canonical CRLF form of text. A message re-stored with bare LF line endings (some servers and
+        // exports do) is the same text: retry in canonical form and accept that only if every signer then verifies.
+        if (signers.any { !it.cryptographicSignatureValid } && hasBareLf(entity)) {
+            val canonical = runCatching { cms.verifyDetached(toCrlf(entity), signature, certificateCandidates) }.getOrNull()
+            if (canonical != null && canonical.isNotEmpty() && canonical.all { it.cryptographicSignatureValid }) signers = canonical
+        }
         if (signers.isEmpty()) throw SmimeProtectionException(SmimeFailure.NO_SIGNATURE, "The CMS object contains no signer")
         return verification(signers, expectedSignerMailbox)
+    }
+
+    private fun hasBareLf(bytes: ByteArray): Boolean = bytes.indices.any { i -> bytes[i] == '\n'.code.toByte() && (i == 0 || bytes[i - 1] != '\r'.code.toByte()) }
+
+    private fun toCrlf(bytes: ByteArray): ByteArray {
+        val out = java.io.ByteArrayOutputStream(bytes.size + 64)
+        for (i in bytes.indices) {
+            if (bytes[i] == '\n'.code.toByte() && (i == 0 || bytes[i - 1] != '\r'.code.toByte())) out.write('\r'.code)
+            out.write(bytes[i].toInt())
+        }
+        return out.toByteArray()
     }
 
     private fun verification(signers: List<SmimeCmsSignerResult>, expectedSignerMailbox: String): SmimeVerification =
@@ -384,18 +401,16 @@ class SmimeEngine(
     }
 
     private fun ensureSupportedRecipientKey(certificate: X509Certificate) {
-        if (!isSupportedRecipientKey(certificate)) {
-            if (!certificate.publicKey.algorithm.equals("RSA", ignoreCase = true)) {
-                throw SmimeProtectionException(SmimeFailure.UNSUPPORTED_CERTIFICATE_KEY, "Only RSA recipient certificates are currently supported")
-            }
-            throw SmimeProtectionException(SmimeFailure.UNSUPPORTED_CERTIFICATE_KEY, "RSA recipient key must be at least 2048 bits")
-        }
+        if (!isSupportedRecipientKey(certificate)) throw SmimeProtectionException(
+            SmimeFailure.UNSUPPORTED_CERTIFICATE_KEY,
+            "Recipient keys must be RSA of at least 2048 bits or EC on P-256, P-384 or P-521",
+        )
     }
 
-    private fun isSupportedRecipientKey(certificate: X509Certificate): Boolean {
-        if (!certificate.publicKey.algorithm.equals("RSA", ignoreCase = true)) return false
-        val bits = (certificate.publicKey as? java.security.interfaces.RSAKey)?.modulus?.bitLength() ?: 0
-        return bits in 2048..16384
+    private fun isSupportedRecipientKey(certificate: X509Certificate): Boolean = when (certificate.publicKey.algorithm.uppercase()) {
+        "RSA" -> ((certificate.publicKey as? java.security.interfaces.RSAKey)?.modulus?.bitLength() ?: 0) in 2048..16384
+        "EC", "ECDSA" -> (certificate.publicKey as? java.security.interfaces.ECKey)?.params?.curve?.field?.fieldSize in setOf(256, 384, 521)
+        else -> false
     }
 
     private fun normalize(mailbox: String) = mailbox.trim().lowercase(java.util.Locale.ROOT)

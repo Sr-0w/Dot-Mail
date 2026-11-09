@@ -29,6 +29,11 @@ internal suspend fun verifySmimeSignature(
     certs: SmimeCertStore?,
 ): SmimeSignatureView? {
     val content = message.body?.smime
+    // signed(enveloped(...)): the outer signature covers the ciphertext and is checked without decrypting anything.
+    if (content is SmimeContent.Encrypted) {
+        val wrapper = content.wrapper ?: return null
+        return verifySmimeSignature(message.copy(body = message.body!!.copy(smime = wrapper)), policy, certs)
+    }
     if (content is SmimeContent.Opaque) return withContext(Dispatchers.IO) {
         val file = File(content.cms)
         if (!file.isFile || file.length() > MAX_SIGNED_ENTITY) return@withContext SmimeSignatureView(State.UNREADABLE)
@@ -131,8 +136,11 @@ internal suspend fun decryptSmimeMessage(
             }.getOrElse { SmimeSignatureView(State.UNREADABLE) }
             else -> null
         }
+        // A wrapping signature (signed(enveloped(...))) and the inner one both count: the weaker verdict is shown.
+        val outer = if (encrypted.wrapper != null) verifySmimeSignature(message, policy, certs) else null
+        val combined = listOfNotNull(signature, outer).maxByOrNull { severity(it.state) }
         val parsed = app.dot.mail.engine.Pgp.parseDecrypted(content, mime = true)
-        app.dot.mail.data.model.SmimeDecryption.Done(app.dot.mail.data.model.MessageBody(parsed.text, parsed.html, hasRemoteImages = false, decryptedAttachments = parsed.toDecryptedAttachments(message.id)), signature)
+        app.dot.mail.data.model.SmimeDecryption.Done(app.dot.mail.data.model.MessageBody(parsed.text, parsed.html, hasRemoteImages = false, decryptedAttachments = parsed.toDecryptedAttachments(message.id)), combined)
     }
 }
 

@@ -1,0 +1,28 @@
+To: Bob <bob-rsa@example.test>
+From: Alice <alice-rsa@example.test>
+Subject: oaep
+MIME-Version: 1.0
+Content-Disposition: attachment; filename="smime.p7m"
+Content-Type: application/pkcs7-mime; smime-type=enveloped-data; name="smime.p7m"
+Content-Transfer-Encoding: base64
+
+MIIDXQYJKoZIhvcNAQcDoIIDTjCCA0oCAQAxggFxMIIBbQIBADAqMBIxEDAOBgNV
+BAMMB2JvYi1yc2ECFGMU3M2TkzYCWqE7ezv77BNw2tSkMDgGCSqGSIb3DQEBBzAr
+oA0wCwYJYIZIAWUDBAIBoRowGAYJKoZIhvcNAQEIMAsGCWCGSAFlAwQCAQSCAQCH
+k+OSylB2CkrZ0nBzbTzG4rOSbuPEio9NVh3zb/8XU6r9Fnj8FNGloJ9LI/Qd5Kec
+fcLf7DAucArzJ8pL5sAmVilT+uFStPLvUJCe6h20GImIp+WdyRhVeQTo6s+rPyWi
+/0C6AibrYZSHspYoPp9a+FgtD4uoE8u1VTJdjmK54tfsLCYsaOcP4JxOfSy2Cuzc
+zqaNRlYycGWfLVdnghu3BD1dyE3TpmjhBnP7UjNPDvtwaP8PL0MDt5VeQiWU+uRf
+3B6xtobLOeRKInD8Zt6rkLBa/7A6n8pnZ4vupBmwg3LGdofHNJA1y9lwaTROD49N
+fOJ9uqVu1J6KlIgbHz+HMIIBzgYJKoZIhvcNAQcBMB0GCWCGSAFlAwQBKgQQGGT9
+/G7QOGz3/qADGeo4woCCAaAlkZKe3Rnmh0BR6BdDxCTxASfXiFkm3iUntDIoqBtq
+kNpU3hLMSsVvgFYwWgHGq4qOWvo1glxBP0cUqVlhWjS3Bg2nKbg2QAx4SLBjSyP/
+6cCpz9w0WRkbolYKjYy8745htNmpBelQdgCn5To75AeMU5WcrjcYh/Eg5LV5MjVA
+vCc2GO+nRaQaLKxVfJrOY+Ovr1cC2oMkQkJqQGiuMnog3yDvHZwBkh0OTBpj1OKm
+kWG/ZKDfdSDvhgjdfrRcB/Z3e27PsQhZfDW7L0AeFSMlEVfklZ/4Dif+igHjBIFF
+viRXpIsHJP/HuyDEZDN81ydOLpExtaOSn0q+9/unw6JvgLbDZv12ozbyKIJl4DYG
+ltR04PAxfUnbBpdkhEB8hAsALvqcUi94iatA2CB+7x1b/XYIXI4200WDLn1T9VUR
+LGG53xICBs5iE8tKOXoKlgZi5ohhKdL71a61FsJlRR9eCKY/gR/tU2PXFtBnuuAv
+Help/3kzUFVdy/qvXciVWzZQYcPtGxPS54Wlc31acJQpI5x5KZ4SK3UTIZm0EQRj
+hg==
+

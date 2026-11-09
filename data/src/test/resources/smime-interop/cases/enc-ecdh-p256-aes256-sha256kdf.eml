@@ -1,0 +1,24 @@
+To: Carol <carol-p256@example.test>
+From: Alice <alice-rsa@example.test>
+Subject: ecdh p256 kdf
+MIME-Version: 1.0
+Content-Disposition: attachment; filename="smime.p7m"
+Content-Type: application/pkcs7-mime; smime-type=enveloped-data; name="smime.p7m"
+Content-Transfer-Encoding: base64
+
+MIICuAYJKoZIhvcNAQcDoIICqTCCAqUCAQIxgc2hgcoCAQOgUaFPMAkGByqGSM49
+AgEDQgAEsEiD03TSRas/EiqKgHjP56nsD4MD8Z7QU1JG8GjmsVE8iQ/2pMjoN5gH
+T5ado/wA4go6JHXMgkPoYACvf2hBADAVBgYrgQQBCwEwCwYJYIZIAWUDBAEtMFsw
+WTAtMBUxEzARBgNVBAMMCmNhcm9sLXAyNTYCFG8vxgL+pHWUhTCw0cztlZBzSej0
+BCjX01kEtS1jmY3fwdGeSwa12W1ki8lVLwjXekuMEeSqvuS1qiEJYjxyMIIBzgYJ
+KoZIhvcNAQcBMB0GCWCGSAFlAwQBKgQQ1r2f9oSUGnjIftaCIKvYooCCAaCUQOsL
+oehZwj8YQ78eQ4TzOJLqppPJ7yvVlyPEXe0/47ZialSNO/xUrO/rPSMMbGRe1U1I
+K8EqWOVrNIBkpsfQjHDeGkBTxUEpaeWsH0ltR0J3jhGHonVGCpg7EmNBW+afVIxP
+qAfC3kkDDh/56lXsQH4ut/TqY+QY4vmL5e70MOUDz/C0MNlKh3Yd/rWMeFzxxrmk
++ctl3ceRww4i73dfRVBv/L2y8dK5sOFw0Bpwo/GtDtSS+gmiQY+Txv/QjgLSF6th
+bjtzrwC1nReIoV0hFCP0rBUS+ddHEZFrntfUoUmBrCJbWX1Xn/zEN6poQKzKEpB5
+brno+VUhEhKhnpg7hDdH2mow7kDNGLOVHVt7YR6aQzq7cwr4AeG1A39xeR6n4Fbj
+qw9ZeM90SfwoYPEDa0DkNGnc1DX6rhe0WNSL+DPmlxPH7n0ejOJ1BjtOo92QE043
+PLga6YVslVGJlW8fmRw5s7ZTbuWWltEQzD7hNLHgb+WY1Tex+P93GaChSCvWnek4
+VS73R3rNtYi4SpFdA++WohpNlREhjLJDnwfAcQ==
+

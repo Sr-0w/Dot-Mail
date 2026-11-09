@@ -1,0 +1,321 @@
+{
+ "generator": "scripts/smime-interop/generate.py",
+ "tools": {
+  "openssl": "OpenSSL 3.2.6 30 Sep 2025 (Library: OpenSSL 3.2.6 30 Sep 2025)"
+ },
+ "cases": [
+  {
+   "name": "sign-rsa-sha1",
+   "file": "cases/sign-rsa-sha1.eml",
+   "kind": "signed",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "signature": "VALID_TRUSTED"
+  },
+  {
+   "name": "sign-rsa-sha256",
+   "file": "cases/sign-rsa-sha256.eml",
+   "kind": "signed",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "signature": "VALID_TRUSTED"
+  },
+  {
+   "name": "sign-rsa-sha512",
+   "file": "cases/sign-rsa-sha512.eml",
+   "kind": "signed",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "signature": "VALID_TRUSTED"
+  },
+  {
+   "name": "sign-rsa-pss-sha256",
+   "file": "cases/sign-rsa-pss-sha256.eml",
+   "kind": "signed",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "signature": "VALID_TRUSTED"
+  },
+  {
+   "name": "sign-ecdsa-p256-sha256",
+   "file": "cases/sign-ecdsa-p256-sha256.eml",
+   "kind": "signed",
+   "from_": "alice-p256@example.test",
+   "text": "interop body with accents éè ✓",
+   "signature": "VALID_TRUSTED"
+  },
+  {
+   "name": "sign-ecdsa-p384-sha384",
+   "file": "cases/sign-ecdsa-p384-sha384.eml",
+   "kind": "signed",
+   "from_": "alice-p384@example.test",
+   "text": "interop body with accents éè ✓",
+   "signature": "VALID_TRUSTED"
+  },
+  {
+   "name": "sign-with-attachment",
+   "file": "cases/sign-with-attachment.eml",
+   "kind": "signed",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "attachments": [
+    "proof.txt"
+   ],
+   "signature": "VALID_TRUSTED"
+  },
+  {
+   "name": "sign-legacy-x-pkcs7-signature",
+   "file": "cases/sign-legacy-x-pkcs7-signature.eml",
+   "kind": "signed",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "signature": "VALID_TRUSTED"
+  },
+  {
+   "name": "sign-opaque-legacy-x-pkcs7-mime",
+   "file": "cases/sign-opaque-legacy-x-pkcs7-mime.eml",
+   "kind": "opaque",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "signature": "VALID_TRUSTED"
+  },
+  {
+   "name": "sign-opaque-cms",
+   "file": "cases/sign-opaque-cms.eml",
+   "kind": "opaque",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "attachments": [
+    "proof.txt"
+   ],
+   "signature": "VALID_TRUSTED"
+  },
+  {
+   "name": "sign-lf-only-line-endings",
+   "file": "cases/sign-lf-only-line-endings.eml",
+   "kind": "signed",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "signature": "VALID_TRUSTED",
+   "note": "messages normalised to LF by some servers/stores; the signature is over CRLF"
+  },
+  {
+   "name": "sign-binary-cte-signature",
+   "file": "cases/sign-binary-cte-signature.eml",
+   "kind": "signed",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "signature": "VALID_TRUSTED"
+  },
+  {
+   "name": "sign-quoted-printable-folded-headers",
+   "file": "cases/sign-quoted-printable-folded-headers.eml",
+   "kind": "signed",
+   "from_": "alice-rsa@example.test",
+   "text": "caf",
+   "signature": "VALID_TRUSTED"
+  },
+  {
+   "name": "enc-rsa-pkcs1-aes256",
+   "file": "cases/enc-rsa-pkcs1-aes256.eml",
+   "kind": "encrypted",
+   "decrypt_with": "bob-rsa",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "attachments": [
+    "proof.txt"
+   ]
+  },
+  {
+   "name": "enc-rsa-aes128",
+   "file": "cases/enc-rsa-aes128.eml",
+   "kind": "encrypted",
+   "decrypt_with": "bob-rsa",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "attachments": [
+    "proof.txt"
+   ]
+  },
+  {
+   "name": "enc-rsa-aes192",
+   "file": "cases/enc-rsa-aes192.eml",
+   "kind": "encrypted",
+   "decrypt_with": "bob-rsa",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "attachments": [
+    "proof.txt"
+   ]
+  },
+  {
+   "name": "enc-rsa-oaep-sha256",
+   "file": "cases/enc-rsa-oaep-sha256.eml",
+   "kind": "encrypted",
+   "decrypt_with": "bob-rsa",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "attachments": [
+    "proof.txt"
+   ]
+  },
+  {
+   "name": "enc-rsa-oaep-sha1",
+   "file": "cases/enc-rsa-oaep-sha1.eml",
+   "kind": "encrypted",
+   "decrypt_with": "bob-rsa",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "attachments": [
+    "proof.txt"
+   ]
+  },
+  {
+   "name": "enc-ecdh-p256-aes128",
+   "file": "cases/enc-ecdh-p256-aes128.eml",
+   "kind": "encrypted",
+   "decrypt_with": "carol-p256",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "attachments": [
+    "proof.txt"
+   ]
+  },
+  {
+   "name": "enc-ecdh-p256-aes256-sha256kdf",
+   "file": "cases/enc-ecdh-p256-aes256-sha256kdf.eml",
+   "kind": "encrypted",
+   "decrypt_with": "carol-p256",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "attachments": [
+    "proof.txt"
+   ]
+  },
+  {
+   "name": "enc-ecdh-p384-aes256",
+   "file": "cases/enc-ecdh-p384-aes256.eml",
+   "kind": "encrypted",
+   "decrypt_with": "dave-p384",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "attachments": [
+    "proof.txt"
+   ]
+  },
+  {
+   "name": "enc-several-recipients-we-are-last",
+   "file": "cases/enc-several-recipients-we-are-last.eml",
+   "kind": "encrypted",
+   "decrypt_with": "bob-rsa",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "attachments": [
+    "proof.txt"
+   ]
+  },
+  {
+   "name": "enc-several-recipients-ec-not-first",
+   "file": "cases/enc-several-recipients-ec-not-first.eml",
+   "kind": "encrypted",
+   "decrypt_with": "carol-p256",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "attachments": [
+    "proof.txt"
+   ]
+  },
+  {
+   "name": "enc-legacy-x-pkcs7-mime",
+   "file": "cases/enc-legacy-x-pkcs7-mime.eml",
+   "kind": "encrypted",
+   "decrypt_with": "bob-rsa",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "attachments": [
+    "proof.txt"
+   ]
+  },
+  {
+   "name": "enc-lf-only-line-endings",
+   "file": "cases/enc-lf-only-line-endings.eml",
+   "kind": "encrypted",
+   "decrypt_with": "bob-rsa",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "attachments": [
+    "proof.txt"
+   ]
+  },
+  {
+   "name": "enc-binary-cte",
+   "file": "cases/enc-binary-cte.eml",
+   "kind": "encrypted",
+   "decrypt_with": "bob-rsa",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "attachments": [
+    "proof.txt"
+   ]
+  },
+  {
+   "name": "enc-8bit-cte",
+   "file": "cases/enc-8bit-cte.eml",
+   "kind": "encrypted",
+   "decrypt_with": "bob-rsa",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "attachments": [
+    "proof.txt"
+   ]
+  },
+  {
+   "name": "wrap-signed-then-encrypted",
+   "file": "cases/wrap-signed-then-encrypted.eml",
+   "kind": "encrypted",
+   "decrypt_with": "bob-rsa",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "attachments": [
+    "proof.txt"
+   ],
+   "signature": "VALID_TRUSTED"
+  },
+  {
+   "name": "wrap-triple-detached-outer",
+   "file": "cases/wrap-triple-detached-outer.eml",
+   "kind": "encrypted",
+   "decrypt_with": "bob-rsa",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "attachments": [
+    "proof.txt"
+   ],
+   "signature": "VALID_TRUSTED"
+  },
+  {
+   "name": "wrap-triple-opaque-outer",
+   "file": "cases/wrap-triple-opaque-outer.eml",
+   "kind": "encrypted",
+   "decrypt_with": "bob-rsa",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "attachments": [
+    "proof.txt"
+   ],
+   "signature": "VALID_TRUSTED"
+  },
+  {
+   "name": "wrap-opaque-signed-then-encrypted",
+   "file": "cases/wrap-opaque-signed-then-encrypted.eml",
+   "kind": "encrypted",
+   "decrypt_with": "bob-rsa",
+   "from_": "alice-rsa@example.test",
+   "text": "interop body with accents éè ✓",
+   "attachments": [
+    "proof.txt"
+   ],
+   "signature": "VALID_TRUSTED"
+  }
+ ]
+}
