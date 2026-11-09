@@ -375,7 +375,7 @@ internal fun SearchResultRow(r: SearchResult, onClick: () -> Unit) {
                 Spacer(Modifier.height(4.dp))
                 Text(
                     onServer, style = Dot.type.label, color = c.textSecondary,
-                    modifier = Modifier.clip(DotShapes.small).border(1.dp, c.border, DotShapes.small).padding(horizontal = DotSpacing.s, vertical = 2.dp),
+                    modifier = Modifier.clip(DotShapes.pill).border(1.dp, c.border, DotShapes.pill).padding(horizontal = DotSpacing.s, vertical = 2.dp),
                 )
             }
         }

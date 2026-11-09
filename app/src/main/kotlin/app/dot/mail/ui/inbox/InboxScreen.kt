@@ -434,7 +434,7 @@ fun InboxScreen(
 
     pendingTrash?.let { ids ->
         androidx.compose.material3.AlertDialog(
-            onDismissRequest = { pendingTrash = null }, modifier = Modifier.dotSurfaceEnter(), containerColor = Dot.colors.surface, shape = DotShapes.large,
+            onDismissRequest = { pendingTrash = null }, modifier = Modifier.dotSurfaceEnter(), containerColor = Dot.colors.surface, shape = DotShapes.dialog,
             title = { Text(pluralStringResource(R.plurals.inbox_confirm_trash_title, ids.size, ids.size), style = Dot.type.title, color = Dot.colors.textPrimary) },
             confirmButton = { app.dot.design.components.DotButton(stringResource(R.string.inbox_delete), { pendingTrash = null; vm.act(MessageAction.TRASH, ids) }, style = app.dot.design.components.ButtonStyle.Danger, compact = true) },
             dismissButton = { app.dot.design.components.DotButton(stringResource(R.string.inbox_cancel), { pendingTrash = null }, style = app.dot.design.components.ButtonStyle.Ghost, compact = true) },

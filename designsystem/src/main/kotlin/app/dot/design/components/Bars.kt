@@ -100,10 +100,10 @@ fun DotSnackbar(data: SnackbarData) {
             .padding(horizontal = DotSpacing.l, vertical = DotSpacing.s)
             .fillMaxWidth()
             .wrapContentHeight()
-            .shadow(3.dp, RoundedCornerShape(24.dp), ambientColor = Color(0x26000000), spotColor = Color(0x33000000))
-            .clip(RoundedCornerShape(24.dp))
-            .background(frostedSurfaceBrush(pressed = false), RoundedCornerShape(24.dp))
-            .border(DotSpacing.hairline * 2, frostedBorderBrush(), RoundedCornerShape(24.dp))
+            .shadow(3.dp, DotShapes.pill, ambientColor = Color(0x26000000), spotColor = Color(0x33000000))
+            .clip(DotShapes.pill)
+            .background(frostedSurfaceBrush(pressed = false), DotShapes.pill)
+            .border(DotSpacing.hairline * 2, frostedBorderBrush(), DotShapes.pill)
             .padding(start = DotSpacing.l, end = DotSpacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {

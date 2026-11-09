@@ -66,11 +66,11 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
 
 - **FR-55 · P2 · Fully rounded Quiet UI shapes** — pill/capsule controls, chips and grouped actions must have true
   semicircular ends; icon-only controls truly circular; dialogs/sheets consistently and generously rounded.
-  - [ ] Audit every pill/capsule/chip/floating control; one centralized shape token set (today `DotShapes` is
-    8/12/18 dp rounded rectangles; `DotFilterChip` uses the 8 dp one)
+  - [x] Audit every pill/capsule/chip/floating control; one centralized shape token set (`DotShapes.pill/circle/dialog/
+    sheet`; buttons, chips, recipient/quote chips and the floating bar use `pill`)
   - [ ] Matching clip/border/background in all states; Light/Dark/OLED, font scaling and animations checked on device
   - [ ] Primary actions stay solid electric blue; glass controls stay neutral and blurred
-  - Evidence: none yet.
+  - Evidence: `PillShapesTest` (token radii + rendered semicircular ends); device checks pending.
 
 ### Account and platform
 

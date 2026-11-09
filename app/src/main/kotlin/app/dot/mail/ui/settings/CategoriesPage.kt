@@ -188,7 +188,7 @@ private fun RuleDialog(initial: Rule, isNew: Boolean, onDismiss: () -> Unit, onD
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.dotSurfaceEnter(),
-        containerColor = c.surface, shape = DotShapes.large,
+        containerColor = c.surface, shape = DotShapes.dialog,
         title = { Text(stringResource(if (isNew) R.string.categories_rule_new else R.string.categories_rule_edit), style = Dot.type.title, color = c.textPrimary) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(DotSpacing.xs)) {

@@ -89,7 +89,7 @@ fun FolderDialogs(
             onDismissRequest = onDismiss,
             modifier = Modifier.dotSurfaceEnter(),
             containerColor = c.surface,
-            shape = DotShapes.large,
+            shape = DotShapes.dialog,
             title = { Text(dialog.folder.name, style = Dot.type.title, color = c.textPrimary) },
             text = {
                 Column {
@@ -117,7 +117,7 @@ fun FolderDialogs(
                 onDismissRequest = onDismiss,
                 modifier = Modifier.dotSurfaceEnter(),
                 containerColor = c.surface,
-                shape = DotShapes.large,
+                shape = DotShapes.dialog,
                 title = { Text(stringResource(R.string.drawer_new_folder), style = Dot.type.title, color = c.textPrimary) },
                 text = {
                     Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(DotSpacing.m)) {
@@ -140,7 +140,7 @@ fun FolderDialogs(
                 onDismissRequest = onDismiss,
                 modifier = Modifier.dotSurfaceEnter(),
                 containerColor = c.surface,
-                shape = DotShapes.large,
+                shape = DotShapes.dialog,
                 title = { Text(stringResource(R.string.drawer_folder_rename_title), style = Dot.type.title, color = c.textPrimary) },
                 text = { DotTextField(name, { name = it; error = null }, label = stringResource(R.string.drawer_folder_name_label), isError = error != null, supporting = error) },
                 confirmButton = {
@@ -158,7 +158,7 @@ fun FolderDialogs(
                 onDismissRequest = onDismiss,
                 modifier = Modifier.dotSurfaceEnter(),
                 containerColor = c.surface,
-                shape = DotShapes.large,
+                shape = DotShapes.dialog,
                 title = { Text(stringResource(R.string.drawer_folder_move_title, dialog.folder.name), style = Dot.type.title, color = c.textPrimary) },
                 text = {
                     Column {
@@ -180,7 +180,7 @@ fun FolderDialogs(
                 onDismissRequest = onDismiss,
                 modifier = Modifier.dotSurfaceEnter(),
                 containerColor = c.surface,
-                shape = DotShapes.large,
+                shape = DotShapes.dialog,
                 title = { Text(stringResource(R.string.drawer_folder_delete_title, dialog.folder.name), style = Dot.type.title, color = c.textPrimary) },
                 text = {
                     Column {

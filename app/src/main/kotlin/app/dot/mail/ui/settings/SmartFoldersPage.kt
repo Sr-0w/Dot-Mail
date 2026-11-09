@@ -212,7 +212,7 @@ internal fun SmartFolderEditor(initial: SmartFolder, isNew: Boolean, onBack: () 
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            modifier = Modifier.dotSurfaceEnter(), containerColor = c.surface, shape = DotShapes.large,
+            modifier = Modifier.dotSurfaceEnter(), containerColor = c.surface, shape = DotShapes.dialog,
             title = { Text(stringResource(R.string.smart_delete_title), style = Dot.type.title, color = c.textPrimary) },
             text = { Text(stringResource(R.string.smart_delete_body), style = Dot.type.callout, color = c.textSecondary) },
             confirmButton = { DotButton(stringResource(R.string.smart_delete), { confirmDelete = false; store.delete(initial.id); onBack() }, style = ButtonStyle.Danger, compact = true) },

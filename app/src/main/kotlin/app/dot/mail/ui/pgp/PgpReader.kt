@@ -196,7 +196,7 @@ fun PgpBar(body: MessageBody, state: PgpReaderState, modifier: Modifier = Modifi
             onDismissRequest = { showUnsupportedInfo = false },
             modifier = Modifier.dotSurfaceEnter(),
             containerColor = c.surface,
-            shape = DotShapes.large,
+            shape = DotShapes.dialog,
             title = { Text(stringResource(R.string.pgp_unsupported_encryption), style = Dot.type.title, color = c.textPrimary) },
             text = { Text(stringResource(R.string.pgp_unsupported_encryption_body), style = Dot.type.callout, color = c.textSecondary) },
             confirmButton = { DotButton(stringResource(R.string.compose_close), { showUnsupportedInfo = false }, style = ButtonStyle.Ghost, compact = true) },

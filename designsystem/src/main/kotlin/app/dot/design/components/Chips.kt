@@ -31,8 +31,8 @@ fun DotFilterChip(text: String, selected: Boolean, onClick: () -> Unit, modifier
     ) {
         Text(
             text, style = Dot.type.label, color = if (selected) c.onInverse else c.textSecondary,
-            modifier = Modifier.clip(DotShapes.small).background(if (selected) c.inverse else Color.Transparent)
-                .border(1.dp, if (selected) c.inverse else c.border, DotShapes.small).padding(horizontal = DotSpacing.m, vertical = 7.dp),
+            modifier = Modifier.clip(DotShapes.pill).background(if (selected) c.inverse else Color.Transparent)
+                .border(1.dp, if (selected) c.inverse else c.border, DotShapes.pill).padding(horizontal = DotSpacing.m, vertical = 7.dp),
         )
     }
 }

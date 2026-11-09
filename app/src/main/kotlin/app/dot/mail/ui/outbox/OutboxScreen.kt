@@ -138,7 +138,7 @@ fun OutboxScreen(onBack: () -> Unit, onEdit: (Long) -> Unit = {}) {
             onDismissRequest = { confirmDuplicate = null },
             modifier = Modifier.dotSurfaceEnter(),
             containerColor = c.surface,
-            shape = DotShapes.large,
+            shape = DotShapes.dialog,
             title = { Text(stringResource(R.string.outbox_send_again_title), style = Dot.type.title, color = c.textPrimary) },
             text = {
                 Text(

@@ -103,7 +103,7 @@ internal fun DateTimeDialog(use24h: Boolean, onDismiss: () -> Unit, onPick: (Lon
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = c.surface,
-        shape = DotShapes.large,
+        shape = DotShapes.dialog,
         text = {
             Column {
                 if (step == 0) {

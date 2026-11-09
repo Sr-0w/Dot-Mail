@@ -138,7 +138,7 @@ internal fun BackupSettings() {
 
     if (infoExport) {
         AlertDialog(
-            onDismissRequest = { infoExport = false }, containerColor = c.surface, shape = DotShapes.large,
+            onDismissRequest = { infoExport = false }, containerColor = c.surface, shape = DotShapes.dialog,
             title = { Text(stringResource(R.string.backup_export), style = Dot.type.title, color = c.textPrimary) },
             text = {
                 Text(
@@ -153,7 +153,7 @@ internal fun BackupSettings() {
 
     pending?.let { p ->
         AlertDialog(
-            onDismissRequest = { pending = null }, containerColor = c.surface, shape = DotShapes.large,
+            onDismissRequest = { pending = null }, containerColor = c.surface, shape = DotShapes.dialog,
             title = { Text(stringResource(R.string.backup_import_title), style = Dot.type.title, color = c.textPrimary) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
@@ -175,7 +175,7 @@ internal fun BackupSettings() {
 
     notice?.let { (title, lines) ->
         AlertDialog(
-            onDismissRequest = { notice = null }, containerColor = c.surface, shape = DotShapes.large,
+            onDismissRequest = { notice = null }, containerColor = c.surface, shape = DotShapes.dialog,
             title = { Text(title, style = Dot.type.title, color = c.textPrimary) },
             text = { Column(Modifier.verticalScroll(rememberScrollState())) { lines.forEach { Text(it, style = Dot.type.callout, color = c.textSecondary, modifier = Modifier.padding(bottom = DotSpacing.s)) } } },
             confirmButton = { DotButton(stringResource(R.string.backup_close), { notice = null }, style = ButtonStyle.Ghost, compact = true) },

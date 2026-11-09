@@ -90,7 +90,7 @@ fun TemplateSheet(
         AlertDialog(
             onDismissRequest = { saving = false },
             containerColor = c.surface,
-            shape = DotShapes.large,
+            shape = DotShapes.dialog,
             title = { Text(stringResource(R.string.templates_save_title), style = Dot.type.title, color = c.textPrimary) },
             text = {
                 Column {

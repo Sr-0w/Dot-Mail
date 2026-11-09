@@ -117,7 +117,7 @@ internal fun AliasesPage(onBack: () -> Unit) {
     if (confirmRemove) {
         AlertDialog(
             onDismissRequest = { confirmRemove = false },
-            modifier = Modifier.dotSurfaceEnter(), containerColor = c.surface, shape = DotShapes.large,
+            modifier = Modifier.dotSurfaceEnter(), containerColor = c.surface, shape = DotShapes.dialog,
             title = { Text(stringResource(R.string.aliases_remove_title), style = Dot.type.title, color = c.textPrimary) },
             text = { Text(stringResource(R.string.aliases_remove_body), style = Dot.type.callout, color = c.textSecondary) },
             confirmButton = {

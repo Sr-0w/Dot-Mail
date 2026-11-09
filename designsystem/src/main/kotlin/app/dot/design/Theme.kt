@@ -52,7 +52,7 @@ fun DotTheme(mode: ThemeMode = ThemeMode.SYSTEM, content: @Composable () -> Unit
                 small = DotShapes.small,
                 medium = DotShapes.medium,
                 large = DotShapes.large,
-                extraLarge = DotShapes.large,
+                extraLarge = DotShapes.dialog,
             ),
             content = content,
         )
