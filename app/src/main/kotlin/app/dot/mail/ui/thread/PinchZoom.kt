@@ -75,7 +75,10 @@ internal fun Modifier.pinchToZoom(): Modifier = composed {
             val placeable = measurable.measure(constraints)
             width = placeable.width.toFloat()
             layout(placeable.width, (placeable.height * scale).roundToInt()) {
-                placeable.placeWithLayer(0, 0) {
+                // Unzoomed (the normal case) the content is placed directly: no extra graphics layer around a WebView, which
+                // is as tall as the whole message and draws through a GPU functor that does not like being wrapped.
+                if (scale == 1f && offsetX == 0f) placeable.place(0, 0)
+                else placeable.placeWithLayer(0, 0) {
                     scaleX = scale; scaleY = scale
                     translationX = offsetX
                     transformOrigin = TransformOrigin(0f, 0f)
