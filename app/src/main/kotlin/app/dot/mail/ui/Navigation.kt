@@ -121,9 +121,9 @@ fun DotMailRoot(requests: StateFlow<ExternalRequest?>, onRequestConsumed: () -> 
             composable<WelcomeRoute> {
                 WelcomeScreen(onAddAccount = { nav.navigate(AddAccountRoute(firstAccount = true)) })
             }
-            composable<AddAccountRoute> {
+            composable<AddAccountRoute> { entry ->
                 AddAccountScreen(
-                    onBack = { nav.popBackStack() },
+                    onBack = { nav.popFrom(entry) },
                     onDone = {
                         nav.navigate(InboxRoute) { popUpTo(0) { inclusive = true } }
                     },
@@ -196,8 +196,9 @@ fun DotMailRoot(requests: StateFlow<ExternalRequest?>, onRequestConsumed: () -> 
                 ThreadScreen(
                     threadId = route.threadId,
                     source = route.source,
-                    onBack = { nav.popBackStack() },
-                    onOpenAdjacent = { next -> nav.navigate(ThreadRoute(next, route.source)) { popUpTo<ThreadRoute> { inclusive = true } } },
+                    onBack = { nav.popFrom(entry) },
+                    // A swipe that completes after Back has begun must not reopen a conversation the user just left.
+                    onOpenAdjacent = { next -> if (nav.isOnTop(entry)) nav.navigate(ThreadRoute(next, route.source)) { popUpTo<ThreadRoute> { inclusive = true } } },
                     onReply = { messageId, mode -> nav.openCompose(ComposeRoute(replyToMessageId = messageId, replyMode = mode.name)) },
                     onComposeTo = { target ->
                         val m = if (target.startsWith("mailto:", true)) app.dot.mail.MailtoParser.parse(target) else ExternalRequest.Compose(to = listOf(target))
@@ -211,7 +212,7 @@ fun DotMailRoot(requests: StateFlow<ExternalRequest?>, onRequestConsumed: () -> 
                 popEnterTransition = { if (reducedMotion) EnterTransition.None else fadeIn(tween(NAV_DURATION_MS, easing = DotMotion.decelerate)) },
                 popExitTransition = { composePopExit(reducedMotion) },
             ) { entry ->
-                ComposeScreen(route = entry.toRoute(), onClose = { nav.popBackStack() })
+                ComposeScreen(route = entry.toRoute(), onClose = { nav.popFrom(entry) })
             }
             composable<SearchRoute>(
                 // Search opens like a field growing out of the header: a short fade with a hint of downward travel.
@@ -221,13 +222,13 @@ fun DotMailRoot(requests: StateFlow<ExternalRequest?>, onRequestConsumed: () -> 
                 popExitTransition = { if (reducedMotion) ExitTransition.None else fadeOut(tween(DotMotion.fast)) + slideOutVertically(tween(DotMotion.fast, easing = DotMotion.accelerate)) { -it / 32 } },
             ) { entry ->
                 val route = entry.toRoute<SearchRoute>()
-                SearchScreen(onBack = { nav.popBackStack() }, onOpenThread = { nav.navigate(ThreadRoute(it)) }, folderId = route.folderId, role = route.role)
+                SearchScreen(onBack = { nav.popFrom(entry) }, onOpenThread = { nav.navigate(ThreadRoute(it)) }, folderId = route.folderId, role = route.role)
             }
-            composable<OutboxRoute> { app.dot.mail.ui.outbox.OutboxScreen(onBack = { nav.popBackStack() }, onEdit = { nav.openCompose(ComposeRoute(draftId = it)) }) }
-            composable<AttachmentsRoute> { app.dot.mail.ui.attachments.AttachmentsScreen(onBack = { nav.popBackStack() }) }
-            composable<SettingsRoute> {
+            composable<OutboxRoute> { entry -> app.dot.mail.ui.outbox.OutboxScreen(onBack = { nav.popFrom(entry) }, onEdit = { nav.openCompose(ComposeRoute(draftId = it)) }) }
+            composable<AttachmentsRoute> { entry -> app.dot.mail.ui.attachments.AttachmentsScreen(onBack = { nav.popFrom(entry) }) }
+            composable<SettingsRoute> { entry ->
                 SettingsScreen(
-                    onBack = { nav.popBackStack() },
+                    onBack = { nav.popFrom(entry) },
                     onAddAccount = { nav.navigate(AddAccountRoute(firstAccount = false)) },
                     onAllAccountsRemoved = { nav.navigate(WelcomeRoute) { popUpTo(0) { inclusive = true } } },
                 )

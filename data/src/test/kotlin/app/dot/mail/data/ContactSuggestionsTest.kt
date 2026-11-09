@@ -97,4 +97,11 @@ class ContactSuggestionsTest {
         graph.addressBook.searcher = DeviceContactSearcher { _, _ -> listOf(EmailAddress(" ANN@X.ORG ", "Ann Book"), EmailAddress("new@x.org", "New")) }
         assertThat(graph.suggestContacts("a", 8).map { it.email.trim().lowercase() }).containsExactly("ann@x.org", "new@x.org").inOrder()
     }
+
+    @Test fun aNonDuplicateContactIsStoredWithoutPadding() = runBlocking<Unit> {
+        history()
+        graph.addressBook.hasPermission = { true }
+        graph.addressBook.searcher = DeviceContactSearcher { _, _ -> listOf(EmailAddress(" NEW@X.ORG ", "New")) }
+        assertThat(graph.suggestContacts("n", 8).map { it.email }).contains("NEW@X.ORG")
+    }
 }

@@ -9,12 +9,15 @@ import app.dot.mail.data.model.EmailAddress
  */
 internal fun mergeSuggestions(history: List<EmailAddress>, addressBook: List<EmailAddress>, limit: Int): List<EmailAddress> {
     val out = LinkedHashMap<String, EmailAddress>()
-    for (h in history) out.putIfAbsent(h.email.trim().lowercase(), h)
+    for (h in history) out.putIfAbsent(h.email.trim().lowercase(), h.tidy())
     for (b in addressBook) {
         val key = b.email.trim().lowercase()
         val existing = out[key]
-        if (existing == null) out[key] = b
+        if (existing == null) out[key] = b.tidy()
         else if (existing.name.isNullOrBlank() && !b.name.isNullOrBlank()) out[key] = existing.copy(name = b.name)
     }
     return out.values.take(limit)
 }
+
+/** The stored address never keeps the padding a contact provider may return. */
+private fun EmailAddress.tidy(): EmailAddress = if (email == email.trim()) this else copy(email = email.trim())
