@@ -235,13 +235,25 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
   never uploaded (OpenPGP, `777c498`). Device: pending (multi-device edit + conflict).
 - **FR-07 · P1 · Opt-in instant notifications** (IMAP IDLE in a foreground service, off by default, battery trade-off
   explained) — PR #30. Device: physical Doze/battery test pending.
-- **FR-08 · P1 · Configurable on-device mail download and storage limits, incl. a full-offline mode**
+- **FR-08 · P1 · Configurable on-device mail download and storage limits, incl. a full-offline mode** — **[Issue #114](https://github.com/Sr-0w/Dot-Mail/issues/114)** (owner-reported offline download failure; canonical P1 bug).
   - [x] Engine: per-account retention, payload caching, disk budgets, LRU eviction that never deletes server mail,
     resumable full-offline download, Wi-Fi/charging constraints, pause/resume, usage breakdown (PR #55, Room v9;
     `docs/reports/codex-storage-offline.md`)
   - [ ] Settings UI for policies, usage breakdown, offline progress, pause/resume (Sol implementation under review;
     EN/FR/DE, direct Settings search entry and Robolectric coverage; `docs/reports/codex-storage-settings-ui.md`)
   - [ ] Real-device checks (storage pressure, WorkManager constraints, large first download)
+  - [ ] **Owner-reported regression (2026-11-10, Galaxy S25 Ultra):** selecting all messages,
+    latest N, or a last-N-days window does not make email content available offline. The exact
+    policy values/progress states are not yet recorded; do not assume the cause or claim that
+    all modes were individually reproduced. **Investigate in issue #114.**
+  - [ ] Verify that every policy actually schedules/downloads/persists **message bodies** (not only
+    headers/snippets), and the reader loads previously unopened messages in airplane mode after
+    app restart; attachment prefetch is optional and independently configurable.
+  - [ ] Audit the full chain Settings → per-account policy → WorkManager/IMAP transfer → durable
+    payload cache → reader lookup. Compare honest downloaded/selected counts and completion states,
+    Wi-Fi/charging constraints, quotas, errors, retry/resume, process death and cache eviction.
+  - [ ] Add device-backed tests/evidence and regression tests. Keep FR-08 In progress until verified
+    on the owner's device; issue #114 owns PR, progress and closure.
 - **FR-12 · P2 · Native Android Contacts integration** — partly done: system contact picker needs no permission; contact
   photos are an opt-in avatar source; "From contacts" filter uses Sent/outbox correspondents or the permission-gated
   address book (PR #55). Recipient autocomplete also suggests address-book contacts only while READ_CONTACTS is already granted (#63; never
