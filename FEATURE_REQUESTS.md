@@ -334,20 +334,19 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
   - [ ] Audit every intended glass control in light/dark/OLED on device: background perceptible and blurred live while
     scrolling, neutral graphite tint (no blue/purple), no solid fallback where blur is supported
   - [ ] Primary blue buttons and flat secondary controls stay non-glass
-- **FR-54 · P1 · Pure top/bottom edge blur without black gradients** (separate from glass capsules) —
-  **[Issue #115](https://github.com/Sr-0w/Dot-Mail/issues/115)** is the canonical task. PR #70 added the
-  liquid-glass frosted header, but the owner **now explicitly rejects the black/opaque page-colour gradient**
-  at the **top and bottom** of the interface (2026-11-10). The earlier gradient requirement is superseded:
-  retain real background **blur only**, with no dark fade, charcoal scrim or black vignette.
-  - [x] Earlier blur flicker/flashes while scrolling — owner accepted on device 2026-11-09 ("good enough")
-  - [ ] Remove independent dark/black/opaque **color gradients from BOTH top and bottom blur regions**;
-    retain the frosted backdrop blur and use only a blur-strength/mask transition if needed so
-    sharp content becomes progressively blurred **without darkening**.
-  - [ ] Audit shared header, reader, bottom action/safe-area effects and any extra status/navigation bar
-    scrims; preserve legibility and avoid an opaque strip, tint, seam, clipping or flicker.
-  - [ ] Band height/position follows collapsing/expanding inbox filter rows (tracks actual bounds).
-  - [ ] Verify fast/slow/reverse scrolling, HTML-heavy WebView mail, Light/Dark/OLED, GPU cost and
-    system bars **on S25 Ultra**, with before/after screenshots and PR evidence in issue #115.
+- **FR-54 · P1 · Pure TOP-edge blur without black gradient; NO blur at bottom** —
+  **[Issue #115](https://github.com/Sr-0w/Dot-Mail/issues/115)** is the canonical task. The owner clarified
+  on 2026-11-10 that **there is no bottom-edge blur and there must not be one**; previous references
+  to top/bottom blur are incorrect. PR #70 introduced the top liquid-glass frosted header, but the owner
+  wants to remove its **black/opaque page-colour gradient** while **preserving the upper backdrop blur**.
+  - [x] Earlier top blur flicker/flashes while scrolling — owner accepted on device 2026-11-09 ("good enough")
+  - [ ] **Top only:** remove independent black/dark/opaque gradient, vignette and color overlays;
+    retain genuine frosted background blur, with clear → progressively blurred content **without darkening**.
+  - [ ] **Bottom:** no blur exists or should be introduced. Do not implement a bottom-edge blur for FR-54.
+  - [ ] Top blur band height/position follows collapsing/expanding inbox filter rows (actual bounds);
+    avoid opaque strips, seams, clipping, flicker, or loss of status-bar legibility.
+  - [ ] Verify on S25 Ultra with fast/slow/reverse scrolling, HTML-heavy reader, Light/Dark/OLED,
+    GPU cost and before/after screenshots; report PR/evidence under issue #115.
 - **FR-56 · P1 · Full-app Quiet UI visual audit (light + dark)** — PR #35, #48, #49 reviewed Demo renders of categories,
   smart folders, search, composer, account setup, attachments, outbox; fixes applied.
   - [ ] Not auditable on the JVM: snooze sheet, dialogs, menus, bottom sheets → device pass
