@@ -334,14 +334,20 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
   - [ ] Audit every intended glass control in light/dark/OLED on device: background perceptible and blurred live while
     scrolling, neutral graphite tint (no blue/purple), no solid fallback where blur is supported
   - [ ] Primary blue buttons and flat secondary controls stay non-glass
-- **FR-54 · P1 · Top-edge scroll blur/fade** (separate from glass capsules) — PR #70 merged (supersedes #54): frosted
-  header on liquid-glass, band bleeding off the screen edge, opaque page-colour gradient from the edge, one shared blur
-  radius. Owner-reported bugs:
-  - [x] Blur flickers/flashes while scrolling — owner accepted on device 2026-11-09 ("good enough")
-  - [ ] Band height/position does not follow the inbox filter row when it collapses/expands (must track the real header
-    bounds)
-  - [ ] No separate dark fade before the blur (content goes sharp → progressively blurred, no dark strip or seam)
-  - [ ] Slow/fast/reverse scroll, filter changes, light/dark/OLED, WebView redraw artefacts, GPU cost
+- **FR-54 · P1 · Pure top/bottom edge blur without black gradients** (separate from glass capsules) —
+  **[Issue #115](https://github.com/Sr-0w/Dot-Mail/issues/115)** is the canonical task. PR #70 added the
+  liquid-glass frosted header, but the owner **now explicitly rejects the black/opaque page-colour gradient**
+  at the **top and bottom** of the interface (2026-11-10). The earlier gradient requirement is superseded:
+  retain real background **blur only**, with no dark fade, charcoal scrim or black vignette.
+  - [x] Earlier blur flicker/flashes while scrolling — owner accepted on device 2026-11-09 ("good enough")
+  - [ ] Remove independent dark/black/opaque **color gradients from BOTH top and bottom blur regions**;
+    retain the frosted backdrop blur and use only a blur-strength/mask transition if needed so
+    sharp content becomes progressively blurred **without darkening**.
+  - [ ] Audit shared header, reader, bottom action/safe-area effects and any extra status/navigation bar
+    scrims; preserve legibility and avoid an opaque strip, tint, seam, clipping or flicker.
+  - [ ] Band height/position follows collapsing/expanding inbox filter rows (tracks actual bounds).
+  - [ ] Verify fast/slow/reverse scrolling, HTML-heavy WebView mail, Light/Dark/OLED, GPU cost and
+    system bars **on S25 Ultra**, with before/after screenshots and PR evidence in issue #115.
 - **FR-56 · P1 · Full-app Quiet UI visual audit (light + dark)** — PR #35, #48, #49 reviewed Demo renders of categories,
   smart folders, search, composer, account setup, attachments, outbox; fixes applied.
   - [ ] Not auditable on the JVM: snooze sheet, dialogs, menus, bottom sheets → device pass
