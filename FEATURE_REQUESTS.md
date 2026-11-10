@@ -33,6 +33,22 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
 
 ### Reading and HTML mail
 
+- **FR-81 · P1 · Email reader text is visibly oversized / seems zoomed by default** — owner reports on
+  Galaxy S25 Ultra (2026-11-10) that the text within opened messages looks much too large, as if the
+  reader applied an unwanted zoom or font scale. **[Issue #109](https://github.com/Sr-0w/Dot-Mail/issues/109)**
+  is the canonical task.
+  - [ ] Reproduce and compare the exact same plain-text and HTML emails in Dot Mail vs Samsung Email/Gmail
+    with identical Android accessibility/font settings, at the default unzoomed reader state.
+  - [ ] Investigate WebView initial/text zoom, viewport/meta/CSS units, Android font scale, saved pinch zoom,
+    reader typography preferences and possible double-scaling by fit-to-width logic; fix the underlying cause
+    rather than blindly shrinking every font.
+  - [ ] Restore natural default body text size while preserving mobile fit-to-width, user-requested pinch zoom,
+    per-message HTML design, accessible text scaling and light/dark/OLED rendering. Re-audit FR-20 (previously
+    Done), FR-23 and FR-28 if impacted.
+  - [ ] Add regression coverage and verify before/after on the S25 Ultra with the same messages; track
+    implementation, device evidence and closure in **issue #109**.
+
+
 - **FR-79 · P1 · Broken image in a real HTML newsletter** — **[Issue #107](https://github.com/Sr-0w/Dot-Mail/issues/107)** — Galaxy S25 Ultra, inbox account
   `robin@snyders.xyz`, sender **Red Hat Developer**, subject **“Red Hat Developer Weekly Newsletter”**,
   received **2026-11-09 at 21:05 (Europe/Brussels)**; reader screenshot at 21:06. In the **“Build here”**
@@ -379,6 +395,8 @@ Each entry: evidence in brackets. "Device ✓" = checked on the owner's phone an
   Never "finished" after one cleanup.
 
 ## Needs a device check (collected from the entries above)
+
+FR-81 reader default text scale / perceived zoom (issue #109) ·
 
 FR-78 Settings Backup overlap · FR-79 Red Hat newsletter image (21:05) · FR-80 HTML/plain-text inbox snippets ·
 
