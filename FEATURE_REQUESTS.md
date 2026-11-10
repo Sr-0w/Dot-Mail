@@ -258,6 +258,11 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
     actually allows swiping both directions between adjacent items in the active list.
   - [ ] Investigate gesture handling through HTML WebView, nested scrolling, pinch, text selection and
     conflicts with the Android edge-Back gesture; preserve vertical scrolling and list order/filtering.
+  - [ ] **Owner reproduction: conversation grouping is OFF.** Verify swipe works with grouping OFF
+    (navigate adjacent **individual messages**, using virtual message IDs) and grouping ON
+    (navigate adjacent conversations); compare both states without forcing grouping ON. Code
+    already has ungrouped messagesPaging/ConversationIds support; check actual reader navigation,
+    WebView pointer consumption and the separate swipe setting (OFF by default). See issue #113.
   - [ ] Add regression tests and validate on Galaxy S25 Ultra with HTML/plain-text mail, on/off states,
     list boundaries, and screen recording. Do not call implemented until verified; keep issue #113 updated.
 - **FR-28 · P2 · Adjustable list density, reading typography, accessibility** — PR #45.
