@@ -85,6 +85,18 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
   - Evidence: no crash reproduced; hardening in the fr22-back PR (guarded backdrop clear, `popFrom`/`isOnTop`, FitWebView
     detach). `0196e79` only fixes Back closing the drawer, which is unrelated.
 
+- **FR-82 · P2 · Save or share complete email as `.eml`** — from a message's More (⋮) menu, provide
+  distinct **Save as .eml** (Android system Save As picker) and **Share .eml** (Android sharesheet) actions,
+  tracking implementation and verification in **[Issue #110](https://github.com/Sr-0w/Dot-Mail/issues/110)**.
+  - [ ] Export a standards-compliant RFC 5322 / MIME message with original headers, body, inline images and
+    attachments; prefer original received raw bytes so S/MIME / OpenPGP signatures or encryption are not broken.
+  - [ ] SAF destination and safe filename for saving; temporary read-only `content://` URI with correct MIME type,
+    grants and cleanup for sharing; no broad storage permissions or private filesystem paths.
+  - [ ] Handle large/uncached/offline messages with progress and explicit failure; never silently export a partial
+    mail or decrypted contents without specific consent.
+  - [ ] Verify interoperability with other mail clients, encrypted/signed mail, attachments and large messages;
+    unit/integration tests and owner S25 Ultra device test required. Issue #110 is the canonical work record.
+
 ### Inbox and lists
 
 - **FR-80 · P1 · HTML markup and raw tracking URLs leak into inbox previews** — **[Issue #108](https://github.com/Sr-0w/Dot-Mail/issues/108)** — Galaxy S25 Ultra,
