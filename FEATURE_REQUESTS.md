@@ -33,6 +33,19 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
 
 ### Reading and HTML mail
 
+- **FR-84 · P2 · Reader exit animation snaps at the end** — on Galaxy S25 Ultra the
+  transition returning from an opened mail to the inbox/list feels **abrupt during its final frames**,
+  rather than easing to a smooth stop. **[Issue #112](https://github.com/Sr-0w/Dot-Mail/issues/112)** is
+  the canonical task; related to FR-58 (motion polish) and FR-22 (Back navigation).
+  - [ ] Reproduce and capture the final frames on-device for the in-app Back button and Android
+    system Back/predictive Back; distinguish end-of-transition easing mismatch from UI/WebView
+    teardown or frame hitch.
+  - [ ] Make the exit transition settle naturally (no abrupt snap, pop, opacity/position jump or
+    flash) without slowing the whole animation or breaking reduced-motion preferences.
+  - [ ] Verify with HTML and plain-text mail, 60/120 Hz, and Light/Dark/OLED; avoid FR-22 crash
+    or FR-21 reader rendering regressions. Keep findings, PR and validation in issue #112.
+
+
 - **FR-81 · P1 · Email reader text is visibly oversized / seems zoomed by default** — owner reports on
   Galaxy S25 Ultra (2026-11-10) that the text within opened messages looks much too large, as if the
   reader applied an unwanted zoom or font scale. **[Issue #109](https://github.com/Sr-0w/Dot-Mail/issues/109)**
