@@ -97,6 +97,16 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
   - [ ] Verify interoperability with other mail clients, encrypted/signed mail, attachments and large messages;
     unit/integration tests and owner S25 Ultra device test required. Issue #110 is the canonical work record.
 
+- **FR-83 · P2 · Download/save attachments without opening them** — in the opened email, provide a
+  direct **Save / Download attachment** action on each attachment row (and in the attachment browser where
+  applicable), distinct from Open/Preview and Share. Work from **[Issue #111](https://github.com/Sr-0w/Dot-Mail/issues/111)**.
+  - [ ] Saving must launch Android's system file picker (SAF), propose the original safe filename, and write the
+    attachment bytes to the chosen location **without opening or previewing** the file; no broad storage access.
+  - [ ] If uncached, download the MIME part with sensible progress/error/offline handling; support large files
+    through streaming, plus multiple attachments and encrypted-message attachments after explicit user action.
+  - [ ] Preserve existing Open/Preview/Share behavior and Quiet UI accessibility; verify filenames, bytes and MIME
+    types in tests and on the owner's S25 Ultra. Issue #111 remains the canonical work record.
+
 ### Inbox and lists
 
 - **FR-80 · P1 · HTML markup and raw tracking URLs leak into inbox previews** — **[Issue #108](https://github.com/Sr-0w/Dot-Mail/issues/108)** — Galaxy S25 Ultra,
