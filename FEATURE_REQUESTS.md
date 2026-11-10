@@ -250,8 +250,16 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
 
 ### Reading and HTML mail
 
-- **FR-25 · P2 · Swipe between conversations in the reader** (setting, off by default; ignores Back-gesture edges, pinch,
-  vertical scroll; haptic tick). Evidence: implemented in v0.1. Device: pending.
+- **FR-25 · P1 · Swipe between conversations in the reader not working on device** — user reports that
+  horizontal swipe to next/previous message does not work (Galaxy S25 Ultra, 2026-11-10), despite the
+  feature being marked implemented in v0.1. **[Issue #113](https://github.com/Sr-0w/Dot-Mail/issues/113)**
+  is the canonical bug and verification task. The option is reportedly **off by default**.
+  - [ ] Check the installed build exposes a discoverable, persistent setting; verify whether enabling it
+    actually allows swiping both directions between adjacent items in the active list.
+  - [ ] Investigate gesture handling through HTML WebView, nested scrolling, pinch, text selection and
+    conflicts with the Android edge-Back gesture; preserve vertical scrolling and list order/filtering.
+  - [ ] Add regression tests and validate on Galaxy S25 Ultra with HTML/plain-text mail, on/off states,
+    list boundaries, and screen recording. Do not call implemented until verified; keep issue #113 updated.
 - **FR-28 · P2 · Adjustable list density, reading typography, accessibility** — PR #45.
   - [x] Compact / comfortable / spacious row metrics; reader typeface (Inter/System/Serif) and line height (plain text via
     style, HTML via CSS variables); TalkBack custom actions on rows; 48 dp quote toggle; font scale 2× tested
