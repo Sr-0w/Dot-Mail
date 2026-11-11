@@ -36,7 +36,7 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
 - **FR-85 · P1 · HTML newsletter opens as raw text and exposed/duplicated URLs** — the exact
   Les Francofolies de Spa / Mariah Carey presale email (2026-11-11, 20:40) displays as fully
   styled HTML in Samsung Email but as plain text and repeated naked URLs in Dot Mail on the
-  S25 Ultra. **[Issue #undefined](https://github.com/Sr-0w/Dot-Mail/issues/116)** is the canonical task. This is a reader-body
+  S25 Ultra. **[Issue #116](https://github.com/Sr-0w/Dot-Mail/issues/116)** is the canonical task. This is a reader-body
   failure, not just FR-80's inbox snippets; compare with FR-20 (Done HTML parity).
   - [ ] Inspect the original MIME `text/html`/`text/plain` alternatives and related inline assets;
     trace IMAP → MIME part selection → cache → sanitizer → WebView to identify the actual root cause.
@@ -45,7 +45,7 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
     embedded/CID images, fitting and reader accessibility intact.
   - [ ] Add MIME/cache/reader regression tests and **verify this same email** in Dot Mail versus
     Samsung Email on S25 Ultra (online/offline, images policy stated); record PR and evidence in
-    issue #undefined. Owner supplied side-by-side screenshots on 2026-11-11; fix/device check pending.
+    issue #116. Owner supplied side-by-side screenshots on 2026-11-11; fix/device check pending.
 
 - **FR-84 · P2 · Reader exit animation snaps at the end** — on Galaxy S25 Ultra the
   transition returning from an opened mail to the inbox/list feels **abrupt during its final frames**,
@@ -476,7 +476,7 @@ Each entry: evidence in brackets. "Device ✓" = checked on the owner's phone an
 
 ## Needs a device check (collected from the entries above)
 
-FR-85 HTML newsletter fallback / raw URLs (issue #undefined) ·
+FR-85 HTML newsletter fallback / raw URLs (issue #116) ·
 
 FR-81 reader default text scale / perceived zoom (issue #109) ·
 
