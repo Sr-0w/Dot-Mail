@@ -10,8 +10,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 
 internal data class HeaderGlass(val backdrop:Backdrop?)
-/** Short ease-out below the header: everything under the header itself is fully frosted. */
-private val FADE=40.dp
+/** Long, gentle ease-out of the blur (Grok-like): content goes from fully frosted to sharp, never darkened. */
+private val FADE=88.dp
+/** The gradient already starts this far above the bottom of the header, so there is no visible edge under the controls. */
+private val FADE_OVERLAP=20.dp
 /** Extra top inset for the list, so at rest its first row sits past most of the fade. */
 private val LIST_INSET=24.dp
 /** The blur band reaches this far past the screen's left, right and top edges, so blur edge effects happen off screen. */
@@ -43,7 +45,8 @@ fun FrostedHeaderLayout(
         // the header actually on screen, so collapsing filters shrink the strong band smoothly instead of leaving it stale.
         val total=expandedHeight+FADE+BLEED
         val visible by androidx.compose.animation.core.animateDpAsState(headerHeight,androidx.compose.animation.core.tween(if(app.dot.design.rememberReducedMotion()) 0 else 220),label="headerBlur")
-        TopEdgeFade(backdrop,1f,Modifier.align(Alignment.TopCenter).bleed(BLEED),height=total,solidUntil=((visible+BLEED)/total).coerceIn(0f,1f),fadeLength=FADE/total,edgeScrim=BLEED+visible,edgeScrimSolid=BLEED+with(density) { WindowInsets.statusBars.getTop(this).toDp() })
+        // Pure blur, no opaque/dark scrim (FR-54, #115).
+        TopEdgeFade(backdrop,1f,Modifier.align(Alignment.TopCenter).bleed(BLEED),height=total,solidUntil=((visible-FADE_OVERLAP+BLEED)/total).coerceIn(0f,1f),fadeLength=(FADE+FADE_OVERLAP)/total)
         CompositionLocalProvider(LocalHeaderGlass provides HeaderGlass(null)) {
             Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().onSizeChanged { size ->
                 with(density) { size.height.toDp() }.let {
