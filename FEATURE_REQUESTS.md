@@ -356,6 +356,8 @@ Last audit: 2026-11-08 (against `main` ff5f441, the code, the tests and the PR l
   - [x] Earlier top blur flicker/flashes while scrolling — owner accepted on device 2026-11-09 ("good enough")
   - [ ] **Top only:** remove independent black/dark/opaque gradient, vignette and color overlays;
     retain genuine frosted background blur, with clear → progressively blurred content **without darkening**.
+    Implemented 2026-11-13: page-colour veil and opaque edge scrim removed from `TopEdgeFade`; blur shaped only by a
+    longer gradient mask (Grok reference, 88 dp ease-out starting 20 dp above the header bottom). Awaiting device check.
   - [ ] **Bottom:** no blur exists or should be introduced. Do not implement a bottom-edge blur for FR-54.
   - [ ] Top blur band height/position follows collapsing/expanding inbox filter rows (actual bounds);
     avoid opaque strips, seams, clipping, flicker, or loss of status-bar legibility.

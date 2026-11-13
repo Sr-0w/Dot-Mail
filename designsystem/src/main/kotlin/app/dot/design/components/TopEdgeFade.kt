@@ -55,7 +55,10 @@ fun edgeMaskStops(solidUntil: Float, fadeLength: Float): Array<Pair<Float, Float
     val f = fadeLength.coerceAtLeast(0.01f)
     fun at(t: Float) = (s + f * t).coerceAtMost(1f)
     // Smoothstep-like ease out: no visible knee where the solid part ends.
-    return arrayOf(0f to 1f, s to 1f, at(0.2f) to 0.9f, at(0.4f) to 0.66f, at(0.6f) to 0.38f, at(0.8f) to 0.14f, at(1f) to 0f)
+    return arrayOf(
+        0f to 1f, s to 1f, at(0.1f) to 0.97f, at(0.25f) to 0.85f, at(0.4f) to 0.66f, at(0.55f) to 0.46f,
+        at(0.7f) to 0.27f, at(0.85f) to 0.11f, at(1f) to 0f,
+    )
         .distinctBy { it.first }.toTypedArray()
 }
 
@@ -80,8 +83,6 @@ fun TopEdgeFade(
     height: Dp = 32.dp,
     solidUntil: Float = 0.6f,
     fadeLength: Float = 1f - solidUntil,
-    edgeScrim: Dp = 0.dp,
-    edgeScrimSolid: Dp = 0.dp,
 ) {
     val reduced = rememberReducedMotion()
     val p = if (reduced) (if (progress > 0.001f) 1f else 0f) else progress.coerceIn(0f, 1f)
@@ -91,33 +92,10 @@ fun TopEdgeFade(
     val stops = edgeMaskStops(solidUntil, fadeLength)
     val box = modifier.fillMaxWidth().height(height).graphicsLayer { alpha = p }
     if (blur) {
-        // Neutral page-colour veil only (no accent hue); light enough that the moving blurred content stays visible.
-        val veil = androidx.compose.ui.graphics.SolidColor(bg.copy(alpha = if (Dot.colors.isDark) 0.34f else 0.42f))
-        Box(box.backdropBlur(state!!, background = bg, tint = veil, mask = maskBrush(stops, androidx.compose.ui.graphics.Color.White))
-            .edgeScrim(edgeScrim, edgeScrimSolid, bg))
+        // Pure blur (FR-54, #115): no veil, no tint, no opaque scrim. Only the gradient mask shapes it, so content goes from
+        // sharp to progressively blurred without any darkening.
+        Box(box.backdropBlur(state!!, background = bg, tint = null, mask = maskBrush(stops, androidx.compose.ui.graphics.Color.White)))
     } else {
         Box(box.background(maskBrush(stops, bg, 0.94f)))
     }
 }
-
-/**
- * Page colour over the top [height] of the band: fully opaque down to [solid] (the screen edge and status bar), then easing
- * out to clear at [height]. At the screen edge there is nothing beyond to blur, so content sliding out there changes the
- * blur abruptly; native-quality frosted bars (Grok's, for one) hide that half of the bar under an opaque page-colour
- * gradient and let the blur show only where content is genuinely passing underneath.
- */
-private fun Modifier.edgeScrim(height: Dp, solid: Dp, color: androidx.compose.ui.graphics.Color): Modifier =
-    if (height <= 0.dp) this else this.then(androidx.compose.ui.Modifier.drawWithContent {
-        drawContent()
-        val h = height.toPx().coerceAtMost(size.height)
-        val s = (solid.toPx() / h).coerceIn(0f, 0.95f)
-        drawRect(
-            Brush.verticalGradient(
-                0f to color, s to color,
-                s + (1f - s) * 0.35f to color.copy(alpha = 0.72f),
-                s + (1f - s) * 0.7f to color.copy(alpha = 0.30f),
-                1f to color.copy(alpha = 0f), endY = h,
-            ),
-            size = androidx.compose.ui.geometry.Size(size.width, h),
-        )
-    })
